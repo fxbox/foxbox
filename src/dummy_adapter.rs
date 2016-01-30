@@ -4,7 +4,7 @@
 
 use context::SharedContext;
 use events::*;
-use iron::{Iron, Request, Response, IronResult};
+use iron::{Request, Response, IronResult};
 use iron::headers::ContentType;
 use iron::status::Status;
 use router::Router;
@@ -16,27 +16,25 @@ use uuid::Uuid;
 struct DummyService {
     properties: ServiceProperties,
     sender: EventSender,
-    context: SharedContext,
-    dontKill: bool
+    dont_kill: bool
 }
 
 impl DummyService {
     fn new(sender: EventSender, context: SharedContext, id: u32) -> DummyService {
         println!("Creating dummy service");
-        let mut ctxClone = context.clone();
-        let ctx = ctxClone.lock().unwrap();
-        let serviceId = Uuid::new_v4().to_simple_string();
+        let ctx_clone = context.clone();
+        let ctx = ctx_clone.lock().unwrap();
+        let service_id = Uuid::new_v4().to_simple_string();
         DummyService {
             properties: ServiceProperties {
-                id: serviceId.clone(),
+                id: service_id.clone(),
                 name: "dummy service".to_string(),
                 description: "really nothing to see".to_string(),
-                http_url: format!("http://{}:{}/services/{}/", ctx.hostname, ctx.http_port, serviceId),
-                ws_url: format!("ws://{}:{}/services/{}/", ctx.hostname, ctx.http_port, serviceId)
+                http_url: format!("http://{}:{}/services/{}/", ctx.hostname, ctx.http_port, service_id),
+                ws_url: format!("ws://{}:{}/services/{}/", ctx.hostname, ctx.http_port, service_id)
             },
             sender: sender,
-            context: context,
-            dontKill: id % 3 == 0
+            dont_kill: id % 3 == 0
         }
     }
 }
@@ -57,7 +55,7 @@ impl Service for DummyService {
     fn start(&self) {
         let sender = self.sender.clone();
         let props = self.properties.clone();
-        let canKill = !self.dontKill.clone();
+        let can_kill = !self.dont_kill.clone();
         thread::spawn(move || {
             println!("Hello from dummy service thread!");
             let mut i = 0;
@@ -65,11 +63,11 @@ impl Service for DummyService {
                 thread::sleep(Duration::from_millis(1000));
                 println!("Bip #{} from {}", i, props.id);
                 i += 1;
-                if i == 3 && canKill {
+                if i == 3 && can_kill {
                     break;
                 }
             }
-            sender.send(EventData::ServiceStop { id: props.id.to_string() });
+            sender.send(EventData::ServiceStop { id: props.id.to_string() }).unwrap();
         });
     }
 
@@ -114,16 +112,16 @@ impl ServiceAdapter for DummyAdapter {
         let mut id = 0;
         let context = self.context.clone();
         thread::spawn(move || {
-            sender.send(EventData::AdapterStart { name: "Dummy Service Adapter".to_string() });
+            sender.send(EventData::AdapterStart { name: "Dummy Service Adapter".to_string() }).unwrap();
             loop {
                 thread::sleep(Duration::from_millis(2000));
                 id += 1;
                 let service = DummyService::new(sender.clone(), context.clone(), id);
-                let sId = service.get_properties().id;
+                let service_id = service.get_properties().id;
                 service.start();
                 let mut ctx = context.lock().unwrap();
-                ctx.services.insert(sId.clone(), Box::new(service));
-                sender.send(EventData::ServiceStart { id: sId });
+                ctx.services.insert(service_id.clone(), Box::new(service));
+                sender.send(EventData::ServiceStart { id: service_id }).unwrap();
 
                 // Create at most 5 dummy services.
                 if id == 5 {
