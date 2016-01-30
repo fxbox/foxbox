@@ -1,5 +1,5 @@
 FoxBox
 ======
 
-[![Build Status](https://secure.travis-ci.org/foxbox/foxbox.svg?branch=master)](https://travis-ci.org/foxbox/foxbox)
+[![Build Status](https://travis-ci.org/fabricedesre/foxbox.svg?branch=master)](https://travis-ci.org/fabricedesre/foxbox)
 [![License](https://img.shields.io/badge/license-MPL2-blue.svg)](https://raw.githubusercontent.com/foxbox/foxbox/master/LICENSE)
