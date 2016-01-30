@@ -1,0 +1,17 @@
+[package]
+name = "foxbox"
+version = "0.1.0"
+authors = ["fabrice <fabrice@desre.org>"]
+
+[dependencies]
+getopts = "*"
+iron = "*"
+mio = "*"
+mount = "*"
+router = "*"
+staticfile = "*"
+websocket = "*"
+serde = "*"
+serde_json = "*"
+serde_macros = "*"
+uuid = "*"
