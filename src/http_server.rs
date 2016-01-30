@@ -11,6 +11,7 @@ use iron::status::Status;
 use mount::Mount;
 use router::Router;
 use staticfile::Static;
+use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::thread;
 
@@ -27,8 +28,6 @@ impl HttpServer {
     }
 
     pub fn start(&self) {
-
-        let server = "localhost:3000";
         let mut router = Router::new();
 
         let context1 = self.context.clone();
@@ -69,9 +68,14 @@ impl HttpServer {
         mount.mount("/", Static::new(Path::new("static")))
              .mount("/services", router);
 
+        let threadContext = self.context.clone();
+        let mut ctx = threadContext.lock().unwrap();
+        let addrs: Vec<_> =
+            (ctx.hostname.as_str(), ctx.http_port).to_socket_addrs().unwrap().collect();
+
         thread::Builder::new().name("HttpServer".to_string())
                               .spawn(move || {
-            Iron::new(mount).http(server).unwrap();
+            Iron::new(mount).http(addrs[0]).unwrap();
         });
     }
 }

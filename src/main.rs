@@ -24,6 +24,7 @@ mod http_server;
 mod service;
 mod controler;
 
+use context::Context;
 use controler::Controler;
 use core::borrow::BorrowMut;
 use getopts::Options;
@@ -40,6 +41,7 @@ fn main() {
 
     let mut opts = Options::new();
     opts.optflag("v", "verbose", "Toggle verbose output");
+    opts.optopt("n", "name", "Set local host name", "HOSTNAME");
     opts.optflag("h", "help", "Print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => { m }
@@ -57,7 +59,9 @@ fn main() {
 
     let sender = event_loop.channel();
 
-    let mut controler = Controler::new(sender, matches.opt_present("v"));
+    let context = Context::shared(matches.opt_present("v"),
+                                  matches.opt_str("n"));
+    let mut controler = Controler::new(sender, context);
     controler.start();
 
     event_loop.run(controler.borrow_mut());

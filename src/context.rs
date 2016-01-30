@@ -9,18 +9,22 @@ use std::sync::{ Arc, Mutex };
 // The `global` context available to all.
 pub struct Context {
     pub verbose: bool,
-    pub services: HashMap<String, Box<Service>>
+    pub services: HashMap<String, Box<Service>>,
+    pub hostname: String,
+    pub http_port: u16
 }
 
 pub type SharedContext = Arc<Mutex<Context>>;
 
 impl Context {
-    pub fn new(verbose: bool) -> Context {
+    pub fn new(verbose: bool, hostname: Option<String>) -> Context {
         Context { services: HashMap::new(),
-                  verbose: verbose }
+                  verbose: verbose,
+                  hostname:  hostname.unwrap_or("localhost".to_string()),
+              	  http_port: 3000 }
     }
 
-    pub fn shared(verbose: bool) -> SharedContext {
-        Arc::new(Mutex::new(Context::new(verbose)))
+    pub fn shared(verbose: bool, hostname: Option<String>) -> SharedContext {
+        Arc::new(Mutex::new(Context::new(verbose, hostname)))
     }
 }

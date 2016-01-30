@@ -16,11 +16,12 @@ use uuid::Uuid;
 struct DummyService {
     properties: ServiceProperties,
     sender: EventSender,
+    context: SharedContext,
     dontKill: bool
 }
 
 impl DummyService {
-    fn new(sender: EventSender, id: u32) -> DummyService {
+    fn new(sender: EventSender, context: SharedContext, id: u32) -> DummyService {
         println!("Creating dummy service");
         DummyService {
             properties: ServiceProperties {
@@ -31,6 +32,7 @@ impl DummyService {
                 ws_url: format!("/services/dummy{}/", id)
             },
             sender: sender,
+            context: context,
             dontKill: id % 3 == 0
         }
     }
@@ -113,7 +115,7 @@ impl ServiceAdapter for DummyAdapter {
             loop {
                 thread::sleep(Duration::from_millis(2000));
                 id += 1;
-                let service = DummyService::new(sender.clone(), id);
+                let service = DummyService::new(sender.clone(), context.clone(), id);
                 let sId = service.get_properties().id;
                 service.start();
                 let mut ctx = context.lock().unwrap();

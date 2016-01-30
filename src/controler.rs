@@ -4,7 +4,7 @@
 
 extern crate mio;
 
-use context::{ Context, SharedContext };
+use context::SharedContext;
 use dummy_adapter::DummyAdapter;
 use events::*;
 use http_server::HttpServer;
@@ -23,10 +23,10 @@ impl Controler {
     /// # use service_manager::Controler;
     /// let controler = Controller::new();
     /// ```
-    pub fn new(sender: EventSender, verbose: bool) -> Controler {
+    pub fn new(sender: EventSender, context: SharedContext) -> Controler {
         Controler {
             sender: sender,
-            context: Context::shared(verbose)
+            context: context
         }
     }
 
