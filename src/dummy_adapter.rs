@@ -23,13 +23,16 @@ struct DummyService {
 impl DummyService {
     fn new(sender: EventSender, context: SharedContext, id: u32) -> DummyService {
         println!("Creating dummy service");
+        let mut ctxClone = context.clone();
+        let ctx = ctxClone.lock().unwrap();
+        let serviceId = Uuid::new_v4().to_simple_string();
         DummyService {
             properties: ServiceProperties {
-                id: Uuid::new_v4().to_simple_string(),
+                id: serviceId.clone(),
                 name: "dummy service".to_string(),
                 description: "really nothing to see".to_string(),
-                http_url: format!("/services/dummy{}/", id),
-                ws_url: format!("/services/dummy{}/", id)
+                http_url: format!("http://{}:{}/services/{}/", ctx.hostname, ctx.http_port, serviceId),
+                ws_url: format!("ws://{}:{}/services/{}/", ctx.hostname, ctx.http_port, serviceId)
             },
             sender: sender,
             context: context,
