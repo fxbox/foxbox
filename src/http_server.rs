@@ -9,7 +9,6 @@ use iron::status::Status;
 use mount::Mount;
 use router::Router;
 use staticfile::Static;
-use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::thread;
 
@@ -63,8 +62,7 @@ impl HttpServer {
 
         let thread_context = self.context.clone();
         let ctx = thread_context.lock().unwrap();
-        let addrs: Vec<_> =
-            (ctx.hostname.as_str(), ctx.http_port).to_socket_addrs().unwrap().collect();
+        let addrs: Vec<_> = ctx.http_as_addrs().unwrap().collect();
 
         thread::Builder::new().name("HttpServer".to_string())
                               .spawn(move || {

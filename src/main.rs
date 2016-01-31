@@ -6,6 +6,9 @@
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
 
+// Needed for IntoIter in context.rs
+#![feature(collections)]
+
 extern crate core;
 extern crate getopts;
 #[macro_use]

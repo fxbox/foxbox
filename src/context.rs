@@ -3,16 +3,22 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 extern crate serde_json;
+extern crate collections;
 
+use self::collections::vec::IntoIter;
 use service::Service;
 use std::collections::HashMap;
+use std::io::Error;
+use std::net::SocketAddr;
+use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex };
 
 // The `global` context available to all.
 pub struct Context {
     pub verbose: bool,
-    pub hostname: String,
-    pub http_port: u16,
+    hostname: String,
+    http_port: u16,
+    ws_port: u16,
 
     services: HashMap<String, Box<Service>>
 }
@@ -24,7 +30,8 @@ impl Context {
         Context { services: HashMap::new(),
                   verbose: verbose,
                   hostname:  hostname.unwrap_or("localhost".to_string()),
-                  http_port: 3000 }
+                  http_port: 3000,
+                  ws_port: 4000 }
     }
 
     pub fn shared(verbose: bool, hostname: Option<String>) -> SharedContext {
@@ -50,5 +57,17 @@ impl Context {
 
     pub fn services_as_json(&self) -> Result<String, serde_json::error::Error> {
         serde_json::to_string(&self.services)
+    }
+
+    pub fn get_http_root_for_service(&self, service_id: String) -> String {
+        format!("http://{}:{}/services/{}/", self.hostname, self.http_port, service_id)
+    }
+
+    pub fn get_ws_root_for_service(&self, service_id: String) -> String {
+        format!("ws://{}:{}/services/{}/", self.hostname, self.ws_port, service_id)
+    }
+
+    pub fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error> {
+        (self.hostname.as_str(), self.http_port).to_socket_addrs()
     }
 }

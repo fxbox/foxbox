@@ -4,7 +4,7 @@
 
 use context::SharedContext;
 use events::*;
-use iron::{Request, Response, IronResult};
+use iron::{ Request, Response, IronResult };
 use iron::headers::ContentType;
 use iron::status::Status;
 use router::Router;
@@ -30,8 +30,8 @@ impl DummyService {
                 id: service_id.clone(),
                 name: "dummy service".to_string(),
                 description: "really nothing to see".to_string(),
-                http_url: format!("http://{}:{}/services/{}/", ctx.hostname, ctx.http_port, service_id),
-                ws_url: format!("ws://{}:{}/services/{}/", ctx.hostname, ctx.http_port, service_id)
+                http_url: ctx.get_http_root_for_service(service_id.clone()),
+                ws_url: ctx.get_ws_root_for_service(service_id)
             },
             sender: sender,
             dont_kill: id % 3 == 0
@@ -41,7 +41,7 @@ impl DummyService {
 
 impl Drop for DummyService {
     fn drop(&mut self) {
-        println!("Droping DummyService {}", self.properties.id);
+        println!("!! Droping DummyService {}", self.properties.id);
     }
 }
 
@@ -50,7 +50,7 @@ impl Service for DummyService {
         self.properties.clone()
     }
 
-    // Starts the service, it will just spawn a thread and get messages once
+    // Starts the service, it will just spawn a thread and send messages once
     // in a while.
     fn start(&self) {
         let sender = self.sender.clone();
@@ -75,8 +75,8 @@ impl Service for DummyService {
         println!("Stopping dummy service");
     }
 
-    // Processes a request.
-    fn process_request(&self, req: &    Request) -> IronResult<Response> {
+    // Processes a http request.
+    fn process_request(&self, req: &Request) -> IronResult<Response> {
         let cmd = req.extensions.get::<Router>().unwrap().find("command").unwrap_or("");
         let mut response = Response::with(format!("Got command {} at url {}", cmd, req.url));
         response.status = Some(Status::Ok);
