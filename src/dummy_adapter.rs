@@ -123,8 +123,8 @@ impl ServiceAdapter for DummyAdapter {
                 ctx.add_service(Box::new(service));
                 sender.send(EventData::ServiceStart { id: service_id }).unwrap();
 
-                // Create at most 5 dummy services.
-                if id == 5 {
+                // Create at most 7 dummy services.
+                if id == 7 {
                     break;
                 }
             }
