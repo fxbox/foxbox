@@ -55,6 +55,13 @@ impl mio::Handler for Controler {
         let mut context = self.context.lock().unwrap();
         match data {
             EventData::ServiceStart { id } => {
+                // The service should be added already, panic if that's not the
+                // case.
+                match context.get_service(&id) {
+                    None => panic!(format!("Missing service with id {}", id)),
+                    Some(_) => {}
+                }
+
                 println!("ServiceStart {} We now have {} services.", id, context.services_count());
             }
             EventData::ServiceStop { id } => {
