@@ -16,10 +16,10 @@ use std::sync::{ Arc, Mutex };
 // The `global` context available to all.
 pub struct Context {
     pub verbose: bool,
+
     hostname: String,
     http_port: u16,
     ws_port: u16,
-
     services: HashMap<String, Box<Service>>
 }
 
