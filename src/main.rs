@@ -64,5 +64,5 @@ fn main() {
     let mut controler = Controler::new(sender, context);
     controler.start();
 
-    event_loop.run(controler.borrow_mut());
+    event_loop.run(controler.borrow_mut()).unwrap();
 }
