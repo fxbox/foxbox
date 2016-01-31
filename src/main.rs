@@ -58,14 +58,17 @@ fn main() {
         return;
     }
 
-    let mut event_loop = mio::EventLoop::new().unwrap();
+    if let Ok(mut event_loop) = mio::EventLoop::new() {
+        let sender = event_loop.channel();
 
-    let sender = event_loop.channel();
+        let context = Context::shared(matches.opt_present("v"),
+                                      matches.opt_str("n"));
+        let mut controler = Controler::new(sender, context);
+        controler.start();
 
-    let context = Context::shared(matches.opt_present("v"),
-                                  matches.opt_str("n"));
-    let mut controler = Controler::new(sender, context);
-    controler.start();
-
-    event_loop.run(controler.borrow_mut()).unwrap();
+        event_loop.run(controler.borrow_mut())
+                  .unwrap_or_else(|_| {  panic!("Starting the event loop failed!"); });
+    } else {
+        panic!("Creating the event loop failed!");
+    }
 }
