@@ -18,7 +18,7 @@ pub struct ServiceProperties {
     pub ws_url: String
 }
 
-pub trait Service : Drop + Send {
+pub trait Service : Send {
     fn get_properties(&self) -> ServiceProperties;
     fn start(&self);
     fn stop(&self);

@@ -39,12 +39,6 @@ impl DummyService {
     }
 }
 
-impl Drop for DummyService {
-    fn drop(&mut self) {
-        println!("!! Droping DummyService {}", self.properties.id);
-    }
-}
-
 impl Service for DummyService {
     fn get_properties(&self) -> ServiceProperties {
         self.properties.clone()
