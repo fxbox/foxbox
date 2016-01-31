@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-extern crate serde_json;
-
 use context::SharedContext;
 use iron::{Iron, Request, Response, IronResult};
 use iron::headers::ContentType;
@@ -34,8 +32,7 @@ impl HttpServer {
         router.get("list.json", move |req: &mut Request| -> IronResult<Response> {
             // Build a json representation of the services.
             let mut ctx = context1.lock().unwrap();
-            let ref services = ctx.services;
-            let serialized = itry!(serde_json::to_string(services));
+            let serialized = itry!(ctx.services_as_json());
 
             let mut response = Response::with(serialized);
             response.status = Some(Status::Ok);
@@ -48,10 +45,9 @@ impl HttpServer {
         router.get(":service/:command", move |req: &mut Request| -> IronResult<Response> {
             // Call a function on a service.
             let mut ctx = context2.lock().unwrap();
-            let ref services = ctx.services;
 
             let id = req.extensions.get::<Router>().unwrap().find("service").unwrap_or("");
-            match services.get(id) {
+            match ctx.get_service(id) {
                 None => {
                     let mut response = Response::with(format!("No Such Service : {}", id));
                     response.status = Some(Status::BadRequest);

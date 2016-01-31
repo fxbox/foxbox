@@ -120,7 +120,7 @@ impl ServiceAdapter for DummyAdapter {
                 let service_id = service.get_properties().id;
                 service.start();
                 let mut ctx = context.lock().unwrap();
-                ctx.services.insert(service_id.clone(), Box::new(service));
+                ctx.add_service(Box::new(service));
                 sender.send(EventData::ServiceStart { id: service_id }).unwrap();
 
                 // Create at most 5 dummy services.

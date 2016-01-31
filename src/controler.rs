@@ -62,11 +62,11 @@ impl mio::Handler for Controler {
         let mut context = self.context.lock().unwrap();
         match data {
             EventData::ServiceStart { id } => {
-                println!("ServiceStart {} We now have {} services.", id, context.services.len());
+                println!("ServiceStart {} We now have {} services.", id, context.services_count());
             }
             EventData::ServiceStop { id } => {
-                context.services.remove(&id);
-                println!("ServiceStop {} We now have {} services.", id, context.services.len());
+                context.remove_service(id.clone());
+                println!("ServiceStop {} We now have {} services.", id, context.services_count());
             }
             _ => { }
         }
