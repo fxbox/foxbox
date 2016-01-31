@@ -8,7 +8,7 @@ use context::SharedContext;
 use dummy_adapter::DummyAdapter;
 use events::*;
 use http_server::HttpServer;
-use mio::{ EventLoop, EventSet, Token };
+use mio::EventLoop;
 use service::{ Service, ServiceAdapter };
 
 pub struct Controler {
@@ -47,15 +47,8 @@ impl mio::Handler for Controler {
     type Timeout = ();
     type Message = EventData;
 
-    fn ready(&mut self,
-             event_loop: &mut EventLoop<Controler>,
-             token: Token,
-             events: EventSet) {
-        println!("Receiving a fd event!");
-    }
-
     fn notify(&mut self,
-              event_loop: &mut EventLoop<Controler>,
+              _: &mut EventLoop<Controler>,
               data: EventData) {
         println!("Receiving a notification! {}", data.description());
 
