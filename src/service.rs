@@ -4,7 +4,7 @@
 
 extern crate serde;
 
-use iron::{Iron, Request, Response, IronResult};
+use iron::{Request, Response, IronResult};
 use self::serde::ser::{ Serialize, Serializer };
 
 pub type ServiceID = String;
