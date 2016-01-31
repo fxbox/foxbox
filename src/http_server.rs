@@ -14,24 +14,21 @@ use std::path::Path;
 use std::thread;
 
 pub struct HttpServer {
-    context: SharedContext,
-    router: Router
+    context: SharedContext
 }
 
 impl HttpServer {
     pub fn new(context: SharedContext) -> HttpServer {
-        let mut router = Router::new();
-        HttpServer { context: context,
-                     router: router }
+        HttpServer { context: context }
     }
 
     pub fn start(&self) {
         let mut router = Router::new();
 
         let context1 = self.context.clone();
-        router.get("list.json", move |req: &mut Request| -> IronResult<Response> {
+        router.get("list.json", move |_: &mut Request| -> IronResult<Response> {
             // Build a json representation of the services.
-            let mut ctx = context1.lock().unwrap();
+            let ctx = context1.lock().unwrap();
             let serialized = itry!(ctx.services_as_json());
 
             let mut response = Response::with(serialized);
@@ -44,7 +41,7 @@ impl HttpServer {
         let context2 = self.context.clone();
         router.get(":service/:command", move |req: &mut Request| -> IronResult<Response> {
             // Call a function on a service.
-            let mut ctx = context2.lock().unwrap();
+            let ctx = context2.lock().unwrap();
 
             let id = req.extensions.get::<Router>().unwrap().find("service").unwrap_or("");
             match ctx.get_service(id) {
@@ -64,14 +61,14 @@ impl HttpServer {
         mount.mount("/", Static::new(Path::new("static")))
              .mount("/services", router);
 
-        let threadContext = self.context.clone();
-        let mut ctx = threadContext.lock().unwrap();
+        let thread_context = self.context.clone();
+        let ctx = thread_context.lock().unwrap();
         let addrs: Vec<_> =
             (ctx.hostname.as_str(), ctx.http_port).to_socket_addrs().unwrap().collect();
 
         thread::Builder::new().name("HttpServer".to_string())
                               .spawn(move || {
             Iron::new(mount).http(addrs[0]).unwrap();
-        });
+        }).unwrap();
     }
 }
