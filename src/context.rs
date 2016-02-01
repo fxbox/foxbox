@@ -23,23 +23,25 @@ pub struct Context {
     services: HashMap<String, Box<Service>>
 }
 
-const DEFAULT_HTTP_PORT: u16 = 3000;
-const DEFAULT_WS_PORT: u16 = 4000;
+const DEFAULT_HTTP_PORT: &'static str = "3000";
+const DEFAULT_WS_PORT: &'static str = "4000";
 const DEFAULT_HOSTNAME: &'static str = "0.0.0.0";
 
 pub type SharedContext = Arc<Mutex<Context>>;
 
 impl Context {
-    pub fn new(verbose: bool, hostname: Option<String>) -> Context {
+    pub fn new(verbose: bool, hostname: Option<String>,
+               http_port: Option<String>, ws_port: Option<String>) -> Context {
         Context { services: HashMap::new(),
                   verbose: verbose,
                   hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_string()),
-                  http_port: DEFAULT_HTTP_PORT,
-                  ws_port: DEFAULT_WS_PORT }
+                  http_port: http_port.unwrap_or(DEFAULT_HTTP_PORT.to_string()).parse::<u16>().unwrap(),
+                  ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT.to_string()).parse::<u16>().unwrap() }
     }
 
-    pub fn shared(verbose: bool, hostname: Option<String>) -> SharedContext {
-        Arc::new(Mutex::new(Context::new(verbose, hostname)))
+    pub fn shared(verbose: bool, hostname: Option<String>,
+                  http_port:Option<String>, ws_port:Option<String>) -> SharedContext {
+        Arc::new(Mutex::new(Context::new(verbose, hostname, http_port, ws_port)))
     }
 
     pub fn add_service(&mut self, service: Box<Service>) {

@@ -45,6 +45,8 @@ fn main() {
     let mut opts = Options::new();
     opts.optflag("v", "verbose", "Toggle verbose output");
     opts.optopt("n", "name", "Set local host name", "HOSTNAME");
+    opts.optopt("p", "http-port", "Set port to listen on for http connections", "HTTP_PORT");
+    opts.optopt("w", "ws-port", "Set port to listen on for web services", "WS_PORT");
     opts.optflag("h", "help", "Print this help menu");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => { m }
@@ -62,7 +64,9 @@ fn main() {
         let sender = event_loop.channel();
 
         let context = Context::shared(matches.opt_present("v"),
-                                      matches.opt_str("n"));
+                                      matches.opt_str("n"),
+                                      matches.opt_str("p"),
+                                      matches.opt_str("w"),);
         let mut controler = Controler::new(sender, context);
         controler.start();
 
