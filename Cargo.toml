@@ -6,7 +6,7 @@ authors = ["fabrice <fabrice@desre.org>"]
 [dependencies]
 getopts = "*"
 iron = "*"
-mio = "*"
+mio = { git = "https://github.com/carllerche/mio.git" }
 mount = "*"
 router = "*"
 staticfile = "*"
