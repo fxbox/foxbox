@@ -25,7 +25,7 @@ pub struct Context {
 
 const DEFAULT_HTTP_PORT: u16 = 3000;
 const DEFAULT_WS_PORT: u16 = 4000;
-const DEFAULT_HOSTNAME: &'static str = "localhost";
+const DEFAULT_HOSTNAME: &'static str = "0.0.0.0";
 
 pub type SharedContext = Arc<Mutex<Context>>;
 
