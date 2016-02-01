@@ -23,15 +23,19 @@ pub struct Context {
     services: HashMap<String, Box<Service>>
 }
 
+const DEFAULT_HTTP_PORT: u16 = 3000;
+const DEFAULT_WS_PORT: u16 = 4000;
+const DEFAULT_HOSTNAME: &'static str = "localhost";
+
 pub type SharedContext = Arc<Mutex<Context>>;
 
 impl Context {
     pub fn new(verbose: bool, hostname: Option<String>) -> Context {
         Context { services: HashMap::new(),
                   verbose: verbose,
-                  hostname:  hostname.unwrap_or("localhost".to_string()),
-                  http_port: 3000,
-                  ws_port: 4000 }
+                  hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_string()),
+                  http_port: DEFAULT_HTTP_PORT,
+                  ws_port: DEFAULT_WS_PORT }
     }
 
     pub fn shared(verbose: bool, hostname: Option<String>) -> SharedContext {
