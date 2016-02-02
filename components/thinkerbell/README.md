@@ -49,8 +49,8 @@ Output device:
 
 > In this Highschool, when a wifi/broadband-enabled device enters or
 > is turned on in the exam perimeter, send a message to the desktop
-> server. For clarity, the message should tell which detector found
-> out about the 
+> server. Give as much detail as possible on where the device is, so
+> that the teachers can come and frown at offending student.
 
 TBD
 
