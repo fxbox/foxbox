@@ -21,6 +21,12 @@ Input devices:
 Output device:
 * all heaters (not a single IoT device, rather a set of devices).
 
+Additional notes:
+* we need to represent time efficiently, e.g. not hammer ourselves
+every ms;
+* we need to be able to access fields such as
+  time-of-day-in-current-timezone.
+
 ### Oven safety
 
 > When I leave the house, if the oven is on, send me a message and
@@ -90,6 +96,13 @@ TBD
 
 > If there are no more cookies on the shelves of the store, send a
 > message to the manager. Don't do this more than once per hour.
+
+TBD
+
+### Art museum painting protectors
+
+> Light sensors detect use of flash. If a flash is detected, ring an
+> annoying sound.
 
 TBD
 
