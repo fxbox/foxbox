@@ -49,7 +49,8 @@ Output device:
 
 > In this Highschool, when a wifi/broadband-enabled device enters or
 > is turned on in the exam perimeter, send a message to the desktop
-> server.
+> server. For clarity, the message should tell which detector found
+> out about the 
 
 TBD
 
@@ -75,8 +76,6 @@ TBD
 
 ## See also
 
-* [http://www.libelium.com/top_50_iot_sensor_applications_ranking/](More
-  applications of sensors)
-* [https://temboo.com/iot-applications](More applications)
-* [https://en.wikipedia.org/wiki/Internet_of_Things#Applications](And
-   on Wikipedia)
+* [More applications of sensors ](http://www.libelium.com/top_50_iot_sensor_applications_ranking/)
+* [More applications](https://temboo.com/iot-applications)
+* [And on Wikipedia](https://en.wikipedia.org/wiki/Internet_of_Things#Applications)
