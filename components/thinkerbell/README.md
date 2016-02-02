@@ -23,15 +23,20 @@ Output device:
 
 ### Oven safety
 
-> When I leave the house, if the oven is on, send me a message.
+> When I leave the house, if the oven is on, send me a message and
+> sound a pre-recorded message on the speaker close to the door.
 
 Input devices:
 * something that will tell the FoxBox that nobody is home. Perhaps an door-opened detector. Perhaps the owner's cellphone;
 * the oven's on/off state.
 
-Output device:
+Output devices:
 * message sender (using Firefox Accounts rather than a real IoT
-  device, but we should be able to behave as if it was)
+  device, but we should be able to behave as if it was);
+* device that can play sound.
+
+Additional note:
+* do we want to send an entire sound file to the sound-playing device?
 
 ### Light setter
 
@@ -45,6 +50,11 @@ Input devices:
 Output device:
 * all lights (not a single IoT device, rather a set of devices).
 
+Additional note:
+* this app is not useful all year round, so we need a simple way to
+  turn the app on/off from the remote control, without necessarily
+  uninstalling it.
+
 ### Smart Device detector
 
 > In this Highschool, when a wifi/broadband-enabled device enters or
@@ -52,7 +62,16 @@ Output device:
 > server. Give as much detail as possible on where the device is, so
 > that the teachers can come and frown at offending student.
 
-TBD
+Input devices:
+* wifi detectors;
+* broadband detectors.
+
+Output device:
+* message sender;
+
+Additional notes:
+* we want to be able to send data on *which* sensor informed us;
+* we need to be able to send messages.
 
 ### Pollution monitor
 
