@@ -1,13 +1,17 @@
-/// Basic structure of a Monitor (aka Server App)
+/// Basic structure of a Monitor (aka Server App, aka wtttttt)
 ///
-/// Monitors can be defined using a simple IFTTT-style UX, installed
-/// from the web from a master device (i.e. the user's cellphone or
-/// smart tv).
+/// Monitors are designed so that the FoxBox can offer a simple
+/// IFTTT-style Web UX to let users write their own scripts. More
+/// complex monitors can installed from the web from a master device
+/// (i.e. the user's cellphone or smart tv).
 ///
 ///
 /// # Example
 ///
 /// "During the night, reduce the temperature of heaters to x degress."
+///
+/// Condition: Time-of-day > 9pm OR Time-of-day < 7am
+/// Execute: Temperature-of-heater-1
 ///
 ///
 /// # Example
@@ -130,6 +134,6 @@ struct Command {
     /// path + method + JSON format.
     api: API,
 
-    arguments: Map<String, Option<Operand>>
+    arguments: Map<String, Option<Expression>>
 }
 
