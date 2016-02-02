@@ -49,17 +49,25 @@ Additional note:
 > When the motion detector hasn't seen any movement in 10 minutes,
 > turn off the lignts.
 
+This one actually needs several triggers.
+
+1. When the motion detector stops seeing movement, start 10 minutes countdown.
+2. When the motion detector starts seeing movement, stop 10 minutes countdown.
+3. When 10 minutes countdown complete, turn off the lights.
+
 Input devices:
-* motion detector (note that we are interested in metadata, not current data);
-* current time of day (again, not an actual sensor/IoT device).
+* motion detector (start/stop);
+* 10 minutes countdown (complete).
 
 Output device:
+* 10 minutes countdown (start/stop);
 * all lights (not a single IoT device, rather a set of devices).
 
-Additional note:
-* this app is not useful all year round, so we need a simple way to
-  turn the app on/off from the remote control, without necessarily
-  uninstalling it.
+Additional notes:
+* since the 10 minute countdown is a pseudo-device, we don't need a
+  special way to identify it;
+* apps are sandboxed, so the countdown can only be seen by this app;
+* we do not need to store any state in the app.
 
 ### Smart Device detector
 
@@ -103,6 +111,12 @@ TBD
 
 > Light sensors detect use of flash. If a flash is detected, ring an
 > annoying sound.
+
+TBD
+
+# How can we handle a server upgrade?
+
+We may need to save some state on behalf of the apps.
 
 TBD
 
