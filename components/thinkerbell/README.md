@@ -77,6 +77,6 @@ TBD
 
 * [http://www.libelium.com/top_50_iot_sensor_applications_ranking/](More
   applications of sensors)
- * [https://temboo.com/iot-applications](More applications)
- * [https://en.wikipedia.org/wiki/Internet_of_Things#Applications](And
+* [https://temboo.com/iot-applications](More applications)
+* [https://en.wikipedia.org/wiki/Internet_of_Things#Applications](And
    on Wikipedia)
