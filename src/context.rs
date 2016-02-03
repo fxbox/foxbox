@@ -33,7 +33,7 @@ impl Context {
     pub fn new(verbose: bool, hostname: Option<String>) -> Context {
         Context { services: HashMap::new(),
                   verbose: verbose,
-                  hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
+                  hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_string()),
                   http_port: DEFAULT_HTTP_PORT,
                   ws_port: DEFAULT_WS_PORT }
     }
@@ -101,9 +101,8 @@ fn test_should_add_a_service() {
         }
     }
 
-    let hostname: Option<String> = Some("localhost".to_string());
     let service = ServiceStub;
-    let mut foo = Context::new(false, hostname);
+    let mut foo = Context::new(false, Some("localhost".to_owned()));
 
     assert_eq!(foo.services.is_empty(), true);
     foo.add_service(Box::new(service));
