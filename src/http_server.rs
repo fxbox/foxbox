@@ -64,7 +64,7 @@ impl HttpServer {
         let ctx = thread_context.lock().unwrap();
         let addrs: Vec<_> = ctx.http_as_addrs().unwrap().collect();
 
-        thread::Builder::new().name("HttpServer".to_string())
+        thread::Builder::new().name("HttpServer".to_owned())
                               .spawn(move || {
             Iron::new(mount).http(addrs[0]).unwrap();
         }).unwrap();
