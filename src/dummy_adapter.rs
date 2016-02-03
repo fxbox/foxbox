@@ -28,8 +28,8 @@ impl DummyService {
         DummyService {
             properties: ServiceProperties {
                 id: service_id.clone(),
-                name: "dummy service".to_string(),
-                description: "really nothing to see".to_string(),
+                name: "dummy service".to_owned(),
+                description: "really nothing to see".to_owned(),
                 http_url: ctx.get_http_root_for_service(service_id.clone()),
                 ws_url: ctx.get_ws_root_for_service(service_id)
             },
@@ -49,7 +49,7 @@ impl Service for DummyService {
     fn start(&self) {
         let sender = self.sender.clone();
         let props = self.properties.clone();
-        let can_kill = !self.dont_kill.clone();
+        let can_kill = !self.dont_kill;
         thread::spawn(move || {
             println!("Hello from dummy service thread!");
             let mut i = 0;
@@ -89,7 +89,7 @@ impl DummyAdapter {
     pub fn new(sender: EventSender,
            context: SharedContext) -> DummyAdapter {
         println!("Creating dummy adapter");
-        DummyAdapter { name: "DummyAdapter".to_string(),
+        DummyAdapter { name: "DummyAdapter".to_owned(),
                        sender: sender,
                        context: context
                      }
@@ -106,7 +106,7 @@ impl ServiceAdapter for DummyAdapter {
         let mut id = 0;
         let context = self.context.clone();
         thread::spawn(move || {
-            sender.send(EventData::AdapterStart { name: "Dummy Service Adapter".to_string() }).unwrap();
+            sender.send(EventData::AdapterStart { name: "Dummy Service Adapter".to_owned() }).unwrap();
             loop {
                 thread::sleep(Duration::from_millis(2000));
                 id += 1;
