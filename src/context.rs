@@ -33,7 +33,7 @@ impl Context {
     pub fn new(verbose: bool, hostname: Option<String>) -> Context {
         Context { services: HashMap::new(),
                   verbose: verbose,
-                  hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_string()),
+                  hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
                   http_port: DEFAULT_HTTP_PORT,
                   ws_port: DEFAULT_WS_PORT }
     }
