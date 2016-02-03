@@ -21,7 +21,7 @@ impl Controler {
     ///
     /// ```
     /// # use service_manager::Controler;
-    /// let controler = Controller::new();
+    /// let controler = Controler::new();
     /// ```
     pub fn new(sender: EventSender, context: SharedContext) -> Controler {
         Controler {
