@@ -85,6 +85,9 @@ I need:
   world. It has the following capabilities:
   * `send text message`
 
+Implementing this may be difficult, since Web Push API are pretty much
+not implemented on mobie devices.
+
 ### Values
 * booleans
 
@@ -131,6 +134,52 @@ not visible by other applications.
 
 ### Values
 Nothing new here.
+
+## Home Security
+
+> When I am on vacation, if my bedroom door opens, I want to receive a
+> picture of whatever happened in my bedroom.
+
+Can be expressed as
+```
+I need:
+- a `door opening detector` with property `door is opened`;
+- a `camera` with property `image`;
+- a `communication channel to user` to `send text message` and `send image`.
+
+1. When `door is opened` of `door opening detector` switches to true
+    and `image` of `camera` is available
+    do `send text message` with `communication channel with user`:
+      "Someone entered your bedroom"
+    do `send image` with `communication channel with user`:
+	  `image` of `camera`.
+```
+
+Note that the following line can be inferred from the contents of the trigger:
+```
+and `image` of `camera` is available
+```
+
+### Input devices
+* `door opening detector`, with property `door is opened`;
+* `camera`, with property `image`
+
+The camera is a weird case, since property `image` can typically weigh several Mb.
+
+### Output devices
+
+TBD
+
+### Values
+* The `image` is most likely a blob (binary data + mime type). The
+rules engine doesn't know what to do with it.
+* Regardless of how many times we access the value `image` of `camera`
+  during the evaluation of the trigger, this value is cached. This
+  allows us to actually manipulate `image` of `camera` in an
+  expression, as if it were synchronous.
+
+### Operator
+* `is available`
 
 ## Smart Device detector
 
