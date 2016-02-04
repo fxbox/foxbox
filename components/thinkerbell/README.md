@@ -101,25 +101,36 @@ important to minimize energy use. We will want to be informed of
 > When the motion detector hasn't seen any movement in 10 minutes,
 > turn off the lignts.
 
-This one actually needs several triggers.
+Can be expressed as
+```
+I need:
+- `motion detectors` (at least one) with property `is there motion`;
+- `lights` (at least one) to `turn off`;
+- `10 minutes countdown` to `start`, `stop`, with property `is done`.
 
-1. When the motion detector stops seeing movement, start 10 minutes countdown.
-2. When the motion detector starts seeing movement, stop 10 minutes countdown.
-3. When 10 minutes countdown complete, turn off the lights.
+1. When `is there motion` of `motion detector` switches to false
+do `start` with `10 minutes countdown`;
+2. When `is there motion` of `motion detector` switches to true
+do `stop` with `10 minutes countdown`;
+3. When `is done` of `10 minutes countdown` switches to true
+do `turn off` with `lights`.
+```
 
-Input devices:
-* motion detector (start/stop);
-* 10 minutes countdown (complete).
+Note that this does not require any explicit state.
 
-Output device:
-* 10 minutes countdown (start/stop);
-* all lights (not a single IoT device, rather a set of devices).
+### Input devices
+* `motion detector`, with property `is there motion`;
+* `10 minutes countdown`, built-in, with property `is done`.
 
-Additional notes:
-* since the 10 minute countdown is a pseudo-device, we don't need a
-  special way to identify it;
-* apps are sandboxed, so the countdown can only be seen by this app;
-* we do not need to store any state in the app.
+### Output devices
+* `lights`, with capability `turn off`;
+* `10 minutes countdown` (the same one), with capabilities `start`, `stop`
+
+Note that applications are sandboxed, so the 10 minutes countdown is
+not visible by other applications.
+
+### Values
+Nothing new here.
 
 ## Smart Device detector
 
