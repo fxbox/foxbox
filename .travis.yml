@@ -3,4 +3,5 @@ rust:
     - nightly
 script:
     - cargo build
+    - cargo rustc -- -Z extra-plugins=clippy # Execute linter
     - RUST_BACKTRACE=1 cargo test

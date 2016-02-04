@@ -2,6 +2,7 @@
 name = "foxbox"
 version = "0.1.0"
 dependencies = [
+ "clippy 0.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.0 (git+https://github.com/carllerche/mio.git)",
