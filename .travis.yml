@@ -2,6 +2,5 @@ language: rust
 rust:
     - nightly
 script:
-    - cargo build
-    - cargo rustc -- -Z extra-plugins=clippy # Execute linter
+    - cargo build # Linter is also executed here
     - RUST_BACKTRACE=1 cargo test
