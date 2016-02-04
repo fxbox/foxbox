@@ -9,6 +9,10 @@
 // Needed for IntoIter in context.rs
 #![feature(collections)]
 
+// Make linter fail for every warning
+#![plugin(clippy)]
+#![deny(clippy)]
+
 extern crate core;
 extern crate getopts;
 #[macro_use]
