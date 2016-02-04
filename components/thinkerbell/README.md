@@ -13,13 +13,13 @@ For the time being, these scenarios are untriaged.
 Can be expressed as
 ```
 I need:
-- `the current time` to `get time of day`;
+- `the current time` with property `time of day`;
 - `heaters` (at least one), to `set temperature`.
 
 1. When `time of day` of `the current time` increases beyond 7pm
-	 do `set temperature` of `heaters` to 16C.
+	 do `set temperature` with `heaters` to 16C.
 2. When `time of day` of `the current time` increases beyond 6am
-    do `set temperature` of `heaters` to 19C.
+    do `set temperature` with `heaters` to 19C.
 ```
 
 For a simple script like this, the "I need" part can probably be
@@ -42,8 +42,6 @@ following capabilities:
 
 These are actual devices, which need a UX interaction to be bound to the script.
 
-Output device:
-* all heaters (not a single IoT device, rather a set of devices).
 
 ### Values
 * Time of day. We probably want to represent it in military time
@@ -63,17 +61,40 @@ Output device:
 > When I leave the house, if the oven is on, send me a message and
 > sound a pre-recorded message on the speaker close to the door.
 
-Input devices:
-* something that will tell the FoxBox that nobody is home. Perhaps an door-opened detector. Perhaps the owner's cellphone;
-* the oven's on/off state.
+Can be expressed as
+```
+I need:
+- a `presence monitor` with property `has presence`;
+- a `oven` with property `is on`;
+- a `communication channel to user` to `send text message`.
 
-Output devices:
-* message sender (using Firefox Accounts rather than a real IoT
-  device, but we should be able to behave as if it was);
-* device that can play sound.
+1. When `has presence` of `presence monitor` switches to false
+    and `is on` of `oven` is false
+    do `send text message` with `communication channel to user`: "Your left
+    your oven on but there is nobody home."
 
-Additional note:
-* do we want to send an entire sound file to the sound-playing device?
+```
+
+### Input devices
+* `presence monitor`, with property `has presence`
+* `oven`, with property `is on`
+
+### Output devices
+* `communication channel to user` is a built-in pseudo device. It
+  needs the FoxBox to be configured with access to the outside
+  world. It has the following capabilities:
+  * `send text message`
+
+### Values
+* booleans
+
+### Operators
+* `switches to`, again measures a state change
+* `is` measure a current state
+
+Note that the order of execution of the branches in the AND will be
+important to minimize energy use. We will want to be informed of
+"switches to", rather than hammering "is".
 
 ## Light setter
 
