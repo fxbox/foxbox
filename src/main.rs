@@ -15,8 +15,11 @@
 
 extern crate core;
 extern crate docopt;
+extern crate env_logger;
 #[macro_use]
 extern crate iron;
+#[macro_use]
+extern crate log;
 extern crate mio;
 extern crate mount;
 extern crate router;
@@ -53,6 +56,8 @@ struct Args {
 }
 
 fn main() {
+    env_logger::init().unwrap();
+
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.decode())
         .unwrap_or_else(|e| e.exit());
