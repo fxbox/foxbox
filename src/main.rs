@@ -14,12 +14,13 @@
 #![deny(clippy)]
 
 extern crate core;
-extern crate getopts;
+extern crate docopt;
 #[macro_use]
 extern crate iron;
 extern crate mio;
 extern crate mount;
 extern crate router;
+extern crate rustc_serialize;
 extern crate serde;
 extern crate staticfile;
 extern crate uuid;
@@ -33,39 +34,38 @@ mod controler;
 
 use context::Context;
 use controler::Controler;
-use getopts::Options;
-use std::env;
+use docopt::Docopt;
 
-fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options]", program);
-    print!("{}", opts.usage(&brief));
+const USAGE: &'static str = "
+Usage: foxbox [-v] [-h] [-n <hostname>]
+
+Options:
+    -v, --verbose            Toggle verbose output.
+    -n, --name               Set local hostname.
+    -h, --help               Print this help menu.
+";
+
+#[derive(RustcDecodable)]
+struct Args {
+    flag_verbose: bool,
+    arg_hostname: Option<String>,
+    flag_help: bool,
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let program = args[0].clone();
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|d| d.decode())
+        .unwrap_or_else(|e| e.exit());
 
-    let mut opts = Options::new();
-    opts.optflag("v", "verbose", "Toggle verbose output");
-    opts.optopt("n", "name", "Set local host name", "HOSTNAME");
-    opts.optflag("h", "help", "Print this help menu");
-    let matches = match opts.parse(&args[1..]) {
-        Ok(m) => { m }
-        Err(_) => {
-            print_usage(&program, opts);
-            return;
-        }
-    };
-    if matches.opt_present("h") {
-        print_usage(&program, opts);
-        return;
+    if args.flag_help {
+        println!("{}", USAGE);
+        return
     }
 
     if let Ok(mut event_loop) = mio::EventLoop::new() {
         let sender = event_loop.channel();
 
-        let context = Context::shared(matches.opt_present("v"),
-                                      matches.opt_str("n"));
+        let context = Context::shared(args.flag_verbose, args.arg_hostname);
         let mut controler = Controler::new(sender, context);
         controler.start();
 
