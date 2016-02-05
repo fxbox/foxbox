@@ -6,13 +6,15 @@
 /// (i.e. the user's cellphone or smart tv).
 
 use dependencies::Path;
+use std::time::Duration;
+use std::collections::HashMap;
 
 struct ServerApp {
     metadata: (), // FIXME: Authorizations, author, description, update url, version, ...
 
     /// `true` if the user has decided to activate the app, `false` if
     /// the user has turned it off.
-    isActivatedByUser: bool,
+    is_activated_by_user: bool,
 
     /// A set of requirements (e.g. "a temperature sensor" / "all
     /// temperature sensors" / "the date since the latest movement in
@@ -101,7 +103,8 @@ enum Value {
     Num(f64),
     String(String),
     Bool(bool),
-    Date(Date),
+    // FIXME find the proper type
+    // Date(Date),
     Duration(Duration),
 }
 
@@ -138,13 +141,15 @@ enum Expression {
         // FIXME: We should be able to find something more
         // user-friendly than let-binding.
         variable: Variable,
-        expr: Expression,
+        // FIXME: use a Box<> for now to avoid recursive type.
+        expr: Box<Expression>,
     },
 
     /// Pure functions on values.
     Function {
         function: Function,
-        arguments: Vec<Expression>
+        // FIXME: use a Box<> for now to avoid recursive type.
+        arguments: Vec<Box<Expression>>
     },
 }
 
@@ -180,6 +185,6 @@ struct Command {
     /// as an index in Trigger.requirements/allocations.
     destination: usize,  // FIXME: Use custom type.
 
-    arguments: Map<String, Option<Expression>>
+    arguments: HashMap<String, Option<Expression>>
 }
 

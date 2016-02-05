@@ -2,4 +2,4 @@
 
 /// The path to an API used to access a specific feature of a specific
 /// resource.
-struct Path; // FIXME: Define
+pub struct Path; // FIXME: Define
