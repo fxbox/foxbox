@@ -55,6 +55,8 @@ These are actual devices, which need a UX interaction to be bound to the script.
   state. Note that this operator magically ensures that we do not
   saturate the heaters with requests to change state.
 
+In the UX, we may wish to conflate state and state change. In the
+interpreter, though, there is a big difference.
 
 ## Oven safety
 
@@ -148,17 +150,12 @@ I need:
 - a `communication channel to user` to `send text message` and `send image`.
 
 1. When `door is opened` of `door opening detector` switches to true
-    and `image` of `camera` is available
     do `send text message` with `communication channel with user`:
-      "Someone entered your bedroom"
+       "Someone entered your bedroom"
     do `send image` with `communication channel with user`:
 	  `image` of `camera`.
 ```
 
-Note that the following line can be inferred from the contents of the trigger:
-```
-and `image` of `camera` is available
-```
 
 ### Input devices
 * `door opening detector`, with property `door is opened`;
@@ -167,19 +164,17 @@ and `image` of `camera` is available
 The camera is a weird case, since property `image` can typically weigh several Mb.
 
 ### Output devices
+* `communication channel with user` with capability `send image`
 
-TBD
 
 ### Values
 * The `image` is most likely a blob (binary data + mime type). The
 rules engine doesn't know what to do with it.
 * Regardless of how many times we access the value `image` of `camera`
-  during the evaluation of the trigger, this value is cached. This
-  allows us to actually manipulate `image` of `camera` in an
-  expression, as if it were synchronous.
+during the evaluation of the trigger, this value is cached.
+* Behind-the-scenes, requesting the `image` of `camera` is async. The
+interpreter hides this from the user.
 
-### Operator
-* `is available`
 
 ## Smart Device detector
 
@@ -188,16 +183,33 @@ rules engine doesn't know what to do with it.
 > server. Give as much detail as possible on where the device is, so
 > that the teachers can come and frown at offending student.
 
-Input devices:
-* wifi detectors;
-* broadband detectors.
+Can be expressed as
+```
+I need:
+- a `wifi detector` (zero or more) with property `activity detected`;
+- a `broadband detector` (zero or more) with property `activity
+detected`;
+- a `communication channel to an application` with capability `send data``?
 
-Output device:
-* message sender;
+1. When `activity detected` of `wifi detector` switches to true
+  do `send data` to `communication channel to an application`:
+    `sensor details` of `activity detected`
+```
 
-Additional notes:
-* we want to be able to send data on *which* sensor informed us;
-* we need to be able to send messages.
+This application is meant to be attached to a specific front-end.
+
+### Input devices
+* a `wifi detector` with property `activity detected`;
+* a `broadband detector` with property `activity detected`.
+
+### Output devices
+* a `communication channel to an application` with capability `send data`;
+
+FIXME: I'm not entirely sure about that one. This detector is meant to
+be used with a specific front-end. What's the best way to specify
+front-end? Do we want to be so generic that we can change front-end?
+That sounds over-engineered, but I can't think of anything simpler atm.
+
 
 ## Pollution monitor
 
