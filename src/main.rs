@@ -75,3 +75,15 @@ fn main() {
         panic!("Creating the event loop failed!");
     }
 }
+
+#[test]
+fn options_are_good() {
+    // test the consistency of the USAGE and Args.
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|d| d.decode())
+        .unwrap_or_else(|e| e.exit());
+
+    assert_eq!(args.flag_verbose, false);
+    assert_eq!(args.arg_hostname, None);
+    assert_eq!(args.flag_help, false);
+}
