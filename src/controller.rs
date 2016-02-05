@@ -44,6 +44,11 @@ impl Controller {
         // Start the dummy adapter.
         let dummy_adapter = DummyAdapter::new(self.sender.clone(), self.context.clone());
         dummy_adapter.start();
+
+        {
+            let mut context = self.context.lock().unwrap();
+            context.start_tunnel().unwrap();
+        }
     }
 }
 

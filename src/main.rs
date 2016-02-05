@@ -11,6 +11,9 @@
 // Needed for IntoIter in context.rs
 #![feature(collections)]
 
+// Needed for time functions
+#![feature(time2)]
+
 // Make linter fail for every warning
 #![plugin(clippy)]
 #![deny(clippy)]
@@ -26,6 +29,7 @@ extern crate env_logger;
 extern crate foxbox_users;
 #[macro_use]
 extern crate iron;
+extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate mio;
@@ -42,9 +46,11 @@ mod controller;
 mod dummy_adapter;
 mod events;
 mod http_server;
+mod managed_process;
 mod ws_server;
 mod service;
 mod registration;
+mod tunnel_controller;
 mod service_router;
 
 mod stubs {
@@ -59,7 +65,7 @@ use context::{ ContextTrait, Context };
 use controller::Controller;
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>]
+Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-t <tunnel>]
 
 Options:
     -v, --verbose            Toggle verbose output.
@@ -67,12 +73,14 @@ Options:
     -p, --port <port>        Set port to listen on for http connections.
     -w, --wsport <wsport>    Set port to listen on for websocket.
     -r, --register <url>     Change the url of the registration endpoint.
+    -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
     -h, --help               Print this help menu.
 ",
         flag_name: Option<String>,
         flag_port: Option<u16>,
         flag_wsport: Option<u16>,
-        flag_register: Option<String>);
+        flag_register: Option<String>,
+        flag_tunnel: Option<String>);
 
 fn main() {
     env_logger::init().unwrap();
@@ -86,7 +94,8 @@ fn main() {
         let sender = event_loop.channel();
 
         let context = Context::shared(args.flag_verbose, args.flag_name,
-                                      args.flag_port, args.flag_wsport);
+                                      args.flag_port, args.flag_wsport,
+                                      args.flag_tunnel);
         let mut controller = Controller::new(sender, context);
         controller.start();
 

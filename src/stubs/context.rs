@@ -25,7 +25,9 @@ pub type SharedContextStub = Arc<Mutex<ContextStub>>;
 
 impl ContextTrait for ContextStub {
 
-    fn new(verbose: bool, hostname: Option<String>, http_port: Option<u16>, ws_port: Option<u16>)
+    fn new(verbose: bool, hostname: Option<String>,
+           http_port: Option<u16>, ws_port: Option<u16>,
+           tunnel_host: Option<String>)
            -> ContextStub {
         ContextStub {
             websockets: HashMap::new(),
@@ -33,9 +35,10 @@ impl ContextTrait for ContextStub {
         }
     }
 
-    fn shared(verbose: bool, hostname: Option<String>, http_port: Option<u16>,
-              ws_port: Option<u16>) -> SharedContextStub {
-        Arc::new(Mutex::new(ContextStub::new(verbose, hostname, http_port, ws_port)))
+    fn shared(verbose: bool, hostname: Option<String>,
+              http_port: Option<u16>, ws_port: Option<u16>,
+              tunnel_host: Option<String>) -> SharedContextStub {
+        Arc::new(Mutex::new(ContextStub::new(verbose, hostname, http_port, ws_port, tunnel_host)))
     }
 
     fn add_service(&mut self, service: Box<Service>) {}
@@ -72,10 +75,18 @@ impl ContextTrait for ContextStub {
         Ok(vec![server].into_iter())
     }
 
+    fn start_tunnel(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn stop_tunnel(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
 }
 
 impl ContextStub {
     pub fn blank_shared() -> SharedContextStub {
-        ContextStub::shared(false, Some("".to_owned()), Some(0), Some(0))
+        ContextStub::shared(false, Some("".to_owned()), Some(0), Some(0), None)
     }
 }
