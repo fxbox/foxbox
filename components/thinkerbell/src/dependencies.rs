@@ -1,5 +1,9 @@
+extern crate rustc_serialize;
+
 use std::sync::mpsc::Sender;
 use std::collections::BTreeMap;
+
+use self::rustc_serialize::json::Json;
 
 /// APIs that we need to implement the code in module lang.
 
@@ -12,24 +16,24 @@ pub struct OutputCapability;
 
 pub struct Device;
 
-/// The path to an API used to access a specific feature of a specific
-/// resource.
-pub struct Path; // FIXME: Define
-
 pub struct Range;
 
 impl Range {
-    fn any() -> Range {
+    pub fn any() -> Range {
         panic!("Not implemented")
     }
-    fn boundary() -> Range {
+    pub fn boundary() -> Range {
         panic!("Not implemented")
     }
 }
 
-trait Watcher {
+pub struct Watcher;
+
+impl Watcher {
   /// Create a new watcher.
-  fn new() -> Watcher;
+    pub fn new() -> Watcher {
+        panic!("Not implemented");
+    }
 
   /// Watch a property of a device.
   ///
@@ -54,7 +58,13 @@ trait Watcher {
   /// Until `witness_2` is dropped, whenever property `Ammo` of
   /// `the_terminator` goes above/beyond 100, the watcher will send a
   /// message on `tx_2`.
-  fn add<T>(&mut self, &Device, &InputCapability, &Range, &Sender<BTreeMap<String, String>>) -> Witness;
+    pub fn add<F>(&mut self,
+                  device: &Device,
+                  input: &InputCapability,
+                  range: &Range,
+                  cb: F) -> Witness where F:FnOnce(Json){
+        panic!("Not implemented");
+    }
 }
 
 /// A structure used to stop watching a property once it is dropped.

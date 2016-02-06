@@ -5,9 +5,13 @@
 /// complex monitors can installed from the web from a master device
 /// (i.e. the user's cellphone or smart tv).
 
-use dependencies::{DeviceKind, InputCapability, OutputCapability, Path};
+use dependencies::{DeviceKind, InputCapability, OutputCapability, Device, Range, Watcher};
+
 use std::time::Duration;
 use std::collections::HashMap;
+
+extern crate rustc_serialize;
+use self::rustc_serialize::json::Json;
 
 /// A Monitor Application, i.e. an application (or a component of an
 /// application) executed on the server.
@@ -50,9 +54,54 @@ struct MonitorApp {
     /// FIXME: We also want a user-readable name for the allocations,
     /// for the sake of the front-end. These names may even be
     /// internationalizable. Later.
-    allocations: Vec<Vec<Path>>,
+    allocations: Vec<Vec<Named<Device>>>,
 
     code: Vec<Trigger>,
+}
+
+impl MonitorApp {
+    fn monitor(&self) {
+        if !self.is_activated_by_user {
+            return;
+        }
+        
+        // Build a watcher for all the input conditions.
+        // FIXME: In future versions, there will be a lot to optimize here.
+        let mut watcher = Watcher::new();
+        let mut witnesses = Vec::new();
+
+        // Build a representation of the state.
+        // This state will be updated whenever one of the inputs changes state.
+        let mut full_state = Vec::new();
+
+        let mut index : usize = 0;
+        for req in &self.requirements {
+            let ref devices = self.allocations[index];
+            for device in devices {
+                let mut device_state = Vec::new();
+                let input_index = 0;
+                for input in &req.data.inputs {
+                    device_state.push(Json::Null);
+                    let cb = |data| {
+                        device_state[input_index] = data;
+                        // FIXME: Also, check whether the conditions
+                        // are now valid.
+                    };
+                    // FIXME: For the moment, we assume that
+                    // conditions on inputs are a OR. Decide whether
+                    // this is a good idea.
+                    let witness = watcher.add(&device.data,
+                                              &input.data,
+                                              &Range::any(),
+                                              cb);
+                    // FIXME: We could do better than Range::any()
+                    witnesses.push(witness);
+                }
+                full_state.push(device_state);
+            }
+            index += 1;
+        }
+    }
 }
 
 /// Data labelled with a user-readable name.
@@ -120,12 +169,9 @@ struct Conjunction {
     all: Vec<Expression>
 }
 
-/// Constants
 enum Value {
-    Num(f64),
-    String(String),
-    Bool(bool),
-    Duration(Duration),
+    json(Json),
+    blob{data: Vec<u8>, mime_type: String},
 }
 
 /// An expression in the language.  Note that expressions may contain
