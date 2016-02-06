@@ -30,16 +30,20 @@ const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 pub type SharedContext = Arc<Mutex<Context>>;
 
 impl Context {
-    pub fn new(verbose: bool, hostname: Option<String>) -> Context {
+    pub fn new(verbose: bool, hostname: Option<String>,
+               http_port: Option<u16>, ws_port: Option<u16>) -> Context {
+
         Context { services: HashMap::new(),
                   verbose: verbose,
                   hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
-                  http_port: DEFAULT_HTTP_PORT,
-                  ws_port: DEFAULT_WS_PORT }
+                  http_port: http_port.unwrap_or(DEFAULT_HTTP_PORT),
+                  ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT) }
     }
 
-    pub fn shared(verbose: bool, hostname: Option<String>) -> SharedContext {
-        Arc::new(Mutex::new(Context::new(verbose, hostname)))
+    pub fn shared(verbose: bool, hostname: Option<String>,
+                  http_port: Option<u16>,
+                  ws_port: Option<u16>) -> SharedContext {
+        Arc::new(Mutex::new(Context::new(verbose, hostname, http_port, ws_port)))
     }
 
     pub fn add_service(&mut self, service: Box<Service>) {
@@ -102,7 +106,7 @@ fn test_should_add_a_service() {
     }
 
     let service = ServiceStub;
-    let mut foo = Context::new(false, Some("localhost".to_owned()));
+    let mut foo = Context::new(false, Some("localhost".to_owned()), None, None);
 
     assert_eq!(foo.services.is_empty(), true);
     foo.add_service(Box::new(service));
