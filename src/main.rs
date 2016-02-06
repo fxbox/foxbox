@@ -40,18 +40,22 @@ use controler::Controler;
 use docopt::Docopt;
 
 const USAGE: &'static str = "
-Usage: foxbox [-v] [-h] [-n <hostname>]
+Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>]
 
 Options:
     -v, --verbose            Toggle verbose output.
-    -n, --name               Set local hostname.
+    -n, --name <hostname>    Set local hostname.
+    -p, --port <port>        Set port to listen on for http connections.
+    -w, --wsport <wsport>    Set port to listen on for websocket.
     -h, --help               Print this help menu.
 ";
 
 #[derive(RustcDecodable)]
 struct Args {
     flag_verbose: bool,
-    arg_hostname: Option<String>,
+    flag_name: Option<String>,
+    flag_port: Option<u16>,
+    flag_wsport: Option<u16>,
     flag_help: bool,
 }
 
@@ -70,7 +74,8 @@ fn main() {
     if let Ok(mut event_loop) = mio::EventLoop::new() {
         let sender = event_loop.channel();
 
-        let context = Context::shared(args.flag_verbose, args.arg_hostname);
+        let context = Context::shared(args.flag_verbose, args.flag_name,
+                                      args.flag_port, args.flag_wsport);
         let mut controler = Controler::new(sender, context);
         controler.start();
 
@@ -83,12 +88,35 @@ fn main() {
 
 #[test]
 fn options_are_good() {
-    // test the consistency of the USAGE and Args.
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.decode())
-        .unwrap_or_else(|e| e.exit());
+    // short form options
+    {
+        let argv = || vec!["foxbox", "-p", "1234", "-n", "foobar",
+                           "-w", "4567", "-v"];
 
-    assert_eq!(args.flag_verbose, false);
-    assert_eq!(args.arg_hostname, None);
-    assert_eq!(args.flag_help, false);
+        let args: Args = Docopt::new(USAGE)
+            .and_then(|d| d.argv(argv().into_iter()).decode())
+            .unwrap_or_else(|e| e.exit());
+
+        assert_eq!(args.flag_verbose, true);
+        assert_eq!(args.flag_name, Some("foobar".to_string()));
+        assert_eq!(args.flag_port, Some(1234));
+        assert_eq!(args.flag_wsport, Some(4567));
+        assert_eq!(args.flag_help, false);
+    }
+    // long form options
+    {
+        let argv = || vec!["foxbox", "--port", "1234",
+                           "--name", "foobar", "--wsport", "4567",
+                           "--verbose"];
+
+        let args: Args = Docopt::new(USAGE)
+            .and_then(|d| d.argv(argv().into_iter()).decode())
+            .unwrap_or_else(|e| e.exit());
+
+        assert_eq!(args.flag_verbose, true);
+        assert_eq!(args.flag_name, Some("foobar".to_string()));
+        assert_eq!(args.flag_port, Some(1234));
+        assert_eq!(args.flag_wsport, Some(4567));
+        assert_eq!(args.flag_help, false);
+    }
 }
