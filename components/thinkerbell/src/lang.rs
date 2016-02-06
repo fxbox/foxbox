@@ -5,31 +5,44 @@
 /// complex monitors can installed from the web from a master device
 /// (i.e. the user's cellphone or smart tv).
 
-use dependencies::Path;
+use dependencies::{DeviceKind, InputCapability, OutputCapability, Path};
 use std::time::Duration;
 use std::collections::HashMap;
 
-struct ServerApp {
+/// A Monitor Application, i.e. an application (or a component of an
+/// application) executed on the server.
+///
+/// Monitor applications are typically used for triggering an action
+/// in reaction to an event: changing temperature when night falls,
+/// ringing an alarm when a door is opened, etc.
+///
+/// Monitor applications are installed from a paired device. They may
+/// either be part of a broader application (which can install them
+/// through a web/REST API) or live on their own.
+struct MonitorApp {
     metadata: (), // FIXME: Authorizations, author, description, update url, version, ...
 
     /// `true` if the user has decided to activate the app, `false` if
     /// the user has turned it off.
     is_activated_by_user: bool,
 
-    /// A set of requirements (e.g. "a temperature sensor" / "all
-    /// temperature sensors" / "the date since the latest movement in
-    /// any motion sensor"). These are specified in the source code
-    /// and do not change unless the source code changes.
+    /// Monitor applications have sets of requirements (e.g. "I need a
+    /// camera"), which are allocated to actual resources through the
+    /// UX. Re-allocating resources may be requested by the user, the
+    /// foxbox, or an application, e.g. when replacing a device or
+    /// upgrading the app.
     ///
     /// The position in the vector is important, as it is used to
     /// represent the instances of resources in the script.
-    ///
-    /// FIXME: We also want a user-readable name for the requirements,
-    /// for the sake of the front-end. These names may even be
-    /// internationalizable. Later.
-    requirements: Vec<Requirement>,
+    /// FIXME: Turn this `Vec` into a data structure in which this property is built-in.
+    requirements: Vec<Named<Requirement>>,
 
     /// The resources actually allocated to match the requirements.
+    /// Allocations can be done in several ways:
+    ///
+    /// - when entering the script through a UX (either the scrip, the UX can suggest
+    ///   allocations;
+    /// - when installing 
     /// Allocations are typically done by the user when installing the
     /// app or the devices. Behind-the-scenes, each allocation is a
     /// mapping to a set of (local) REST APIs.
@@ -42,33 +55,42 @@ struct ServerApp {
     code: Vec<Trigger>,
 }
 
+/// Data labelled with a user-readable name.
+struct Named<T> {
+    /// User-readable name.
+    name: String,
+
+    data: T,
+}
+
 /// A resource needed by this application. Typically, a definition of
-/// an input or output device.
+/// device with some input our output capabilities.
 struct Requirement {
-    /// The kind of resource, e.g. "flashbulb".
-    kind: String, // FIXME: There must be some kind of standard, no?
+    /// The kind of resource, e.g. "a flashbulb".
+    kind: DeviceKind,
 
-    /// The set of properties of the resource (e.g. luminosity,
-    /// temperature).
-    properties: Vec<String>,
+    /// Input capabilities we need from the device, e.g. "the time of
+    /// day", "the current temperature".
+    inputs: Vec<Named<InputCapability>>,
 
-    /// Minimal number of resources required.
+    /// Output capabilities we need from the device, e.g. "play a
+    /// sound", "set luminosity".
+    outputs: Vec<Named<OutputCapability>>,
+    
+    /// Minimal number of resources required. If unspecified in the
+    /// script, this is 1.
     min: u32,
 
-    /// Maximal number of resources that may be handled.
+    /// Maximal number of resources that may be handled. If
+    /// unspecified in the script, this is the same as `min`.
     max: u32,
 
-    /// The minimal duration between two reads from this device
-    /// or `None` if this device is not used for input.
-    refresh: Option<Duration>,
-
-    /// The minimal duration between two outputs to this device
-    /// or `None` if this device is not used for output.
-    cooldown: Option<Duration>,
+    // FIXME: We may need cooldown properties.
 }
 
 
-/// A single trigger, i.e. "when some condition is true, do something".
+/// A single trigger, i.e. "when some condition becomes true, do
+/// something".
 struct Trigger {
     /// The condition in which to execute the trigger.
     condition: Disjunction,
@@ -98,22 +120,28 @@ struct Conjunction {
     all: Vec<Expression>
 }
 
+/// Constants
 enum Value {
-    /// Constants
     Num(f64),
     String(String),
     Bool(bool),
-    // FIXME find the proper type
-    // Date(Date),
     Duration(Duration),
 }
 
+/// An expression in the language.  Note that expressions may contain
+/// inputs, which are typically asynchronous. Consequently,
+/// expressions are evaluated asynchronously.
 enum Expression {
     Const {
         value: Value,
 
-        /// Taint values with their source. Used to e.g. display the
-        /// name of the sensor.
+        /// We are dealing with real-world values, so physical units
+        /// will prevent real-world accidents.
+        unit: (), // FIXME: An actual unit
+
+        /// The source for this value.  Used whenever we need to find
+        /// out which sensor triggered the trigger (e.g. "where is the
+        /// fire?").
         sources: Vec<usize>,
     },
 
@@ -132,29 +160,18 @@ enum Expression {
         index: usize, // FIXME: We should use a custom type.
 
         /// A property to fetch (e.g. "luminosity" or "meta/latest-on").
-        property: String,
+        property: InputCapability,
     },
 
-    Variable(Variable),
-
-    LetBinding {
-        // FIXME: We should be able to find something more
-        // user-friendly than let-binding.
-        variable: Variable,
-        // FIXME: use a Box<> for now to avoid recursive type.
-        expr: Box<Expression>,
-    },
-
-    /// Pure functions on values.
+    /// Pure functions on values. The fact that they are pure
+    /// functions is important, as it lets us find out automatically
+    /// which subexpressions (including inputs) do not need to be
+    /// re-evaluated.
     Function {
         function: Function,
         // FIXME: use a Box<> for now to avoid recursive type.
         arguments: Vec<Box<Expression>>
     },
-}
-
-struct Variable {
-    index: usize
 }
 
 enum Function {
@@ -184,6 +201,8 @@ struct Command {
     /// The resource to which this command applies,
     /// as an index in Trigger.requirements/allocations.
     destination: usize,  // FIXME: Use custom type.
+
+    action: OutputCapability,
 
     arguments: HashMap<String, Option<Expression>>
 }
