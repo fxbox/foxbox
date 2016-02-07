@@ -1,17 +1,20 @@
-extern crate rustc_serialize;
+#![allow(unused_variables)]
+#![allow(dead_code)]
 
-use std::sync::mpsc::Sender;
-use std::collections::BTreeMap;
+extern crate rustc_serialize;
 
 use self::rustc_serialize::json::Json;
 
 /// APIs that we need to implement the code in module lang.
 
 /// A description of a device, e.g. "a lightbulb".
+#[derive(Clone)]
 pub struct DeviceKind;
 
+#[derive(Clone)]
 pub struct InputCapability;
 
+#[derive(Clone)]
 pub struct OutputCapability;
 
 pub struct Device;
@@ -57,7 +60,9 @@ impl Watcher {
   ///
   /// Until `witness_2` is dropped, whenever property `Ammo` of
   /// `the_terminator` goes above/beyond 100, the watcher will send a
-  /// message on `tx_2`.
+    /// message on `tx_2`.
+    #[allow(unused_variables)]
+    #[allow(dead_code)]
     pub fn add<F>(&mut self,
                   device: &Device,
                   input: &InputCapability,
