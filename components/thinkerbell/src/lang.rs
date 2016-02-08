@@ -70,37 +70,17 @@ struct MonitorApp {
 }
 
 impl<'a> MonitorApp {
-/*
-    Ideally, I'd like something along these lines.
-    But, as rustc kindly pointed out to me, that's pretty much unsafe.
-
-    fn iter_state_index(&'a self) -> Box<Iterator<Item=InputIndex> + 'a>
+    /// Index-safe iteration through all the possible
+    /// allocations/individual devices/inputs.
+    fn iter_state_index(&self) -> Vec<InputBinding>
     {
-        Box::new(
-            Zip::new((&self.requirements, &self.allocations, 0..)).
-                flat_map(|(req, allocation, allocation_index)| {
-                    let allocation_index_clone = allocation_index.clone();
-                    Zip::new((allocation, 0..)).
-                        flat_map(|(individual_device, individual_device_index)| {
-                            Zip::new((&req.data.inputs, 0..)).
-                                map(|(_, individual_input_index)| {
-                                    InputIndex {
-                                        allocation: allocation_index_clone,
-                                        device: individual_device_index,
-                                        input: individual_input_index
-                                    }
-                                })
-                        })
-                }))
-}
-     */
-    fn iter_state_index(&'a self) -> Vec<InputIndex>
-    {
+        // FIXME: Several possible optimizations here, including
+        // caching the vector.
         let mut vec = Vec::new();
         for (req, allocation, allocation_index) in Zip::new((&self.requirements, &self.allocations, 0..)) {
             for (individual_device, individual_device_index) in Zip::new((allocation, 0..)) {
                 for (input, individual_input_index) in Zip::new((&req.data.inputs, 0..)) {
-                    vec.push(InputIndex {
+                    vec.push(InputBinding {
                         allocation: allocation_index,
                         device: individual_device_index,
                         input: individual_input_index
@@ -110,25 +90,47 @@ impl<'a> MonitorApp {
         }
         vec
     }
-
-    fn get_individual_device(&self, index: &InputIndex) -> Arc<Device> {
-        self.allocations[index.allocation][index.device].data.clone()
-    }
-
-    fn get_input(&self, index: &InputIndex) -> InputCapability {
-        self.requirements[index.allocation].data.inputs[index.input].data.clone()
-    }
 }
 
-struct InputIndex {
+/// The binding of an input capability to a specific device set.
+struct InputBinding {
+    /// The device set holding this input capability.
+    /// Index in `app.allocations`.
     allocation: usize,
+
+    /// The individual device holding this input capability.
+    /// Index in `app.allocations[self.allocation]`.
     device: usize,
+
+    /// The specific input holding this input capability.
+    /// Index in `app.allocations[self.allocation][self.device]`.
     input: usize,
 }
 
+impl InputBinding {
+    /// Get the device providing the InputBinding.
+    fn get_individual_device(&self, app: &MonitorApp) -> Arc<Device> {
+        app.allocations[self.allocation][self.device].data.clone()
+    }
 
+    /// Get the input capability for this binding.
+    fn get_input(&self, app: &MonitorApp) -> InputCapability {
+        app.requirements[self.allocation].data.inputs[self.input].data.clone()
+    }
+
+    /// Update the state attached to this input binding.
+    fn set_state(&self, state: &mut MonitorTaskState, value: Option<Json>) {
+        state.input_state[self.allocation][self.device][self.input] = value;
+    }
+}
+
+/// The state of a given condition.
 struct ConditionState {
-    are_conditions_met: bool
+    /// `true` if the conditions were met last time the state of the
+    /// inputs changed. We use this to trigger an action only when
+    /// conditions were previously unmet and are now met.
+    are_conditions_met: bool,
+    // FIXME: In the future, the cooldown should go here.
 }
 
 type InputState = Vec<Vec<Vec<Option<Json>>>>;
@@ -147,11 +149,6 @@ struct MonitorTaskState {
     witnesses: Vec<Witness>,
 
     app: MonitorApp,
-}
-impl MonitorTaskState {
-    fn set_state(&mut self, index: &InputIndex, value: Option<Json>) {
-        self.input_state[index.allocation][index.device][index.input] = value;
-    }
 }
 
 struct MonitorComm {
@@ -204,8 +201,8 @@ impl MonitorTask {
             // the condition to build a better `Range`.
             witnesses.push(
                 watcher.add(
-                    &app.get_individual_device(&state_index), // FIXME: Implement
-                    &app.get_input(&state_index), // FIXME: Implement
+                    &state_index.get_individual_device(&app),
+                    &state_index.get_input(&app),
                     &Range::any(),
                     |data| {
                         let _ = tx.send(MonitorOp::Update {
@@ -239,7 +236,7 @@ impl MonitorTask {
                     index,
                 } => {
                     // Update the state
-                    self.state.set_state(&index, Some(data));
+                    index.set_state(&mut self.state, Some(data));
 
                     // Find out if we should execute triggers.
                     // FIXME: We could optimize this by finding out which triggers
@@ -285,7 +282,7 @@ impl MonitorTask {
 }
 
 enum MonitorOp {
-    Update{data: Json, index: InputIndex},
+    Update{data: Json, index: InputBinding},
     Execute{state: InputState, commands: Vec<Command>},
     Stop
 }
