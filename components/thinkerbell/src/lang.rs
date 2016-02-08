@@ -9,16 +9,13 @@
 /// complex monitors can installed from the web from a master device
 /// (i.e. the user's cellphone or smart tv).
 
-use dependencies::{DeviceKind, InputCapability, OutputCapability, Device, Range, Watcher};
+use dependencies::{DeviceKind, InputCapability, OutputCapability, Device, Range, Value, Watcher};
 
 use std::time::Duration;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-
-extern crate rustc_serialize;
-use self::rustc_serialize::json::Json;
 
 extern crate itertools;
 use self::itertools::Zip;
@@ -123,7 +120,7 @@ impl InputBinding {
     }
 
     /// Update the state attached to this input binding.
-    fn set_state(&self, state: &mut MonitorTaskState, value: Option<Json>) {
+    fn set_state(&self, state: &mut MonitorTaskState, value: Option<Value>) {
         state.input_state[self.allocation][self.device][self.input] = value;
     }
 }
@@ -137,7 +134,7 @@ struct ConditionState {
     // FIXME: In the future, the cooldown should go here.
 }
 
-type InputState = Vec<Vec<Vec<Option<Json>>>>;
+type InputState = Vec<Vec<Vec<Option<Value>>>>;
 struct MonitorTaskState {
     /// The state of each trigger.
     ///
@@ -234,7 +231,7 @@ impl MonitorTask {
         let mut witnesses = Vec::new();
 
         for state_index in self.state.app.iter_state_index() {
-            // FIXME: We currently use `Range::any()` for simplicity.
+            // FIXME: We currently use `Range::Any` for simplicity.
             // However, in most cases, we should be able to look inside
             // the condition to build a better `Range`.
 
@@ -246,7 +243,7 @@ impl MonitorTask {
                 watcher.add(
                     &state_index.get_individual_device(&self.state.app),
                     &state_index.get_input(&self.state.app),
-                    &Range::any(),
+                    &Range::Any,
                     |data| {
                         let _ignored = self.comm.tx.send(MonitorOp::Update {
                             data: data,
@@ -310,7 +307,7 @@ impl MonitorTask {
 }
 
 enum MonitorOp {
-    Update{data: Json, index: InputBinding},
+    Update{data: Value, index: InputBinding},
     Execute{state: InputState, commands: Vec<Command>},
     Stop
 }
@@ -393,7 +390,7 @@ struct Requirement {
 #[derive(Clone)]
 struct Trigger {
     /// The condition in which to execute the trigger.
-    condition: Disjunction,
+    condition: Conjunction,
 
     /// Stuff to do once `condition` is met.
     execute: Vec<Command>,
@@ -404,35 +401,84 @@ struct Trigger {
     cooldown: Duration,
 }
 
-/// A disjunction (e.g. a "or") of conditions.
-///
-/// # Example
-///
-/// Door alarm #1 OR door alarm #2
-#[derive(Clone)]
-struct Disjunction {
-    /// The disjunction is true iff any of the following conjunctions is true.
-    any: Vec<Conjunction>
-}
-
-impl Disjunction {
-    fn is_met(&self, input_state: &InputState) -> bool {
-        panic!("Not implemented");
-    }
-}
-
 /// A conjunction (e.g. a "and") of conditions.
 #[derive(Clone)]
 struct Conjunction {
     /// The conjunction is true iff all of the following expressions evaluate to true.
-    all: Vec<Expression>
+    all: Vec<Condition>
 }
 
-#[derive(Clone)]
-enum Value {
-    Json(Json),
-    Blob{data: Arc<Vec<u8>>, mime_type: String},
+impl Conjunction {
+    fn is_met(&self, input_state: &InputState) -> bool { // FIXME: Should be a bool labelled by the devices involved
+        for condition in &self.all {
+            if !condition.is_met(input_state) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
+
+/// An individual condition.
+///
+/// Conditions always take the form: "data received from sensor is in
+/// given range".
+///
+/// A condition is true if *any* of the sensors allocated to this
+/// requirement has yielded a value that is in the given range.
+#[derive(Clone)]
+struct Condition {
+    requirement_index: usize,
+    input_index: usize,
+    range: Range,
+}
+
+impl Condition {
+    /// Find out if *any* of the sensors allocated to this requirement
+    /// has yielded a value that is in the given range.
+    fn is_met(&self, input_state: &InputState) -> bool {
+        for measure in &input_state[self.requirement_index][self.input_index] {
+            if match *measure {
+                None => { false /* We haven't received a measurement yet.*/ },
+                Some(ref data) => {
+                    use dependencies::Range::*;
+                    use dependencies::Value::*;
+
+                    match (data, &self.range) {
+                        // Any always matches
+                        (_, &Any) => true,
+                        // Operations on bools and strings
+                        (&Bool(ref b), &EqBool(ref b2)) => b == b2,
+                        (&String(ref s), &EqString(ref s2)) => s == s2,
+
+                        // Numbers. FIXME: Implement physical units.
+                        (&Num(ref x), &Leq(ref max)) => x <= max,
+                        (&Num(ref x), &Geq(ref min)) => min <= x,
+                        (&Num(ref x), &BetweenEq{ref min, ref max}) => min <= x && x <= max,
+                        (&Num(ref x), &OutOfStrict{ref min, ref max}) => x < min || max < x,
+
+                        // Type errors don't match.
+                        (&Bool(_), _) => false,
+                        (&String(_), _) => false,
+                        (_, &EqBool(_)) => false,
+                        (_, &EqString(_)) => false,
+
+                        // There is no such thing as a range on json or blob.
+                        (&Json(_), _) |
+                        (&Blob{..}, _) => false,
+                    }
+                }
+            }
+
+ {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+
 
 /// An expression in the language.  Note that expressions may contain
 /// inputs, which are typically asynchronous. Consequently,
