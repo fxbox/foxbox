@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-    
+
 extern crate rustc_serialize;
 use self::rustc_serialize::json::Json;
 
@@ -69,14 +69,70 @@ struct MonitorApp {
     is_running: bool,
 }
 
+impl<'a> MonitorApp {
+/*
+    Ideally, I'd like something along these lines.
+    But, as rustc kindly pointed out to me, that's pretty much unsafe.
+
+    fn iter_state_index(&'a self) -> Box<Iterator<Item=InputIndex> + 'a>
+    {
+        Box::new(
+            Zip::new((&self.requirements, &self.allocations, 0..)).
+                flat_map(|(req, allocation, allocation_index)| {
+                    let allocation_index_clone = allocation_index.clone();
+                    Zip::new((allocation, 0..)).
+                        flat_map(|(individual_device, individual_device_index)| {
+                            Zip::new((&req.data.inputs, 0..)).
+                                map(|(_, individual_input_index)| {
+                                    InputIndex {
+                                        allocation: allocation_index_clone,
+                                        device: individual_device_index,
+                                        input: individual_input_index
+                                    }
+                                })
+                        })
+                }))
+}
+     */
+    fn iter_state_index(&'a self) -> Vec<InputIndex>
+    {
+        let mut vec = Vec::new();
+        for (req, allocation, allocation_index) in Zip::new((&self.requirements, &self.allocations, 0..)) {
+            for (individual_device, individual_device_index) in Zip::new((allocation, 0..)) {
+                for (input, individual_input_index) in Zip::new((&req.data.inputs, 0..)) {
+                    vec.push(InputIndex {
+                        allocation: allocation_index,
+                        device: individual_device_index,
+                        input: individual_input_index
+                    })
+                }
+            }
+        }
+        vec
+    }
+
+    fn get_individual_device(&self, index: &InputIndex) -> Arc<Device> {
+        self.allocations[index.allocation][index.device].data.clone()
+    }
+
+    fn get_input(&self, index: &InputIndex) -> InputCapability {
+        self.requirements[index.allocation].data.inputs[index.input].data.clone()
+    }
+}
+
+struct InputIndex {
+    allocation: usize,
+    device: usize,
+    input: usize,
+}
+
+
 struct ConditionState {
     are_conditions_met: bool
 }
 
 type InputState = Vec<Vec<Vec<Option<Json>>>>;
-struct MonitorTask {
-    watcher: Watcher,
-
+struct MonitorTaskState {
     // Invariant: len() is the same as that of app.code
     trigger_condition_state: Vec<ConditionState>,
 
@@ -90,10 +146,21 @@ struct MonitorTask {
 
     witnesses: Vec<Witness>,
 
+    app: MonitorApp,
+}
+impl MonitorTaskState {
+    fn set_state(&mut self, index: &InputIndex, value: Option<Json>) {
+        self.input_state[index.allocation][index.device][index.input] = value;
+    }
+}
+
+struct MonitorComm {
     tx: Sender<MonitorOp>,
     rx: Receiver<MonitorOp>,
-
-    app: MonitorApp,
+}
+struct MonitorTask {
+    state: MonitorTaskState,
+    comm: MonitorComm,
 }
 
 impl MonitorTask {
@@ -131,6 +198,25 @@ impl MonitorTask {
         let mut witnesses = Vec::new();
         let (tx, rx) = channel();
 
+        for state_index in app.iter_state_index() {
+            // FIXME: We currently use `Range::any()` for simplicity.
+            // However, in most cases, we should be able to look inside
+            // the condition to build a better `Range`.
+            witnesses.push(
+                watcher.add(
+                    &app.get_individual_device(&state_index), // FIXME: Implement
+                    &app.get_input(&state_index), // FIXME: Implement
+                    &Range::any(),
+                    |data| {
+                        let _ = tx.send(MonitorOp::Update {
+                            data: data,
+                            index: state_index,
+                        });
+                        // Ignore errors. If the thread is shutting down, it's ok to lose messages.
+                    }));
+        }
+
+        /*
         for (req, allocation, allocation_state, allocation_index) in Zip::new((&app.requirements, &app.allocations, &full_input_state, 0..)) {
             for (individual_device, individual_device_state, individual_device_index) in Zip::new((allocation, allocation_state, 0..)) {
                 for (input, individual_input_state, individual_input_index) in Zip::new((&req.data.inputs, individual_device_state, 0..)) {
@@ -154,36 +240,38 @@ impl MonitorTask {
                 }
             }
         }
+         */
 
         MonitorTask {
-            watcher: watcher,
-            trigger_condition_state: trigger_condition_state,
-            input_state: full_input_state,
-            witnesses: witnesses,
-            app: app,
-            tx: tx,
-            rx: rx,
+            state: MonitorTaskState {
+                trigger_condition_state: trigger_condition_state,
+                input_state: full_input_state,
+                witnesses: witnesses,
+                app: app,
+            },
+            comm: MonitorComm {
+                tx: tx,
+                rx: rx,
+            }
         }
     }
 
     fn run(&mut self) {
-        for msg in &self.rx {
+        for msg in &self.comm.rx {
             use self::MonitorOp::*;
             match msg {
                 Update {
                     data,
-                    allocation_index,
-                    individual_device_index,
-                    individual_input_index
-                } => { // FIXME: Three raw indices make for a crappy data structure.
+                    index,
+                } => {
                     // Update the state
-                    self.input_state[allocation_index][individual_device_index][individual_input_index] = Some(data);
+                    self.state.set_state(&index, Some(data));
 
                     // Find out if we should execute triggers.
                     // FIXME: We could optimize this by finding out which triggers
                     // are tainted by the update and only rechecking these.
-                    for (trigger, trigger_condition_state) in Zip::new((&self.app.code, &mut self.trigger_condition_state)) {
-                        if trigger.condition.is_met(&self.input_state) {
+                    for (trigger, trigger_condition_state) in Zip::new((&self.state.app.code, &mut self.state.trigger_condition_state)) {
+                        if trigger.condition.is_met(&self.state.input_state) {
                             if !trigger_condition_state.are_conditions_met {
                                 // Conditions were not met, now they are, so it is
                                 // time to start executing. We copy the inputs
@@ -192,8 +280,8 @@ impl MonitorTask {
                                 // FIXME: Handle cooldown.
                                 
                                 trigger_condition_state.are_conditions_met = true;
-                                let _ = self.tx.send(MonitorOp::Execute {
-                                    state: self.input_state.clone(),
+                                let _ = self.comm.tx.send(MonitorOp::Execute {
+                                    state: self.state.input_state.clone(),
                                     commands: trigger.execute.clone()
                                 }); // Ignore errors. If the thread is shutting down, it's ok to lose messages.
                             }
@@ -207,7 +295,7 @@ impl MonitorTask {
                 }
                 Stop => {
                     // Clean up watcher, stop the thread.
-                    self.witnesses.clear();
+                    self.state.witnesses.clear();
                     return;
                 }
             }
@@ -216,7 +304,7 @@ impl MonitorTask {
 }
 
 enum MonitorOp {
-    Update{data: Json, allocation_index: usize, individual_device_index: usize, individual_input_index: usize},
+    Update{data: Json, index: InputIndex},
     Execute{state: InputState, commands: Vec<Command>},
     Stop
 }
