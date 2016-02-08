@@ -216,32 +216,6 @@ impl MonitorTask {
                     }));
         }
 
-        /*
-        for (req, allocation, allocation_state, allocation_index) in Zip::new((&app.requirements, &app.allocations, &full_input_state, 0..)) {
-            for (individual_device, individual_device_state, individual_device_index) in Zip::new((allocation, allocation_state, 0..)) {
-                for (input, individual_input_state, individual_input_index) in Zip::new((&req.data.inputs, individual_device_state, 0..)) {
-                    // FIXME: We currently use `Range::any()` for simplicity.
-                    // However, in most cases, we should be able to look inside
-                    // the condition to build a better `Range`.
-                    witnesses.push(
-                        watcher.add(
-                            &individual_device.data,
-                            &input.data,
-                            &Range::any(),
-                            |data| {
-                                let _ = tx.send(MonitorOp::Update {
-                                    data: data,
-                                    allocation_index: allocation_index,
-                                    individual_device_index: individual_device_index,
-                                    individual_input_index: individual_input_index
-                                }); // FIXME: Find a better structure than sending indices.
-                                // Ignore errors. If the thread is shutting down, it's ok to lose messages.
-                            }));
-                }
-            }
-        }
-         */
-
         MonitorTask {
             state: MonitorTaskState {
                 trigger_condition_state: trigger_condition_state,
@@ -271,23 +245,30 @@ impl MonitorTask {
                     // FIXME: We could optimize this by finding out which triggers
                     // are tainted by the update and only rechecking these.
                     for (trigger, trigger_condition_state) in Zip::new((&self.state.app.code, &mut self.state.trigger_condition_state)) {
-                        if trigger.condition.is_met(&self.state.input_state) {
-                            if !trigger_condition_state.are_conditions_met {
-                                // Conditions were not met, now they are, so it is
-                                // time to start executing. We copy the inputs
-                                // and dispatch to a background thread
-
-                                // FIXME: Handle cooldown.
-                                
-                                trigger_condition_state.are_conditions_met = true;
-                                let _ = self.comm.tx.send(MonitorOp::Execute {
-                                    state: self.state.input_state.clone(),
-                                    commands: trigger.execute.clone()
-                                }); // Ignore errors. If the thread is shutting down, it's ok to lose messages.
-                            }
-                        } else {
-                            trigger_condition_state.are_conditions_met = false;
+                        let is_met = trigger.condition.is_met(&self.state.input_state);
+                        if is_met == trigger_condition_state.are_conditions_met {
+                            // No change in conditions. Nothing to do.
+                            continue;
                         }
+                        trigger_condition_state.are_conditions_met = is_met;
+                        if !is_met {
+                            // Conditions were met, now they are not anymore.
+                            // The next time they are met, we can trigger
+                            // a new execution.
+                            continue;
+                        }
+                        // Conditions were not met, now they are, so it is
+                        // time to start executing. We copy the inputs
+                        // and dispatch to a background thread
+
+                        // FIXME: Handle cooldown.
+                                
+                        trigger_condition_state.are_conditions_met = true;
+                        let _ = self.comm.tx.send(MonitorOp::Execute {
+                            state: self.state.input_state.clone(),
+                            commands: trigger.execute.clone()
+                        });
+                        // Ignore errors. If the thread is shutting down, it's ok to lose messages.
                     }
                 },
                 Execute {..} => {
