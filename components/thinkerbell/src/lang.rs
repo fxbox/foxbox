@@ -64,9 +64,13 @@ struct MonitorApp {
     /// - when installing an application with a web front-end.
     allocations: Vec<Vec<Named<Arc<Device>>>>,
 
-    code: Vec<Trigger>,
+    /// A set of rules, stating what must be done in which circumstance.
+    rules: Vec<Trigger>,
 
-    is_running: bool,
+    /// Either `None` if the application is not launched, or `Some(tx)`,
+    /// where `tx` is a channel used to communicate with the thread
+    /// running the application.
+    command_sender: Option<Sender<MonitorOp>>,
 }
 
 impl<'a> MonitorApp {
@@ -135,41 +139,55 @@ struct ConditionState {
 
 type InputState = Vec<Vec<Vec<Option<Json>>>>;
 struct MonitorTaskState {
-    // Invariant: len() is the same as that of app.code
+    /// The state of each trigger.
+    ///
+    /// Invariant: len() is the same as that of `self.app.rule`s
     trigger_condition_state: Vec<ConditionState>,
 
     /// For each device set allocated, for each individual device
     /// allocated, for each input watched by the app, the latest state
     /// received.
-    // Invariant: outer len() is the same as that of self.requirements.
-    // Invariant: inner len() is the same as number of input devices bound
-    // to the corresponding requirement. May be empty.
+    ///
+    /// Use `InputBinding` to access the data.
     input_state: InputState,
 
     witnesses: Vec<Witness>,
 
+    /// A clone of the code being executed.
     app: MonitorApp,
 }
 
+/// The part of the monitor used to communicate between threads.
+///
+/// Kept separate to help the borrow checker understand what we're
+/// accessing at any time.
 struct MonitorComm {
     tx: Sender<MonitorOp>,
     rx: Receiver<MonitorOp>,
 }
+
+/// A MonitorApp currently being executed.
+///
+/// Each MonitorTask runs on its own thread.
 struct MonitorTask {
     state: MonitorTaskState,
     comm: MonitorComm,
 }
 
 impl MonitorTask {
-    fn new(app: MonitorApp) -> Self {
+    /// Create a new MonitorTask.
+    ///
+    /// This creates the data structures and initializes watching,
+    /// but the task is not launched
+    fn start(app: MonitorApp) -> Sender<MonitorOp> {
         // Initialize condition state.
-        let mut trigger_condition_state = Vec::with_capacity(app.code.len());
-        for _ in &app.code {
+        let mut trigger_condition_state = Vec::with_capacity(app.rules.len());
+        for _ in &app.rules {
             trigger_condition_state.push(ConditionState {
                 are_conditions_met: false,
             });
         }
-        assert_eq!(trigger_condition_state.len(), app.code.len());
+        assert_eq!(trigger_condition_state.len(), app.rules.len());
         
         // Initialize input state.
         let mut full_input_state = Vec::with_capacity(app.requirements.len());
@@ -199,21 +217,29 @@ impl MonitorTask {
             // FIXME: We currently use `Range::any()` for simplicity.
             // However, in most cases, we should be able to look inside
             // the condition to build a better `Range`.
+
+            // FIXME: We currently monitor all the inputs that are
+            // used by this rule, even if they are not part of the
+            // condition (e.g. we monitor the camera all the time even
+            // if we only need to trigger when an intruder enters).
             witnesses.push(
                 watcher.add(
                     &state_index.get_individual_device(&app),
                     &state_index.get_input(&app),
                     &Range::any(),
                     |data| {
-                        let _ = tx.send(MonitorOp::Update {
+                        let _ignored = tx.send(MonitorOp::Update {
                             data: data,
                             index: state_index,
                         });
-                        // Ignore errors. If the thread is shutting down, it's ok to lose messages.
+                        // Ignore errors. If the thread is shutting
+                        // down, it's ok to lose messages.
                     }));
         }
 
-        MonitorTask {
+        let result = tx.clone();
+
+        let mut task = MonitorTask {
             state: MonitorTaskState {
                 trigger_condition_state: trigger_condition_state,
                 input_state: full_input_state,
@@ -224,9 +250,17 @@ impl MonitorTask {
                 tx: tx,
                 rx: rx,
             }
-        }
+        };
+
+        thread::spawn(move || {
+            task.run();
+        });
+
+        result
     }
 
+    /// Execute the monitoring task.
+    /// This currently expects to be executed in its own thread.
     fn run(&mut self) {
         for msg in &self.comm.rx {
             use self::MonitorOp::*;
@@ -241,7 +275,7 @@ impl MonitorTask {
                     // Find out if we should execute triggers.
                     // FIXME: We could optimize this by finding out which triggers
                     // are tainted by the update and only rechecking these.
-                    for (trigger, trigger_condition_state) in Zip::new((&self.state.app.code, &mut self.state.trigger_condition_state)) {
+                    for (trigger, trigger_condition_state) in Zip::new((&self.state.app.rules, &mut self.state.trigger_condition_state)) {
                         let is_met = trigger.condition.is_met(&self.state.input_state);
                         if is_met == trigger_condition_state.are_conditions_met {
                             // No change in conditions. Nothing to do.
@@ -261,7 +295,7 @@ impl MonitorTask {
                         // FIXME: Handle cooldown.
                                 
                         trigger_condition_state.are_conditions_met = true;
-                        let _ = self.comm.tx.send(MonitorOp::Execute {
+                        let _ignored = self.comm.tx.send(MonitorOp::Execute {
                             state: self.state.input_state.clone(),
                             commands: trigger.execute.clone()
                         });
@@ -288,24 +322,41 @@ enum MonitorOp {
 }
 
 impl MonitorApp {
+    ///
+    /// Start executing the application.
+    ///
     pub fn start(&mut self) {
-        if self.is_running {
+        if self.command_sender.is_some() {
             return;
         }
-        self.is_running = true;
+        self.command_sender = Some(MonitorTask::start(self.clone()));
+    }
 
-        let mut task = MonitorTask::new(self.clone());
-        thread::spawn(move || {
-            task.run();
-        });
+    ///
+    /// Stop the execution of the application.
+    ///
+    pub fn stop(&mut self) {
+        match self.command_sender {
+            None => {
+                /* Nothing to stop */
+                return;
+            },
+            Some(ref tx) => {
+                // Shutdown the application, asynchronously.
+                let _ignored = tx.send(MonitorOp::Stop);
+                // Do not return.
+            }
+        }
+        self.command_sender = None;
     }
 }
 
 
 
+
 /// Data labelled with a user-readable name.
 #[derive(Clone)]
-struct Named<T> {
+struct Named<T> where T: Clone {
     /// User-readable name.
     name: String,
 
