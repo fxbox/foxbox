@@ -5,6 +5,8 @@
 // Needed to derive `Serialize` on ServiceProperties
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
+// For Docopt macro
+#![plugin(docopt_macros)]
 
 // Needed for IntoIter in context.rs
 #![feature(collections)]
@@ -37,9 +39,8 @@ mod controler;
 
 use context::Context;
 use controler::Controler;
-use docopt::Docopt;
 
-const USAGE: &'static str = "
+docopt!(Args derive Debug, "
 Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>]
 
 Options:
@@ -48,28 +49,15 @@ Options:
     -p, --port <port>        Set port to listen on for http connections.
     -w, --wsport <wsport>    Set port to listen on for websocket.
     -h, --help               Print this help menu.
-";
-
-#[derive(RustcDecodable)]
-struct Args {
-    flag_verbose: bool,
-    flag_name: Option<String>,
-    flag_port: Option<u16>,
-    flag_wsport: Option<u16>,
-    flag_help: bool,
-}
+",
+        flag_name: Option<String>,
+        flag_port: Option<u16>,
+        flag_wsport: Option<u16>);
 
 fn main() {
     env_logger::init().unwrap();
 
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.decode())
-        .unwrap_or_else(|e| e.exit());
-
-    if args.flag_help {
-        println!("{}", USAGE);
-        return
-    }
+    let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
     if let Ok(mut event_loop) = mio::EventLoop::new() {
         let sender = event_loop.channel();
@@ -93,8 +81,8 @@ fn options_are_good() {
         let argv = || vec!["foxbox", "-p", "1234", "-n", "foobar",
                            "-w", "4567", "-v"];
 
-        let args: Args = Docopt::new(USAGE)
-            .and_then(|d| d.argv(argv().into_iter()).decode())
+        let args: Args = Args::docopt().argv(argv().into_iter())
+            .decode()
             .unwrap_or_else(|e| e.exit());
 
         assert_eq!(args.flag_verbose, true);
@@ -109,8 +97,8 @@ fn options_are_good() {
                            "--name", "foobar", "--wsport", "4567",
                            "--verbose"];
 
-        let args: Args = Docopt::new(USAGE)
-            .and_then(|d| d.argv(argv().into_iter()).decode())
+        let args: Args = Args::docopt().argv(argv().into_iter())
+            .decode()
             .unwrap_or_else(|e| e.exit());
 
         assert_eq!(args.flag_verbose, true);
