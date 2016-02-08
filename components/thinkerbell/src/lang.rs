@@ -409,7 +409,7 @@ struct Conjunction {
 }
 
 impl Conjunction {
-    fn is_met(&self, input_state: &InputState) -> bool { // FIXME: Should be a bool labelled by the devices involved
+    fn is_met(&self, input_state: &InputState) -> bool {
         for condition in &self.all {
             if !condition.is_met(input_state) {
                 return false;
@@ -437,8 +437,8 @@ impl Condition {
     /// Find out if *any* of the sensors allocated to this requirement
     /// has yielded a value that is in the given range.
     fn is_met(&self, input_state: &InputState) -> bool {
-        for measure in &input_state[self.requirement_index][self.input_index] {
-            if match *measure {
+        for (individual_device, individual_device_index) in Zip::new((&input_state[self.requirement_index], 0..)) {
+            if match individual_device[self.input_index] {
                 None => { false /* We haven't received a measurement yet.*/ },
                 Some(ref data) => {
                     use dependencies::Range::*;
@@ -469,8 +469,7 @@ impl Condition {
                     }
                 }
             }
-
- {
+            {
                 return true;
             }
         }
