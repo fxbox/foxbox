@@ -82,7 +82,7 @@ impl Context {
 
 #[test]
 #[allow(unused_variables)]
-fn test_should_add_a_service() {
+fn test_context_service() {
     use service::{ Service, ServiceProperties };
     use iron::{Request, Response, IronResult};
 
@@ -91,11 +91,11 @@ fn test_should_add_a_service() {
     impl Service for ServiceStub {
         fn get_properties(&self) -> ServiceProperties {
             ServiceProperties {
-                id: '1'.to_string(),
+                id: "1".to_owned(),
                 name: "dummy service".to_owned(),
                 description: "really nothing to see".to_owned(),
-                http_url: '2'.to_string(),
-                ws_url: '3'.to_string()
+                http_url: "2".to_owned(),
+                ws_url: "3".to_owned()
             }
         }
         fn start(&self)  {}
@@ -106,9 +106,37 @@ fn test_should_add_a_service() {
     }
 
     let service = ServiceStub;
-    let mut foo = Context::new(false, Some("localhost".to_owned()), None, None);
+    let context = Context::shared(false, Some("localhost".to_owned()), None, None);
+    let mut foo = context.lock().unwrap();
 
     assert_eq!(foo.services.is_empty(), true);
     foo.add_service(Box::new(service));
     assert_eq!(foo.services.is_empty(), false);
+    assert_eq!(foo.services_count(), 1);
+
+    // Verify that the service with id "1" is there.
+    {
+        let service1 = foo.get_service("1");
+        match service1 {
+            Some(svc) => {
+                assert_eq!(svc.get_properties().id, "1");
+            }
+            None => assert!(false, "No service with id 1")
+        }
+    }
+
+    let id = "1".to_owned();
+    assert_eq!(foo.get_http_root_for_service(id.clone()),
+               "http://localhost:3000/services/1/");
+    assert_eq!(foo.get_ws_root_for_service(id.clone()),
+               "ws://localhost:4000/services/1/");
+
+    match foo.services_as_json() {
+        Ok(txt) => assert_eq!(txt, "{\"1\":{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}}"),
+        Err(err) => assert!(false, err)
+    }
+
+    foo.remove_service(id);
+    assert_eq!(foo.services_count(), 0);
+    assert_eq!(foo.services.is_empty(), true);
 }
