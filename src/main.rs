@@ -42,7 +42,7 @@ extern crate uuid;
 extern crate ws;
 
 mod controller;
-mod dummy_adapter;
+mod adapters;
 mod events;
 mod http_server;
 mod managed_process;

@@ -25,11 +25,13 @@ pub fn create<T: Controller>(controller: T) -> Router {
     });
 
     let c2 = controller.clone();
-    router.get(":service/:command", move |req: &mut Request| -> IronResult<Response> {
+    router.any(":service/:command", move |req: &mut Request| -> IronResult<Response> {
         // Call a function on a service.
-        let id = req.extensions.get::<Router>().unwrap().find("service").unwrap_or("");
-        c2.dispatch_service_request(id.to_owned(), req)
+        let id = req.extensions.get::<Router>().unwrap()
+            .find("service").unwrap_or("").to_owned();
+        c2.dispatch_service_request(id, req)
     });
+
 
     router
 }

@@ -22,7 +22,7 @@ pub trait Service : Send + Sync {
     fn get_properties(&self) -> ServiceProperties;
     fn start(&self);
     fn stop(&self);
-    fn process_request(&self, req: &Request) -> IronResult<Response>;
+    fn process_request(&self, req: &mut Request) -> IronResult<Response>;
 }
 
 impl Serialize for Service {
