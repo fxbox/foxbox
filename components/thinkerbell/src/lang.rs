@@ -9,7 +9,7 @@
 /// complex monitors can installed from the web from a master device
 /// (i.e. the user's cellphone or smart tv).
 
-use dependencies::{DeviceKind, InputCapability, OutputCapability, Device, Range, Watcher, Witness};
+use dependencies::{DeviceKind, InputCapability, OutputCapability, Device, Range, Watcher};
 
 use std::time::Duration;
 use std::collections::HashMap;
@@ -151,8 +151,6 @@ struct MonitorTaskState {
     /// Use `InputBinding` to access the data.
     input_state: InputState,
 
-    witnesses: Vec<Witness>,
-
     /// A clone of the code being executed.
     app: MonitorApp,
 }
@@ -175,11 +173,11 @@ struct MonitorTask {
 }
 
 impl MonitorTask {
+
     /// Create a new MonitorTask.
     ///
-    /// This creates the data structures and initializes watching,
-    /// but the task is not launched
-    fn start(app: MonitorApp) -> Sender<MonitorOp> {
+    /// To initiate watching, use method `run()`.
+    fn new(app: MonitorApp) -> Self {
         // Initialize condition state.
         let mut trigger_condition_state = Vec::with_capacity(app.rules.len());
         for _ in &app.rules {
@@ -209,11 +207,33 @@ impl MonitorTask {
         assert_eq!(full_input_state.len(), app.requirements.len());
 
         // Start watching
-        let mut watcher = Watcher::new();
-        let mut witnesses = Vec::new();
         let (tx, rx) = channel();
 
-        for state_index in app.iter_state_index() {
+        MonitorTask {
+            state: MonitorTaskState {
+                trigger_condition_state: trigger_condition_state,
+                input_state: full_input_state,
+                app: app,
+            },
+            comm: MonitorComm {
+                tx: tx,
+                rx: rx,
+            }
+        }
+    }
+
+    /// Get a channel that may be used to send commands to the task.
+    fn get_command_sender(&self) -> Sender<MonitorOp> {
+        self.comm.tx.clone()
+    }
+
+    /// Execute the monitoring task.
+    /// This currently expects to be executed in its own thread.
+    fn run(&mut self) {
+        let mut watcher = Watcher::new();
+        let mut witnesses = Vec::new();
+
+        for state_index in self.state.app.iter_state_index() {
             // FIXME: We currently use `Range::any()` for simplicity.
             // However, in most cases, we should be able to look inside
             // the condition to build a better `Range`.
@@ -224,11 +244,11 @@ impl MonitorTask {
             // if we only need to trigger when an intruder enters).
             witnesses.push(
                 watcher.add(
-                    &state_index.get_individual_device(&app),
-                    &state_index.get_input(&app),
+                    &state_index.get_individual_device(&self.state.app),
+                    &state_index.get_input(&self.state.app),
                     &Range::any(),
                     |data| {
-                        let _ignored = tx.send(MonitorOp::Update {
+                        let _ignored = self.comm.tx.send(MonitorOp::Update {
                             data: data,
                             index: state_index,
                         });
@@ -237,31 +257,6 @@ impl MonitorTask {
                     }));
         }
 
-        let result = tx.clone();
-
-        let mut task = MonitorTask {
-            state: MonitorTaskState {
-                trigger_condition_state: trigger_condition_state,
-                input_state: full_input_state,
-                witnesses: witnesses,
-                app: app,
-            },
-            comm: MonitorComm {
-                tx: tx,
-                rx: rx,
-            }
-        };
-
-        thread::spawn(move || {
-            task.run();
-        });
-
-        result
-    }
-
-    /// Execute the monitoring task.
-    /// This currently expects to be executed in its own thread.
-    fn run(&mut self) {
         for msg in &self.comm.rx {
             use self::MonitorOp::*;
             match msg {
@@ -307,7 +302,6 @@ impl MonitorTask {
                 }
                 Stop => {
                     // Clean up watcher, stop the thread.
-                    self.state.witnesses.clear();
                     return;
                 }
             }
@@ -329,7 +323,11 @@ impl MonitorApp {
         if self.command_sender.is_some() {
             return;
         }
-        self.command_sender = Some(MonitorTask::start(self.clone()));
+        let mut task = MonitorTask::new(self.clone());
+        self.command_sender = Some(task.get_command_sender());
+        thread::spawn(move || {
+            task.run();
+        });
     }
 
     ///
