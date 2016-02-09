@@ -39,7 +39,7 @@ This should work straight-forward. Install a rust nightly, clone the repo, and t
 ## Building and running locally on OS X
 
 ``` bash
-$ brew install openssl ... ... ... # TODO: other build dependencies?
+$ brew install openssl
 $ brew install multirust
 $ multirust update
 $ multirust default nightly
