@@ -1,0 +1,26 @@
+{
+  "name": "foxbox",
+  "version": "1.0.0",
+  "description": "The FoxBox daemon",
+  "engines": {
+    "node": ">=4.0.0"
+  },
+  "scripts": {
+    "test": "./node_modules/.bin/mocha test/selenium/ftu_test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fxbox/foxbox.git"
+  },
+  "author": "The FoxLink Team",
+  "license": "MPL-2.0",
+  "bugs": {
+    "url": "https://github.com/fxbox/foxbox/issues"
+  },
+  "homepage": "https://github.com/fxbox/foxbox",
+  "devDependencies": {
+    "jshint": "2.9.1",
+    "mocha": "2.4.5",
+    "selenium-webdriver": "2.48.2"
+  }
+}

@@ -15,7 +15,7 @@ describe('setup page', function() {
       build();
   });
   beforeEach(function() {
-    driver.get('http://foxbox.local:3000/');
+    driver.get('http://localhost:3000/');
   });
   after(function() {
     driver.quit();
