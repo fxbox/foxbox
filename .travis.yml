@@ -3,16 +3,13 @@ rust:
     - nightly
 
 before_script:
-    - "sh -e /etc/init.d/xvfb start"
-    - "export DISPLAY=:99.0"
-    - "wget http://selenium-release.storage.googleapis.com/2.50/selenium-server-standalone-2.50.1.jar"
-    - "java -jar selenium-server-standalone-2.50.1.jar > /dev/null &"
-    - sleep 5
     - nvm install 4.2
     - nvm use 4.2
+    - npm install -g selenium-standalone
     - npm install selenium-webdriver
+    - selenium-standalone install
 
 script:
     - cargo build # Linter is also executed here
     - RUST_BACKTRACE=1 cargo test
-    - (cargo run > /dev/null &) ; node test/selenium/ftu_test.js
+    - (cargo run > /dev/null & selenium-standalone start &) ; sleep 5 ; node test/selenium/ftu_test.js
