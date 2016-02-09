@@ -16,12 +16,13 @@ use std::cmp::{Eq, Ord, Ordering};
 #[derive(Clone)]
 pub struct DeviceKind;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct InputCapability;
 
 #[derive(Clone)]
 pub struct OutputCapability;
 
+#[derive(Clone)]
 pub struct Device;
 
 #[derive(Clone)]
