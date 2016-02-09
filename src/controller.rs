@@ -11,20 +11,20 @@ use http_server::HttpServer;
 use mio::EventLoop;
 use service::{ Service, ServiceAdapter };
 
-pub struct Controler {
+pub struct Controller {
     sender: EventSender,
     context: SharedContext
 }
 
-impl Controler {
-    /// Construct a new `Controler`.
+impl Controller {
+    /// Construct a new `Controller`.
     ///
     /// ```
-    /// # use service_manager::Controler;
-    /// let controler = Controller::new();
+    /// # use service_manager::Controller;
+    /// let controller = Controller::new();
     /// ```
-    pub fn new(sender: EventSender, context: SharedContext) -> Controler {
-        Controler {
+    pub fn new(sender: EventSender, context: SharedContext) -> Controller {
+        Controller {
             sender: sender,
             context: context
         }
@@ -43,12 +43,12 @@ impl Controler {
     }
 }
 
-impl mio::Handler for Controler {
+impl mio::Handler for Controller {
     type Timeout = ();
     type Message = EventData;
 
     fn notify(&mut self,
-              _: &mut EventLoop<Controler>,
+              _: &mut EventLoop<Controller>,
               data: EventData) {
         println!("Receiving a notification! {}", data.description());
 

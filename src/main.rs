@@ -35,10 +35,10 @@ mod dummy_adapter;
 mod events;
 mod http_server;
 mod service;
-mod controler;
+mod controller;
 
 use context::Context;
-use controler::Controler;
+use controller::Controller;
 
 docopt!(Args derive Debug, "
 Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>]
@@ -64,10 +64,10 @@ fn main() {
 
         let context = Context::shared(args.flag_verbose, args.flag_name,
                                       args.flag_port, args.flag_wsport);
-        let mut controler = Controler::new(sender, context);
-        controler.start();
+        let mut controller = Controller::new(sender, context);
+        controller.start();
 
-        event_loop.run(&mut controler)
+        event_loop.run(&mut controller)
                   .unwrap_or_else(|_| {  panic!("Starting the event loop failed!"); });
     } else {
         panic!("Creating the event loop failed!");
