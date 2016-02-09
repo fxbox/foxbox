@@ -13,7 +13,7 @@ use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex };
 
-// The `global` context available to all.
+/// The `global` context available to all.
 pub struct Context {
     pub verbose: bool,
 

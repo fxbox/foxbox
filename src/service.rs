@@ -18,6 +18,7 @@ pub struct ServiceProperties {
     pub ws_url: String
 }
 
+/// A `Service` represents an individual device.
 pub trait Service : Send {
     fn get_properties(&self) -> ServiceProperties;
     fn start(&self);
@@ -33,6 +34,12 @@ impl Serialize for Service {
     }
 }
 
+/// A `ServiceAdapter` implements functionality to discover and register a specific type of IoT
+/// device protocol. A `ServiceAdapter` can instantiate multiple `Service`s, each representing
+/// an individual device.
+///
+/// For instance, a `LightBulbAdapter` might instantiate a `LightBulbService` for each light bulb
+/// it discovers, registering each with the global `Context`.
 pub trait ServiceAdapter {
     fn get_name(&self) -> String;
     fn start(&self);
