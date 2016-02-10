@@ -12,7 +12,7 @@ env_logger = "0.3.2"
 iron = "0.2.6"
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
-mount = "0.0.9"
+mount = "0.0.10"
 router = "0.1.0"
 rustc-serialize = "0.3"
 serde = "0.6.11"
