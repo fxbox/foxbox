@@ -22,3 +22,6 @@ serde_macros = "0.6.11"
 staticfile = "0.1.0"
 uuid = "0.1.18"
 websocket = "0.15.0"
+# TODO: Put a version number to stainless, once a version newer than 0.1.3 is
+# released: https://github.com/reem/stainless/issues/43#issuecomment-174245604
+stainless = { git = "https://github.com/reem/stainless.git", rev = "82392f2e" }

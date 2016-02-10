@@ -80,52 +80,46 @@ impl Context {
     }
 }
 
-#[cfg(test)]
-#[allow(unused_variables)]
-mod tests {
-    use super::*;
-    use service::{ Service, ServiceProperties };
-    use iron::{ Request, Response, IronResult };
 
-    struct ServiceStub;
+describe! context {
 
-    impl Service for ServiceStub {
-        fn get_properties(&self) -> ServiceProperties {
-            ServiceProperties {
-                id: "1".to_owned(),
-                name: "dummy service".to_owned(),
-                description: "really nothing to see".to_owned(),
-                http_url: "2".to_owned(),
-                ws_url: "3".to_owned()
+    before_each {
+        use service::{ Service, ServiceProperties };
+        use iron::{ Request, Response, IronResult };
+
+        struct ServiceStub;
+
+        impl Service for ServiceStub {
+            fn get_properties(&self) -> ServiceProperties {
+                ServiceProperties {
+                    id: "1".to_owned(),
+                    name: "dummy service".to_owned(),
+                    description: "really nothing to see".to_owned(),
+                    http_url: "2".to_owned(),
+                    ws_url: "3".to_owned()
+                }
+            }
+            fn start(&self)  {}
+            fn stop(&self) {}
+            fn process_request(&self, _: &Request) -> IronResult<Response> {
+                Ok(Response::new())
             }
         }
-        fn start(&self)  {}
-        fn stop(&self) {}
-        fn process_request(&self, req: &Request) -> IronResult<Response> {
-            Ok(Response::new())
-        }
+
+        let service = ServiceStub;
+        let context = Context::shared(false, Some("localhost".to_owned()), None, None);
+        let mut locked_context = context.lock().unwrap();
     }
 
-    mod add_service {
-        use super::super::*;
-
-        #[test]
-        fn test_should_increase_number_of_services() {
-            let service = super::ServiceStub;
-            let context = Context::shared(false, Some("localhost".to_owned()), None, None);
-            let mut locked_context = context.lock().unwrap();
-
+    describe! add_service {
+        it "should increase number of services" {
             assert_eq!(locked_context.services.is_empty(), true);
             locked_context.add_service(Box::new(service));
             assert_eq!(locked_context.services.is_empty(), false);
             assert_eq!(locked_context.services_count(), 1);
         }
 
-        #[test]
-        fn test_should_make_service_available() {
-            let service = super::ServiceStub;
-            let context = Context::shared(false, Some("localhost".to_owned()), None, None);
-            let mut locked_context = context.lock().unwrap();
+        it "should make service available" {
             locked_context.add_service(Box::new(service));
 
             let service1 = locked_context.get_service("1");
@@ -137,33 +131,19 @@ mod tests {
             }
         }
 
-        #[test]
-        fn test_should_create_http_root() {
-            let service = super::ServiceStub;
-            let context = Context::shared(false, Some("localhost".to_owned()), None, None);
-            let mut locked_context = context.lock().unwrap();
+        it "should create http root" {
             locked_context.add_service(Box::new(service));
-
             assert_eq!(locked_context.get_http_root_for_service("1".to_string()),
                        "http://localhost:3000/services/1/");
         }
 
-        #[test]
-        fn test_should_create_ws_root() {
-            let service = super::ServiceStub;
-            let context = Context::shared(false, Some("localhost".to_owned()), None, None);
-            let mut locked_context = context.lock().unwrap();
+        it "should create ws root" {
             locked_context.add_service(Box::new(service));
-
             assert_eq!(locked_context.get_ws_root_for_service("1".to_string()),
                        "ws://localhost:4000/services/1/");
         }
 
-        #[test]
-        fn test_should_return_a_json() {
-            let service = super::ServiceStub;
-            let context = Context::shared(false, Some("localhost".to_owned()), None, None);
-            let mut locked_context = context.lock().unwrap();
+        it "should return a json" {
             locked_context.add_service(Box::new(service));
 
             match locked_context.services_as_json() {
@@ -173,12 +153,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_should_delete_a_service() {
-        let service = ServiceStub;
-        let context = Context::shared(false, Some("localhost".to_owned()), None, None);
-        let mut locked_context = context.lock().unwrap();
 
+    it "should delete a service" {
         locked_context.add_service(Box::new(service));
         let id = "1".to_owned();
         locked_context.remove_service(id);
