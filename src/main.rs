@@ -41,6 +41,11 @@ mod http_server;
 mod service;
 mod controller;
 
+mod stubs {
+    #![allow(dead_code)]
+    pub mod service;
+}
+
 use context::Context;
 use controller::Controller;
 
