@@ -1,5 +1,8 @@
 # ThinkerBell: A scripting engine for the world of IoT
 
+[![Build Status](https://api.travis-ci.org/fxbox/thinkerbell.svg?branch=master)](https://api.travis-ci.org/fxbox/thinkerbell)
+
+
 These notes concentrate on Monitors, i.e. code that should executed on
 the FoxBox.
 
