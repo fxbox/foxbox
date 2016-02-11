@@ -38,7 +38,7 @@ use self::chrono::{Duration, DateTime, UTC};
 /// Monitor applications are installed from a paired device. They may
 /// either be part of a broader application (which can install them
 /// through a web/REST API) or live on their own.
-pub struct Script<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+pub struct Script<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// Authorization, author, description, update url, version, ...
     metadata: (), // FIXME: Implement
 
@@ -47,35 +47,35 @@ pub struct Script<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
     /// UX. Re-allocating resources may be requested by the user, the
     /// foxbox, or an application, e.g. when replacing a device or
     /// upgrading the app.
-    requirements: Vec<Arc<Requirement<Ctx, Dev>>>,
+    requirements: Vec<Arc<Requirement<Ctx, Env>>>,
 
     /// Resources actually allocated for each requirement.
     /// This must have the same size as `requirements`.
-    allocations: Vec<Resource<Ctx, Dev>>,
+    allocations: Vec<Resource<Ctx, Env>>,
 
     /// A set of rules, stating what must be done in which circumstance.
-    rules: Vec<Trigger<Ctx, Dev>>,
+    rules: Vec<Trigger<Ctx, Env>>,
 }
 
-struct Resource<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
-    devices: Vec<Dev::Device>,
+struct Resource<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    devices: Vec<Env::Device>,
     phantom: PhantomData<Ctx>,
 }
 
 
 /// A resource needed by this application. Typically, a definition of
 /// device with some input our output capabilities.
-struct Requirement<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+struct Requirement<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The kind of resource, e.g. "a flashbulb".
-    kind: Dev::DeviceKind,
+    kind: Env::DeviceKind,
 
     /// Input capabilities we need from the device, e.g. "the time of
     /// day", "the current temperature".
-    inputs: Vec<Dev::InputCapability>,
+    inputs: Vec<Env::InputCapability>,
 
     /// Output capabilities we need from the device, e.g. "play a
     /// sound", "set luminosity".
-    outputs: Vec<Dev::OutputCapability>,
+    outputs: Vec<Env::OutputCapability>,
     
     /// Minimal number of resources required. If unspecified in the
     /// script, this is 1.
@@ -91,12 +91,12 @@ struct Requirement<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
 
 /// A single trigger, i.e. "when some condition becomes true, do
 /// something".
-struct Trigger<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+struct Trigger<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The condition in which to execute the trigger.
-    condition: Conjunction<Ctx, Dev>,
+    condition: Conjunction<Ctx, Env>,
 
     /// Stuff to do once `condition` is met.
-    execute: Vec<Statement<Ctx, Dev>>,
+    execute: Vec<Statement<Ctx, Env>>,
 
     /// Minimal duration between two executions of the trigger.  If a
     /// duration was not picked by the developer, a reasonable default
@@ -105,9 +105,9 @@ struct Trigger<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
 }
 
 /// A conjunction (e.g. a "and") of conditions.
-struct Conjunction<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+struct Conjunction<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The conjunction is true iff all of the following expressions evaluate to true.
-    all: Vec<Condition<Ctx, Dev>>,
+    all: Vec<Condition<Ctx, Env>>,
     state: Ctx::ConditionState,
 }
 
@@ -118,45 +118,45 @@ struct Conjunction<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
 ///
 /// A condition is true if *any* of the sensors allocated to this
 /// requirement has yielded a value that is in the given range.
-struct Condition<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+struct Condition<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     input: Ctx::InputSet,
-    capability: Dev::InputCapability,
+    capability: Env::InputCapability,
     range: Range,
     state: Ctx::ConditionState,
 }
 
 
 /// Stuff to actually do. In practice, this means placing calls to devices.
-struct Statement<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+struct Statement<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The resource to which this command applies.  e.g. "all
     /// heaters", "a single communication channel", etc.
     destination: Ctx::OutputSet,
 
     /// The action to execute on the resource.
-    action: Dev::OutputCapability,
+    action: Env::OutputCapability,
 
     /// Data to send to the resource.
-    arguments: HashMap<String, Expression<Ctx, Dev>>
+    arguments: HashMap<String, Expression<Ctx, Env>>
 }
 
-struct InputSet<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+struct InputSet<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The set of inputs from which to grab the value.
-    condition: Condition<Ctx, Dev>,
+    condition: Condition<Ctx, Env>,
     /// The value to grab.
-    capability: Dev::InputCapability,
+    capability: Env::InputCapability,
 }
 
 /// A value that may be sent to an output.
-enum Expression<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+enum Expression<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// A dynamic value, which must be read from one or more inputs.
     // FIXME: Not ready yet
-    Input(InputSet<Ctx, Dev>),
+    Input(InputSet<Ctx, Env>),
 
     /// A constant value.
     Value(Value),
 
     /// More than a single value.
-    Vec(Vec<Expression<Ctx, Dev>>)
+    Vec(Vec<Expression<Ctx, Env>>)
 }
 
 /// A manner of representing internal nodes.
@@ -177,9 +177,9 @@ pub trait Context {
 
 /// A script ready to be executed.
 /// Each script is meant to be executed in an individual thread.
-struct ExecutionTask<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
+struct ExecutionTask<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The current state of execution the script.
-    state: Script<Ctx, Dev>,
+    state: Script<Ctx, Env>,
 
     /// Communicating with the thread running script.
     tx: Sender<ExecutionOp>,
@@ -200,12 +200,12 @@ enum ExecutionOp {
 }
 
 
-impl<Dev> ExecutionTask<CompiledCtx<Dev>, Dev> where Dev: DeviceAccess {
+impl<Env> ExecutionTask<CompiledCtx<Env>, Env> where Env: DeviceAccess {
     /// Create a new execution task.
     ///
     /// The caller is responsible for spawning a new thread and
     /// calling `run()`.
-    fn new(script: &Script<UncheckedCtx, UncheckedDev>) -> Result<Self, Error> {
+    fn new(script: &Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
         // Prepare the script for execution:
         // - replace instances of Input with InputDev, which map
         //   to a specific device and cache the latest known value
@@ -232,7 +232,7 @@ impl<Dev> ExecutionTask<CompiledCtx<Dev>, Dev> where Dev: DeviceAccess {
     fn run(&mut self) {
         panic!("Not implemented");
         /*
-        let mut watcher = Dev::Watcher::new();
+        let mut watcher = Env::Watcher::new();
         let mut witnesses = Vec::new();
 
         // Start listening to all inputs that appear in conditions.
@@ -326,14 +326,14 @@ struct IsMet {
     new: bool,
 }
 
-impl<Dev> Trigger<CompiledCtx<Dev>, Dev> where Dev: DeviceAccess {
+impl<Env> Trigger<CompiledCtx<Env>, Env> where Env: DeviceAccess {
     fn is_met(&mut self) -> IsMet {
         self.condition.is_met()
     }
 }
 
 
-impl<Dev> Conjunction<CompiledCtx<Dev>, Dev> where Dev: DeviceAccess {
+impl<Env> Conjunction<CompiledCtx<Env>, Env> where Env: DeviceAccess {
     /// For a conjunction to be true, all its components must be true.
     fn is_met(&mut self) -> IsMet {
         let old = self.state.is_met;
@@ -355,7 +355,7 @@ impl<Dev> Conjunction<CompiledCtx<Dev>, Dev> where Dev: DeviceAccess {
 }
 
 
-impl<Dev> Condition<CompiledCtx<Dev>, Dev> where Dev: DeviceAccess {
+impl<Env> Condition<CompiledCtx<Env>, Env> where Env: DeviceAccess {
     /// Determine if one of the devices serving as input for this
     /// condition meets the condition.
     fn is_met(&mut self) -> IsMet {
@@ -439,18 +439,18 @@ pub enum Error {
 trait Rebinder {
     type SourceCtx: Context;
     type DestCtx: Context;
-    type SourceDev: DeviceAccess;
-    type DestDev: DeviceAccess;
+    type SourceEnv: DeviceAccess;
+    type DestEnv: DeviceAccess;
 
     // Rebinding the device access
-    fn rebind_device(&self, &<<Self as Rebinder>::SourceDev as DeviceAccess>::Device) ->
-        Result<<<Self as Rebinder>::DestDev as DeviceAccess>::Device, Error>;
-    fn rebind_device_kind(&self, &<<Self as Rebinder>::SourceDev as DeviceAccess>::DeviceKind) ->
-        Result<<<Self as Rebinder>::DestDev as DeviceAccess>::DeviceKind, Error>;
-    fn rebind_input_capability(&self, &<<Self as Rebinder>::SourceDev as DeviceAccess>::InputCapability) ->
-        Result<<<Self as Rebinder>::DestDev as DeviceAccess>::InputCapability, Error>;
-    fn rebind_output_capability(&self, &<<Self as Rebinder>::SourceDev as DeviceAccess>::OutputCapability) ->
-        Result<<<Self as Rebinder>::DestDev as DeviceAccess>::OutputCapability, Error>;
+    fn rebind_device(&self, &<<Self as Rebinder>::SourceEnv as DeviceAccess>::Device) ->
+        Result<<<Self as Rebinder>::DestEnv as DeviceAccess>::Device, Error>;
+    fn rebind_device_kind(&self, &<<Self as Rebinder>::SourceEnv as DeviceAccess>::DeviceKind) ->
+        Result<<<Self as Rebinder>::DestEnv as DeviceAccess>::DeviceKind, Error>;
+    fn rebind_input_capability(&self, &<<Self as Rebinder>::SourceEnv as DeviceAccess>::InputCapability) ->
+        Result<<<Self as Rebinder>::DestEnv as DeviceAccess>::InputCapability, Error>;
+    fn rebind_output_capability(&self, &<<Self as Rebinder>::SourceEnv as DeviceAccess>::OutputCapability) ->
+        Result<<<Self as Rebinder>::DestEnv as DeviceAccess>::OutputCapability, Error>;
 
     // Rebinding the context
     fn rebind_input(&self, &<<Self as Rebinder>::SourceCtx as Context>::InputSet) ->
@@ -463,9 +463,9 @@ trait Rebinder {
         Result<<<Self as Rebinder>::DestCtx as Context>::ConditionState, Error>;
 }
 
-impl<Ctx, Dev> Script<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Script<R::DestCtx, R::DestDev>, Error>
-        where R: Rebinder<SourceDev = Dev, SourceCtx = Ctx>
+impl<Ctx, Env> Script<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    fn rebind<R>(&self, rebinder: &R) -> Result<Script<R::DestCtx, R::DestEnv>, Error>
+        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
     {
         let mut rules = Vec::with_capacity(self.rules.len());
         for rule in &self.rules {
@@ -516,9 +516,9 @@ impl<Ctx, Dev> Script<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
 }
 
 
-impl<Ctx, Dev> Trigger<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Trigger<R::DestCtx, R::DestDev>, Error>
-        where R: Rebinder<SourceDev = Dev, SourceCtx = Ctx>
+impl<Ctx, Env> Trigger<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    fn rebind<R>(&self, rebinder: &R) -> Result<Trigger<R::DestCtx, R::DestEnv>, Error>
+        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
     {
         let mut execute = Vec::with_capacity(self.execute.len());
         for ex in &self.execute {
@@ -532,9 +532,9 @@ impl<Ctx, Dev> Trigger<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
     }
 }
 
-impl<Ctx, Dev> Conjunction<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Conjunction<R::DestCtx, R::DestDev>, Error>
-        where R: Rebinder<SourceDev = Dev, SourceCtx = Ctx>
+impl<Ctx, Env> Conjunction<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    fn rebind<R>(&self, rebinder: &R) -> Result<Conjunction<R::DestCtx, R::DestEnv>, Error>
+        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
     {
         let mut all = Vec::with_capacity(self.all.len());
         for c in &self.all {
@@ -548,9 +548,9 @@ impl<Ctx, Dev> Conjunction<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
 }
 
 
-impl<Ctx, Dev> Condition<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Condition<R::DestCtx, R::DestDev>, Error>
-        where R: Rebinder<SourceDev = Dev, SourceCtx = Ctx>
+impl<Ctx, Env> Condition<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    fn rebind<R>(&self, rebinder: &R) -> Result<Condition<R::DestCtx, R::DestEnv>, Error>
+        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
     {
         Ok(Condition {
             range: self.range.clone(),
@@ -563,9 +563,9 @@ impl<Ctx, Dev> Condition<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
 
 
 
-impl<Ctx, Dev> Statement<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Statement<R::DestCtx, R::DestDev>, Error>
-        where R: Rebinder<SourceDev = Dev, SourceCtx = Ctx>
+impl<Ctx, Env> Statement<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    fn rebind<R>(&self, rebinder: &R) -> Result<Statement<R::DestCtx, R::DestEnv>, Error>
+        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
     {
         let mut arguments = HashMap::with_capacity(self.arguments.len());
         for (key, value) in &self.arguments {
@@ -579,9 +579,9 @@ impl<Ctx, Dev> Statement<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
     }
 }
 
-impl<Ctx, Dev> Expression<Ctx, Dev> where Dev: DeviceAccess, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Expression<R::DestCtx, R::DestDev>, Error>
-        where R: Rebinder<SourceDev = Dev, SourceCtx = Ctx>
+impl<Ctx, Env> Expression<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    fn rebind<R>(&self, rebinder: &R) -> Result<Expression<R::DestCtx, R::DestEnv>, Error>
+        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
     {
         match *self {
             Expression::Value(ref v) => Ok(Expression::Value(v.clone())),
@@ -623,8 +623,8 @@ impl Context for UncheckedCtx {
 /// A DeviceAccess used to represent a script that hasn't been
 /// compiled yet. Rather than having typed devices, capabilities,
 /// etc. everything is represented by a string.
-struct UncheckedDev;
-impl DeviceAccess for UncheckedDev {
+struct UncheckedEnv;
+impl DeviceAccess for UncheckedEnv {
     type Device = String;
     type DeviceKind = String;
     type InputCapability = String;
@@ -652,25 +652,25 @@ struct CompiledCtx<DeviceAccess> {
     phantom: PhantomData<DeviceAccess>,
 }
 
-struct CompiledInput<Dev> where Dev: DeviceAccess {
-    device: Dev::Device,
+struct CompiledInput<Env> where Env: DeviceAccess {
+    device: Env::Device,
     state: RwLock<Option<DatedData>>,
 }
 
-struct CompiledOutput<Dev> where Dev: DeviceAccess {
-    device: Dev::Device,
+struct CompiledOutput<Env> where Env: DeviceAccess {
+    device: Env::Device,
 }
 
-type CompiledInputSet<Dev> = Arc<Vec<Arc<CompiledInput<Dev>>>>;
-type CompiledOutputSet<Dev> = Arc<Vec<Arc<CompiledOutput<Dev>>>>;
+type CompiledInputSet<Env> = Arc<Vec<Arc<CompiledInput<Env>>>>;
+type CompiledOutputSet<Env> = Arc<Vec<Arc<CompiledOutput<Env>>>>;
 struct CompiledConditionState {
     is_met: bool
 }
 
-impl<Dev> Context for CompiledCtx<Dev> where Dev: DeviceAccess {
+impl<Env> Context for CompiledCtx<Env> where Env: DeviceAccess {
     type ConditionState = CompiledConditionState; // FIXME: We could share this
-    type OutputSet = CompiledOutputSet<Dev>;
-    type InputSet = CompiledInputSet<Dev>;
+    type OutputSet = CompiledOutputSet<Env>;
+    type InputSet = CompiledInputSet<Env>;
 }
 
 
@@ -696,10 +696,10 @@ impl Watcher for FakeWatcher {
 
 /*
 impl DeviceAccess for CompiledDev {
-    type Input = Vector<Arc<InputDev>>;
-    type Output = Vector<Arc<OutputDev>>;
+    type Input = Vector<Arc<InputEnv>>;
+    type Output = Vector<Arc<OutputEnv>>;
     type ConditionState = ConditionDev;
-    type Device = Device;
+    type Device = Envice;
     type InputCapability = InputCapability;
     type OutputCapability = OutputCapability;
 }
@@ -718,15 +718,15 @@ struct DatedData {
     data: Value,
 }
 
-struct Precompiler<'a, Dev> where Dev: DeviceAccess {
-    script: &'a Script<UncheckedCtx, UncheckedDev>,
-    inputs: Vec<Option<CompiledInputSet<Dev>>>,
-    outputs: Vec<Option<CompiledOutputSet<Dev>>>,
-    phantom: PhantomData<Dev>,
+struct Precompiler<'a, Env> where Env: DeviceAccess {
+    script: &'a Script<UncheckedCtx, UncheckedEnv>,
+    inputs: Vec<Option<CompiledInputSet<Env>>>,
+    outputs: Vec<Option<CompiledOutputSet<Env>>>,
+    phantom: PhantomData<Env>,
 }
 
-impl<'a, Dev> Precompiler<'a, Dev> where Dev: DeviceAccess {
-    fn new(source: &'a Script<UncheckedCtx, UncheckedDev>) -> Result<Self, Error> {
+impl<'a, Env> Precompiler<'a, Env> where Env: DeviceAccess {
+    fn new(source: &'a Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
 
         use self::Error::*;
         use self::SourceError::*;
@@ -764,7 +764,7 @@ impl<'a, Dev> Precompiler<'a, Dev> where Dev: DeviceAccess {
             if has_inputs {
                 let mut resolved = Vec::with_capacity(alloc.devices.len());
                 for dev in &alloc.devices {
-                    match Dev::get_device(&dev) {
+                    match Env::get_device(&dev) {
                         None => return Err(DevAccessError(DeviceNotFound)),
                         Some(d) => resolved.push(Arc::new(CompiledInput {
                             device: d,
@@ -777,7 +777,7 @@ impl<'a, Dev> Precompiler<'a, Dev> where Dev: DeviceAccess {
             if has_outputs {
                 let mut resolved = Vec::with_capacity(alloc.devices.len());
                 for dev in &alloc.devices {
-                    match Dev::get_device(&dev) {
+                    match Env::get_device(&dev) {
                         None => return Err(DevAccessError(DeviceNotFound)),
                         Some(d) => resolved.push(Arc::new(CompiledOutput {
                             device: d,
@@ -799,47 +799,47 @@ impl<'a, Dev> Precompiler<'a, Dev> where Dev: DeviceAccess {
     }
 }
 
-impl<'a, Dev> Rebinder for Precompiler<'a, Dev>
-    where Dev: DeviceAccess {
+impl<'a, Env> Rebinder for Precompiler<'a, Env>
+    where Env: DeviceAccess {
     type SourceCtx = UncheckedCtx;
-    type DestCtx = CompiledCtx<Dev>;
+    type DestCtx = CompiledCtx<Env>;
 
-    type SourceDev = UncheckedDev;
-    type DestDev = Dev;
+    type SourceEnv = UncheckedEnv;
+    type DestEnv = Env;
 
     // Rebinding the device access. Nothing to do.
-    fn rebind_device(&self, dev: &<<Self as Rebinder>::SourceDev as DeviceAccess>::Device) ->
-        Result<<<Self as Rebinder>::DestDev as DeviceAccess>::Device, Error>
+    fn rebind_device(&self, dev: &<<Self as Rebinder>::SourceEnv as DeviceAccess>::Device) ->
+        Result<<<Self as Rebinder>::DestEnv as DeviceAccess>::Device, Error>
     {
-        match Self::DestDev::get_device(dev) {
+        match Self::DestEnv::get_device(dev) {
             None => Err(Error::DevAccessError(DevAccessError::DeviceNotFound)),
             Some(found) => Ok(found.clone())
         }
     }
 
 
-    fn rebind_device_kind(&self, kind: &<<Self as Rebinder>::SourceDev as DeviceAccess>::DeviceKind) ->
-        Result<<<Self as Rebinder>::DestDev as DeviceAccess>::DeviceKind, Error>
+    fn rebind_device_kind(&self, kind: &<<Self as Rebinder>::SourceEnv as DeviceAccess>::DeviceKind) ->
+        Result<<<Self as Rebinder>::DestEnv as DeviceAccess>::DeviceKind, Error>
     {
-        match Self::DestDev::get_device_kind(kind) {
+        match Self::DestEnv::get_device_kind(kind) {
             None => Err(Error::DevAccessError(DevAccessError::DeviceKindNotFound)),
             Some(found) => Ok(found.clone())
         }
     }
     
-    fn rebind_input_capability(&self, cap: &<<Self as Rebinder>::SourceDev as DeviceAccess>::InputCapability) ->
-        Result<<<Self as Rebinder>::DestDev as DeviceAccess>::InputCapability, Error>
+    fn rebind_input_capability(&self, cap: &<<Self as Rebinder>::SourceEnv as DeviceAccess>::InputCapability) ->
+        Result<<<Self as Rebinder>::DestEnv as DeviceAccess>::InputCapability, Error>
     {
-        match Self::DestDev::get_input_capability(cap) {
+        match Self::DestEnv::get_input_capability(cap) {
             None => Err(Error::DevAccessError(DevAccessError::DeviceCapabilityNotFound)),
             Some(found) => Ok(found.clone())
         }
     }
 
-    fn rebind_output_capability(&self, cap: &<<Self as Rebinder>::SourceDev as DeviceAccess>::OutputCapability) ->
-        Result<<<Self as Rebinder>::DestDev as DeviceAccess>::OutputCapability, Error>
+    fn rebind_output_capability(&self, cap: &<<Self as Rebinder>::SourceEnv as DeviceAccess>::OutputCapability) ->
+        Result<<<Self as Rebinder>::DestEnv as DeviceAccess>::OutputCapability, Error>
     {
-        match Self::DestDev::get_output_capability(cap) {
+        match Self::DestEnv::get_output_capability(cap) {
             None => Err(Error::DevAccessError(DevAccessError::DeviceCapabilityNotFound)),
             Some(found) => Ok(found.clone())
         }
