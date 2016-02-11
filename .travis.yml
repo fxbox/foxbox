@@ -20,4 +20,4 @@ script:
     - cargo build # Linter is also executed here
     - RUST_BACKTRACE=1 cargo test
     - jshint static/*.js test/selenium/*.js
-    - (cargo run > /dev/null &) ; ./node_modules/.bin/mocha test/selenium/ftu_test.js
+    - (cargo run &> /dev/null &) ; ./node_modules/.bin/mocha test/selenium/ftu_test.js
