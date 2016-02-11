@@ -1,8 +1,8 @@
-mod values;
+pub mod values;
 
 
 /// The language
-mod lang;
+pub mod lang;
 
 /// Stuff that must be provided by the Rust broker.
-mod dependencies;
+pub mod dependencies;

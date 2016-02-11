@@ -40,75 +40,75 @@ use self::chrono::{Duration, DateTime, UTC};
 /// through a web/REST API) or live on their own.
 pub struct Script<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// Authorization, author, description, update url, version, ...
-    metadata: (), // FIXME: Implement
+    pub metadata: (), // FIXME: Implement
 
     /// Monitor applications have sets of requirements (e.g. "I need a
     /// camera"), which are allocated to actual resources through the
     /// UX. Re-allocating resources may be requested by the user, the
     /// foxbox, or an application, e.g. when replacing a device or
     /// upgrading the app.
-    requirements: Vec<Arc<Requirement<Ctx, Env>>>,
+    pub requirements: Vec<Arc<Requirement<Ctx, Env>>>,
 
     /// Resources actually allocated for each requirement.
     /// This must have the same size as `requirements`.
-    allocations: Vec<Resource<Ctx, Env>>,
+    pub allocations: Vec<Resource<Ctx, Env>>,
 
     /// A set of rules, stating what must be done in which circumstance.
-    rules: Vec<Trigger<Ctx, Env>>,
+    pub rules: Vec<Trigger<Ctx, Env>>,
 }
 
-struct Resource<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
-    devices: Vec<Env::Device>,
-    phantom: PhantomData<Ctx>,
+pub struct Resource<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    pub devices: Vec<Env::Device>,
+    pub phantom: PhantomData<Ctx>,
 }
 
 
 /// A resource needed by this application. Typically, a definition of
 /// device with some input our output capabilities.
-struct Requirement<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+pub struct Requirement<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The kind of resource, e.g. "a flashbulb".
-    kind: Env::DeviceKind,
+    pub kind: Env::DeviceKind,
 
     /// Input capabilities we need from the device, e.g. "the time of
     /// day", "the current temperature".
-    inputs: Vec<Env::InputCapability>,
+    pub inputs: Vec<Env::InputCapability>,
 
     /// Output capabilities we need from the device, e.g. "play a
     /// sound", "set luminosity".
-    outputs: Vec<Env::OutputCapability>,
+    pub outputs: Vec<Env::OutputCapability>,
     
     /// Minimal number of resources required. If unspecified in the
     /// script, this is 1.
-    min: u32,
+    pub min: u32,
 
     /// Maximal number of resources that may be handled. If
     /// unspecified in the script, this is the same as `min`.
-    max: u32,
+    pub max: u32,
 
-    phantom: PhantomData<Ctx>,
+    pub phantom: PhantomData<Ctx>,
     // FIXME: We may need cooldown properties.
 }
 
 /// A single trigger, i.e. "when some condition becomes true, do
 /// something".
-struct Trigger<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+pub struct Trigger<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The condition in which to execute the trigger.
-    condition: Conjunction<Ctx, Env>,
+    pub condition: Conjunction<Ctx, Env>,
 
     /// Stuff to do once `condition` is met.
-    execute: Vec<Statement<Ctx, Env>>,
+    pub execute: Vec<Statement<Ctx, Env>>,
 
     /// Minimal duration between two executions of the trigger.  If a
     /// duration was not picked by the developer, a reasonable default
     /// duration should be picked (e.g. 10 minutes).
-    cooldown: Duration,
+    pub cooldown: Duration,
 }
 
 /// A conjunction (e.g. a "and") of conditions.
-struct Conjunction<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+pub struct Conjunction<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The conjunction is true iff all of the following expressions evaluate to true.
-    all: Vec<Condition<Ctx, Env>>,
-    state: Ctx::ConditionState,
+    pub all: Vec<Condition<Ctx, Env>>,
+    pub state: Ctx::ConditionState,
 }
 
 /// An individual condition.
@@ -118,36 +118,36 @@ struct Conjunction<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
 ///
 /// A condition is true if *any* of the sensors allocated to this
 /// requirement has yielded a value that is in the given range.
-struct Condition<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
-    input: Ctx::InputSet,
-    capability: Env::InputCapability,
-    range: Range,
-    state: Ctx::ConditionState,
+pub struct Condition<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+    pub input: Ctx::InputSet,
+    pub capability: Env::InputCapability,
+    pub range: Range,
+    pub state: Ctx::ConditionState,
 }
 
 
 /// Stuff to actually do. In practice, this means placing calls to devices.
-struct Statement<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+pub struct Statement<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The resource to which this command applies.  e.g. "all
     /// heaters", "a single communication channel", etc.
-    destination: Ctx::OutputSet,
+    pub destination: Ctx::OutputSet,
 
     /// The action to execute on the resource.
-    action: Env::OutputCapability,
+    pub action: Env::OutputCapability,
 
     /// Data to send to the resource.
-    arguments: HashMap<String, Expression<Ctx, Env>>
+    pub arguments: HashMap<String, Expression<Ctx, Env>>
 }
 
-struct InputSet<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+pub struct InputSet<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// The set of inputs from which to grab the value.
-    condition: Condition<Ctx, Env>,
+    pub condition: Condition<Ctx, Env>,
     /// The value to grab.
-    capability: Env::InputCapability,
+    pub capability: Env::InputCapability,
 }
 
 /// A value that may be sent to an output.
-enum Expression<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+pub enum Expression<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
     /// A dynamic value, which must be read from one or more inputs.
     // FIXME: Not ready yet
     Input(InputSet<Ctx, Env>),
@@ -177,9 +177,9 @@ pub trait Context {
 
 /// A script ready to be executed.
 /// Each script is meant to be executed in an individual thread.
-struct ExecutionTask<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
+pub struct ExecutionTask<Env> where Env: DeviceAccess {
     /// The current state of execution the script.
-    state: Script<Ctx, Env>,
+    state: Script<CompiledCtx<Env>, Env>,
 
     /// Communicating with the thread running script.
     tx: Sender<ExecutionOp>,
@@ -200,12 +200,12 @@ enum ExecutionOp {
 }
 
 
-impl<Env> ExecutionTask<CompiledCtx<Env>, Env> where Env: DeviceAccess {
+impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
     /// Create a new execution task.
     ///
     /// The caller is responsible for spawning a new thread and
     /// calling `run()`.
-    fn new(script: &Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
+    pub fn new(script: &Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
         // Prepare the script for execution:
         // - replace instances of Input with InputDev, which map
         //   to a specific device and cache the latest known value
@@ -606,7 +606,7 @@ impl<Ctx, Env> Expression<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
 /// A Context used to represent a script that hasn't been compiled
 /// yet. Rather than pointing to specific device + capability, inputs
 /// and outputs are numbers that are meaningful only in the AST.
-struct UncheckedCtx;
+pub struct UncheckedCtx;
 impl Context for UncheckedCtx {
     /// In this implementation, each input is represented by its index
     /// in the array of allocations.
@@ -623,7 +623,7 @@ impl Context for UncheckedCtx {
 /// A DeviceAccess used to represent a script that hasn't been
 /// compiled yet. Rather than having typed devices, capabilities,
 /// etc. everything is represented by a string.
-struct UncheckedEnv;
+pub struct UncheckedEnv;
 impl DeviceAccess for UncheckedEnv {
     type Device = String;
     type DeviceKind = String;
@@ -674,7 +674,7 @@ impl<Env> Context for CompiledCtx<Env> where Env: DeviceAccess {
 }
 
 
-struct FakeWatcher;
+pub struct FakeWatcher;
 impl Watcher for FakeWatcher {
     type Witness = ();
     type Device = String;
