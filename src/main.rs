@@ -18,6 +18,7 @@
 extern crate core;
 extern crate docopt;
 extern crate env_logger;
+extern crate foxbox_users;
 #[macro_use]
 extern crate iron;
 #[macro_use]

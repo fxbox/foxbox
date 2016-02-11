@@ -2,10 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-extern crate foxbox_users;
-
 use context::SharedContext;
-use self::foxbox_users::users_router::UsersRouter;
+use foxbox_users::users_router::UsersRouter;
 use iron::{Iron, Request, Response, IronResult};
 use iron::headers::ContentType;
 use iron::status::Status;
@@ -59,12 +57,10 @@ impl HttpServer {
             }
         });
 
-        let users_router = UsersRouter::new();
-
         let mut mount = Mount::new();
         mount.mount("/", Static::new(Path::new("static")))
              .mount("/services", router)
-             .mount("/users_admin", users_router);
+             .mount("/users_admin", UsersRouter::new());
 
         let thread_context = self.context.clone();
         let ctx = thread_context.lock().unwrap();
