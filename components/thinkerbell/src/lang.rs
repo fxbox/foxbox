@@ -11,15 +11,16 @@
 
 use dependencies::{DeviceKind, InputCapability, OutputCapability, Device, Range, Value, Watcher};
 
-use std::time::Duration;
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock}; // FIXME: Investigate if we really need so many instances of Arc.
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
-extern crate itertools;
-use self::itertools::Zip;
+extern crate chrono;
+use self::chrono::{Duration, DateTime, UTC};
+
+extern crate rustc_serialize;
+use self::rustc_serialize::json::Json;
 
 ///
 /// # Definition of the AST
@@ -37,7 +38,7 @@ use self::itertools::Zip;
 /// either be part of a broader application (which can install them
 /// through a web/REST API) or live on their own.
 #[derive(Clone)]
-struct Script<Input, Output, ConditionState> {
+pub struct Script<Input, Output, ConditionState> {
     /// Authorization, author, description, update url, version, ...
     metadata: (), // FIXME: Implement
 
@@ -97,7 +98,7 @@ struct Trigger<Input, Output, ConditionState> {
     condition: Conjunction<Input, ConditionState>,
 
     /// Stuff to do once `condition` is met.
-    execute: Vec<Statement<Input, Output>>,
+    execute: Vec<Statement<Input, Output, ConditionState>>,
 
     /// Minimal duration between two executions of the trigger.  If a
     /// duration was not picked by the developer, a reasonable default
@@ -131,36 +132,70 @@ struct Condition<Input, ConditionState> {
 
 /// Stuff to actually do. In practice, this maps to a REST call.
 #[derive(Clone)]
-struct Statement<Input, Output> {
-    /// The resource to which this command applies,
-    /// as an index in Trigger.requirements/allocations.
+struct Statement<Input, Output, ConditionState> {
+    /// The resource to which this command applies.  e.g. "all
+    /// heaters", "a single communication channel", etc.
     destination: Output,
 
+    /// The action to execute on the resource.
     action: OutputCapability,
 
-    arguments: HashMap<String, Expression<Input>>
+    /// Data to send to the resource.
+    arguments: HashMap<String, Expression<Input, ConditionState>>
+}
+
+#[derive(Clone)]
+struct InputSet<Input, ConditionState> {
+    /// The set of inputs from which to grab the value.
+    condition: Condition<Input, ConditionState>,
+    /// The value to grab.
+    capability: InputCapability,
 }
 
 /// A value that may be sent to an output.
 #[derive(Clone)]
-enum Expression<Input> {
-    /// A dynamic value, which must be read from an input.
-    Input(Input),
+enum Expression<Input, ConditionState> {
+    /// A dynamic value, which must be read from one or more inputs.
+    // FIXME: Not ready yet
+    Input(InputSet<Input, ConditionState>),
 
     /// A constant value.
-    Value(Value)
+    Value(Value),
+
+    /// More than a single value.
+    Vec(Vec<Expression<Input, ConditionState>>)
 }
 
 ///
 /// # Launching and running the script
 ///
 
+/// A script ready to be executed.
+/// Each script is meant to be executed in an individual thread.
+struct ExecutionTask {
+    /// The current state of execution the script.
+    state: Script<Arc<InputEnv>, Arc<OutputEnv>, ConditionEnv>,
+
+    /// Communicating with the thread running script.
+    tx: Sender<ExecutionOp>,
+    rx: Receiver<ExecutionOp>,
+}
+
+
+/// Data, labelled with its latest update.
+struct DatedData {
+    updated: DateTime<UTC>,
+    data: Value,
+}
+
+/// A single input device, ready to use, with its latest known state.
 struct SingleInputEnv {
     device: Device,
-    state: RwLock<Option<Value>>
+    state: RwLock<Option<DatedData>>
 }
 type InputEnv = Vec<SingleInputEnv>;
 
+/// A single output device, ready to use.
 struct SingleOutputEnv {
     device: Device
 }
@@ -170,20 +205,21 @@ struct ConditionEnv {
     is_met: bool
 }
 
-struct ExecutionTask {
-    state: Script<Arc<InputEnv>, Arc<OutputEnv>, ConditionEnv>,
-    tx: Sender<ExecutionOp>,
-    rx: Receiver<ExecutionOp>,
-}
-
 enum ExecutionOp {
+    /// An input has been updated, time to check if we have triggers
+    /// ready to be executed.
     Update,
-//    Execute {state: InputState, commands: Vec<Statement>},
+
+    /// Time to stop executing the script.
     Stop
 }
 
 
 impl ExecutionTask {
+    /// Create a new execution task.
+    ///
+    /// The caller is responsible for spawning a new thread and
+    /// calling `run()`.
     fn new<'a>(script: &'a Script<usize, usize, ()>) -> Self {
         // Prepare the script for execution:
         // - replace instances of Input with InputEnv, which map
@@ -212,8 +248,6 @@ impl ExecutionTask {
         let mut watcher = Watcher::new();
         let mut witnesses = Vec::new();
 
-        let mut instant : u64 = 0;
-
         // Start listening to all inputs that appear in conditions.
         // Some inputs may appear only in expressions, so we are
         // not interested in their value.
@@ -221,16 +255,24 @@ impl ExecutionTask {
             for condition in &rule.condition.all {
                 for single in &*condition.input {
                     witnesses.push(
-                        // We can be watching several times the same device + capability + range.
-                        // For the moment, we assume that the watcher will optimize the I/O for us.
-                        // For the time being, we do not attempt to optimize condition checking.
+                        // We can end up watching several times the
+                        // same device + capability + range.  For the
+                        // moment, we do not attempt to optimize
+                        // either I/O (which we expect will be
+                        // optimized by `watcher`) or condition
+                        // checking (which we should eventually
+                        // optimize, if we find out that we end up
+                        // with large rulesets).
                         watcher.add(
                             &single.device,
                             &condition.capability,
                             &condition.range,
                             |value| {
                                 // One of the inputs has been updated.
-                                *single.state.write().unwrap() = Some(value);
+                                *single.state.write().unwrap() = Some(DatedData {
+                                    updated: UTC::now(),
+                                    data: value
+                                });
                                 // Note that we can unwrap() safely,
                                 // as it fails only if the thread is
                                 // already in panic.
@@ -246,7 +288,7 @@ impl ExecutionTask {
 
         // FIXME: We are going to end up with stale data in some inputs.
         // We need to find out how to get rid of it.
-
+        // FIXME(2): We now have dates.
 
         // Now, start handling events.
         for msg in &self.rx {
@@ -273,9 +315,13 @@ impl ExecutionTask {
 
                         // Conditions were not met, now they are, so
                         // it is time to start executing.
-                        
-                        // FIXME: Handle cooldown.
 
+                        // FIXME: We do not want triggers to be
+                        // triggered too often. Handle cooldown.
+                        
+                        for statement in &rule.execute {
+                            // FIXME: Execute
+                        }
                     }
                 }
             }
@@ -301,7 +347,7 @@ impl<O> Trigger<Arc<InputEnv>, O, ConditionEnv> {
 impl Conjunction<Arc<InputEnv>, ConditionEnv> {
     /// For a conjunction to be true, all its components must be true.
     fn is_met(&mut self) -> IsMet {
-        let mut old = self.state.is_met.clone();
+        let old = self.state.is_met.clone();
         let mut new = true;
 
         for mut single in &mut self.all {
@@ -323,7 +369,7 @@ impl Condition<Arc<InputEnv>, ConditionEnv> {
     /// Determine if one of the devices serving as input for this
     /// condition meets the condition.
     fn is_met(&mut self) -> IsMet {
-        let mut old = self.state.is_met.clone();
+        let old = self.state.is_met.clone();
         let mut new = false;
         for single in &*self.input {
             // This will fail only if the thread has already panicked.
@@ -334,7 +380,7 @@ impl Condition<Arc<InputEnv>, ConditionEnv> {
                     use dependencies::Range::*;
                     use dependencies::Value::*;
 
-                    match (data, &self.range) {
+                    match (&data.data, &self.range) {
                         // Any always matches
                         (_, &Any) => true,
                         // Operations on bools and strings
@@ -453,8 +499,8 @@ impl<Input, ConditionState> Condition<Input, ConditionState> {
     }
 }
 
-impl <Input, Output> Statement<Input, Output> {
-    fn rebind<Condition, Input2, Output2, Condition2>(&self, rebinder: &Rebinder<Input, Output, Condition, Input2, Output2, Condition2>) -> Statement<Input2, Output2> where
+impl <Input, Output, ConditionState> Statement<Input, Output, ConditionState> {
+    fn rebind<Input2, Output2, Condition2>(&self, rebinder: &Rebinder<Input, Output, ConditionState, Input2, Output2, Condition2>) -> Statement<Input2, Output2, Condition2> where
         Input2: Clone,
         Output2: Clone {
             let arguments = self.arguments.iter().map(|(key, value)| {
@@ -468,15 +514,17 @@ impl <Input, Output> Statement<Input, Output> {
         }
 }
 
-impl<Input> Expression<Input> {
-    fn rebind<Condition, Output, Input2, Output2, Condition2>(&self, rebinder: &Rebinder<Input, Output, Condition, Input2, Output2, Condition2>) -> Expression<Input2> where
+impl<Input, ConditionState> Expression<Input, ConditionState> {
+    fn rebind<Output, Input2, Output2, Condition2>(&self, rebinder: &Rebinder<Input, Output, ConditionState, Input2, Output2, Condition2>) -> Expression<Input2, Condition2> where
         Input2: Clone,
         Output2: Clone 
     {
         use self::Expression::*;
         match *self {
-            Input(ref input) => Input(rebinder.alloc_input(input).clone()),
-            Value(ref v) => Value(v.clone())
+            Value(ref v) => Value(v.clone()),
+            Vec(ref v) => Vec(v.iter().map(|x| x.rebind(rebinder)).collect()),
+            //            Input(ref input) => Input(rebinder.alloc_input(input).clone()),
+            Input(_) => panic!("Not impl implemented yet")
         }
     }
 }
@@ -524,295 +572,6 @@ impl<'a> Rebinder<usize, usize, (), Arc<InputEnv>, Arc<OutputEnv>, ConditionEnv>
     }
 }
 
-/*
-impl Conjunction {
-    fn is_met(&self, input_state: &InputState) -> bool {
-        for condition in &self.all {
-            if !condition.is_met(input_state) {
-                return false;
-            }
-        }
-        return true;
-    }
-}
-
-
-impl Condition {
-    /// Find out if *any* of the sensors allocated to this requirement
-    /// has yielded a value that is in the given range.
-    fn is_met(&self, input_state: &InputState) -> bool {
-    }
-}
-*/
-
-
-
-/*
-    /// For each requirement, the resources actually allocated to
-    /// match the requirements. This may be 1 or more individual
-    /// devices.
-    ///
-    /// Allocations can be done in several ways:
-    ///
-    /// - when entering the script through a UX (either the script or
-    ///   the UX can suggest allocations);
-    /// - when installing an application with a web front-end.
-    allocations: Vec<Vec<Named<Arc<Device>>>>,
-
-
-    /// Either `None` if the application is not launched, or `Some(tx)`,
-    /// where `tx` is a channel used to communicate with the thread
-    /// running the application.
-    command_sender: Option<Sender<MonitorOp>>,
-}
-
-
-impl<'a> Script {
-    /// Index-safe iteration through all the possible
-    /// allocations/individual devices/inputs.
-    fn iter_state_index(&self) -> Vec<InputBinding>
-    {
-        // FIXME: Several possible optimizations here, including
-        // caching the vector.
-        let mut vec = Vec::new();
-        for (req, allocation, allocation_index) in Zip::new((&self.requirements, &self.allocations, 0..)) {
-            for (individual_device, individual_device_index) in Zip::new((allocation, 0..)) {
-                for (input, individual_input_index) in Zip::new((&req.data.inputs, 0..)) {
-                    vec.push(InputBinding {
-                        allocation: allocation_index,
-                        device: individual_device_index,
-                        input: individual_input_index
-                    })
-                }
-            }
-        }
-        vec
-    }
-}
-
-/// The binding of an input capability to a specific device set.
-struct InputBinding {
-    /// The device set holding this input capability.
-    /// Index in `app.allocations`.
-    allocation: usize,
-
-    /// The individual device holding this input capability.
-    /// Index in `app.allocations[self.allocation]`.
-    device: usize,
-
-    /// The specific input holding this input capability.
-    /// Index in `app.allocations[self.allocation][self.device]`.
-    input: usize,
-}
-
-impl InputBinding {
-    /// Get the device providing the InputBinding.
-    fn get_individual_device(&self, app: &Script) -> Arc<Device> {
-        app.allocations[self.allocation][self.device].data.clone()
-    }
-
-    /// Get the input capability for this binding.
-    fn get_input(&self, app: &Script) -> InputCapability {
-        app.requirements[self.allocation].data.inputs[self.input].data.clone()
-    }
-
-    /// Update the state attached to this input binding.
-    fn set_state(&self, state: &mut MonitorTaskState, value: Option<Value>) {
-        state.input_state[self.allocation][self.device][self.input] = value;
-    }
-}
- */
-/*
-/// The state of a given condition.
-struct ConditionState {
-    /// `true` if the conditions were met last time the state of the
-    /// inputs changed. We use this to trigger an action only when
-    /// conditions were previously unmet and are now met.
-    are_conditions_met: bool,
-    // FIXME: In the future, the cooldown should go here.
-}
-
-type InputState = Vec<Vec<Vec<Option<Value>>>>;
-struct MonitorTaskState {
-    /// The state of each trigger.
-    ///
-    /// Invariant: len() is the same as that of `self.app.rule`s
-    trigger_condition_state: Vec<ConditionState>,
-
-    /// For each device set allocated, for each individual device
-    /// allocated, for each input watched by the app, the latest state
-    /// received.
-    ///
-    /// Use `InputBinding` to access the data.
-    input_state: InputState,
-
-    /// A clone of the code being executed.
-    app: Script,
-}
-
-/// The part of the monitor used to communicate between threads.
-///
-/// Kept separate to help the borrow checker understand what we're
-/// accessing at any time.
-struct MonitorComm {
-    tx: Sender<MonitorOp>,
-    rx: Receiver<MonitorOp>,
-}
-
-/// A Script currently being executed.
-///
-/// Each MonitorTask runs on its own thread.
-struct MonitorTask {
-    state: MonitorTaskState,
-    comm: MonitorComm,
-}
-*/
-/*
-impl MonitorTask {
-
-    /// Create a new MonitorTask.
-    ///
-    /// To initiate watching, use method `run()`.
-    fn new(app: Script<?>, ) -> Self {
-        // Initialize condition state.
-        let mut trigger_condition_state = Vec::with_capacity(app.rules.len());
-        for _ in &app.rules {
-            trigger_condition_state.push(ConditionState {
-                are_conditions_met: false,
-            });
-        }
-        assert_eq!(trigger_condition_state.len(), app.rules.len());
-        
-        // Initialize input state.
-        let mut full_input_state = Vec::with_capacity(app.requirements.len());
-        for (req, allocation) in app.requirements.iter().zip(&app.allocations) {
-
-            // State for this allocation. A single allocation may map
-            // to a number of inputs (e.g. "all fire alarms").
-            let mut allocation_state = Vec::with_capacity(allocation.len());
-            for individual_device in allocation {
-                let mut individual_device_state = Vec::with_capacity(req.data.inputs.len());
-                for _ in 0 .. req.data.inputs.len() {
-                    individual_device_state.push(None);
-                }
-                allocation_state.push(individual_device_state);
-            }
-            assert_eq!(allocation_state.len(), allocation.len());
-            full_input_state.push(allocation_state);
-        }
-        assert_eq!(full_input_state.len(), app.requirements.len());
-
-        // Start watching
-        let (tx, rx) = channel();
-
-        MonitorTask {
-            state: MonitorTaskState {
-                trigger_condition_state: trigger_condition_state,
-                input_state: full_input_state,
-                app: app,
-            },
-            comm: MonitorComm {
-                tx: tx,
-                rx: rx,
-            }
-        }
-    }
-
-    /// Get a channel that may be used to send commands to the task.
-    fn get_command_sender(&self) -> Sender<MonitorOp> {
-        self.comm.tx.clone()
-    }
-
-    /// Execute the monitoring task.
-    /// This currently expects to be executed in its own thread.
-    fn run(&mut self) {
-        let mut watcher = Watcher::new();
-        let mut witnesses = Vec::new();
-
-        for state_index in self.state.app.iter_state_index() {
-            // FIXME: We currently use `Range::Any` for simplicity.
-            // However, in most cases, we should be able to look inside
-            // the condition to build a better `Range`.
-
-            // FIXME: We currently monitor all the inputs that are
-            // used by this rule, even if they are not part of the
-            // condition (e.g. we monitor the camera all the time even
-            // if we only need to trigger when an intruder enters).
-            witnesses.push(
-                watcher.add(
-                    &state_index.get_individual_device(&self.state.app),
-                    &state_index.get_input(&self.state.app),
-                    &Range::Any,
-                    |data| {
-                        let _ignored = self.comm.tx.send(MonitorOp::Update {
-                            data: data,
-                            index: state_index,
-                        });
-                        // Ignore errors. If the thread is shutting
-                        // down, it's ok to lose messages.
-                    }));
-        }
-
-        for msg in &self.comm.rx {
-            use self::MonitorOp::*;
-            match msg {
-                Update {
-                    data,
-                    index,
-                } => {
-                    // Update the state
-                    index.set_state(&mut self.state, Some(data));
-
-                    // Find out if we should execute triggers.
-                    // FIXME: We could optimize this by finding out which triggers
-                    // are tainted by the update and only rechecking these.
-                    for (trigger, trigger_condition_state) in Zip::new((&self.state.app.rules, &mut self.state.trigger_condition_state)) {
-                        let is_met = trigger.condition.is_met(&self.state.input_state);
-                        if is_met == trigger_condition_state.are_conditions_met {
-                            // No change in conditions. Nothing to do.
-                            continue;
-                        }
-                        trigger_condition_state.are_conditions_met = is_met;
-                        if !is_met {
-                            // Conditions were met, now they are not anymore.
-                            // The next time they are met, we can trigger
-                            // a new execution.
-                            continue;
-                        }
-                        // Conditions were not met, now they are, so it is
-                        // time to start executing. We copy the inputs
-                        // and dispatch to a background thread
-
-                        // FIXME: Handle cooldown.
-                                
-                        trigger_condition_state.are_conditions_met = true;
-                        let _ignored = self.comm.tx.send(MonitorOp::Execute {
-                            state: self.state.input_state.clone(),
-                            commands: trigger.execute.clone()
-                        });
-                        // Ignore errors. If the thread is shutting down, it's ok to lose messages.
-                    }
-                },
-                Execute {..} => {
-                    panic!("Not implemented");
-                }
-                Stop => {
-                    // Clean up watcher, stop the thread.
-                    return;
-                }
-            }
-        }
-    }
-}
-
- */
-/*
-enum MonitorOp {
-    Update {data: Value, index: InputBinding},
-    Execute {state: InputState, commands: Vec<Statement>},
-    Stop
-}
-*/
 /*
 impl Script {
     ///

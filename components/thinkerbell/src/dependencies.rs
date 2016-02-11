@@ -25,6 +25,12 @@ pub struct OutputCapability;
 #[derive(Clone)]
 pub struct Device;
 
+impl Device {
+    fn fetch(&self, cap: &InputCapability) -> Result<Value, ()> {
+        panic!("Not implemented yet");
+    }
+}
+
 #[derive(Clone)]
 pub enum Range {
     /// Operations on numbers.
