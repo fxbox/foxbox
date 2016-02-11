@@ -38,3 +38,29 @@ pub trait ServiceAdapter {
     fn start(&self);
     fn stop(&self);
 }
+
+
+describe! service {
+    before_each {
+        extern crate serde_json;
+        use stubs::service::ServiceStub;
+
+        // Box<T> is required because Service is a Trait object. We can't manipulate is unless
+        // we have a reference to it
+        let service: Box<Service> = Box::new(ServiceStub);
+    }
+
+    it "should be serializable" {
+        // This works because serialize() is called thanks to to_string(). This is not a real unit
+        // test, then. A mock should be used below. As mocks are not easily spy-able, that would
+        // require a to implement each of the functions defined here[1]. That sounds overkill for a
+        // simple 3-line-function.
+        //
+        // FIXME: Create a Mock of a Serializer, once we can easily spy on them.
+        //
+        // [1] https://serde-rs.github.io/serde/serde/serde/ser/trait.Serializer.html
+        let serialized_json = serde_json::to_string(&service).unwrap();
+        assert_eq!(serialized_json, "{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"\
+        really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}");
+    }
+}
