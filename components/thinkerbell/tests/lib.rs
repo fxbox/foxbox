@@ -77,6 +77,11 @@ impl Watcher for TestWatcher {
 
 }
 
+
+///
+/// Compilation tests
+///
+
 #[test]
 /// Attempt to compile an empty script. This should succeed.
 fn test_compile_empty_script() {
@@ -173,4 +178,43 @@ fn test_compile_wrong_kind() {
             assert!(false, "Compilation should have failed");
         }
     }
+}
+
+///
+/// Execution tests
+///
+
+#[test]
+fn test_simple_rule() {
+    let script : Script<UncheckedCtx, UncheckedEnv> = Script {
+        metadata: (),
+
+        // One requirement
+        requirements: vec![Arc::new(Requirement {
+            kind: "kind 1".to_owned(),
+            inputs: vec!["input 1".to_owned()],
+            outputs: vec![],
+            min: 1,
+            max: 1,
+            phantom: PhantomData
+        })],
+
+        // As many allocations
+        allocations: vec![Resource {
+            devices: vec!["device 1".to_owned()],
+            phantom: PhantomData
+        }],
+        rules: vec![],
+    };
+
+    let result = ExecutionTask::<TestEnv>::new(&script);
+    match result {
+        Ok(_) => {},
+        Err(ref err) => {
+            println!("Compilation should have failed {:?}", err);
+        }
+    }
+
+    let mut task = result.unwrap();
+    task.run();
 }

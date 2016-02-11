@@ -18,6 +18,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::marker::PhantomData;
 use std::result::Result;
 use std::result::Result::*;
+use std::thread;
 
 extern crate chrono;
 use self::chrono::{Duration, DateTime, UTC};
@@ -229,9 +230,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
 
     /// Execute the monitoring task.
     /// This currently expects to be executed in its own thread.
-    fn run(&mut self) {
-        panic!("Not implemented");
-        /*
+    pub fn run(&mut self) {
         let mut watcher = Env::Watcher::new();
         let mut witnesses = Vec::new();
 
@@ -313,7 +312,6 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
                 }
             }
         }
-*/
     }
 }
 
@@ -426,9 +424,15 @@ pub enum DevAccessError {
 }
 
 #[derive(Debug)]
+pub enum RunningError {
+    AlreadyRunning,
+}
+
+#[derive(Debug)]
 pub enum Error {
     SourceError(SourceError),
     DevAccessError(DevAccessError),
+    RunningError(RunningError),
 }
 
 /// Rebind a script from an environment to another one.
@@ -695,24 +699,6 @@ impl Watcher for FakeWatcher {
     }
 }
 
-/*
-impl DeviceAccess for CompiledDev {
-    type Input = Vector<Arc<InputEnv>>;
-    type Output = Vector<Arc<OutputEnv>>;
-    type ConditionState = ConditionDev;
-    type Device = Envice;
-    type InputCapability = InputCapability;
-    type OutputCapability = OutputCapability;
-}
-
-impl ExecutionDeviceAccess for CompiledDev {
-    type Watcher = Box<Watcher>;
-    fn condition_is_met<'a>(is_met: &'a mut Self::ConditionState) -> &'a IsMet {
-        is_met
-    }
-}
- */
-
 /// Data, labelled with its latest update.
 struct DatedData {
     updated: DateTime<UTC>,
@@ -875,20 +861,27 @@ impl<'a, Env> Rebinder for Precompiler<'a, Env>
         }
     }
 }
-/*
-impl Script {
+
+/// Running a single script
+struct Execution<Env> where Env: DeviceAccess {
+    command_sender: Option<Sender<ExecutionOp>>,
+    phantom: PhantomData<Env>,
+}
+
+impl<Env: 'static> Execution<Env> where Env: DeviceAccess {
     ///
     /// Start executing the application.
     ///
-    pub fn start(&mut self) {
+    pub fn start(&mut self, script: &Script<UncheckedCtx, UncheckedEnv>) -> Result<(), Error>{
         if self.command_sender.is_some() {
-            return;
+            return Err(Error::RunningError(RunningError::AlreadyRunning));
         }
-        let mut task = MonitorTask::new(self.clone());
+        let mut task = try!(ExecutionTask::<Env>::new(script));
         self.command_sender = Some(task.get_command_sender());
         thread::spawn(move || {
             task.run();
         });
+        Ok(())
     }
 
     ///
@@ -902,7 +895,7 @@ impl Script {
             },
             Some(ref tx) => {
                 // Shutdown the application, asynchronously.
-                let _ignored = tx.send(MonitorOp::Stop);
+                let _ignored = tx.send(ExecutionOp::Stop);
                 // Do not return.
             }
         }
@@ -910,4 +903,4 @@ impl Script {
     }
 }
 
-*/
+

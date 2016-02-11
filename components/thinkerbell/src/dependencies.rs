@@ -7,11 +7,11 @@ use values::{Value, Range};
 /// The environment in which the code is meant to be executed.  This
 /// can typically be instantiated either with actual bindings to
 /// devices, or with a unit-testing framework.
-pub trait DeviceAccess {
-    type DeviceKind: Clone;
-    type Device: Clone;
-    type InputCapability: Clone;
-    type OutputCapability: Clone;
+pub trait DeviceAccess: Send + Sync {
+    type DeviceKind: Clone + Send + Sync;
+    type Device: Clone + Send + Sync;
+    type InputCapability: Clone + Send + Sync;
+    type OutputCapability: Clone + Send + Sync;
     type Watcher: Watcher + Watcher<Device=Self::Device, InputCapability=Self::InputCapability>;
 
     fn get_device_kind(&String) -> Option<Self::DeviceKind>;
