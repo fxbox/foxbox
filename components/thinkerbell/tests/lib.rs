@@ -1,8 +1,13 @@
+use std::sync::Arc;
+use std::marker::PhantomData;
+
+
 extern crate thinkerbell;
 
 use thinkerbell::dependencies::{DeviceAccess, Watcher};
 use thinkerbell::values::{Value, Range};
-use thinkerbell::lang::{ExecutionTask, UncheckedCtx, UncheckedEnv, Script};
+use thinkerbell::lang::{ExecutionTask, UncheckedCtx, UncheckedEnv, Script, Requirement, Resource};
+
 
 /// An implementation of DeviceAccess for the purpose of unit testing.
 struct TestEnv;
@@ -85,4 +90,87 @@ fn test_compile_empty_script() {
     // Compiling an empty script should succeed.
     let task = ExecutionTask::<TestEnv>::new(&script);
     assert!(task.is_ok());
+}
+
+#[test]
+/// Attempt to compile a script with the wrong number of allocations.
+/// This should fail.
+fn test_compile_bad_number_of_allocations() {
+    use thinkerbell::lang::SourceError::*;
+    use thinkerbell::lang::Error::*;
+
+    let script : Script<UncheckedCtx, UncheckedEnv> = Script {
+        metadata: (),
+
+        // One requirement
+        requirements: vec![Arc::new(Requirement {
+            kind: "kind 1".to_owned(), // This kind exists, so that shouldn't cause a failure.
+            inputs: vec!["input 1".to_owned()], // This input exists, so that shouldn't cause a failure.
+            outputs: vec![],
+            min: 1,
+            max: 1,
+            phantom: PhantomData
+        })],
+
+        // No allocations
+        allocations: vec![],
+        rules: vec![],
+    };
+
+    let task = ExecutionTask::<TestEnv>::new(&script);
+
+
+    match task {
+        Err(SourceError(AllocationLengthError{..})) => (), // success
+        Err(err) => {
+            println!("Wrong error {:?}", err);
+            assert!(false);
+        },
+        Ok(_) => {
+            assert!(false, "Compilation should have failed");
+        }
+    }
+}
+
+#[test]
+/// Attempt to compile a script with a resource of a kind that doesn't exist on the box.
+/// This should fail.
+fn test_compile_wrong_kind() {
+    use thinkerbell::lang::DevAccessError::*;
+    use thinkerbell::lang::Error::*;
+
+    let script : Script<UncheckedCtx, UncheckedEnv> = Script {
+        metadata: (),
+
+        // One requirement
+        requirements: vec![Arc::new(Requirement {
+            kind: "not available on this foxbox".to_owned(), // This kind doesn't exists on the system, so that should cause a failure.
+            inputs: vec!["input 1".to_owned()], // This input exists, so that shouldn't cause a failure.
+            outputs: vec![],
+            min: 1,
+            max: 1,
+            phantom: PhantomData
+        })],
+
+        // As many allocations
+        allocations: vec![Resource {
+            devices: vec![],
+            phantom: PhantomData
+        }],
+        rules: vec![],
+    };
+
+    let task = ExecutionTask::<TestEnv>::new(&script);
+
+
+    match task {
+        Err(DevAccessError(DeviceKindNotFound)) => (), // success
+        Err(err) => {
+            println!("Wrong error {:?}", err);
+            assert!(false);
+        },
+        Ok(_) => {
+            assert!(false, "Compilation should have failed");
+        }
+    }
 }

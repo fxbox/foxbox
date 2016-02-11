@@ -425,6 +425,7 @@ pub enum DevAccessError {
     DeviceCapabilityNotFound, // FIXME: Add details    
 }
 
+#[derive(Debug)]
 pub enum Error {
     SourceError(SourceError),
     DevAccessError(DevAccessError),
