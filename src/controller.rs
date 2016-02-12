@@ -6,7 +6,7 @@ extern crate mio;
 
 use context::SharedContext;
 use dummy_adapter::DummyAdapter;
-use events::*;
+use events::{ EventData, EventSender };
 use http_server::HttpServer;
 use mio::EventLoop;
 use service::{ Service, ServiceAdapter };
