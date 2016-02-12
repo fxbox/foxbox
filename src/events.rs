@@ -25,3 +25,23 @@ impl EventData {
 }
 
 pub type EventSender = mio::Sender<EventData>;
+
+
+describe! event_data {
+    it "AdapterStart should return its name as a description" {
+        let data = EventData::AdapterStart { name: "name".to_owned() };
+        assert_eq!(data.description(), "name");
+    }
+
+    it "ServiceStart should return its ID as a description" {
+        let data = EventData::ServiceStart { id: "id".to_owned() };
+        assert_eq!(data.description(), "id");
+    }
+
+    // TODO Factorize this test with the one above once there's a way to loop over a random emum.
+    // https://github.com/rust-lang/rfcs/issues/284
+    it "ServiceStop should return its ID as a description" {
+        let data = EventData::ServiceStop { id: "id".to_owned() };
+        assert_eq!(data.description(), "id");
+    }
+}
