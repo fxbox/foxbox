@@ -176,6 +176,61 @@ pub trait Context {
 /// # Launching and running the script
 ///
 
+
+/// Running and controlling a single script.
+pub struct Execution<Env> where Env: DeviceAccess {
+    command_sender: Option<Sender<ExecutionOp>>,
+    phantom: PhantomData<Env>,
+}
+
+impl<Env: 'static> Execution<Env> where Env: DeviceAccess {
+    pub fn new() -> Self {
+        Execution {
+            command_sender: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Start executing the script.
+    ///
+    /// # Errors
+    ///
+    /// Produces RunningError:AlreadyRunning if the script is already running.
+    pub fn start(&mut self, script: &Script<UncheckedCtx, UncheckedEnv>) -> Result<(), Error>{
+        if self.command_sender.is_some() {
+            return Err(Error::RunningError(RunningError::AlreadyRunning));
+        }
+        let mut task = try!(ExecutionTask::<Env>::new(script));
+        self.command_sender = Some(task.get_command_sender());
+        thread::spawn(move || {
+            task.run();
+        });
+        Ok(())
+    }
+
+    /// Stop executing the script, asynchronously.
+    ///
+    /// # Errors
+    ///
+    /// Produces RunningError:NotRunning if the script is not running yet.
+    pub fn stop(&mut self) -> Result<Receiver<()>, Error> {
+        let result = match self.command_sender {
+            None => {
+                /* Nothing to stop */
+                Err(Error::RunningError(RunningError::NotRunning))
+            },
+            Some(ref tx) => {
+                // Shutdown the application, asynchronously.
+                let (tstop, rstop) = channel();
+                let _ignored = tx.send(ExecutionOp::Stop(tstop));
+                Ok(rstop)
+            }
+        };
+        self.command_sender = None;
+        return result;
+    }
+}
+
 /// A script ready to be executed.
 /// Each script is meant to be executed in an individual thread.
 pub struct ExecutionTask<Env> where Env: DeviceAccess {
@@ -197,7 +252,7 @@ enum ExecutionOp {
     Update,
 
     /// Time to stop executing the script.
-    Stop
+    Stop(Sender<()>)
 }
 
 
@@ -230,7 +285,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
 
     /// Execute the monitoring task.
     /// This currently expects to be executed in its own thread.
-    pub fn run(&mut self) {
+    fn run(&mut self) {
         let mut watcher = Env::Watcher::new();
         let mut witnesses = Vec::new();
 
@@ -280,10 +335,11 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
         for msg in &self.rx {
             use self::ExecutionOp::*;
             match msg {
-                Stop => {
+                Stop(tx) => {
                     // Leave the loop.
                     // The watcher and the witnesses will be cleaned up on exit.
                     // Any further message will be ignored.
+                    tx.send(());
                     return;
                 }
 
@@ -426,6 +482,7 @@ pub enum DevAccessError {
 #[derive(Debug)]
 pub enum RunningError {
     AlreadyRunning,
+    NotRunning,
 }
 
 #[derive(Debug)]
@@ -861,46 +918,4 @@ impl<'a, Env> Rebinder for Precompiler<'a, Env>
         }
     }
 }
-
-/// Running a single script
-struct Execution<Env> where Env: DeviceAccess {
-    command_sender: Option<Sender<ExecutionOp>>,
-    phantom: PhantomData<Env>,
-}
-
-impl<Env: 'static> Execution<Env> where Env: DeviceAccess {
-    ///
-    /// Start executing the application.
-    ///
-    pub fn start(&mut self, script: &Script<UncheckedCtx, UncheckedEnv>) -> Result<(), Error>{
-        if self.command_sender.is_some() {
-            return Err(Error::RunningError(RunningError::AlreadyRunning));
-        }
-        let mut task = try!(ExecutionTask::<Env>::new(script));
-        self.command_sender = Some(task.get_command_sender());
-        thread::spawn(move || {
-            task.run();
-        });
-        Ok(())
-    }
-
-    ///
-    /// Stop the execution of the application.
-    ///
-    pub fn stop(&mut self) {
-        match self.command_sender {
-            None => {
-                /* Nothing to stop */
-                return;
-            },
-            Some(ref tx) => {
-                // Shutdown the application, asynchronously.
-                let _ignored = tx.send(ExecutionOp::Stop);
-                // Do not return.
-            }
-        }
-        self.command_sender = None;
-    }
-}
-
 

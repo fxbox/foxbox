@@ -6,7 +6,7 @@ extern crate thinkerbell;
 
 use thinkerbell::dependencies::{DeviceAccess, Watcher};
 use thinkerbell::values::{Value, Range};
-use thinkerbell::lang::{ExecutionTask, UncheckedCtx, UncheckedEnv, Script, Requirement, Resource};
+use thinkerbell::lang::{Execution, ExecutionTask, UncheckedCtx, UncheckedEnv, Script, Requirement, Resource};
 
 
 /// An implementation of DeviceAccess for the purpose of unit testing.
@@ -185,7 +185,7 @@ fn test_compile_wrong_kind() {
 ///
 
 #[test]
-fn test_simple_rule() {
+fn test_start_stop() {
     let script : Script<UncheckedCtx, UncheckedEnv> = Script {
         metadata: (),
 
@@ -207,14 +207,15 @@ fn test_simple_rule() {
         rules: vec![],
     };
 
-    let result = ExecutionTask::<TestEnv>::new(&script);
-    match result {
+    let mut runner = Execution::<TestEnv>::new();
+    match runner.start(&script) {
         Ok(_) => {},
         Err(ref err) => {
-            println!("Compilation should have failed {:?}", err);
+            println!("Compilation should have succeeded {:?}", err);
         }
     }
 
-    let mut task = result.unwrap();
-    task.run();
+    // Wait until the script has stopped
+    let rx = runner.stop().unwrap();
+    rx.recv().unwrap();
 }
