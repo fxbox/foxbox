@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 
-use std::cmp::{Eq, Ord, Ordering};
+use std::cmp::{Eq, Ordering};
 use std::sync::Arc;
 
 extern crate rustc_serialize;
@@ -50,22 +50,26 @@ pub struct Number {
     value: f64,
     physical_unit: (), // FIXME: Implement
 }
-
-impl Ord for Number {
-    fn cmp(&self, other: &Self) -> Ordering {
-        panic!("Not implemented")
+impl Number {
+    pub fn new(value: f64, physical_unit: ()) -> Self {
+        Number {
+            value: value,
+            physical_unit: physical_unit
+        }
     }
 }
 
 impl PartialOrd<Number> for Number {
     fn partial_cmp(&self, other: &Number) -> Option<Ordering> {
-        panic!("Not implemented")
+        assert!(self.physical_unit == other.physical_unit, "Conversion of units is not implemented");
+        self.value.partial_cmp(&other.value)
     }
 }
 
 impl PartialEq<Number> for Number {
     fn eq(&self, other: &Number) -> bool {
-        panic!("Not implemented")
+        assert!(self.physical_unit == other.physical_unit, "Conversion of units is not implemented");
+        self.value.eq(&other.value)
     }
 }
 

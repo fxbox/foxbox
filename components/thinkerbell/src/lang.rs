@@ -1,4 +1,3 @@
-
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
@@ -295,6 +294,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
         for rule in &self.state.rules  {
             for condition in &rule.condition.all {
                 for single in &*condition.input {
+                    let tx = self.tx.clone();
                     witnesses.push(
                         // We can end up watching several times the
                         // same device + capability + range.  For the
@@ -308,7 +308,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
                             &single.device,
                             &condition.capability,
                             &condition.range,
-                            |value| {
+                            move |value| {
                                 // One of the inputs has been updated.
                                 *single.state.write().unwrap() = Some(DatedData {
                                     updated: UTC::now(),
@@ -320,7 +320,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
 
                                 // Find out if we should execute one of the
                                 // statements of the trigger.
-                                let _ignored = self.tx.send(ExecutionOp::Update);
+                                let _ignored = tx.send(ExecutionOp::Update);
                                 // If the thread is down, it is ok to ignore messages.
                             }));
                     }
@@ -331,6 +331,8 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
         // We need to find out how to get rid of it.
         // FIXME(2): We now have dates.
 
+        println!("ExecutionTask: Starting to handle messages");
+ 
         // Now, start handling events.
         for msg in &self.rx {
             use self::ExecutionOp::*;
@@ -339,15 +341,18 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
                     // Leave the loop.
                     // The watcher and the witnesses will be cleaned up on exit.
                     // Any further message will be ignored.
-                    tx.send(());
+                    let _ignored = tx.send(());
                     return;
                 }
 
                 Update => {
+                    println!("ExecutionTask: Received an update");
                     // Find out if we should execute triggers.
                     for mut rule in &mut self.state.rules {
                         let is_met = rule.is_met();
+                        println!("ExecutionTask: Examining conditon. {} => {}", is_met.old, is_met.new);
                         if !(is_met.new && !is_met.old) {
+                            println!("ExecutionTask: Skipping");
                             // We should execute the trigger only if
                             // it was false and is now true. Here,
                             // either it was already true or it isn't
@@ -357,6 +362,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
 
                         // Conditions were not met, now they are, so
                         // it is time to start executing.
+                        println!("ExecutionTask: Executing");
 
                         // FIXME: We do not want triggers to be
                         // triggered too often. Handle cooldown.
@@ -655,7 +661,7 @@ impl<Ctx, Env> Expression<Ctx, Env> where Env: DeviceAccess, Ctx: Context {
                 Ok(Expression::Vec(v2))
             }
             //            Input(ref input) => Input(rebinder.rebind_input(input).clone()),
-            Expression::Input(_) => panic!("Not impl implemented yet")
+            Expression::Input(_) => panic!("Not implemented yet")
         }
     }
 }
@@ -750,7 +756,7 @@ impl Watcher for FakeWatcher {
               device: &Self::Device,
               input: &Self::InputCapability,
               condition: &Range,
-              cb: F) -> () where F:FnOnce(Value)
+              cb: F) -> Self::Witness where F:Fn(Value) + Send
     {
         panic!("Cannot execute a FakeWatcher");
     }

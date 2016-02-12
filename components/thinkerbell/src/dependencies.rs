@@ -32,7 +32,7 @@ pub trait Watcher {
               device: &Self::Device,
               input: &Self::InputCapability,
               condition: &Range,
-              cb: F) -> Self::Witness where F:FnOnce(Value);
+              cb: F) -> Self::Witness where F:Fn(Value) + Send;
 }
 
 
