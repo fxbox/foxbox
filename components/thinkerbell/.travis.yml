@@ -1,5 +1,7 @@
 language: rust
 rust:
   - nightly
-script:
-  - RUST_BACKTRACE=1 cargo test
+  - beta
+matrix:
+  allow_failures:
+    - rust: nightly

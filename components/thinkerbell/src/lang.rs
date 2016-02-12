@@ -177,12 +177,12 @@ pub trait Context {
 
 
 /// Running and controlling a single script.
-pub struct Execution<Env> where Env: DeviceAccess {
+pub struct Execution<Env> where Env: DeviceAccess + 'static {
     command_sender: Option<Sender<ExecutionOp>>,
     phantom: PhantomData<Env>,
 }
 
-impl<Env: 'static> Execution<Env> where Env: DeviceAccess {
+impl<Env> Execution<Env> where Env: DeviceAccess + 'static {
     pub fn new() -> Self {
         Execution {
             command_sender: None,
@@ -195,38 +195,51 @@ impl<Env: 'static> Execution<Env> where Env: DeviceAccess {
     /// # Errors
     ///
     /// Produces RunningError:AlreadyRunning if the script is already running.
-    pub fn start(&mut self, script: &Script<UncheckedCtx, UncheckedEnv>) -> Result<(), Error>{
+    pub fn start<F>(&mut self, script: Script<UncheckedCtx, UncheckedEnv>, on_result: F) where F: FnOnce(Result<(), Error>) + Send + 'static {
         if self.command_sender.is_some() {
-            return Err(Error::RunningError(RunningError::AlreadyRunning));
+            on_result(Err(Error::RunningError(RunningError::AlreadyRunning)));
+            return;
         }
-        let mut task = try!(ExecutionTask::<Env>::new(script));
-        self.command_sender = Some(task.get_command_sender());
+        let (tx, rx) = channel();
+        let tx2 = tx.clone();
+        self.command_sender = Some(tx);
         thread::spawn(move || {
-            task.run();
+            match ExecutionTask::<Env>::new(&script, tx2, rx) {
+                Err(er) => {
+                    on_result(Err(er));
+                },
+                Ok(mut task) => {
+                    on_result(Ok(()));
+                    task.run();
+                }
+            }
         });
-        Ok(())
     }
+
 
     /// Stop executing the script, asynchronously.
     ///
     /// # Errors
     ///
     /// Produces RunningError:NotRunning if the script is not running yet.
-    pub fn stop(&mut self) -> Result<Receiver<()>, Error> {
+    pub fn stop<F>(&mut self, on_result: F) where F: Fn(Result<(), Error>) + Send + 'static {
         let result = match self.command_sender {
             None => {
                 /* Nothing to stop */
-                Err(Error::RunningError(RunningError::NotRunning))
+                on_result(Err(Error::RunningError(RunningError::NotRunning)));
             },
             Some(ref tx) => {
                 // Shutdown the application, asynchronously.
-                let (tstop, rstop) = channel();
-                let _ignored = tx.send(ExecutionOp::Stop(tstop));
-                Ok(rstop)
+                let _ignored = tx.send(ExecutionOp::Stop(Box::new(on_result)));
             }
         };
         self.command_sender = None;
-        return result;
+    }
+}
+
+impl<Env> Drop for Execution<Env> where Env: DeviceAccess + 'static {
+    fn drop(&mut self) {
+        let _ignored = self.stop(|_ignored| { });
     }
 }
 
@@ -248,10 +261,10 @@ pub struct ExecutionTask<Env> where Env: DeviceAccess {
 enum ExecutionOp {
     /// An input has been updated, time to check if we have triggers
     /// ready to be executed.
-    Update,
+    Update {index: usize, updated: DateTime<UTC>, value: Value},
 
     /// Time to stop executing the script.
-    Stop(Sender<()>)
+    Stop(Box<Fn(Result<(), Error>) + Send>)
 }
 
 
@@ -260,7 +273,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
     ///
     /// The caller is responsible for spawning a new thread and
     /// calling `run()`.
-    pub fn new(script: &Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
+    fn new(script: &Script<UncheckedCtx, UncheckedEnv>, tx: Sender<ExecutionOp>, rx: Receiver<ExecutionOp>) -> Result<Self, Error> {
         // Prepare the script for execution:
         // - replace instances of Input with InputDev, which map
         //   to a specific device and cache the latest known value
@@ -269,7 +282,6 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
         let precompiler = try!(Precompiler::new(script));
         let bound = try!(script.rebind(&precompiler));
         
-        let (tx, rx) = channel();
         Ok(ExecutionTask {
             state: bound,
             rx: rx,
@@ -277,16 +289,16 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
         })
     }
 
-    /// Get a channel that may be used to send commands to the task.
-    fn get_command_sender(&self) -> Sender<ExecutionOp> {
-        self.tx.clone()
-    }
-
     /// Execute the monitoring task.
     /// This currently expects to be executed in its own thread.
     fn run(&mut self) {
-        let mut watcher = Env::Watcher::new();
+        let mut watcher = Env::get_watcher();
         let mut witnesses = Vec::new();
+        
+        // A thread-safe indirection towards a single input state.
+        // We assume that `cells` never mutates again once we
+        // have finished the loop below.
+        let mut cells : Vec<Arc<CompiledInput<Env>>> = Vec::new();
 
         // Start listening to all inputs that appear in conditions.
         // Some inputs may appear only in expressions, so we are
@@ -295,6 +307,9 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
             for condition in &rule.condition.all {
                 for single in &*condition.input {
                     let tx = self.tx.clone();
+                    cells.push(single.clone());
+                    let index = cells.len();
+
                     witnesses.push(
                         // We can end up watching several times the
                         // same device + capability + range.  For the
@@ -310,49 +325,55 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
                             &condition.range,
                             move |value| {
                                 // One of the inputs has been updated.
-                                *single.state.write().unwrap() = Some(DatedData {
+                                // Update `state` and determine
+                                // whether there is anything we need
+                                // to do.
+                                let _ignored = tx.send(ExecutionOp::Update {
                                     updated: UTC::now(),
-                                    data: value
+                                    value: value,
+                                    index: index
                                 });
-                                // Note that we can unwrap() safely,
-                                // as it fails only if the thread is
-                                // already in panic.
-
-                                // Find out if we should execute one of the
-                                // statements of the trigger.
-                                let _ignored = tx.send(ExecutionOp::Update);
                                 // If the thread is down, it is ok to ignore messages.
                             }));
                     }
             }
         }
 
+        // Make sure that the vector never mutates past this
+        // point. This ensures that our `index` remains valid for the
+        // rest of the execution.
+        let cells = cells;
+
         // FIXME: We are going to end up with stale data in some inputs.
         // We need to find out how to get rid of it.
         // FIXME(2): We now have dates.
 
-        println!("ExecutionTask: Starting to handle messages");
- 
         // Now, start handling events.
         for msg in &self.rx {
             use self::ExecutionOp::*;
             match msg {
-                Stop(tx) => {
+                Stop(f) => {
                     // Leave the loop.
                     // The watcher and the witnesses will be cleaned up on exit.
                     // Any further message will be ignored.
-                    let _ignored = tx.send(());
+                    f(Ok(()));
                     return;
                 }
 
-                Update => {
-                    println!("ExecutionTask: Received an update");
+                Update {updated, value, index} => {
+                    let cell = &cells[index];
+                    *cell.state.write().unwrap() = Some(DatedData {
+                        updated: UTC::now(),
+                        data: value
+                    });
+                    // Note that we can unwrap() safely,
+                    // as it fails only if the thread is
+                    // already in panic.
+
                     // Find out if we should execute triggers.
                     for mut rule in &mut self.state.rules {
                         let is_met = rule.is_met();
-                        println!("ExecutionTask: Examining conditon. {} => {}", is_met.old, is_met.new);
                         if !(is_met.new && !is_met.old) {
-                            println!("ExecutionTask: Skipping");
                             // We should execute the trigger only if
                             // it was false and is now true. Here,
                             // either it was already true or it isn't
@@ -362,7 +383,6 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
 
                         // Conditions were not met, now they are, so
                         // it is time to start executing.
-                        println!("ExecutionTask: Executing");
 
                         // FIXME: We do not want triggers to be
                         // triggered too often. Handle cooldown.
@@ -699,6 +719,10 @@ impl DeviceAccess for UncheckedEnv {
     type OutputCapability = String;
     type Watcher = FakeWatcher;
 
+    fn get_watcher() -> Self::Watcher {
+        panic!("UncheckEnv cannot instantiate a watcher");
+    }
+
     fn get_device_kind(key: &String) -> Option<String> {
         Some(key.clone())
     }
@@ -729,8 +753,8 @@ struct CompiledOutput<Env> where Env: DeviceAccess {
     device: Env::Device,
 }
 
-type CompiledInputSet<Env> = Arc<Vec<Arc<CompiledInput<Env>>>>;
-type CompiledOutputSet<Env> = Arc<Vec<Arc<CompiledOutput<Env>>>>;
+type CompiledInputSet<Env> = Vec<Arc<CompiledInput<Env>>>;
+type CompiledOutputSet<Env> = Vec<Arc<CompiledOutput<Env>>>;
 struct CompiledConditionState {
     is_met: bool
 }
@@ -748,15 +772,11 @@ impl Watcher for FakeWatcher {
     type Device = String;
     type InputCapability = String;
 
-    fn new() -> FakeWatcher {
-        panic!("Cannot instantiate a FakeWatcher");
-    }
-
     fn add<F>(&mut self,
               device: &Self::Device,
               input: &Self::InputCapability,
               condition: &Range,
-              cb: F) -> Self::Witness where F:Fn(Value) + Send
+              cb: F) -> Self::Witness where F:Fn(Value)
     {
         panic!("Cannot execute a FakeWatcher");
     }
@@ -822,7 +842,7 @@ impl<'a, Env> Precompiler<'a, Env> where Env: DeviceAccess {
                         }))
                     }
                 }
-                input = Some(Arc::new(resolved));
+                input = Some(resolved);
             }
             if has_outputs {
                 let mut resolved = Vec::with_capacity(alloc.devices.len());
@@ -834,7 +854,7 @@ impl<'a, Env> Precompiler<'a, Env> where Env: DeviceAccess {
                         }))
                     }
                 }
-                output = Some(Arc::new(resolved));
+                output = Some(resolved);
             }
             inputs.push(input);
             outputs.push(output);
