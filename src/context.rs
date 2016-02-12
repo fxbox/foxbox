@@ -80,63 +80,85 @@ impl Context {
     }
 }
 
-#[test]
-#[allow(unused_variables)]
-fn test_context_service() {
-    use service::{ Service, ServiceProperties };
-    use iron::{Request, Response, IronResult};
 
-    struct ServiceStub;
+describe! context {
 
-    impl Service for ServiceStub {
-        fn get_properties(&self) -> ServiceProperties {
-            ServiceProperties {
-                id: "1".to_owned(),
-                name: "dummy service".to_owned(),
-                description: "really nothing to see".to_owned(),
-                http_url: "2".to_owned(),
-                ws_url: "3".to_owned()
+    before_each {
+        use service::{ Service, ServiceProperties };
+        use iron::{ Request, Response, IronResult };
+
+        struct ServiceStub;
+
+        impl Service for ServiceStub {
+            fn get_properties(&self) -> ServiceProperties {
+                ServiceProperties {
+                    id: "1".to_owned(),
+                    name: "dummy service".to_owned(),
+                    description: "really nothing to see".to_owned(),
+                    http_url: "2".to_owned(),
+                    ws_url: "3".to_owned()
+                }
+            }
+            fn start(&self)  {}
+            fn stop(&self) {}
+            fn process_request(&self, _: &Request) -> IronResult<Response> {
+                Ok(Response::new())
             }
         }
-        fn start(&self)  {}
-        fn stop(&self) {}
-        fn process_request(&self, req: &Request) -> IronResult<Response> {
-            Ok(Response::new())
-        }
+
+        let service = ServiceStub;
+        let context = Context::shared(false, Some("localhost".to_owned()), None, None);
+        let mut locked_context = context.lock().unwrap();
     }
 
-    let service = ServiceStub;
-    let context = Context::shared(false, Some("localhost".to_owned()), None, None);
-    let mut foo = context.lock().unwrap();
+    describe! add_service {
+        it "should increase number of services" {
+            assert_eq!(locked_context.services.is_empty(), true);
+            locked_context.add_service(Box::new(service));
+            assert_eq!(locked_context.services.is_empty(), false);
+            assert_eq!(locked_context.services_count(), 1);
+        }
 
-    assert_eq!(foo.services.is_empty(), true);
-    foo.add_service(Box::new(service));
-    assert_eq!(foo.services.is_empty(), false);
-    assert_eq!(foo.services_count(), 1);
+        it "should make service available" {
+            locked_context.add_service(Box::new(service));
 
-    // Verify that the service with id "1" is there.
-    {
-        let service1 = foo.get_service("1");
-        match service1 {
-            Some(svc) => {
-                assert_eq!(svc.get_properties().id, "1");
+            let service1 = locked_context.get_service("1");
+            match service1 {
+                Some(svc) => {
+                    assert_eq!(svc.get_properties().id, "1");
+                }
+                None => assert!(false, "No service with id 1")
             }
-            None => assert!(false, "No service with id 1")
+        }
+
+        it "should create http root" {
+            locked_context.add_service(Box::new(service));
+            assert_eq!(locked_context.get_http_root_for_service("1".to_string()),
+                       "http://localhost:3000/services/1/");
+        }
+
+        it "should create ws root" {
+            locked_context.add_service(Box::new(service));
+            assert_eq!(locked_context.get_ws_root_for_service("1".to_string()),
+                       "ws://localhost:4000/services/1/");
+        }
+
+        it "should return a json" {
+            locked_context.add_service(Box::new(service));
+
+            match locked_context.services_as_json() {
+                Ok(txt) => assert_eq!(txt, "{\"1\":{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}}"),
+                Err(err) => assert!(false, err)
+            }
         }
     }
 
-    let id = "1".to_owned();
-    assert_eq!(foo.get_http_root_for_service(id.clone()),
-               "http://localhost:3000/services/1/");
-    assert_eq!(foo.get_ws_root_for_service(id.clone()),
-               "ws://localhost:4000/services/1/");
 
-    match foo.services_as_json() {
-        Ok(txt) => assert_eq!(txt, "{\"1\":{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}}"),
-        Err(err) => assert!(false, err)
+    it "should delete a service" {
+        locked_context.add_service(Box::new(service));
+        let id = "1".to_owned();
+        locked_context.remove_service(id);
+        assert_eq!(locked_context.services_count(), 0);
+        assert_eq!(locked_context.services.is_empty(), true);
     }
-
-    foo.remove_service(id);
-    assert_eq!(foo.services_count(), 0);
-    assert_eq!(foo.services.is_empty(), true);
 }
