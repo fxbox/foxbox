@@ -84,27 +84,7 @@ impl Context {
 describe! context {
 
     before_each {
-        use service::{ Service, ServiceProperties };
-        use iron::{ Request, Response, IronResult };
-
-        struct ServiceStub;
-
-        impl Service for ServiceStub {
-            fn get_properties(&self) -> ServiceProperties {
-                ServiceProperties {
-                    id: "1".to_owned(),
-                    name: "dummy service".to_owned(),
-                    description: "really nothing to see".to_owned(),
-                    http_url: "2".to_owned(),
-                    ws_url: "3".to_owned()
-                }
-            }
-            fn start(&self)  {}
-            fn stop(&self) {}
-            fn process_request(&self, _: &Request) -> IronResult<Response> {
-                Ok(Response::new())
-            }
-        }
+        use stubs::service::ServiceStub;
 
         let service = ServiceStub;
         let context = Context::shared(false, Some("localhost".to_owned()), None, None);
