@@ -46,7 +46,7 @@ mod stubs {
     pub mod service;
 }
 
-use context::Context;
+use context::{ ContextTrait, Context };
 use controller::Controller;
 
 docopt!(Args derive Debug, "

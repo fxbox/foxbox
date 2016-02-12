@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use context::SharedContext;
+use context::{ ContextTrait, SharedContext };
 use foxbox_users::users_router::UsersRouter;
 use iron::{Iron, Request, Response, IronResult};
 use iron::headers::ContentType;

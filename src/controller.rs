@@ -4,7 +4,7 @@
 
 extern crate mio;
 
-use context::SharedContext;
+use context::{ ContextTrait, SharedContext };
 use dummy_adapter::DummyAdapter;
 use events::{ EventData, EventSender };
 use http_server::HttpServer;
