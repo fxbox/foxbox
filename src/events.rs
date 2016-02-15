@@ -14,6 +14,7 @@ pub enum EventData {
 
 impl EventData {
     pub fn description(&self) -> String {
+        #![allow(match_same_arms)]
         let description = match *self {
             EventData::AdapterStart { ref name } => name,
             EventData::ServiceStart { ref id } => id,
