@@ -12,7 +12,7 @@ Target hardware for prototyping is the Raspberry Pi 2. It's ARMv7 with Neon, but
 
 ## Toolchain
 
-Rust 1.8+ is required. We're building with rust nightly (1.8.0 as of 2016-02-04, with ```rustc -V``` reporting: *rustc 1.8.0-nightly (dea183aa8 2016-02-02)*)
+Rust 1.8+ is required. We're building with rust nightly (1.8.0 as of 2016-02-15, with ```rustc -V``` reporting: *rustc 1.8.0-nightly (fae516277 2016-02-13)*)
 
 ## Cross Compilation Toolchain
 
