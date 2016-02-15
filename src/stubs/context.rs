@@ -41,10 +41,14 @@ impl ContextTrait for ContextStub {
     fn services_count(&self) -> usize { 0 }
 
     fn get_service(&self, id: &str) -> Option<&Box<Service>> {
-        Some(&self.stubbed_service)
+        if id == "1" {
+            Some(&self.stubbed_service)
+        } else {
+            None
+        }
     }
 
-    fn services_as_json(&self) -> Result<String, serde_json::error::Error> { Ok("".to_owned()) }
+    fn services_as_json(&self) -> Result<String, serde_json::error::Error> { Ok("{}".to_owned()) }
 
     fn get_http_root_for_service(&self, service_id: String) -> String { "".to_owned() }
 

@@ -41,7 +41,7 @@ impl<Ctx> ServiceRouter<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static 
             let id = req.extensions.get::<Router>().unwrap().find("service").unwrap_or("");
             match ctx.get_service(id) {
                 None => {
-                    let mut response = Response::with(format!("No Such Service : {}", id));
+                    let mut response = Response::with(format!("No Such Service: {}", id));
                     response.status = Some(Status::BadRequest);
                     response.headers.set(ContentType::plaintext());
                     Ok(response)
@@ -56,38 +56,48 @@ impl<Ctx> ServiceRouter<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static 
 
 }
 
+
+// FIXME: Declare this crate in the test module, and avoid the use of pub
+// When this comment was written, putting these 2 lines in before_each returns a compile error:
+// ``` error: unresolved import `self::iron_test::request`. Could not find `iron_test` in
+// service_router::service_router` [E0432] ```
 extern crate iron_test;
+pub use self::iron_test::{request, response};
 
-use stubs::context::ContextStub;
-use iron::{Handler, Headers, status};
-use self::iron_test::{request, response};
-
-#[test]
-fn test_toto() {
-// describe! http_server {
-    // before_each {
-
+describe! service_router {
+    before_each {
+        use stubs::context::ContextStub;
+        use iron::Headers;
 
         let context = ContextStub::blank_shared();
-        let http_server = ServiceRouter::<ContextStub>::new(context);
-    // }
+        let service_router = ServiceRouter::<ContextStub>::new(context);
+    }
 
-    // it "should create list.json" {
-// pub struct Request<'a, 'b> {
-//     pub url: Url,
-//     pub remote_addr: SocketAddr,
-//     pub local_addr: SocketAddr,
-//     pub headers: Headers,
-//     pub body: Body<'a, 'b>,
-//     pub method: Method,
-//     pub extensions: TypeMap,
-// }
-
+    it "should create list.json" {
         let response = request::get("http://localhost:3000/list.json",
                         Headers::new(),
-                        &http_server.generate_router()).unwrap();
+                        &service_router.generate_router()).unwrap();
 
+        let result = response::extract_body_to_string(response);
 
-        // let res = http_server.handle(req).unwrap();
-    // }
+        assert_eq!(result, "{}");
+    }
+
+    it "should make service available" {
+        let response = request::get("http://localhost:3000/1/a-command",
+                        Headers::new(),
+                        &service_router.generate_router()).unwrap();
+
+        let result = response::extract_body_to_string(response);
+        assert_eq!(result, "request processed");
+    }
+
+    it "should return an error if no service was found" {
+        let response = request::get("http://localhost:3000/unknown-id/a-command",
+                        Headers::new(),
+                        &service_router.generate_router()).unwrap();
+
+        let result = response::extract_body_to_string(response);
+        assert_eq!(result, "No Such Service: unknown-id");
+    }
 }
