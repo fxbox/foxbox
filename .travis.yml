@@ -1,6 +1,6 @@
 language: rust
 rust:
-    - nightly-2016-02-11
+    - nightly
 
 addons:
   hosts:
