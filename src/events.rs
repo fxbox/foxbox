@@ -16,8 +16,8 @@ impl EventData {
     pub fn description(&self) -> String {
         let description = match *self {
             EventData::AdapterStart { ref name } => name,
-            EventData::ServiceStart { ref id } => id,
-            EventData::ServiceStop { ref id } => id
+            EventData::ServiceStart { ref id }
+            | EventData::ServiceStop { ref id } => id,
         };
 
         description.to_string()
