@@ -42,6 +42,7 @@ mod events;
 mod http_server;
 mod service;
 mod controller;
+mod service_router;
 
 mod stubs {
     #![allow(dead_code)]

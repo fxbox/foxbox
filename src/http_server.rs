@@ -3,62 +3,26 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use context::{ ContextTrait, Shared };
+use service_router::ServiceRouter;
 use foxbox_users::users_router::UsersRouter;
-use iron::{Iron, Request, Response, IronResult};
-use iron::headers::ContentType;
-use iron::status::Status;
+use iron::Iron;
 use mount::Mount;
-use router::Router;
 use staticfile::Static;
 use std::path::Path;
 use std::thread;
 use core::marker::Reflect;
 
-// pub struct ExecutionTask<Env> where Env: DeviceAccess {
 pub struct HttpServer<Ctx> where Ctx: ContextTrait {
-    context: Shared<Ctx>
+    context: Shared<Ctx>,
 }
 
-// impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
 impl<Ctx> HttpServer<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static {
     pub fn new(context: Shared<Ctx>) -> HttpServer<Ctx> {
         HttpServer { context: context }
     }
 
-    pub fn start(&self) {
-        let mut router = Router::new();
-
-        let context1 = self.context.clone();
-        router.get("list.json", move |_: &mut Request| -> IronResult<Response> {
-            // Build a json representation of the services.
-            let ctx = context1.lock().unwrap();
-            let serialized = itry!(ctx.services_as_json());
-
-            let mut response = Response::with(serialized);
-            response.status = Some(Status::Ok);
-            response.headers.set(ContentType::json());
-
-            Ok(response)
-        });
-
-        let context2 = self.context.clone();
-        router.get(":service/:command", move |req: &mut Request| -> IronResult<Response> {
-            // Call a function on a service.
-            let ctx = context2.lock().unwrap();
-
-            let id = req.extensions.get::<Router>().unwrap().find("service").unwrap_or("");
-            match ctx.get_service(id) {
-                None => {
-                    let mut response = Response::with(format!("No Such Service : {}", id));
-                    response.status = Some(Status::BadRequest);
-                    response.headers.set(ContentType::plaintext());
-                    Ok(response)
-                }
-                Some(service) => {
-                    service.process_request(req)
-                }
-            }
-        });
+    pub fn start(&mut self) {
+        let router = ServiceRouter::new(self.context.clone()).generate_router();
 
         let mut mount = Mount::new();
         mount.mount("/", Static::new(Path::new("static")))
@@ -73,19 +37,5 @@ impl<Ctx> HttpServer<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static {
                               .spawn(move || {
             Iron::new(mount).http(addrs[0]).unwrap();
         }).unwrap();
-    }
-}
-
-describe! http_server {
-    before_each {
-        use stubs::context::ContextStub;
-        // use context::SharedContext;
-
-        let context = ContextStub::blank_shared();
-        let http_server = HttpServer::<ContextStub>::new(context);
-    }
-
-    it "should create list.json" {
-
     }
 }

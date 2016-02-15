@@ -34,7 +34,7 @@ impl Controller {
         println!("Starting controller");
 
         // Start the http server.
-        let http_server = HttpServer::new(self.context.clone());
+        let mut http_server = HttpServer::new(self.context.clone());
         http_server.start();
 
         // Start the dummy adapter.
