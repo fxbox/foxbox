@@ -5,6 +5,7 @@
 use service::{ Service, ServiceProperties };
 use iron::{ Request, Response, IronResult };
 
+#[derive(Clone, Copy)]
 pub struct ServiceStub;
 
 impl Service for ServiceStub {

@@ -29,10 +29,10 @@ const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 
 pub trait ContextTrait {
     fn new(verbose: bool, hostname: Option<String>,
-           http_port: Option<u16>, ws_port: Option<u16>) -> Context;
+           http_port: Option<u16>, ws_port: Option<u16>) -> Self;
     fn shared(verbose: bool, hostname: Option<String>,
               http_port: Option<u16>,
-              ws_port: Option<u16>) -> SharedContext;
+              ws_port: Option<u16>) -> Shared<Self>;
     fn add_service(&mut self, service: Box<Service>);
     fn remove_service(&mut self, id: String);
     fn services_count(&self) -> usize;
@@ -43,11 +43,12 @@ pub trait ContextTrait {
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error>;
 }
 
-pub type SharedContext = Arc<Mutex<Context>>;
+pub type Shared<T> = Arc<Mutex<T>>;
+pub type SharedContext = Shared<Context>;
 
 impl ContextTrait for Context {
     fn new(verbose: bool, hostname: Option<String>,
-               http_port: Option<u16>, ws_port: Option<u16>) -> Context {
+               http_port: Option<u16>, ws_port: Option<u16>) -> Self {
 
         Context { services: HashMap::new(),
                   verbose: verbose,
@@ -58,7 +59,7 @@ impl ContextTrait for Context {
 
     fn shared(verbose: bool, hostname: Option<String>,
                   http_port: Option<u16>,
-                  ws_port: Option<u16>) -> SharedContext {
+                  ws_port: Option<u16>) -> Shared<Self> {
         Arc::new(Mutex::new(Context::new(verbose, hostname, http_port, ws_port)))
     }
 

@@ -18,6 +18,8 @@
 #![feature(const_fn)] // Dependency of stainless
 #![plugin(stainless)] // Test runner
 
+#![feature(reflect_marker)]
+
 extern crate core;
 extern crate docopt;
 extern crate env_logger;
@@ -43,7 +45,10 @@ mod controller;
 
 mod stubs {
     #![allow(dead_code)]
+    #![allow(unused_variables)]
+    #![allow(boxed_local)]
     pub mod service;
+    pub mod context;
 }
 
 use context::{ ContextTrait, Context };

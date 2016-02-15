@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use context::{ ContextTrait, SharedContext };
+use context::{ ContextTrait, Shared };
 use foxbox_users::users_router::UsersRouter;
 use iron::{Iron, Request, Response, IronResult};
 use iron::headers::ContentType;
@@ -12,13 +12,16 @@ use router::Router;
 use staticfile::Static;
 use std::path::Path;
 use std::thread;
+use core::marker::Reflect;
 
-pub struct HttpServer {
-    context: SharedContext
+// pub struct ExecutionTask<Env> where Env: DeviceAccess {
+pub struct HttpServer<Ctx> where Ctx: ContextTrait {
+    context: Shared<Ctx>
 }
 
-impl HttpServer {
-    pub fn new(context: SharedContext) -> HttpServer {
+// impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
+impl<Ctx> HttpServer<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static {
+    pub fn new(context: Shared<Ctx>) -> HttpServer<Ctx> {
         HttpServer { context: context }
     }
 
@@ -70,5 +73,19 @@ impl HttpServer {
                               .spawn(move || {
             Iron::new(mount).http(addrs[0]).unwrap();
         }).unwrap();
+    }
+}
+
+describe! http_server {
+    before_each {
+        use stubs::context::ContextStub;
+        // use context::SharedContext;
+
+        let context = ContextStub::blank_shared();
+        let http_server = HttpServer::<ContextStub>::new(context);
+    }
+
+    it "should create list.json" {
+
     }
 }
