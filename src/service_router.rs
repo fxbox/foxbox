@@ -9,51 +9,42 @@ use iron::status::Status;
 use router::Router;
 use core::marker::Reflect;
 
-pub struct ServiceRouter<Ctx> where Ctx: ContextTrait {
-    context: Shared<Ctx>,
-}
 
-impl<Ctx> ServiceRouter<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static {
-    pub fn new(context: Shared<Ctx>) -> ServiceRouter<Ctx> {
-        ServiceRouter { context: context }
-    }
+pub fn create<Ctx: Send + Reflect + ContextTrait + 'static> (context: Shared<Ctx>) -> Router {
 
-    pub fn generate_router(&self) -> Router {
-        let mut router = Router::new();
-        let context1 = self.context.clone();
-        router.get("list.json", move |_: &mut Request| -> IronResult<Response> {
-            // Build a json representation of the services.
-            let ctx = context1.lock().unwrap();
-            let serialized = itry!(ctx.services_as_json());
+    let mut router = Router::new();
+    let context1 = context.clone();
+    router.get("list.json", move |_: &mut Request| -> IronResult<Response> {
+        // Build a json representation of the services.
+        let ctx = context1.lock().unwrap();
+        let serialized = itry!(ctx.services_as_json());
 
-            let mut response = Response::with(serialized);
-            response.status = Some(Status::Ok);
-            response.headers.set(ContentType::json());
+        let mut response = Response::with(serialized);
+        response.status = Some(Status::Ok);
+        response.headers.set(ContentType::json());
 
-            Ok(response)
-        });
+        Ok(response)
+    });
 
-        let context2 = self.context.clone();
-        router.get(":service/:command", move |req: &mut Request| -> IronResult<Response> {
-            // Call a function on a service.
-            let ctx = context2.lock().unwrap();
+    let context2 = context.clone();
+    router.get(":service/:command", move |req: &mut Request| -> IronResult<Response> {
+        // Call a function on a service.
+        let ctx = context2.lock().unwrap();
 
-            let id = req.extensions.get::<Router>().unwrap().find("service").unwrap_or("");
-            match ctx.get_service(id) {
-                None => {
-                    let mut response = Response::with(format!("No Such Service: {}", id));
-                    response.status = Some(Status::BadRequest);
-                    response.headers.set(ContentType::plaintext());
-                    Ok(response)
-                }
-                Some(service) => {
-                    service.process_request(req)
-                }
+        let id = req.extensions.get::<Router>().unwrap().find("service").unwrap_or("");
+        match ctx.get_service(id) {
+            None => {
+                let mut response = Response::with(format!("No Such Service: {}", id));
+                response.status = Some(Status::BadRequest);
+                response.headers.set(ContentType::plaintext());
+                Ok(response)
             }
-        });
-        router
-    }
-
+            Some(service) => {
+                service.process_request(req)
+            }
+        }
+    });
+    router
 }
 
 
@@ -70,23 +61,22 @@ describe! service_router {
         use iron::Headers;
 
         let context = ContextStub::blank_shared();
-        let service_router = ServiceRouter::<ContextStub>::new(context);
+        let service_router = create(context);
     }
 
     it "should create list.json" {
         let response = request::get("http://localhost:3000/list.json",
                         Headers::new(),
-                        &service_router.generate_router()).unwrap();
+                        &service_router).unwrap();
 
         let result = response::extract_body_to_string(response);
-
         assert_eq!(result, "{}");
     }
 
     it "should make service available" {
         let response = request::get("http://localhost:3000/1/a-command",
                         Headers::new(),
-                        &service_router.generate_router()).unwrap();
+                        &service_router).unwrap();
 
         let result = response::extract_body_to_string(response);
         assert_eq!(result, "request processed");
@@ -95,7 +85,7 @@ describe! service_router {
     it "should return an error if no service was found" {
         let response = request::get("http://localhost:3000/unknown-id/a-command",
                         Headers::new(),
-                        &service_router.generate_router()).unwrap();
+                        &service_router).unwrap();
 
         let result = response::extract_body_to_string(response);
         assert_eq!(result, "No Such Service: unknown-id");

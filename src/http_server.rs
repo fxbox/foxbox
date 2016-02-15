@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use context::{ ContextTrait, Shared };
-use service_router::ServiceRouter;
+use service_router;
 use foxbox_users::users_router::UsersRouter;
 use iron::Iron;
 use mount::Mount;
@@ -22,7 +22,7 @@ impl<Ctx> HttpServer<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static {
     }
 
     pub fn start(&mut self) {
-        let router = ServiceRouter::new(self.context.clone()).generate_router();
+        let router = service_router::create(self.context.clone());
 
         let mut mount = Mount::new();
         mount.mount("/", Static::new(Path::new("static")))
