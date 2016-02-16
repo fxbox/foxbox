@@ -18,6 +18,8 @@
 #![cfg_attr(test, feature(const_fn))] // Dependency of stainless
 #![cfg_attr(test, plugin(stainless))] // Test runner
 
+#![feature(reflect_marker)]
+
 extern crate core;
 extern crate docopt;
 extern crate env_logger;
@@ -40,13 +42,17 @@ mod events;
 mod http_server;
 mod service;
 mod controller;
+mod service_router;
 
 mod stubs {
     #![allow(dead_code)]
+    #![allow(unused_variables)]
+    #![allow(boxed_local)]
     pub mod service;
+    pub mod context;
 }
 
-use context::Context;
+use context::{ ContextTrait, Context };
 use controller::Controller;
 
 docopt!(Args derive Debug, "

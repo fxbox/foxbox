@@ -27,11 +27,28 @@ const DEFAULT_HTTP_PORT: u16 = 3000;
 const DEFAULT_WS_PORT: u16 = 4000;
 const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 
-pub type SharedContext = Arc<Mutex<Context>>;
+pub trait ContextTrait {
+    fn new(verbose: bool, hostname: Option<String>,
+           http_port: Option<u16>, ws_port: Option<u16>) -> Self;
+    fn shared(verbose: bool, hostname: Option<String>,
+              http_port: Option<u16>,
+              ws_port: Option<u16>) -> Shared<Self>;
+    fn add_service(&mut self, service: Box<Service>);
+    fn remove_service(&mut self, id: String);
+    fn services_count(&self) -> usize;
+    fn get_service(&self, id: &str) -> Option<&Box<Service>>;
+    fn services_as_json(&self) -> Result<String, serde_json::error::Error>;
+    fn get_http_root_for_service(&self, service_id: String) -> String;
+    fn get_ws_root_for_service(&self, service_id: String) -> String;
+    fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error>;
+}
 
-impl Context {
-    pub fn new(verbose: bool, hostname: Option<String>,
-               http_port: Option<u16>, ws_port: Option<u16>) -> Context {
+pub type Shared<T> = Arc<Mutex<T>>;
+pub type SharedContext = Shared<Context>;
+
+impl ContextTrait for Context {
+    fn new(verbose: bool, hostname: Option<String>,
+               http_port: Option<u16>, ws_port: Option<u16>) -> Self {
 
         Context { services: HashMap::new(),
                   verbose: verbose,
@@ -40,42 +57,42 @@ impl Context {
                   ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT) }
     }
 
-    pub fn shared(verbose: bool, hostname: Option<String>,
+    fn shared(verbose: bool, hostname: Option<String>,
                   http_port: Option<u16>,
-                  ws_port: Option<u16>) -> SharedContext {
+                  ws_port: Option<u16>) -> Shared<Self> {
         Arc::new(Mutex::new(Context::new(verbose, hostname, http_port, ws_port)))
     }
 
-    pub fn add_service(&mut self, service: Box<Service>) {
+    fn add_service(&mut self, service: Box<Service>) {
         let service_id = service.get_properties().id;
         self.services.insert(service_id, service);
     }
 
-    pub fn remove_service(&mut self, id: String) {
+    fn remove_service(&mut self, id: String) {
         self.services.remove(&id);
     }
 
-    pub fn services_count(&self) -> usize {
+    fn services_count(&self) -> usize {
         self.services.len()
     }
 
-    pub fn get_service(&self, id: &str) -> Option<&Box<Service>> {
+    fn get_service(&self, id: &str) -> Option<&Box<Service>> {
         self.services.get(id)
     }
 
-    pub fn services_as_json(&self) -> Result<String, serde_json::error::Error> {
+    fn services_as_json(&self) -> Result<String, serde_json::error::Error> {
         serde_json::to_string(&self.services)
     }
 
-    pub fn get_http_root_for_service(&self, service_id: String) -> String {
+    fn get_http_root_for_service(&self, service_id: String) -> String {
         format!("http://{}:{}/services/{}/", self.hostname, self.http_port, service_id)
     }
 
-    pub fn get_ws_root_for_service(&self, service_id: String) -> String {
+    fn get_ws_root_for_service(&self, service_id: String) -> String {
         format!("ws://{}:{}/services/{}/", self.hostname, self.ws_port, service_id)
     }
 
-    pub fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error> {
+    fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error> {
         (self.hostname.as_str(), self.http_port).to_socket_addrs()
     }
 }

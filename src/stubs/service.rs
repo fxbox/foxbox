@@ -5,6 +5,7 @@
 use service::{ Service, ServiceProperties };
 use iron::{ Request, Response, IronResult };
 
+#[derive(Clone, Copy)]
 pub struct ServiceStub;
 
 impl Service for ServiceStub {
@@ -20,6 +21,6 @@ impl Service for ServiceStub {
     fn start(&self)  {}
     fn stop(&self) {}
     fn process_request(&self, _: &Request) -> IronResult<Response> {
-        Ok(Response::new())
+        Ok(Response::with("request processed"))
     }
 }
