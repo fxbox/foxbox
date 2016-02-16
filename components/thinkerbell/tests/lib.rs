@@ -5,7 +5,7 @@ use std::sync::mpsc::{channel, sync_channel, Sender};
 use std::thread;
 
 extern crate thinkerbell;
-use thinkerbell::dependencies::{DeviceAccess, ExecutableDeviceAccess, Watcher};
+use thinkerbell::dependencies::{DevEnv, ExecutableDevEnv, Watcher};
 use thinkerbell::values::{Value, Range, Number};
 use thinkerbell::lang::{Execution, UncheckedCtx, UncheckedEnv, Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
 
@@ -15,7 +15,7 @@ use self::chrono::Duration;
 #[macro_use]
 extern crate lazy_static;
 
-/// An implementation of DeviceAccess for the purpose of unit testing.
+/// An implementation of DevEnv for the purpose of unit testing.
 lazy_static!(
     static ref OUTPUTS: Mutex<HashMap</*device*/String, HashMap</*capability*/String, HashMap<String, Value>> >> = Mutex::new(HashMap::new());
     );
@@ -45,14 +45,14 @@ impl TestEnv {
     }
 }
 
-impl DeviceAccess for TestEnv {
+impl DevEnv for TestEnv {
     type DeviceKind = String;
     type Device = String;
     type InputCapability = String;
     type OutputCapability = String;
 }
 
-impl ExecutableDeviceAccess for TestEnv {
+impl ExecutableDevEnv for TestEnv {
         type Watcher = TestWatcher;
 
     fn get_watcher() -> Self::Watcher {

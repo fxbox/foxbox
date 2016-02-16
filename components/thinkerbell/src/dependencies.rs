@@ -9,14 +9,14 @@ use values::{Value, Range};
 /// The environment in which the code is meant to be executed.  This
 /// can typically be instantiated either with actual bindings to
 /// devices, or with a unit-testing framework.
-pub trait DeviceAccess: Send {
+pub trait DevEnv: Send {
     type DeviceKind: Clone + Send;
     type Device: Clone + Send;
     type InputCapability: Clone + Send;
     type OutputCapability: Clone + Send;
 }
 
-pub trait ExecutableDeviceAccess: DeviceAccess {
+pub trait ExecutableDevEnv: DevEnv {
     fn get_device_kind(&String) -> Option<Self::DeviceKind>;
     fn get_device(&String) -> Option<Self::Device>;
     fn get_input_capability(&String) -> Option<Self::InputCapability>;
