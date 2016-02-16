@@ -55,7 +55,7 @@ $ git clone git@github.com:<username>/foxbox.git
 $ cd foxbox
 ```
 
-## Running the deamon
+## Running the daemon
 
 ```bash
 $ cargo run
