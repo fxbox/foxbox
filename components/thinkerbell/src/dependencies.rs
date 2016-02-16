@@ -14,15 +14,18 @@ pub trait DeviceAccess: Send {
     type Device: Clone + Send;
     type InputCapability: Clone + Send;
     type OutputCapability: Clone + Send;
-    type Watcher: Watcher + Watcher<Device=Self::Device, InputCapability=Self::InputCapability>;
+}
 
-    fn get_watcher() -> Self::Watcher; // FIXME: Maybe this should only appear in a subtrait.
+pub trait ExecutableDeviceAccess: DeviceAccess {
     fn get_device_kind(&String) -> Option<Self::DeviceKind>;
     fn get_device(&String) -> Option<Self::Device>;
     fn get_input_capability(&String) -> Option<Self::InputCapability>;
     fn get_output_capability(&String) -> Option<Self::OutputCapability>;
 
-    fn send(&Self::Device, &Self::OutputCapability, &HashMap<String, Value>); // FIXME: Define errors
+    
+    type Watcher: Watcher + Watcher<Device=Self::Device, InputCapability=Self::InputCapability>;
+    fn get_watcher() -> Self::Watcher; // FIXME: Maybe this should only appear in a subtrait.
+    fn send(&Self::Device, &Self::OutputCapability, &HashMap<String, Value>); // FIXME: Define errors    
 }
 
 /// An object that may be used to track state changes in devices.

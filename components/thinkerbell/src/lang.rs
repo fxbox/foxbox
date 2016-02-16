@@ -8,7 +8,7 @@
 /// complex monitors can installed from the web from a master device
 /// (i.e. the user's cellphone or smart tv).
 
-use dependencies::{DeviceAccess, Watcher};
+use dependencies::{DeviceAccess, ExecutableDeviceAccess, Watcher};
 use values::{Value, Range};
 
 use std::collections::HashMap;
@@ -177,12 +177,12 @@ pub trait Context {
 
 
 /// Running and controlling a single script.
-pub struct Execution<Env> where Env: DeviceAccess + 'static {
+pub struct Execution<Env> where Env: ExecutableDeviceAccess + 'static {
     command_sender: Option<Sender<ExecutionOp>>,
     phantom: PhantomData<Env>,
 }
 
-impl<Env> Execution<Env> where Env: DeviceAccess + 'static {
+impl<Env> Execution<Env> where Env: ExecutableDeviceAccess + 'static {
     pub fn new() -> Self {
         Execution {
             command_sender: None,
@@ -237,7 +237,7 @@ impl<Env> Execution<Env> where Env: DeviceAccess + 'static {
     }
 }
 
-impl<Env> Drop for Execution<Env> where Env: DeviceAccess + 'static {
+impl<Env> Drop for Execution<Env> where Env: ExecutableDeviceAccess + 'static {
     fn drop(&mut self) {
         let _ignored = self.stop(|_ignored| { });
     }
@@ -268,7 +268,7 @@ enum ExecutionOp {
 }
 
 
-impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
+impl<Env> ExecutionTask<Env> where Env: ExecutableDeviceAccess {
     /// Create a new execution task.
     ///
     /// The caller is responsible for spawning a new thread and
@@ -490,7 +490,7 @@ impl<Env> Condition<CompiledCtx<Env>, Env> where Env: DeviceAccess {
     }
 }
 
-impl<Env> Statement<CompiledCtx<Env>, Env> where Env: DeviceAccess {
+impl<Env> Statement<CompiledCtx<Env>, Env> where Env: ExecutableDeviceAccess {
     fn eval(&self) -> Result<(), Error> {
         let args = self.arguments.iter().map(|(k, v)| {
             (k.clone(), v.eval())
@@ -502,7 +502,7 @@ impl<Env> Statement<CompiledCtx<Env>, Env> where Env: DeviceAccess {
     }
 }
 
-impl<Env> Expression<CompiledCtx<Env>, Env> where Env: DeviceAccess {
+impl<Env> Expression<CompiledCtx<Env>, Env> where Env: ExecutableDeviceAccess {
     fn eval(&self) -> Value {
         match *self {
             Expression::Value(ref v) => v.clone(),
@@ -743,31 +743,6 @@ impl DeviceAccess for UncheckedEnv {
     type DeviceKind = String;
     type InputCapability = String;
     type OutputCapability = String;
-    type Watcher = FakeWatcher;
-
-    fn get_watcher() -> Self::Watcher {
-        panic!("UncheckEnv cannot instantiate a watcher");
-    }
-
-    fn send(_: &Self::Device, _: &Self::OutputCapability, _: &HashMap<String, Value>) {
-        panic!("UncheckEnv cannot send data");
-    }
-
-    fn get_device_kind(key: &String) -> Option<String> {
-        Some(key.clone())
-    }
-
-    fn get_device(key: &String) -> Option<String> {
-        Some(key.clone())
-    }
-
-    fn get_input_capability(key: &String) -> Option<String> {
-        Some(key.clone())
-    }
-
-    fn get_output_capability(key: &String) -> Option<String> {
-        Some(key.clone())
-    }
 }
 
 struct CompiledCtx<DeviceAccess> {
@@ -818,14 +793,14 @@ struct DatedData {
     data: Value,
 }
 
-struct Precompiler<'a, Env> where Env: DeviceAccess {
+struct Precompiler<'a, Env> where Env: ExecutableDeviceAccess {
     script: &'a Script<UncheckedCtx, UncheckedEnv>,
     inputs: Vec<Option<CompiledInputSet<Env>>>,
     outputs: Vec<Option<CompiledOutputSet<Env>>>,
     phantom: PhantomData<Env>,
 }
 
-impl<'a, Env> Precompiler<'a, Env> where Env: DeviceAccess {
+impl<'a, Env> Precompiler<'a, Env> where Env: ExecutableDeviceAccess {
     fn new(source: &'a Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
 
         use self::Error::*;
@@ -900,7 +875,7 @@ impl<'a, Env> Precompiler<'a, Env> where Env: DeviceAccess {
 }
 
 impl<'a, Env> Rebinder for Precompiler<'a, Env>
-    where Env: DeviceAccess {
+    where Env: ExecutableDeviceAccess {
     type SourceCtx = UncheckedCtx;
     type DestCtx = CompiledCtx<Env>;
 

@@ -5,7 +5,7 @@ use std::sync::mpsc::{channel, sync_channel, Sender};
 use std::thread;
 
 extern crate thinkerbell;
-use thinkerbell::dependencies::{DeviceAccess, Watcher};
+use thinkerbell::dependencies::{DeviceAccess, ExecutableDeviceAccess, Watcher};
 use thinkerbell::values::{Value, Range, Number};
 use thinkerbell::lang::{Execution, UncheckedCtx, UncheckedEnv, Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
 
@@ -50,7 +50,10 @@ impl DeviceAccess for TestEnv {
     type Device = String;
     type InputCapability = String;
     type OutputCapability = String;
-    type Watcher = TestWatcher;
+}
+
+impl ExecutableDeviceAccess for TestEnv {
+        type Watcher = TestWatcher;
 
     fn get_watcher() -> Self::Watcher {
         Self::Watcher::new()

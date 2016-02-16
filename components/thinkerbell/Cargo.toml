@@ -1,10 +1,9 @@
 [package]
 name = "thinkerbell"
 version = "0.1.0"
-authors = ["David Rajchenbach-Teller <david.teller@univ-orleans.fr>"]
+authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
 rustc-serialize = "0.3.16"
 chrono = "0.2.19"
-asynchronous = "0.4.5"
 lazy_static = "0.1.15"
