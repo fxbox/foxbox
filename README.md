@@ -1,46 +1,125 @@
-FoxBox
-======
+# FoxBox
 
 [![Build Status](https://travis-ci.org/fxbox/foxbox.svg?branch=master)](https://travis-ci.org/fxbox/foxbox)
 [![License](https://img.shields.io/badge/license-MPL2-blue.svg)](https://raw.githubusercontent.com/fxbox/foxbox/master/LICENSE)
 
 
-## Target
+## Technologies
 
-Target hardware for prototyping is the Raspberry Pi 2. It's ARMv7 with Neon, but building without Neon support should do for now. Target OS is the latest Raspbian which is based on Debian 8.0 Jessie.
+### Rust
 
+We're using Rust for the daemon/server. Currently v1.8.x nightly is required. As
+of 2016-02-04:
 
-## Toolchain
-
-Rust 1.8+ is required. We're building with rust nightly (1.8.0 as of 2016-02-15, with ```rustc -V``` reporting: *rustc 1.8.0-nightly (fae516277 2016-02-13)*)
-
-## Cross Compilation Toolchain
-
-If you prefer to cross-compile on your dev system, this is the way to go. There is an extensive write-up of the process at https://github.com/japaric/rust-cross. There's also an experimental, pre-compiled toolchain at 
-https://people.mozilla.org/~fdesre/rust-rpi2.tar.gz which Fabrice built on Ubuntu 15.10. It is linked against a specific version of libstdc++.so.6 (GLIBCXX_3.4.21), so it may or may not work on other distributions. Ubuntu 15.04 is reportedly no good.
-
- * Download and and unpack toolchain linked above in $toolchain
- * Add $toolchain/x-tools/bin and $toolchain/bin to your PATH
- * Add $toolchain/lib to your LD_LIBRARY_PATH
-
-To build a rust file:
-
-``` bash
-$ rustc --target=armv7-unknown-linux-gnueabihf -C linker=armv7-unknown-linux-gnueabihf-g++ hello.rs
+```bash
+$ rustc -V
+rustc 1.8.0-nightly (fae516277 2016-02-13)
 ```
 
-## Building and running locally on Linux
+It's recommended that you use [`multirust`](https://github.com/brson/multirust)
+to install and switch between versions of Rust.
 
-This should work straight-forward. Install a rust nightly via multirust, clone the repo, and then cargo run.
+### Node
+
+We're using Node to run Selenium tests. Currently v4.x LTS. We plan to stay on
+stable LTS releases. It's recommended that you use
+[`nvm`](https://github.com/creationix/nvm) to install and switch between
+versions of Node.
 
 
-## Building and running locally on OS X
+## Target hardware
+
+We're using the Raspberry Pi 2 as a prototyping target (ARMv7). The target
+operating system is the latest Raspbian which is based on Debian 8.0 Jessie.
+
+
+## Contributing
+
+Note: We're in an iterative prototyping phase of the project. Things are moving
+really fast so it may be easier to contribute when the dust starts to settle.
+You've been warned. :shipit:
+
+### Forks and feature branches
+
+You should fork the main repo and create pull requests against feature branches
+of your fork. If you need some guidance with this see:
+
+ - https://guides.github.com/introduction/flow/
+ - http://scottchacon.com/2011/08/31/github-flow.html
+
+
+## Setup
+
+```bash
+$ git clone git@github.com:<username>/foxbox.git
+$ cd foxbox
+```
+
+## Running the deamon
+
+```bash
+$ cargo run
+```
+
+Alternatively you can build the app without running it via:
+
+```bash
+$ cargo build
+```
+
+
+## Rust tests
+
+```bash
+$ cargo test
+```
+
+
+## Selenium tests
+
+You'll need to make sure you install the dependencies via:
+
+```bash
+$ npm install
+```
+
+Then you can run the Selenium tests via:
+
+```bash
+$ npm test
+```
+
+
+## Cross compiling to ARM
+
+There is no one solution for this. The process will be different depending on
+your operating system. You may be able to build on a RPi, but the larger the
+applicatoin gets, the slower and more painful this will be (not recommended).
+
+### Linux
+
+@fabricedesre has created a script to help compile a toolchain. So far it's
+only been tested on Ubuntu but there's nothing ubuntu specific so that should
+work just fine on any Linux.
+
+ - https://github.com/fabricedesre/rustpi2
+
+For an extensive write-up about cross compiling Rust programs see:
+
+ - https://github.com/japaric/rust-cross
+
+
+### Mac OS X
+
+Cross compiling on Mac hasn't been documented. A PR is welcomed. :wink:
+
+
+## Notes for Mac OS X
+
+You'll need some dependencies installed to build.
 
 ``` bash
 $ brew install openssl
-$ brew install multirust
-$ multirust update
-$ multirust default nightly
 ```
 
 This is required to build the openssl crate using homebrew's openssl:
@@ -49,17 +128,3 @@ This is required to build the openssl crate using homebrew's openssl:
 $ export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
 $ export OPENSSL_INCLUDE_DIR=/usr/local/Cellar/openssl/1.0.2f/include/
 ```
-
-This then builds and runs the project locally:
-
-``` bash
-$ git clone https://github.com/fxbox/foxbox
-$ cd foxbox
-$ cargo build
-$ cargo run
-```
-
-
-## Building on Raspbian
-
-Rustc doesn't build natively on the Raspberry Pi, yet, because the rust team is not offering ARM binaries for staging at this point. However, there are working ARMv7 binary builds at https://github.com/warricksothr/RustBuild . Grab and install a nightly build of rust, rustlib, and cargo from there. After that, clone and cargo run the Foxbox repo.
