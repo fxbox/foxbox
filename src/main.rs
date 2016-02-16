@@ -15,8 +15,8 @@
 #![plugin(clippy)]
 #![deny(clippy)]
 
-#![feature(const_fn)] // Dependency of stainless
-#![plugin(stainless)] // Test runner
+#![cfg_attr(test, feature(const_fn))] // Dependency of stainless
+#![cfg_attr(test, plugin(stainless))] // Test runner
 
 extern crate core;
 extern crate docopt;
