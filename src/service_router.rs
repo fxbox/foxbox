@@ -55,6 +55,7 @@ pub fn create<Ctx: Send + Reflect + ContextTrait + 'static> (context: Shared<Ctx
 extern crate iron_test;
 pub use self::iron_test::{request, response};
 
+#[cfg(test)]
 describe! service_router {
     before_each {
         use stubs::context::ContextStub;
