@@ -20,7 +20,7 @@ Instead of compiling or installing a cross compiling toolchain yourself, you can
 
 Once you have pulled the image, follow these steps to compile any Rust program:
 * Enter the program's directory: `cd $program_directory`
-* Run the image: ``docker run -v `pwd`:/home/rustpi2/source -v $HOME/.cargo:/home/rustpi2/.cargo fabricedesre/rustpi2 cargopi build [options]``
+* Run the image: ``docker run -v `pwd`:/home/rustpi2/dev/source -v $HOME/.cargo:/home/rustpi2/.cargo fabricedesre/rustpi2 cargopi build [options]``
 
 The `cargopi` command is equivalent to `cargo --target=armv7-unknown-linux-gnueabihf`.
 
