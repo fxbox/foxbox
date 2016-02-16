@@ -308,7 +308,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
                 for single in &*condition.input {
                     let tx = self.tx.clone();
                     cells.push(single.clone());
-                    let index = cells.len();
+                    let index = cells.len() - 1;
 
                     witnesses.push(
                         // We can end up watching several times the
@@ -388,7 +388,7 @@ impl<Env> ExecutionTask<Env> where Env: DeviceAccess {
                         // triggered too often. Handle cooldown.
                         
                         for statement in &rule.execute {
-                            // FIXME: Execute
+                            let _ignored = statement.eval(); // FIXME: Log errors
                         }
                     }
                 }
@@ -468,6 +468,7 @@ impl<Env> Condition<CompiledCtx<Env>, Env> where Env: DeviceAccess {
                         (&String(_), _) => false,
                         (_, &EqBool(_)) => false,
                         (_, &EqString(_)) => false,
+                        (&Vec(_), _) => false,
 
                         // There is no such thing as a range on json or blob.
                         (&Json(_), _) |
@@ -489,6 +490,30 @@ impl<Env> Condition<CompiledCtx<Env>, Env> where Env: DeviceAccess {
     }
 }
 
+impl<Env> Statement<CompiledCtx<Env>, Env> where Env: DeviceAccess {
+    fn eval(&self) -> Result<(), Error> {
+        let args = self.arguments.iter().map(|(k, v)| {
+            (k.clone(), v.eval())
+        }).collect();
+        for output in &self.destination {
+            Env::send(&output.device, &self.action, &args); // FIXME: Handle errors
+        }
+        return Ok(());
+    }
+}
+
+impl<Env> Expression<CompiledCtx<Env>, Env> where Env: DeviceAccess {
+    fn eval(&self) -> Value {
+        match *self {
+            Expression::Value(ref v) => v.clone(),
+            Expression::Input(_) => panic!("Cannot read an input in an expression yet"),
+            Expression::Vec(ref vec) => {
+                Value::Vec(vec.iter().map(|expr| expr.eval()).collect())
+            }
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub enum SourceError {
@@ -502,7 +527,8 @@ pub enum SourceError {
 pub enum DevAccessError {
     DeviceNotFound, // FIXME: Add details
     DeviceKindNotFound, // FIXME: Add details
-    DeviceCapabilityNotFound, // FIXME: Add details    
+    DeviceCapabilityNotFound, // FIXME: Add details
+    CouldNotSend, // FIXME: Add details
 }
 
 #[derive(Debug)]
@@ -723,6 +749,10 @@ impl DeviceAccess for UncheckedEnv {
         panic!("UncheckEnv cannot instantiate a watcher");
     }
 
+    fn send(_: &Self::Device, _: &Self::OutputCapability, _: &HashMap<String, Value>) {
+        panic!("UncheckEnv cannot send data");
+    }
+
     fn get_device_kind(key: &String) -> Option<String> {
         Some(key.clone())
     }
@@ -825,7 +855,7 @@ impl<'a, Env> Precompiler<'a, Env> where Env: DeviceAccess {
             let mut output = None;
 
             let has_inputs = req.inputs.len() > 0;
-            let has_outputs = req.inputs.len() > 0;
+            let has_outputs = req.outputs.len() > 0;
             if  !has_inputs && !has_outputs {
                 // An empty resource? This doesn't make sense.
                 return Err(SourceError(NoCapability));

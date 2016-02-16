@@ -45,7 +45,7 @@ pub enum Range {
     Any,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Number {
     value: f64,
     physical_unit: (), // FIXME: Implement
@@ -76,11 +76,12 @@ impl PartialEq<Number> for Number {
 impl Eq for Number {
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Value {
     String(String),
     Bool(bool),
     Num(Number),
+    Vec(Vec<Value>),
     Json(Json),
     Blob{data: Arc<Vec<u8>>, mime_type: String},
 }

@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
+
 use values::{Value, Range};
 
 /// APIs that we need to implement the code in module lang.
@@ -19,6 +21,8 @@ pub trait DeviceAccess: Send {
     fn get_device(&String) -> Option<Self::Device>;
     fn get_input_capability(&String) -> Option<Self::InputCapability>;
     fn get_output_capability(&String) -> Option<Self::OutputCapability>;
+
+    fn send(&Self::Device, &Self::OutputCapability, &HashMap<String, Value>); // FIXME: Define errors
 }
 
 /// An object that may be used to track state changes in devices.

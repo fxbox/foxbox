@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, sync_channel, Sender};
@@ -7,13 +7,43 @@ use std::thread;
 extern crate thinkerbell;
 use thinkerbell::dependencies::{DeviceAccess, Watcher};
 use thinkerbell::values::{Value, Range, Number};
-use thinkerbell::lang::{Execution, UncheckedCtx, UncheckedEnv, Script, Requirement, Resource, Trigger, Conjunction, Condition};
+use thinkerbell::lang::{Execution, UncheckedCtx, UncheckedEnv, Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
 
 extern crate chrono;
 use self::chrono::Duration;
 
+#[macro_use]
+extern crate lazy_static;
+
 /// An implementation of DeviceAccess for the purpose of unit testing.
+lazy_static!(
+    static ref OUTPUTS: Mutex<HashMap</*device*/String, HashMap</*capability*/String, HashMap<String, Value>> >> = Mutex::new(HashMap::new());
+    );
+
 struct TestEnv;
+
+impl TestEnv {
+    fn reset() {
+        let mut outputs = OUTPUTS.lock().unwrap();
+        outputs.clear();
+    }
+
+    fn get_state(device: &String, cap: &String) -> Option<HashMap<String, Value>> {
+        let outputs = OUTPUTS.lock().unwrap();
+        outputs.get(device).and_then(|per_device| {
+            per_device.get(cap).cloned()
+        })
+    }
+
+    fn set_state(device: &String, cap: &String, state: HashMap<String, Value>) {
+        let mut outputs = OUTPUTS.lock().unwrap();
+        if !outputs.contains_key(device) {
+            outputs.insert(device.clone(), HashMap::new());
+        }
+        let per_device = outputs.get_mut(device).unwrap();
+        per_device.insert(cap.clone(), state);
+    }
+}
 
 impl DeviceAccess for TestEnv {
     type DeviceKind = String;
@@ -28,7 +58,7 @@ impl DeviceAccess for TestEnv {
 
     fn get_device_kind(key: &String) -> Option<String> {
         // A set of well-known device kinds
-        for s in vec!["clock", "kind 2", "kind 3"] {
+        for s in vec!["clock", "display device", "kind 3"] {
             if s == key {
                 return Some(key.clone());
             }
@@ -38,7 +68,7 @@ impl DeviceAccess for TestEnv {
 
     fn get_device(key: &String) -> Option<String> {
         // A set of well-known devices
-        for s in vec!["built-in clock", "device 2", "device 3"] {
+        for s in vec!["built-in clock", "built-in display 1", "built-in display 2"] {
             if s == key {
                 return Some(key.clone());
             }
@@ -57,12 +87,16 @@ impl DeviceAccess for TestEnv {
     }
 
     fn get_output_capability(key: &String) -> Option<String> {
-        for s in vec!["output 1", "output 2", "output 3"] {
+        for s in vec!["show", "output 2", "output 3"] {
             if s == key {
                 return Some(key.clone());
             }
         }
         None
+    }
+
+    fn send(device: &Self::Device, cap: &Self::OutputCapability, value: &HashMap<String, Value>) {
+        TestEnv::set_state(device, cap, value.clone());
     }
 }
 
@@ -89,7 +123,7 @@ impl TestWatcher {
             let clock_key = ("built-in clock".to_owned(), "ticks".to_owned());
             loop {
                 ticks += 1;
-                if ticks >= 5 {
+                if ticks >= 10 {
                     assert!(false, "TestWatcher: timeout");
                 }
                 if let Ok(msg) = rx.try_recv() {
@@ -286,51 +320,65 @@ fn test_start_stop() {
         rules: vec![],
     };
 
-    println!("test_start_stop 1");
+    println!("Starting compilation + execution");
     let (tx, rx) = sync_channel(0);
     let mut runner = Execution::<TestEnv>::new();
-    println!("test_start_stop 2");
     runner.start(script, move |res| {tx.send(res).unwrap();});
-    println!("test_start_stop 3");
 
     let result = rx.recv().unwrap();
     assert!(result.is_ok(), "Compilation should succeed {:?}", result);
-    println!("test_start_stop 4");
-    println!("test_start_stop 5");
 
+    println!("Stopping compilation + execution");
     // Wait until the script has stopped
     let (tx2, rx2) = channel();
     runner.stop(move |result| {
-        println!("test_start_stop: stop cb 1");
+        println!("Result received");
         tx2.send(result).unwrap();
-        println!("test_start_stop: stop cb 2");
     });
+
+    println!("Waiting until compilation + execution has stopped");
     let result = rx2.recv().unwrap();
     assert!(result.is_ok());
-    println!("test_start_stop 6");
-
 }
 
 #[test]
+/// Watch a clock. Once 3 seconds have elapsed, it should cause a send
+/// to several devices.
 fn test_watch_one_input() {
+    TestEnv::reset();
+
     let script : Script<UncheckedCtx, UncheckedEnv> = Script {
         metadata: (),
 
-        // One requirement
-        requirements: vec![Arc::new(Requirement {
-            kind: "clock".to_owned(),
-            inputs: vec!["ticks".to_owned()],
-            outputs: vec![],
-            min: 1,
-            max: 1,
-            phantom: PhantomData
-        })],
+        // Two requirements: an input and an output
+        requirements: vec![
+            Arc::new(Requirement {
+                kind: "clock".to_owned(),
+                inputs: vec!["ticks".to_owned()],
+                outputs: vec![],
+                min: 1,
+                max: 1,
+                phantom: PhantomData
+            }),
+            Arc::new(Requirement {
+                kind: "display device".to_owned(),
+                inputs: vec![],
+                outputs: vec!["show".to_owned()],
+                min: 1,
+                max: 1,
+                phantom: PhantomData
+            })],
 
         // As many allocations
-        allocations: vec![Resource {
-            devices: vec!["built-in clock".to_owned()],
-            phantom: PhantomData
-        }],
+        allocations: vec![
+            Resource {
+                devices: vec!["built-in clock".to_owned()],
+                phantom: PhantomData
+            },
+            Resource {
+                devices: vec!["built-in display 1".to_owned(), "built-in display 2".to_owned()],
+                phantom: PhantomData
+            }],
         rules: vec![Trigger{
             condition: Conjunction {
                 all: vec![Condition {
@@ -341,22 +389,44 @@ fn test_watch_one_input() {
                 }],
                 state: (),
             },
-            execute: vec![],
+            execute: vec![Statement {
+                destination: 1, // The first (and only) output
+                action: "show".to_owned(),
+                arguments: {
+                    let mut args = HashMap::new();
+                    args.insert("reached".to_owned(), Expression::Value(Value::Bool(true)));
+                    args
+                }}],
             cooldown: Duration::seconds(0),
         }],
     };
 
+    println!("Starting script");
     let (tx, rx) = sync_channel(0);
     let mut runner = Execution::<TestEnv>::new();
     runner.start(script, move |res| {tx.send(res).unwrap();});
     let result = rx.recv().unwrap();
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Compilation should succeed {:?}", result);
 
+    println!("Letting the script run a little");
     thread::sleep(std::time::Duration::new(5, 0));
-    // Wait until the script has stopped
+
+    println!("Taking script down");
     // Wait until the script has stopped
     let (tx, rx) = sync_channel(0);
     runner.stop(move |result| {tx.send(result).unwrap();} );
     let result = rx.recv().unwrap();
     assert!(result.is_ok());
+
+    println!("Checking that the output has been executed");
+    for device in &vec!["built-in display 1".to_owned(), "built-in display 2".to_owned()] {
+        let state = TestEnv::get_state(device, &"show".to_owned()).unwrap();
+        let reached = state.get(&"reached".to_owned()).unwrap();
+        match *reached {
+            Value::Bool(true) => println!("Correct version observed"),
+            _ => assert!(false, "{:?}", reached)
+        }
+        
+    }
+    TestEnv::reset();
 }
