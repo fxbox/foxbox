@@ -81,6 +81,7 @@ impl Context {
 }
 
 
+#[cfg(test)]
 describe! context {
 
     before_each {

@@ -27,6 +27,7 @@ impl EventData {
 pub type EventSender = mio::Sender<EventData>;
 
 
+#[cfg(test)]
 describe! event_data {
     it "AdapterStart should return its name as a description" {
         let data = EventData::AdapterStart { name: "name".to_owned() };

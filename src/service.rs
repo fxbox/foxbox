@@ -40,6 +40,7 @@ pub trait ServiceAdapter {
 }
 
 
+#[cfg(test)]
 describe! service {
     before_each {
         extern crate serde_json;
