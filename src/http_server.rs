@@ -44,3 +44,25 @@ impl<T> HttpServer<T> where T: Send + Reflect + ContextTrait + 'static {
         mount
     }
 }
+
+// FIXME: See explanation in service_router.rs
+extern crate iron_test;
+pub use self::iron_test::{request, response};
+
+#[cfg(test)]
+describe! http_server {
+    before_each {
+        use stubs::context::ContextStub;
+        use iron::Headers;
+
+        let context = ContextStub::blank_shared();
+        let http_server = HttpServer::new(context);
+        let handler = http_server.create_handler_and_its_routes();
+    }
+
+    it "should expose static files" {
+        // unwrap() panics if there is no route
+        // FIXME: Mock paths, instead of relying on static/index.html
+        request::get("http://localhost:3000/index.html", Headers::new(), &handler).unwrap();
+    }
+}
