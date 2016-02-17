@@ -1,6 +1,8 @@
 language: rust
 rust:
   - nightly
+  env:
+    RUST_BACKTRACE=1
   - beta
 matrix:
   allow_failures:

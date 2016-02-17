@@ -9,7 +9,7 @@ use std::thread;
 extern crate thinkerbell;
 use thinkerbell::dependencies::{DevEnv, ExecutableDevEnv, Watcher};
 use thinkerbell::values::{Value, Range, Number};
-use thinkerbell::lang::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression, UncheckedCtx, UncheckedEnv};
+use thinkerbell::ast::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression, UncheckedCtx, UncheckedEnv};
 use thinkerbell::run::Execution;
 
 extern crate chrono;
