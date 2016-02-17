@@ -11,3 +11,5 @@ pub mod dependencies;
 
 /// Miscellaneous internal utilities.
 mod util;
+
+pub mod compile;

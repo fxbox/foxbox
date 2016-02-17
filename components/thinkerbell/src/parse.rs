@@ -1,7 +1,7 @@
-use lang::{UncheckedCtx, UncheckedEnv, Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
+use lang::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
 use values::{Number, Value, Range};
 use util::map;
-
+use compile::{UncheckedCtx, UncheckedEnv};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 

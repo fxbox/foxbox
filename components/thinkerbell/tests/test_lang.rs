@@ -9,7 +9,8 @@ use std::thread;
 extern crate thinkerbell;
 use thinkerbell::dependencies::{DevEnv, ExecutableDevEnv, Watcher};
 use thinkerbell::values::{Value, Range, Number};
-use thinkerbell::lang::{Execution, UncheckedCtx, UncheckedEnv, Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
+use thinkerbell::lang::{Execution, Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
+use thinkerbell::compile::{UncheckedCtx, UncheckedEnv};
 
 extern crate chrono;
 use self::chrono::Duration;
@@ -212,7 +213,8 @@ fn test_compile_empty_script() {
 /// Attempt to compile a script with the wrong number of allocations.
 /// This should fail.
 fn test_compile_bad_number_of_allocations() {
-    use thinkerbell::lang::SourceError::*;
+    use thinkerbell::compile::SourceError::*;
+    use thinkerbell::compile::Error::*;
     use thinkerbell::lang::Error::*;
 
     let script : Script<UncheckedCtx, UncheckedEnv> = Script {
@@ -238,7 +240,7 @@ fn test_compile_bad_number_of_allocations() {
 
 
     match result {
-        Err(SourceError(AllocationLengthError{..})) => (), // success
+        Err(CompileError(SourceError(AllocationLengthError{..}))) => (), // success
         Err(err) => {
             println!("Wrong error {:?}", err);
             assert!(false);
@@ -253,7 +255,8 @@ fn test_compile_bad_number_of_allocations() {
 /// Attempt to compile a script with a resource of a kind that doesn't exist on the box.
 /// This should fail.
 fn test_compile_wrong_kind() {
-    use thinkerbell::lang::DevAccessError::*;
+    use thinkerbell::compile::DevAccessError::*;
+    use thinkerbell::compile::Error::*;
     use thinkerbell::lang::Error::*;
 
     let script : Script<UncheckedCtx, UncheckedEnv> = Script {
@@ -283,7 +286,7 @@ fn test_compile_wrong_kind() {
 
     println!("test_compile_wrong_kind: result {:?}", &result);
     match result {
-        Err(DevAccessError(DeviceKindNotFound)) => (), // success
+        Err(CompileError(DevAccessError(DeviceKindNotFound))) => (), // success
         Err(err) => {
             println!("Wrong error {:?}", err);
             assert!(false);
