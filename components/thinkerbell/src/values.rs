@@ -5,10 +5,7 @@
 use std::cmp::{Eq, Ordering};
 use std::sync::Arc;
 
-extern crate rustc_serialize;
-
-use self::rustc_serialize::json::Json;
-
+extern crate serde_json;
 
 #[derive(Clone)]
 pub enum Range {
@@ -82,6 +79,6 @@ pub enum Value {
     Bool(bool),
     Num(Number),
     Vec(Vec<Value>),
-    Json(Json),
+    Json(self::serde_json::Value),
     Blob{data: Arc<Vec<u8>>, mime_type: String},
 }

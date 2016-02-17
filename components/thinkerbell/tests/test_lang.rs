@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+/// Tests for lang.rs
+
+use std::sync::Mutex;
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, sync_channel, Sender};
@@ -217,14 +219,12 @@ fn test_compile_bad_number_of_allocations() {
         metadata: (),
 
         // One requirement
-        requirements: vec![Arc::new(Requirement {
+        requirements: vec![Requirement {
             kind: "clock".to_owned(), // This kind exists, so that shouldn't cause a failure.
             inputs: vec!["ticks".to_owned()], // This input exists, so that shouldn't cause a failure.
             outputs: vec![],
-            min: 1,
-            max: 1,
             phantom: PhantomData
-        })],
+        }],
 
         // No allocations
         allocations: vec![],
@@ -260,14 +260,12 @@ fn test_compile_wrong_kind() {
         metadata: (),
 
         // One requirement
-        requirements: vec![Arc::new(Requirement {
+        requirements: vec![Requirement {
             kind: "not available on this foxbox".to_owned(), // This kind doesn't exists on the system, so that should cause a failure.
             inputs: vec!["ticks".to_owned()], // This input exists, so that shouldn't cause a failure.
             outputs: vec![],
-            min: 1,
-            max: 1,
             phantom: PhantomData
-        })],
+        }],
 
         // As many allocations
         allocations: vec![Resource {
@@ -306,14 +304,12 @@ fn test_start_stop() {
         metadata: (),
 
         // One requirement
-        requirements: vec![Arc::new(Requirement {
+        requirements: vec![Requirement {
             kind: "clock".to_owned(),
             inputs: vec!["ticks".to_owned()],
             outputs: vec![],
-            min: 1,
-            max: 1,
             phantom: PhantomData
-        })],
+        }],
 
         // As many allocations
         allocations: vec![Resource {
@@ -355,22 +351,18 @@ fn test_watch_one_input() {
 
         // Two requirements: an input and an output
         requirements: vec![
-            Arc::new(Requirement {
+            Requirement {
                 kind: "clock".to_owned(),
                 inputs: vec!["ticks".to_owned()],
                 outputs: vec![],
-                min: 1,
-                max: 1,
                 phantom: PhantomData
-            }),
-            Arc::new(Requirement {
+            },
+            Requirement {
                 kind: "display device".to_owned(),
                 inputs: vec![],
                 outputs: vec!["show".to_owned()],
-                min: 1,
-                max: 1,
                 phantom: PhantomData
-            })],
+            }],
 
         // As many allocations
         allocations: vec![
@@ -400,7 +392,6 @@ fn test_watch_one_input() {
                     args.insert("reached".to_owned(), Expression::Value(Value::Bool(true)));
                     args
                 }}],
-            cooldown: Duration::seconds(0),
         }],
     };
 

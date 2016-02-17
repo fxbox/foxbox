@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-/// Basic structure of a Monitor (aka Server App, aka wtttttt)
+/// Basic structure of a Monitor (aka Server App)
 ///
 /// Monitors are designed so that the FoxBox can offer a simple
 /// IFTTT-style Web UX to let users write their own scripts. More
@@ -20,7 +20,7 @@ use std::result::Result::*;
 use std::thread;
 
 extern crate chrono;
-use self::chrono::{Duration, DateTime, UTC};
+use self::chrono::{DateTime, UTC};
 
 
 ///
@@ -47,7 +47,7 @@ pub struct Script<Ctx, Env> where Env: DevEnv, Ctx: Context {
     /// UX. Re-allocating resources may be requested by the user, the
     /// foxbox, or an application, e.g. when replacing a device or
     /// upgrading the app.
-    pub requirements: Vec<Arc<Requirement<Ctx, Env>>>,
+    pub requirements: Vec<Requirement<Ctx, Env>>,
 
     /// Resources actually allocated for each requirement.
     /// This must have the same size as `requirements`.
@@ -77,14 +77,6 @@ pub struct Requirement<Ctx, Env> where Env: DevEnv, Ctx: Context {
     /// sound", "set luminosity".
     pub outputs: Vec<Env::OutputCapability>,
     
-    /// Minimal number of resources required. If unspecified in the
-    /// script, this is 1.
-    pub min: u32,
-
-    /// Maximal number of resources that may be handled. If
-    /// unspecified in the script, this is the same as `min`.
-    pub max: u32,
-
     pub phantom: PhantomData<Ctx>,
     // FIXME: We may need cooldown properties.
 }
@@ -98,10 +90,13 @@ pub struct Trigger<Ctx, Env> where Env: DevEnv, Ctx: Context {
     /// Stuff to do once `condition` is met.
     pub execute: Vec<Statement<Ctx, Env>>,
 
+    /*
     /// Minimal duration between two executions of the trigger.  If a
     /// duration was not picked by the developer, a reasonable default
     /// duration should be picked (e.g. 10 minutes).
+    FIXME: Implement
     pub cooldown: Duration,
+     */
 }
 
 /// A conjunction (e.g. a "and") of conditions.
@@ -140,8 +135,10 @@ pub struct Statement<Ctx, Env> where Env: DevEnv, Ctx: Context {
 }
 
 pub struct InputSet<Ctx, Env> where Env: DevEnv, Ctx: Context {
-    /// The set of inputs from which to grab the value.
+    /// The set of inputs from which to grab the value, i.e.
+    /// all the inputs matching some condition.
     pub condition: Condition<Ctx, Env>,
+
     /// The value to grab.
     pub capability: Env::InputCapability,
 }
@@ -610,14 +607,12 @@ impl<Ctx, Env> Script<Ctx, Env> where Env: DevEnv, Ctx: Context {
                 outputs.push(try!(rebinder.rebind_output_capability(cap)));
             }
 
-            requirements.push(Arc::new(Requirement {
+            requirements.push(Requirement {
                 kind: try!(rebinder.rebind_device_kind(&req.kind)),
                 inputs: inputs,
                 outputs: outputs,
-                min: req.min,
-                max: req.max,
                 phantom: PhantomData,
-            }));
+            });
         }
 
         Ok(Script {
@@ -639,7 +634,8 @@ impl<Ctx, Env> Trigger<Ctx, Env> where Env: DevEnv, Ctx: Context {
             execute.push(try!(ex.rebind(rebinder)));
         }
         Ok(Trigger {
-            cooldown: self.cooldown.clone(),
+            // FIXME: Implement cooldown
+//            cooldown: self.cooldown.clone(),
             execute: execute,
             condition: try!(self.condition.rebind(rebinder)),
         })

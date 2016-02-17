@@ -4,6 +4,6 @@ version = "0.1.0"
 authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
-rustc-serialize = "0.3.16"
+serde_json = "0.6.0"
 chrono = "0.2.19"
 lazy_static = "0.1.15"
