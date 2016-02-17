@@ -22,12 +22,7 @@ impl<T> HttpServer<T> where T: Send + Reflect + ContextTrait + 'static {
     }
 
     pub fn start(&mut self) {
-        let router = service_router::create(self.context.clone());
-
-        let mut mount = Mount::new();
-        mount.mount("/", Static::new(Path::new("static")))
-             .mount("/services", router)
-             .mount("/users_admin", UsersRouter::new());
+        let handler = self.create_handler_and_its_routes();
 
         let thread_context = self.context.clone();
         let ctx = thread_context.lock().unwrap();
@@ -35,7 +30,17 @@ impl<T> HttpServer<T> where T: Send + Reflect + ContextTrait + 'static {
 
         thread::Builder::new().name("HttpServer".to_owned())
                               .spawn(move || {
-            Iron::new(mount).http(addrs[0]).unwrap();
+            Iron::new(handler).http(addrs[0]).unwrap();
         }).unwrap();
+    }
+
+    fn create_handler_and_its_routes(& self) -> Mount {
+        let router = service_router::create(self.context.clone());
+
+        let mut mount = Mount::new();
+        mount.mount("/", Static::new(Path::new("static")))
+             .mount("/services", router)
+             .mount("/users_admin", UsersRouter::new());
+        mount
     }
 }
