@@ -1,4 +1,4 @@
-/// Tests for lang.rs
+/// Tests for lang.rs, compile.rs, run.rs
 
 use std::sync::Mutex;
 use std::marker::PhantomData;
@@ -9,8 +9,8 @@ use std::thread;
 extern crate thinkerbell;
 use thinkerbell::dependencies::{DevEnv, ExecutableDevEnv, Watcher};
 use thinkerbell::values::{Value, Range, Number};
-use thinkerbell::lang::{Execution, Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
-use thinkerbell::compile::{UncheckedCtx, UncheckedEnv};
+use thinkerbell::lang::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression, UncheckedCtx, UncheckedEnv};
+use thinkerbell::run::Execution;
 
 extern crate chrono;
 use self::chrono::Duration;
@@ -215,7 +215,7 @@ fn test_compile_empty_script() {
 fn test_compile_bad_number_of_allocations() {
     use thinkerbell::compile::SourceError::*;
     use thinkerbell::compile::Error::*;
-    use thinkerbell::lang::Error::*;
+    use thinkerbell::run::Error::*;
 
     let script : Script<UncheckedCtx, UncheckedEnv> = Script {
         metadata: (),
@@ -257,7 +257,7 @@ fn test_compile_bad_number_of_allocations() {
 fn test_compile_wrong_kind() {
     use thinkerbell::compile::DevAccessError::*;
     use thinkerbell::compile::Error::*;
-    use thinkerbell::lang::Error::*;
+    use thinkerbell::run::Error::*;
 
     let script : Script<UncheckedCtx, UncheckedEnv> = Script {
         metadata: (),

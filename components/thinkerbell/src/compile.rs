@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
 
-use lang::{Script, Requirement, Resource, Trigger, Statement, Conjunction, Condition, Expression};
+use lang::{Script, Requirement, Resource, Trigger, Statement, Conjunction, Condition, Expression, Context, UncheckedCtx, UncheckedEnv};
 use values::Value;
 use util::map;
 
@@ -20,45 +20,6 @@ pub struct DatedData {
     pub data: Value,
 }
 
-/// A manner of representing internal nodes.
-pub trait Context {
-    /// A representation of one or more input devices.
-    type InputSet;
-
-    /// A representation of one or more output devices.
-    type OutputSet;
-
-    /// A representation of the current state of a condition.
-    type ConditionState;
-}
-
-/// A Context used to represent a script that hasn't been compiled
-/// yet. Rather than pointing to specific device + capability, inputs
-/// and outputs are numbers that are meaningful only in the AST.
-pub struct UncheckedCtx;
-impl Context for UncheckedCtx {
-    /// In this implementation, each input is represented by its index
-    /// in the array of allocations.
-    type InputSet = usize;
-
-    /// In this implementation, each output is represented by its
-    /// index in the array of allocations.
-    type OutputSet = usize;
-
-    /// In this implementation, conditions have no state.
-    type ConditionState = ();
-}
-
-/// A DevEnv used to represent a script that hasn't been
-/// compiled yet. Rather than having typed devices, capabilities,
-/// etc. everything is represented by a string.
-pub struct UncheckedEnv;
-impl DevEnv for UncheckedEnv {
-    type Device = String;
-    type DeviceKind = String;
-    type InputCapability = String;
-    type OutputCapability = String;
-}
 
 pub struct CompiledCtx<DevEnv> {
     phantom: PhantomData<DevEnv>,
