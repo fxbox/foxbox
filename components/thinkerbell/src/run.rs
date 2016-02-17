@@ -1,5 +1,5 @@
 use dependencies::{DevEnv, ExecutableDevEnv, Watcher};
-use lang::{Script, Trigger, Statement, Conjunction, Condition, Expression, UncheckedCtx, UncheckedEnv};
+use ast::{Script, Trigger, Statement, Conjunction, Condition, Expression, UncheckedCtx, UncheckedEnv};
 use compile::{CompiledCtx, Precompiler, CompiledInput, DatedData};
 use compile;
 use values::Value;

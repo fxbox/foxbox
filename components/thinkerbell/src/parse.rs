@@ -1,4 +1,4 @@
-use lang::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression, UncheckedCtx, UncheckedEnv};
+use ast::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression, UncheckedCtx, UncheckedEnv};
 use values::{Number, Value, Range};
 use util::map;
 use std::collections::HashMap;

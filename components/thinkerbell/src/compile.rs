@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
 
-use lang::{Script, Requirement, Resource, Trigger, Statement, Conjunction, Condition, Expression, Context, UncheckedCtx, UncheckedEnv};
+use ast::{Script, Requirement, Resource, Trigger, Statement, Conjunction, Condition, Expression, Context, UncheckedCtx, UncheckedEnv};
 use values::Value;
 use util::map;
 

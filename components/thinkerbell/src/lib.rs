@@ -1,16 +1,22 @@
+/// An abstraction on top of the APIs that will need to be implemented
+/// at lower-level.
+pub mod dependencies;
+
+/// Dealing with values provided by the devices.
 pub mod values;
 
+/// Definition of the AST.
+pub mod ast;
 
-/// The language
-pub mod lang;
-
+/// Parsing JSON into an AST.
 pub mod parse;
 
-/// Stuff that must be provided by the Rust broker.
-pub mod dependencies;
+/// Compiling an AST into something runnable.
+pub mod compile;
+
+/// Actually executing code.
+pub mod run;
 
 /// Miscellaneous internal utilities.
 mod util;
 
-pub mod compile;
-pub mod run;
