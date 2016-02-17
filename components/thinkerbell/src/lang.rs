@@ -10,6 +10,7 @@
 
 use dependencies::{DevEnv, ExecutableDevEnv, Watcher};
 use values::{Value, Range};
+use util::map;
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock}; // FIXME: Investigate if we really need so many instances of Arc. I suspect that most can be replaced by &'a.
@@ -201,7 +202,7 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + 'static {
         let tx2 = tx.clone();
         self.command_sender = Some(tx);
         thread::spawn(move || {
-            match ExecutionTask::<Env>::new(&script, tx2, rx) {
+            match ExecutionTask::<Env>::new(script, tx2, rx) {
                 Err(er) => {
                     on_result(Err(er));
                 },
@@ -270,14 +271,14 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     ///
     /// The caller is responsible for spawning a new thread and
     /// calling `run()`.
-    fn new(script: &Script<UncheckedCtx, UncheckedEnv>, tx: Sender<ExecutionOp>, rx: Receiver<ExecutionOp>) -> Result<Self, Error> {
+    fn new(script: Script<UncheckedCtx, UncheckedEnv>, tx: Sender<ExecutionOp>, rx: Receiver<ExecutionOp>) -> Result<Self, Error> {
         // Prepare the script for execution:
         // - replace instances of Input with InputDev, which map
         //   to a specific device and cache the latest known value
         //   on the input.
         // - replace instances of Output with OutputDev
-        let precompiler = try!(Precompiler::new(script));
-        let bound = try!(script.rebind(&precompiler));
+        let precompiler = try!(Precompiler::new(&script));
+        let bound = try!(precompiler.rebind_script(script));
         
         Ok(ExecutionTask {
             state: bound,
@@ -541,172 +542,7 @@ pub enum Error {
     RunningError(RunningError),
 }
 
-/// Rebind a script from an environment to another one.
-///
-/// This is typically used as a compilation step, to turn code in
-/// which device kinds, device allocations, etc. are represented as
-/// strings or numbers into code in which they are represented by
-/// concrete data structures.
-trait Rebinder {
-    type SourceCtx: Context;
-    type DestCtx: Context;
-    type SourceEnv: DevEnv;
-    type DestEnv: DevEnv;
 
-    // Rebinding the device access
-    fn rebind_device(&self, &<<Self as Rebinder>::SourceEnv as DevEnv>::Device) ->
-        Result<<<Self as Rebinder>::DestEnv as DevEnv>::Device, Error>;
-    fn rebind_device_kind(&self, &<<Self as Rebinder>::SourceEnv as DevEnv>::DeviceKind) ->
-        Result<<<Self as Rebinder>::DestEnv as DevEnv>::DeviceKind, Error>;
-    fn rebind_input_capability(&self, &<<Self as Rebinder>::SourceEnv as DevEnv>::InputCapability) ->
-        Result<<<Self as Rebinder>::DestEnv as DevEnv>::InputCapability, Error>;
-    fn rebind_output_capability(&self, &<<Self as Rebinder>::SourceEnv as DevEnv>::OutputCapability) ->
-        Result<<<Self as Rebinder>::DestEnv as DevEnv>::OutputCapability, Error>;
-
-    // Rebinding the context
-    fn rebind_input(&self, &<<Self as Rebinder>::SourceCtx as Context>::InputSet) ->
-        Result<<<Self as Rebinder>::DestCtx as Context>::InputSet, Error>;
-
-    fn rebind_output(&self, &<<Self as Rebinder>::SourceCtx as Context>::OutputSet) ->
-        Result<<<Self as Rebinder>::DestCtx as Context>::OutputSet, Error>;
-
-    fn rebind_condition(&self, &<<Self as Rebinder>::SourceCtx as Context>::ConditionState) ->
-        Result<<<Self as Rebinder>::DestCtx as Context>::ConditionState, Error>;
-}
-
-impl<Ctx, Env> Script<Ctx, Env> where Env: DevEnv, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Script<R::DestCtx, R::DestEnv>, Error>
-        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
-    {
-        let mut rules = Vec::with_capacity(self.rules.len());
-        for rule in &self.rules {
-            rules.push(try!(rule.rebind(rebinder)));
-        }
-
-        let mut allocations = Vec::with_capacity(self.allocations.len());
-        for res in &self.allocations {
-            let mut devices = Vec::with_capacity(res.devices.len());
-            for dev in &res.devices {
-                devices.push(try!(rebinder.rebind_device(&dev)));
-            }
-            allocations.push(Resource {
-                devices: devices,
-                phantom: PhantomData,
-            });
-        }
-
-        let mut requirements = Vec::with_capacity(self.requirements.len());
-        for req in &self.requirements {
-            let mut inputs = Vec::with_capacity(req.inputs.len());
-            for cap in &req.inputs {
-                inputs.push(try!(rebinder.rebind_input_capability(cap)));
-            }
-
-            let mut outputs = Vec::with_capacity(req.outputs.len());
-            for cap in &req.outputs {
-                outputs.push(try!(rebinder.rebind_output_capability(cap)));
-            }
-
-            requirements.push(Requirement {
-                kind: try!(rebinder.rebind_device_kind(&req.kind)),
-                inputs: inputs,
-                outputs: outputs,
-                phantom: PhantomData,
-            });
-        }
-
-        Ok(Script {
-            metadata: self.metadata.clone(),
-            requirements: requirements,
-            allocations: allocations,
-            rules: rules,
-        })
-    }
-}
-
-
-impl<Ctx, Env> Trigger<Ctx, Env> where Env: DevEnv, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Trigger<R::DestCtx, R::DestEnv>, Error>
-        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
-    {
-        let mut execute = Vec::with_capacity(self.execute.len());
-        for ex in &self.execute {
-            execute.push(try!(ex.rebind(rebinder)));
-        }
-        Ok(Trigger {
-            // FIXME: Implement cooldown
-//            cooldown: self.cooldown.clone(),
-            execute: execute,
-            condition: try!(self.condition.rebind(rebinder)),
-        })
-    }
-}
-
-impl<Ctx, Env> Conjunction<Ctx, Env> where Env: DevEnv, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Conjunction<R::DestCtx, R::DestEnv>, Error>
-        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
-    {
-        let mut all = Vec::with_capacity(self.all.len());
-        for c in &self.all {
-            all.push(try!(c.rebind(rebinder)));
-        }
-        Ok(Conjunction {
-            all: all,
-            state: try!(rebinder.rebind_condition(&self.state)),
-        })
-    }
-}
-
-
-impl<Ctx, Env> Condition<Ctx, Env> where Env: DevEnv, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Condition<R::DestCtx, R::DestEnv>, Error>
-        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
-    {
-        Ok(Condition {
-            range: self.range.clone(),
-            capability: try!(rebinder.rebind_input_capability(&self.capability)),
-            input: try!(rebinder.rebind_input(&self.input)),
-            state: try!(rebinder.rebind_condition(&self.state)),
-        })
-    }
-}
-
-
-
-impl<Ctx, Env> Statement<Ctx, Env> where Env: DevEnv, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Statement<R::DestCtx, R::DestEnv>, Error>
-        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
-    {
-        let mut arguments = HashMap::with_capacity(self.arguments.len());
-        for (key, value) in &self.arguments {
-            arguments.insert(key.clone(), try!(value.rebind(rebinder)));
-        }
-        Ok(Statement {
-            destination: try!(rebinder.rebind_output(&self.destination)),
-            action: try!(rebinder.rebind_output_capability(&self.action)),
-            arguments: arguments
-        })
-    }
-}
-
-impl<Ctx, Env> Expression<Ctx, Env> where Env: DevEnv, Ctx: Context {
-    fn rebind<R>(&self, rebinder: &R) -> Result<Expression<R::DestCtx, R::DestEnv>, Error>
-        where R: Rebinder<SourceEnv = Env, SourceCtx = Ctx>
-    {
-        match *self {
-            Expression::Value(ref v) => Ok(Expression::Value(v.clone())),
-            Expression::Vec(ref v) => {
-                let mut v2 = Vec::with_capacity(v.len());
-                for x in v {
-                    v2.push(try!(x.rebind(rebinder)));
-                }
-                Ok(Expression::Vec(v2))
-            }
-            //            Input(ref input) => Input(rebinder.rebind_input(input).clone()),
-            Expression::Input(_) => panic!("Not implemented yet")
-        }
-    }
-}
 
 
 ///
@@ -789,15 +625,14 @@ struct DatedData {
     data: Value,
 }
 
-struct Precompiler<'a, Env> where Env: ExecutableDevEnv {
-    script: &'a Script<UncheckedCtx, UncheckedEnv>,
+struct Precompiler<Env> where Env: ExecutableDevEnv {
     inputs: Vec<Option<CompiledInputSet<Env>>>,
     outputs: Vec<Option<CompiledOutputSet<Env>>>,
     phantom: PhantomData<Env>,
 }
 
-impl<'a, Env> Precompiler<'a, Env> where Env: ExecutableDevEnv {
-    fn new(source: &'a Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
+impl<Env> Precompiler<Env> where Env: ExecutableDevEnv {
+    fn new(source: &Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
 
         use self::Error::*;
         use self::SourceError::*;
@@ -862,7 +697,6 @@ impl<'a, Env> Precompiler<'a, Env> where Env: ExecutableDevEnv {
         }
 
         Ok(Precompiler {
-            script: source,
             inputs: inputs,
             outputs: outputs,
             phantom: PhantomData
@@ -870,55 +704,144 @@ impl<'a, Env> Precompiler<'a, Env> where Env: ExecutableDevEnv {
     }
 }
 
-impl<'a, Env> Rebinder for Precompiler<'a, Env>
+impl<Env> Precompiler<Env>
     where Env: ExecutableDevEnv {
-    type SourceCtx = UncheckedCtx;
-    type DestCtx = CompiledCtx<Env>;
 
-    type SourceEnv = UncheckedEnv;
-    type DestEnv = Env;
-
-    // Rebinding the device access. Nothing to do.
-    fn rebind_device(&self, dev: &<<Self as Rebinder>::SourceEnv as DevEnv>::Device) ->
-        Result<<<Self as Rebinder>::DestEnv as DevEnv>::Device, Error>
+    fn rebind_script(&self, script: Script<UncheckedCtx, UncheckedEnv>) -> Result<Script<CompiledCtx<Env>, Env>, Error>
     {
-        match Self::DestEnv::get_device(dev) {
+        let rules = try!(map(script.rules, |rule| self.rebind_trigger(rule)));
+
+        let allocations = try!(map(script.allocations, |res| {
+            let devices = try!(map(res.devices, |dev| {
+                self.rebind_device(dev)
+            }));
+            Ok(Resource {
+                devices: devices,
+                phantom: PhantomData,
+            })
+        }));
+
+        let requirements = try!(map(script.requirements, |req| {
+            let inputs = try!(map(req.inputs, |input| {
+                self.rebind_input_capability(input)
+            }));
+            let outputs = try!(map(req.outputs, |output| {
+                self.rebind_output_capability(output)
+            }));
+            Ok(Requirement {
+                kind: try!(self.rebind_device_kind(req.kind)),
+                inputs: inputs,
+                outputs: outputs,
+                phantom: PhantomData
+            })
+        }));
+
+        Ok(Script {
+            metadata: (),
+            requirements: requirements,
+            allocations: allocations,
+            rules: rules
+        })
+    }
+
+    fn rebind_trigger(&self, trigger: Trigger<UncheckedCtx, UncheckedEnv>) -> Result<Trigger<CompiledCtx<Env>, Env>, Error>
+    {
+        let execute = try!(map(trigger.execute, |statement| {
+            self.rebind_statement(statement)
+        }));
+        Ok(Trigger {
+            execute: execute,
+            condition: try!(self.rebind_conjunction(trigger.condition))
+        })
+    }
+
+    fn rebind_conjunction(&self, conjunction: Conjunction<UncheckedCtx, UncheckedEnv>) -> Result<Conjunction<CompiledCtx<Env>, Env>, Error>
+    {
+        let all = try!(map(conjunction.all, |condition| {
+            self.rebind_condition(condition)
+        }));
+        Ok(Conjunction {
+            all: all,
+            state: try!(self.rebind_condition_state(conjunction.state))
+        })
+    }
+
+    fn rebind_condition(&self, condition: Condition<UncheckedCtx, UncheckedEnv>) -> Result<Condition<CompiledCtx<Env>, Env>, Error>
+    {
+        Ok(Condition {
+            range: condition.range,
+            capability: try!(self.rebind_input_capability(condition.capability)),
+            input: try!(self.rebind_input(condition.input)),
+            state: try!(self.rebind_condition_state(condition.state))
+        })
+    }
+
+    fn rebind_statement(&self, statement: Statement<UncheckedCtx, UncheckedEnv>) -> Result<Statement<CompiledCtx<Env>, Env>, Error>
+    {
+        let mut arguments = HashMap::with_capacity(statement.arguments.len());
+        for (key, expr) in statement.arguments {
+            arguments.insert(key.clone(), try!(self.rebind_expression(expr)));
+        }
+        Ok(Statement {
+            destination: try!(self.rebind_output(statement.destination)),
+            action: try!(self.rebind_output_capability(statement.action)),
+            arguments: arguments
+        })
+    }
+
+    fn rebind_expression(&self, expression: Expression<UncheckedCtx, UncheckedEnv>) -> Result<Expression<CompiledCtx<Env>, Env>, Error>
+    {
+        let expression = match expression {
+            Expression::Value(v) => Expression::Value(v),
+            Expression::Vec(v) => {
+                Expression::Vec(try!(map(v, |expr| {
+                    self.rebind_expression(expr)
+                })))
+            }
+            Expression::Input(_) => panic!("Not implemented yet")
+        };
+        Ok(expression)
+    }
+
+    fn rebind_device(&self, dev: <UncheckedEnv as DevEnv>::Device) -> Result<Env::Device, Error>
+    {
+        match Env::get_device(&dev) {
             None => Err(Error::DevAccessError(DevAccessError::DeviceNotFound)),
             Some(found) => Ok(found.clone())
         }
     }
 
 
-    fn rebind_device_kind(&self, kind: &<<Self as Rebinder>::SourceEnv as DevEnv>::DeviceKind) ->
-        Result<<<Self as Rebinder>::DestEnv as DevEnv>::DeviceKind, Error>
+    fn rebind_device_kind(&self, kind: <UncheckedEnv as DevEnv>::DeviceKind) ->
+        Result<Env::DeviceKind, Error>
     {
-        match Self::DestEnv::get_device_kind(kind) {
+        match Env::get_device_kind(&kind) {
             None => Err(Error::DevAccessError(DevAccessError::DeviceKindNotFound)),
             Some(found) => Ok(found.clone())
         }
     }
     
-    fn rebind_input_capability(&self, cap: &<<Self as Rebinder>::SourceEnv as DevEnv>::InputCapability) ->
-        Result<<<Self as Rebinder>::DestEnv as DevEnv>::InputCapability, Error>
+    fn rebind_input_capability(&self, cap: <UncheckedEnv as DevEnv>::InputCapability) ->
+        Result<Env::InputCapability, Error>
     {
-        match Self::DestEnv::get_input_capability(cap) {
+        match Env::get_input_capability(&cap) {
             None => Err(Error::DevAccessError(DevAccessError::DeviceCapabilityNotFound)),
             Some(found) => Ok(found.clone())
         }
     }
 
-    fn rebind_output_capability(&self, cap: &<<Self as Rebinder>::SourceEnv as DevEnv>::OutputCapability) ->
-        Result<<<Self as Rebinder>::DestEnv as DevEnv>::OutputCapability, Error>
+    fn rebind_output_capability(&self, cap: <UncheckedEnv as DevEnv>::OutputCapability) ->
+        Result<Env::OutputCapability, Error>
     {
-        match Self::DestEnv::get_output_capability(cap) {
+        match Env::get_output_capability(&cap) {
             None => Err(Error::DevAccessError(DevAccessError::DeviceCapabilityNotFound)),
             Some(found) => Ok(found.clone())
         }
     }
 
-    // Recinding the context
-    fn rebind_condition(&self, state: &<<Self as Rebinder>::SourceCtx as Context>::ConditionState) ->
-        Result<<<Self as Rebinder>::DestCtx as Context>::ConditionState, Error>
+    // Rebinding the context
+    fn rebind_condition_state(&self, state: <UncheckedCtx as Context>::ConditionState) ->
+        Result<<CompiledCtx<Env> as Context>::ConditionState, Error>
     {
         // By default, conditions are not met.
         Ok(CompiledConditionState {
@@ -926,20 +849,20 @@ impl<'a, Env> Rebinder for Precompiler<'a, Env>
         })
     }
 
-    fn rebind_input(&self, index: &<<Self as Rebinder>::SourceCtx as Context>::InputSet) ->
-        Result<<<Self as Rebinder>::DestCtx as Context>::InputSet, Error>
+    fn rebind_input(&self, index: <UncheckedCtx as Context>::InputSet) ->
+        Result<<CompiledCtx<Env> as Context>::InputSet, Error>
     {
-        match self.inputs[*index] {
+        match self.inputs[index] {
             None => Err(Error::SourceError(SourceError::NoSuchInput)),
             Some(ref input) => Ok(input.clone())
         }
     }
 
 
-    fn rebind_output(&self, index: &<<Self as Rebinder>::SourceCtx as Context>::OutputSet) ->
-        Result<<<Self as Rebinder>::DestCtx as Context>::OutputSet, Error>
+    fn rebind_output(&self, index: <UncheckedCtx as Context>::OutputSet) ->
+        Result<<CompiledCtx<Env> as Context>::OutputSet, Error>
     {
-        match self.outputs[*index] {
+        match self.outputs[index] {
             None => Err(Error::SourceError(SourceError::NoSuchOutput)),
             Some(ref output) => Ok(output.clone())
         }

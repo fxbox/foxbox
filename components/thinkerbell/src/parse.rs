@@ -1,5 +1,6 @@
 use lang::{UncheckedCtx, UncheckedEnv, Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression};
 use values::{Number, Value, Range};
+use util::map;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -91,7 +92,7 @@ impl Parser {
         use self::serde_json::Value::*;
         if let Object(mut obj) = source {
             let requirements = if let Some(Array(requirements)) = obj.remove(&"requirements".to_owned()) {
-                try!(Self::map(requirements, |req| {
+                try!(map(requirements, |req| {
                     Self::parse_requirement(req)
                 }))
             } else {
@@ -99,7 +100,7 @@ impl Parser {
             };
 
             let allocations = if let Some(Array(allocations)) = obj.remove(&"allocations".to_owned()) {
-                try!(Self::map(allocations, |alloc| {
+                try!(map(allocations, |alloc| {
                     Self::parse_resource(alloc)
                 }))
             } else {
@@ -107,7 +108,7 @@ impl Parser {
             };
 
             let rules = if let Some(Array(rules)) = obj.remove(&"rules".to_owned()) {
-                try!(Self::map(rules, |rule| {
+                try!(map(rules, |rule| {
                     Self::parse_trigger(rule)
                 }))
             } else {
@@ -128,7 +129,7 @@ impl Parser {
     pub fn parse_resource(source: Json) -> Result<Resource<UncheckedCtx, UncheckedEnv>, Error> {
         use self::serde_json::Value::*;
         if let Array(vec) = source {
-            let devices = try!(Self::map(vec, |dev| {
+            let devices = try!(map(vec, |dev| {
                 match dev {
                     String(name) => Ok(name),
                     _ => Err(Error::Resource(ResourceError::InvalidResource))
@@ -154,7 +155,7 @@ impl Parser {
             let inputs = match obj.remove(&"inputs".to_owned()) {
                 None => vec![],
                 Some(Array(inputs)) =>
-                    try!(Self::map(inputs, |input| {
+                    try!(map(inputs, |input| {
                         match input {
                             String(x) => Ok(x),
                             _ => Err(Error::Requirement(RequirementError::InvalidInput))
@@ -165,7 +166,7 @@ impl Parser {
             let outputs = match obj.remove(&"outputs".to_owned()) {
                 None => vec![],
                 Some(Array(outputs)) =>
-                    try!(Self::map(outputs, |output| {
+                    try!(map(outputs, |output| {
                         match output {
                             String(x) => Ok(x),
                             _ => Err(Error::Requirement(RequirementError::InvalidOutput))
@@ -194,7 +195,7 @@ impl Parser {
             };
 
             let execute = if let Some(Array(execute)) = obj.remove(&"action".to_owned()) {
-                try!(Self::map(execute, |statement| {
+                try!(map(execute, |statement| {
                     Self::parse_statement(statement)
                 }))
             } else {
@@ -214,7 +215,7 @@ impl Parser {
     pub fn parse_conjunction(source: Json) -> Result<Conjunction<UncheckedCtx, UncheckedEnv>, Error> {
         use self::serde_json::Value::*;
         if let Array(all) = source {
-            let all = try!(Self::map(all, |condition| {
+            let all = try!(map(all, |condition| {
                 Self::parse_condition(condition)
             }));
             Ok(Conjunction {
@@ -332,7 +333,7 @@ impl Parser {
             String(s) => Expression::Value(Value::String(s)),
             Bool(b) => Expression::Value(Value::Bool(b)),
             Array(a) => {
-                Expression::Vec(try!(Self::map(a, |expr| {
+                Expression::Vec(try!(map(a, |expr| {
                     Self::parse_expression(expr)
                 })))
             }
@@ -363,15 +364,6 @@ impl Parser {
         } else {
             Err(Error::Expression(ExpressionError::InvalidNumber))
         }
-    }
-
-    // Utility function. A variant of `map` that stops in case of error.
-    fn map<T, F, U>(vec: Vec<T>, cb: F) -> Result<Vec<U>, Error> where F: Fn(T) -> Result<U, Error> {
-        let mut result = Vec::with_capacity(vec.len());
-        for val in vec {
-            result.push(try!(cb(val)));
-        }
-        Ok(result)
     }
 
 }
