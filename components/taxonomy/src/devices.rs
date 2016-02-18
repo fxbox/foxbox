@@ -1,3 +1,4 @@
+use std::time::Duration;
 extern crate chrono;
 
 ///
@@ -110,8 +111,8 @@ pub enum ValueKind {
 
 impl ValueKind {
     pub fn get_type(&self) -> Type {
-        use ValueKind::*;
-        use Type::*;
+        use self::ValueKind::*;
+        use self::Type::*;
         match *self {
             Ready => Unit,
             OnOff | OpenClosed => Bool,
@@ -144,7 +145,7 @@ pub enum IO {
         /// - Long-running pollution or humidity sensors typically
         ///   do not accept requests and rather send batches of
         ///   data every 24h.
-        poll: Option<std::time::Duration>,
+        poll: Option<Duration>,
 
         /// If `Some(duration)`, this endpoint can send the data to
         /// the FoxBox whenever it is updated. Parameter `duration`
@@ -152,7 +153,7 @@ pub enum IO {
         ///
         /// Otherwise, the endpoint cannot send data to the FoxBox
         /// and needs to be polled.
-        trigger: Option<std::time::Duration>,
+        trigger: Option<Duration>,
 
         /// Date at which the latest value was received, whether through
         /// polling or through a trigger.
@@ -164,7 +165,7 @@ pub enum IO {
 
         /// If `Some(duration)`, this endpoint supports pushing,
         /// i.e. the FoxBox can send values.
-        push: Option<std::time::Duration>,
+        push: Option<Duration>,
 
         /// Date at which the latest value was sent to the endpoint.
         updated: chrono::DateTime<chrono::UTC>,
