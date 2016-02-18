@@ -39,22 +39,88 @@ pub type EndPointId = String;
 
 /// The kind of value provided by an endpoint.
 #[derive(Debug, Clone)]
-pub struct ValueKind {
-    /// The vendor. An empty string for standardized value kinds,
-    /// otherwise a string identifying the owner of this non-standard
-    /// value (e.g. "Mozilla")
-    pub vendor: String,
-
-    /// Identification of the adapter providing this kind of value.
-    pub adapter: String,
-
-    /// The nature of the value.
+pub enum ValueKind {
     ///
-    /// For instance: "is-on", "is-open".
-    pub nature: String,
+    /// # No payload
+    ///
 
-    /// The data type of the value.
-    pub typ: Type
+    /// The endpoint is ready. Used for instance once a countdown has
+    /// reached completion.
+    Ready,
+
+    ///
+    /// # Boolean
+    ///
+
+    /// The endpoint is used to detect or decide whether some device
+    /// is on or off.
+    OnOff,
+
+    /// The endpoint is used to detect or decide whether some device
+    /// is open or closed.
+    OpenClosed,
+
+    ///
+    /// # Time
+    ///
+
+    /// The endpoint is used to read or set the current absolute time.
+    /// Used for instance to wait until a specific time and day before
+    /// triggering an action, or to set the appropriate time on a new
+    /// device.
+    CurrentTime,
+
+    /// The endpoint is used to read or set the current time of day.
+    /// Used for instance to trigger an action at a specific hour
+    /// every day.
+    CurrentTimeOfDay,
+
+    /// The endpoint is part of a countdown. This is the time
+    /// remaining until the countdown is elapsed.
+    RemainingTime,
+
+    ///
+    /// # Temperature
+    ///
+
+    Thermostat,
+    ActualTemperature,
+
+    /// TODO: Add more
+
+    /// An operation of a kind that has not been standardized yet.
+    Extension {
+        /// The vendor. An empty string for standardized value kinds,
+        /// otherwise a string identifying the owner of this non-standard
+        /// value (e.g. "Mozilla")
+        vendor: String,
+
+        /// Identification of the adapter introducing this operation.
+        adapter: String,
+
+        /// The nature of the value.
+        ///
+        /// For instance: "is-on", "is-open".
+        nature: String,
+
+        /// The data type of the value.
+        typ: Type
+    }
+}
+
+impl ValueKind {
+    pub fn get_type(&self) -> Type {
+        use ValueKind::*;
+        use Type::*;
+        match *self {
+            Ready => Unit,
+            OnOff | OpenClosed => Bool,
+            CurrentTime => TimeStamp,
+            CurrentTimeOfDay | RemainingTime => Duration,
+            Thermostat | ActualTemperature => Temperature,
+            Extension { ref typ, ..} => typ.clone(),
+        }
+    }
 }
 
 
@@ -159,6 +225,8 @@ pub enum Type {
     /// A precise timestamp. Used for instance to determine when an
     /// event has taken place.
     TimeStamp,
+
+    Temperature,
 
     ///
     /// ...
