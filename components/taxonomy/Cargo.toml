@@ -1,5 +1,5 @@
 [package]
-name = "fxbox-taxonomy"
+name = "fxbox_taxonomy"
 version = "0.1.0"
 authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
