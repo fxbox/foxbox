@@ -1,7 +1,7 @@
 //!
 //! The API for communicating with devices.
 //!
-//! This API is provided as Trait to be implemented:
+//! This API is provided as Traits to be implemented:
 //!
 //! - by the low-level layers of the FoxBox, including the adapters;
 //! - by test suites and tools that need to simulate connected devices.
@@ -17,6 +17,7 @@ use devices::*;
 
 use std::time::Duration;
 
+/// An error produced by one of the APIs in this module.
 pub enum Error {
     /// There is no such hub connected to the Foxbox, even indirectly.
     NoSuchHub(HubId),
@@ -28,9 +29,14 @@ pub enum Error {
     TypeError,
 }
 
+/// A value that can be sent or received through this API.
+/// FIXME: Define.
 pub struct Value; // FIXME: Define
 
 /// The public API.
+///
+/// This API is subdivided in traits purely for the sake of
+/// namespacing.
 pub trait API {
     /// The subset of the API dedicated to hubs.
     type HubAPI: HubAPI;
@@ -44,7 +50,6 @@ pub trait API {
 // FIXME: We should probably use traits for building requests, as this
 // will be more future-proof.
 /// A request for one or more hubs.
-
 pub struct HubRequest {
     /// If `Some(id)`, return only the hub with the corresponding id.
     pub id: Option<HubId>,
@@ -59,11 +64,13 @@ pub struct HubRequest {
     pub outputs: Vec<OutputRequest>,
 }
 
+/// An acceptable interval of time.
 pub struct Period {
     pub min: Option<Duration>,
     pub max: Option<Duration>,
 }
 
+/// A request for one or more input endpoints.
 pub struct InputRequest {
     /// If `Some(id)`, return only the endpoint with the corresponding id.
     pub id: Option<EndPointId>,
@@ -92,6 +99,7 @@ pub struct InputRequest {
     pub trigger: Option<Period>,
 }
 
+/// A request for one or more output endpoints.
 pub struct OutputRequest {
     /// If `Some(id)`, return only the endpoint with the corresponding id.
     pub id: Option<EndPointId>,
@@ -117,15 +125,13 @@ pub struct OutputRequest {
 }
 
 
-///
 /// Hub-level API
-///
 pub trait HubAPI {
     /// Get a list of hubs matching some conditions
     ///
     /// # REST API
     ///
-    /// GET /api/v1/hub/list
+    /// `GET /api/v1/hub/list`
     fn get_list(&self, &HubRequest) -> Vec<Hub>;
 
     /// Add a tag to an existing hub.
@@ -134,7 +140,7 @@ pub trait HubAPI {
     ///
     /// # REST API
     ///
-    /// PUT /api/v1/hub/tag/$HubId
+    /// `PUT /api/v1/hub/tag/$HubId`
     fn put_tag(&self, &HubId, String) -> Result<(), Error>;
 
     /// Add a tag to an existing hub.
@@ -143,13 +149,11 @@ pub trait HubAPI {
     ///
     /// # REST API
     ///
-    /// DELETE /api/v1/hub/tag/$HubId
+    /// `DELETE /api/v1/hub/tag/$HubId`
     fn delete_tag(&self, &HubId, String) -> Result<(), Error>;
 }
 
-///
 /// Endpoint-level API
-///
 pub trait EndPointAPI {
     /// A value that causes a disconnection once it is dropped.
     type Guard;
@@ -158,7 +162,7 @@ pub trait EndPointAPI {
     ///
     /// # REST API
     ///
-    /// GET /api/v1/endpoint/list
+    /// `GET /api/v1/endpoint/list`
     fn get_input_endpoints(&self, &InputRequest) -> Vec<EndPoint<Input>>;
     fn get_output_endpoints(&self, &OutputRequest) -> Vec<EndPoint<Output>>;
 
@@ -168,7 +172,7 @@ pub trait EndPointAPI {
     ///
     /// # REST API
     ///
-    /// PUT /api/v1/endpoint/tag/$EndPointId
+    /// `PUT /api/v1/endpoint/tag/$EndPointId`
     fn put_tag(&self, &EndPointId, String) -> Result<(), Error>;
 
     /// Add a tag to an existing endpoint.
@@ -177,7 +181,7 @@ pub trait EndPointAPI {
     ///
     /// # REST API
     ///
-    /// DELETE /api/v1/endpoint/tag/$EndPointId
+    /// `DELETE /api/v1/endpoint/tag/$EndPointId`
     fn delete_tag(&self, &EndPointId, String) -> Result<(), Error>;
 
     /// Read one value from an input enpoint
@@ -191,12 +195,19 @@ pub trait EndPointAPI {
     ///
     /// # REST API
     ///
-    /// PUT /api/v1/endpoint/value/$EndpointId
+    /// `PUT /api/v1/endpoint/value/$EndpointId`
     fn put_endpoint_value(&self, &EndPoint<Output>, Value) -> Result<(), Error>;
 
     /// Watch for any change
-    // FIXME: Optional argument.
-    fn register_watch<F>(&self, &EndPoint<Input>, cb: F) -> Result<Self::Guard, Error>
+    ///
+    /// # WebSocket API
+    ///
+    /// `/api/v1/endpoint/watch/$EndPointId`
+    fn register_watch<F>(&self, &EndPoint<Input>, &WatchOptions, cb: F)
+                         -> Result<Self::Guard, Error>
         where F: Fn(Value) + Send;
 }
 
+/// Options for watching an endpoint.
+/// FIXME: Define.
+pub struct WatchOptions;
