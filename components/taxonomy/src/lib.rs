@@ -19,16 +19,16 @@ pub struct Hub {
     /// applications. They are used by applications.
     ///
     /// For instance "entrance".
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 
     /// An id unique to this hub.
-    id: HubId,
+    pub id: HubId,
 
     /// Hubs depending on this hub.
-    subhubs: Vec<Hub>,
+    pub subhubs: Vec<Hub>,
 
     /// Endpoints connected directly to this hub.
-    endpoints: Vec<EndPoint>,
+    pub endpoints: Vec<EndPoint>,
 }
 
 ///
@@ -43,18 +43,18 @@ pub struct ValueKind {
     /// The vendor. An empty string for standardized value kinds,
     /// otherwise a string identifying the owner of this non-standard
     /// value (e.g. "Mozilla")
-    vendor: String,
+    pub vendor: String,
 
     /// Identification of the adapter providing this kind of value.
-    adapter: String,
+    pub adapter: String,
 
     /// The nature of the value.
     ///
     /// For instance: "is-on", "is-open".
-    nature: String,
+    pub nature: String,
 
     /// The data type of the value.
-    typ: Type
+    pub typ: Type
 }
 
 
@@ -118,16 +118,16 @@ pub struct EndPoint {
     /// applications. They are used to regroup endpoints for rules.
     ///
     /// For instance "entrance".
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 
     /// An id unique to this endpoint.
-    id: EndPointId,
+    pub id: EndPointId,
 
     /// The update mechanism for this endpoint.
-    mechanism: IO,
+    pub mechanism: IO,
 
     /// The last time the device was seen.
-    last_seen: chrono::DateTime<chrono::UTC>,
+    pub last_seen: chrono::DateTime<chrono::UTC>,
 }
 
 
