@@ -11,17 +11,21 @@ use staticfile::Static;
 use std::path::Path;
 use std::thread;
 use core::marker::Reflect;
+// TODO: Remove this import once https://github.com/iron/iron/pull/411 lands
+use hyper::server::Listening;
 
-pub struct HttpServer<T> {
-    context: Shared<T>,
+pub struct HttpServer<Ctx> where Ctx: ContextTrait {
+    context: Shared<Ctx>
 }
 
-impl<T> HttpServer<T> where T: Send + Reflect + ContextTrait + 'static {
-    pub fn new(context: Shared<T>) -> HttpServer<T> {
-        HttpServer { context: context }
+impl<Ctx> HttpServer<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static {
+    pub fn new(context: Shared<Ctx>) -> HttpServer<Ctx> {
+        HttpServer {
+            context: context
+        }
     }
 
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> thread::JoinHandle<Listening> {
         let handler = self.create_handler_and_its_routes();
 
         let thread_context = self.context.clone();
@@ -30,8 +34,8 @@ impl<T> HttpServer<T> where T: Send + Reflect + ContextTrait + 'static {
 
         thread::Builder::new().name("HttpServer".to_owned())
                               .spawn(move || {
-            Iron::new(handler).http(addrs[0]).unwrap();
-        }).unwrap();
+            Iron::new(handler).http(addrs[0]).unwrap()
+        }).unwrap()
     }
 
     fn create_handler_and_its_routes(& self) -> Mount {
@@ -51,18 +55,41 @@ pub use self::iron_test::{request, response};
 
 #[cfg(test)]
 describe! http_server {
+
     before_each {
         use stubs::context::ContextStub;
-        use iron::Headers;
-
         let context = ContextStub::blank_shared();
-        let http_server = HttpServer::new(context);
-        let handler = http_server.create_handler_and_its_routes();
     }
 
-    it "should expose static files" {
-        // unwrap() panics if there is no route
-        // FIXME: Mock paths, instead of relying on static/index.html
-        request::get("http://localhost:3000/index.html", Headers::new(), &handler).unwrap();
+    describe! routes {
+        before_each {
+            use iron::Headers;
+
+            let http_server = HttpServer::new(context);
+            let handler = http_server.create_handler_and_its_routes();
+        }
+
+        it "should expose static files" {
+            // unwrap() panics if there is no route
+            // FIXME: Mock paths, instead of relying on static/index.html
+            request::get("http://localhost:3000/index.html", Headers::new(), &handler).unwrap();
+        }
+
+        it "should expose services" {
+            // FIXME: Mock service_router, instead of relying on its implementation
+            request::get("http://localhost:3000/services/1/a-command", Headers::new(), &handler).unwrap();
+        }
+    }
+
+    describe! thread {
+        before_each {
+            let mut http_server = HttpServer::new(context);
+            let join_handle = http_server.start();
+        }
+
+        it "should start server in a new thread" {
+            let thread_name = join_handle.thread().name().unwrap();
+            assert_eq!(thread_name, "HttpServer");
+        }
     }
 }

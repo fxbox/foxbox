@@ -12,6 +12,8 @@ env_logger = "0.3.2"
 foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "78d3e2f" }
 iron = "0.2.6"
 iron-test = "0.2.0"
+# TODO: Remove this import once https://github.com/iron/iron/pull/411 lands
+hyper = "0.7.2"
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
 mount = "0.0.10"

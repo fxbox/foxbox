@@ -55,7 +55,7 @@ impl ContextTrait for ContextStub {
     fn get_ws_root_for_service(&self, service_id: String) -> String { "".to_owned() }
 
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error> {
-        let server: SocketAddr = "127.0.0.1:80".parse().unwrap();
+        let server: SocketAddr = "127.0.0.1:8000".parse().unwrap();
         Ok(vec![server].into_iter())
     }
 
