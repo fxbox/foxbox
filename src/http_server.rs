@@ -15,27 +15,41 @@ use core::marker::Reflect;
 use hyper::server::Listening;
 
 pub struct HttpServer<Ctx> where Ctx: ContextTrait {
-    context: Shared<Ctx>
+    context: Shared<Ctx>,
+    join_handle: Option<thread::JoinHandle<Listening>>
 }
 
 impl<Ctx> HttpServer<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static {
     pub fn new(context: Shared<Ctx>) -> HttpServer<Ctx> {
         HttpServer {
-            context: context
+            context: context,
+            join_handle: None
         }
     }
 
-    pub fn start(&mut self) -> thread::JoinHandle<Listening> {
+    pub fn start(&mut self) {
         let handler = self.create_handler_and_its_routes();
 
         let thread_context = self.context.clone();
         let ctx = thread_context.lock().unwrap();
         let addrs: Vec<_> = ctx.http_as_addrs().unwrap().collect();
 
-        thread::Builder::new().name("HttpServer".to_owned())
-                              .spawn(move || {
-            Iron::new(handler).http(addrs[0]).unwrap()
-        }).unwrap()
+        self.join_handle = thread::Builder::new()
+                            .name("HttpServer".to_owned())
+                            .spawn(move || {
+                                Iron::new(handler).http(addrs[0]).unwrap()
+                            })
+                            .ok();
+    }
+
+    /// Warning: This function doesn't work because of the library `hyper`.
+    #[allow(dead_code)] // Initially meant for tests only. Please remove if used by production code
+    fn stop(self) {
+        let handle = self.join_handle.unwrap();
+        let mut listening_socket = handle.join().unwrap();
+        // XXX The following line is the guilty one.
+        // See https://github.com/hyperium/hyper/issues/338
+        listening_socket.close().unwrap();
     }
 
     fn create_handler_and_its_routes(& self) -> Mount {
@@ -79,17 +93,30 @@ describe! http_server {
             // FIXME: Mock service_router, instead of relying on its implementation
             request::get("http://localhost:3000/services/1/a-command", Headers::new(), &handler).unwrap();
         }
+
+        // TODO: Write a test for /users_admin either once we're able to mock it, or once it's
+        // internal router exposes at least a route
     }
 
     describe! thread {
         before_each {
             let mut http_server = HttpServer::new(context);
-            let join_handle = http_server.start();
+            http_server.start();
         }
 
         it "should start server in a new thread" {
-            let thread_name = join_handle.thread().name().unwrap();
-            assert_eq!(thread_name, "HttpServer");
+            // This if let by reference is necessary, otherwise the join_handle gets consumed
+            // and prevents http_server.stop() from being executed
+            if let Some(ref join_handle) = http_server.join_handle {
+                let thread_name = join_handle.thread().name().unwrap();
+                assert_eq!(thread_name, "HttpServer");
+            } else {
+                panic!("http_server.join_handle not defined");
+            }; // TODO: Remove semicolon once https://github.com/reem/stainless/issues/47 lands
+        }
+
+        after_each {
+            http_server.stop();
         }
     }
 }
