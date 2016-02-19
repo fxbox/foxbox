@@ -7,6 +7,7 @@ dependencies = [
  "docopt_macros 0.6.81 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=78d3e2f)",
+ "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron-test 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",

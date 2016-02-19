@@ -26,6 +26,8 @@ extern crate env_logger;
 extern crate foxbox_users;
 #[macro_use]
 extern crate iron;
+// TODO: Remove this import once https://github.com/iron/iron/pull/411 lands
+extern crate hyper;
 #[macro_use]
 extern crate log;
 extern crate mio;
