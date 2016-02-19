@@ -12,12 +12,12 @@ use std::path::Path;
 use std::thread;
 use core::marker::Reflect;
 
-pub struct HttpServer<Ctx> where Ctx: ContextTrait {
-    context: Shared<Ctx>,
+pub struct HttpServer<T> {
+    context: Shared<T>,
 }
 
-impl<Ctx> HttpServer<Ctx> where Ctx: Send + Reflect + ContextTrait + 'static {
-    pub fn new(context: Shared<Ctx>) -> HttpServer<Ctx> {
+impl<T> HttpServer<T> where T: Send + Reflect + ContextTrait + 'static {
+    pub fn new(context: Shared<T>) -> HttpServer<T> {
         HttpServer { context: context }
     }
 

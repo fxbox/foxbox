@@ -10,7 +10,7 @@ use router::Router;
 use core::marker::Reflect;
 
 
-pub fn create<Ctx: Send + Reflect + ContextTrait + 'static> (context: Shared<Ctx>) -> Router {
+pub fn create<T: Send + Reflect + ContextTrait + 'static> (context: Shared<T>) -> Router {
 
     let mut router = Router::new();
     let context1 = context.clone();
