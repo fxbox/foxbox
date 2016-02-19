@@ -158,7 +158,7 @@ pub enum ServiceKind {
 
 impl ServiceKind {
     /// Get the type of values used to communicate with this service.
-    pub fn get_type(&self) -> Type {
+    pub fn get_type(&self) -> values::Type {
         use self::ServiceKind::*;
         use values::Type::*;
         match *self {
