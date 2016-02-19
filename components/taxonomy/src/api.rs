@@ -14,8 +14,7 @@
 //!
 
 use devices::*;
-
-use std::time::Duration;
+use requests::*;
 
 /// An error produced by one of the APIs in this module.
 pub enum Error {
@@ -46,76 +45,6 @@ pub trait API {
     type ServiceAPI: ServiceAPI;
     fn get_service_api(&self) -> Self::ServiceAPI;
 }
-
-// FIXME: We should probably use traits for building requests, as this
-// will be more future-proof.
-/// A request for one or more nodes.
-pub struct NodeRequest {
-    /// If `Some(id)`, return only the node with the corresponding id.
-    pub id: Option<NodeId>,
-
-    ///  Restrict results to nodes that have all the tags in `tags`.
-    pub tags: Vec<String>,
-
-    /// Restrict results to nodes that have all the inputs in `inputs`.
-    pub inputs: Vec<InputRequest>,
-
-    /// Restrict results to nodes that have all the outputs in `outputs`.
-    pub outputs: Vec<OutputRequest>,
-}
-
-/// An acceptable interval of time.
-pub struct Period {
-    pub min: Option<Duration>,
-    pub max: Option<Duration>,
-}
-
-/// A request for one or more input services.
-pub struct InputRequest {
-    /// If `Some(id)`, return only the service with the corresponding id.
-    pub id: Option<ServiceId>,
-
-    /// If `Some(id)`, return only services that are immediate children
-    /// of node `id`.
-    pub parent: Option<NodeId>,
-
-    ///  Restrict results to services that have all the tags in `tags`.
-    pub tags: Vec<String>,
-
-    /// If `Some(k)`, restrict results to services that produce values
-    /// of kind `k`.
-    pub kind: Option<ServiceKind>,
-
-    /// If `Some(r)`, restrict results to services that support polling
-    /// with the acceptable period.
-    pub poll: Option<Period>,
-
-    /// If `Some(r)`, restrict results to services that support trigger
-    /// with the acceptable period.
-    pub trigger: Option<Period>,
-}
-
-/// A request for one or more output services.
-pub struct OutputRequest {
-    /// If `Some(id)`, return only the service with the corresponding id.
-    pub id: Option<ServiceId>,
-
-    /// If `Some(id)`, return only services that are immediate children
-    /// of node `id`.
-    pub parent: Option<NodeId>,
-
-    ///  Restrict results to services that have all the tags in `tags`.
-    pub tags: Vec<String>,
-
-    /// If `Some(k)`, restrict results to services that accept values
-    /// of kind `k`.
-    pub kind: Option<ServiceKind>,
-
-    /// If `Some(r)`, restrict results to services that support pushing
-    /// with the acceptable period.
-    pub push: Option<Period>,
-}
-
 
 /// Node-level API
 pub trait NodeAPI {

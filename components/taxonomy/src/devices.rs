@@ -84,7 +84,7 @@ pub type ServiceId = String;
 /// pre-existing constructors. For this purpose, this enumeration
 /// offers a constructor `Extension`, designed to describe novel
 /// services.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ServiceKind {
     ///
     /// # No payload
