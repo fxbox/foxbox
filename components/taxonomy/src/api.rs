@@ -79,10 +79,6 @@ pub struct InputRequest {
     /// of node `id`.
     pub parent: Option<NodeId>,
 
-    /// If `Some(id)`, return only services that are descendants of node
-    /// `id`.
-    pub ancestor: Option<NodeId>,
-
     ///  Restrict results to services that have all the tags in `tags`.
     pub tags: Vec<String>,
 
@@ -107,10 +103,6 @@ pub struct OutputRequest {
     /// If `Some(id)`, return only services that are immediate children
     /// of node `id`.
     pub parent: Option<NodeId>,
-
-    /// If `Some(id)`, return only services that are descendants of node
-    /// `id`.
-    pub ancestor: Option<NodeId>,
 
     ///  Restrict results to services that have all the tags in `tags`.
     pub tags: Vec<String>,

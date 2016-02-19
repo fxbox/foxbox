@@ -9,27 +9,27 @@ extern crate chrono;
 
 pub type NodeId = String;
 
-/// Metadata on a node. A node is a device or collection of devices to
-/// services may be connected, as well as other nodes. The FoxBox is
-/// the root node. Simple devices that can do a single thing (e.g. a
-/// button) are services, while complex devices containing several
-/// sensors or effectors are also nodes, in which each sensor and each
-/// effector is an service.
+/// Metadata on a node. A node is a device or collection of devices
+/// that may offer services. The FoxBox itself a node offering
+/// services such as a clock, communication with the user through her
+/// smart devices, etc.
 #[derive(Debug, Clone)]
 pub struct Node {
     /// Tags describing the node.
     ///
     /// These tags can be set by the user, adapters or
-    /// applications. They are used by applications.
+    /// applications. They are used by applications to find nodes and
+    /// services.
     ///
-    /// For instance "entrance".
+    /// For instance, a user may set tag "entrance" to all nodes
+    /// placed in the entrance of his house, or a tag "blue" to a node
+    /// controlling blue lights. An adapter may set tags "plugged" or
+    /// "battery" to devices that respectively depend on a plugged
+    /// power source or on a battery.
     tags: Vec<String>,
 
     /// An id unique to this node.
     id: NodeId,
-
-    /// If this node has a parent, the id of the parent.
-    parent: Option<NodeId>,
 
     /// Nodes depending on this node.
     subnodes: Vec<Node>,
@@ -53,16 +53,6 @@ impl Node {
     /// An id unique to this node.
     pub fn get_id<'a>(&'a self) -> &'a NodeId {
         &self.id
-    }
-
-    /// If this node has a parent, the id of the parent.
-    pub fn get_parent<'a>(&'a self) -> &'a Option<NodeId> {
-        &self.parent
-    }
-
-    /// Nodes depending on this node.
-    pub fn get_subnodes<'a>(&'a self) -> &'a Vec<Node> {
-        &self.subnodes
     }
 
     /// Input services connected directly to this node.
