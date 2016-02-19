@@ -4,19 +4,20 @@ use values;
 extern crate chrono;
 
 ///
-/// Hubs
+/// Nodes
 ///
 
-pub type HubId = String;
+pub type NodeId = String;
 
-/// A hub represents a node to which several endpoints, as well as
-/// other hubs can be connected. The FoxBox is the root hub. Simple
-/// devices that can do a single thing (e.g. a button) are endpoints,
-/// while complex devices containing several sensors or effectors are
-/// also hubs, in which each sensor and each effector is an endpoint.
+/// Metadata on a node. A node is a device or collection of devices to
+/// services may be connected, as well as other nodes. The FoxBox is
+/// the root node. Simple devices that can do a single thing (e.g. a
+/// button) are services, while complex devices containing several
+/// sensors or effectors are also nodes, in which each sensor and each
+/// effector is an service.
 #[derive(Debug, Clone)]
-pub struct Hub {
-    /// Tags describing the hub.
+pub struct Node {
+    /// Tags describing the node.
     ///
     /// These tags can be set by the user, adapters or
     /// applications. They are used by applications.
@@ -24,22 +25,22 @@ pub struct Hub {
     /// For instance "entrance".
     tags: Vec<String>,
 
-    /// An id unique to this hub.
-    id: HubId,
+    /// An id unique to this node.
+    id: NodeId,
 
-    /// If this hub has a parent, the id of the parent.
-    parent: Option<HubId>,
+    /// If this node has a parent, the id of the parent.
+    parent: Option<NodeId>,
 
-    /// Hubs depending on this hub.
-    subhubs: Vec<Hub>,
+    /// Nodes depending on this node.
+    subnodes: Vec<Node>,
 
-    /// Endpoints connected directly to this hub.
-    inputs: Vec<EndPoint<Input>>,
-    outputs: Vec<EndPoint<Output>>,
+    /// Services connected directly to this node.
+    inputs: Vec<Service<Input>>,
+    outputs: Vec<Service<Output>>,
 }
 
-impl Hub {
-    /// Tags describing the hub.
+impl Node {
+    /// Tags describing the node.
     ///
     /// These tags can be set by the user, adapters or
     /// applications. They are used by applications.
@@ -49,46 +50,57 @@ impl Hub {
         &self.tags
     }
 
-    /// An id unique to this hub.
-    pub fn get_id<'a>(&'a self) -> &'a HubId {
+    /// An id unique to this node.
+    pub fn get_id<'a>(&'a self) -> &'a NodeId {
         &self.id
     }
 
-    /// If this hub has a parent, the id of the parent.
-    pub fn get_parent<'a>(&'a self) -> &'a Option<HubId> {
+    /// If this node has a parent, the id of the parent.
+    pub fn get_parent<'a>(&'a self) -> &'a Option<NodeId> {
         &self.parent
     }
 
-    /// Hubs depending on this hub.
-    pub fn get_subhubs<'a>(&'a self) -> &'a Vec<Hub> {
-        &self.subhubs
+    /// Nodes depending on this node.
+    pub fn get_subnodes<'a>(&'a self) -> &'a Vec<Node> {
+        &self.subnodes
     }
 
-    /// Input endpoints connected directly to this hub.
-    pub fn get_inputs<'a>(&'a self) -> &'a Vec<EndPoint<Input>> {
+    /// Input services connected directly to this node.
+    pub fn get_inputs<'a>(&'a self) -> &'a Vec<Service<Input>> {
         &self.inputs
     }
 
-    /// Output endpoints connected directly to this hub.
-    pub fn get_outputs<'a>(&'a self) -> &'a Vec<EndPoint<Output>> {
+    /// Output services connected directly to this node.
+    pub fn get_outputs<'a>(&'a self) -> &'a Vec<Service<Output>> {
         &self.outputs
     }
 }
 
 ///
-/// Endpoints
+/// Services
 ///
 
-pub type EndPointId = String;
+pub type ServiceId = String;
 
-/// The kind of value provided by an endpoint.
+/// The kind of the service, i.e. a strongly-typed description of
+/// _what_ the service can do. Used both for locating services
+/// (e.g. "I need a clock" or "I need something that can provide
+/// pictures") and for determining the data structure that these
+/// services can provide or consume.
+///
+/// A number of service kinds are standardized, and provided as a set
+/// of strongly-typed enum constructors. It is clear, however, that
+/// many devices will offer services that cannot be described by
+/// pre-existing constructors. For this purpose, this enumeration
+/// offers a constructor `Extension`, designed to describe novel
+/// services.
 #[derive(Debug, Clone)]
-pub enum ValueKind {
+pub enum ServiceKind {
     ///
     /// # No payload
     ///
 
-    /// The endpoint is ready. Used for instance once a countdown has
+    /// The service is ready. Used for instance once a countdown has
     /// reached completion.
     Ready,
 
@@ -96,11 +108,11 @@ pub enum ValueKind {
     /// # Boolean
     ///
 
-    /// The endpoint is used to detect or decide whether some device
+    /// The service is used to detect or decide whether some device
     /// is on or off.
     OnOff,
 
-    /// The endpoint is used to detect or decide whether some device
+    /// The service is used to detect or decide whether some device
     /// is open or closed.
     OpenClosed,
 
@@ -108,18 +120,18 @@ pub enum ValueKind {
     /// # Time
     ///
 
-    /// The endpoint is used to read or set the current absolute time.
+    /// The service is used to read or set the current absolute time.
     /// Used for instance to wait until a specific time and day before
     /// triggering an action, or to set the appropriate time on a new
     /// device.
     CurrentTime,
 
-    /// The endpoint is used to read or set the current time of day.
+    /// The service is used to read or set the current time of day.
     /// Used for instance to trigger an action at a specific hour
     /// every day.
     CurrentTimeOfDay,
 
-    /// The endpoint is part of a countdown. This is the time
+    /// The service is part of a countdown. This is the time
     /// remaining until the countdown is elapsed.
     RemainingTime,
 
@@ -134,27 +146,30 @@ pub enum ValueKind {
 
     /// An operation of a kind that has not been standardized yet.
     Extension {
-        /// The vendor. An empty string for standardized value kinds,
-        /// otherwise a string identifying the owner of this non-standard
-        /// value (e.g. "Mozilla")
+        /// The vendor. Used for namespacing purposes, to avoid
+        /// confusing two incompatible extensions with similar
+        /// names. For instance, "foxlink@mozilla.com".
         vendor: String,
 
         /// Identification of the adapter introducing this operation.
+        /// Designed to aid with tracing and debugging.
         adapter: String,
 
-        /// The nature of the value.
+        /// A string describing the nature of the value, designed to
+        /// let applications discover the devices.
         ///
-        /// For instance: "is-on", "is-open".
-        nature: String,
+        /// Examples: `"GroundHumidity"`.
+        kind: String,
 
         /// The data type of the value.
         typ: values::Type
     }
 }
 
-impl ValueKind {
-    pub fn get_type(&self) -> values::Type {
-        use self::ValueKind::*;
+impl ServiceKind {
+    /// Get the type of values used to communicate with this service.
+    pub fn get_type(&self) -> Type {
+        use self::ServiceKind::*;
         use values::Type::*;
         match *self {
             Ready => Unit,
@@ -168,18 +183,18 @@ impl ValueKind {
 }
 
 
-/// An input operation available on an endpoint.
+/// An input operation available on an service.
 #[derive(Debug, Clone)]
 pub struct Input {
-    /// The kind of value that can be obtained from this endpoint.
-    kind: ValueKind,
+    /// The kind of value that can be obtained from this service.
+    kind: ServiceKind,
 
-    /// If `Some(duration)`, this endpoint can be polled, i.e. it
+    /// If `Some(duration)`, this service can be polled, i.e. it
     /// will respond when the FoxBox requests the latest value.
     /// Parameter `duration` indicates the smallest interval
     /// between two updates.
     ///
-    /// Otherwise, the endpoint cannot be polled and will push
+    /// Otherwise, the service cannot be polled and will push
     /// data to the FoxBox when it is available.
     ///
     /// # Examples
@@ -189,11 +204,11 @@ pub struct Input {
     ///   data every 24h.
     poll: Option<Duration>,
 
-    /// If `Some(duration)`, this endpoint can send the data to
+    /// If `Some(duration)`, this service can send the data to
     /// the FoxBox whenever it is updated. Parameter `duration`
     /// indicates the smallest interval between two updates.
     ///
-    /// Otherwise, the endpoint cannot send data to the FoxBox
+    /// Otherwise, the service cannot send data to the FoxBox
     /// and needs to be polled.
     trigger: Option<Duration>,
 
@@ -203,17 +218,17 @@ pub struct Input {
 }
 
 impl Input {
-    /// The kind of value that can be obtained from this endpoint.
-    pub fn get_kind(&self) -> ValueKind {
+    /// The kind of value that can be obtained from this service.
+    pub fn get_kind(&self) -> ServiceKind {
         self.kind.clone()
     }
 
-    /// If `Some(duration)`, this endpoint can be polled, i.e. it
+    /// If `Some(duration)`, this service can be polled, i.e. it
     /// will respond when the FoxBox requests the latest value.
     /// Parameter `duration` indicates the smallest interval
     /// between two updates.
     ///
-    /// Otherwise, the endpoint cannot be polled and will push
+    /// Otherwise, the service cannot be polled and will push
     /// data to the FoxBox when it is available.
     ///
     /// # Examples
@@ -225,11 +240,11 @@ impl Input {
         self.poll.clone()
     }
 
-    /// If `Some(duration)`, this endpoint can send the data to
+    /// If `Some(duration)`, this service can send the data to
     /// the FoxBox whenever it is updated. Parameter `duration`
     /// indicates the smallest interval between two updates.
     ///
-    /// Otherwise, the endpoint cannot send data to the FoxBox
+    /// Otherwise, the service cannot send data to the FoxBox
     /// and needs to be polled.
     pub fn get_trigger(&self) -> Option<Duration> {
         self.trigger.clone()
@@ -246,27 +261,27 @@ impl Input {
     }
 }
 
-/// An output operation available on an endpoint.
+/// An output operation available on an service.
 #[derive(Debug, Clone)]
 pub struct Output {
-    /// The kind of value that can be sent to this endpoint.
-    kind: ValueKind,
+    /// The kind of value that can be sent to this service.
+    kind: ServiceKind,
 
-    /// If `Some(duration)`, this endpoint supports pushing,
+    /// If `Some(duration)`, this service supports pushing,
     /// i.e. the FoxBox can send values.
     push: Option<Duration>,
 
-    /// Date at which the latest value was sent to the endpoint.
+    /// Date at which the latest value was sent to the service.
     updated: chrono::DateTime<chrono::UTC>,
 }
 
 impl Output {
-    /// The kind of value that can be sent to this endpoint.
-    pub fn get_kind(&self) -> ValueKind {
+    /// The kind of value that can be sent to this service.
+    pub fn get_kind(&self) -> ServiceKind {
         self.kind.clone()
     }
 
-    /// If `Some(duration)`, this endpoint supports pushing,
+    /// If `Some(duration)`, this service supports pushing,
     /// i.e. the FoxBox can send values.
     pub fn get_push(&self) -> Option<Duration> {
         self.push.clone()
@@ -282,56 +297,56 @@ impl Output {
     }
 }
 
-/// An endpoint represents a single place where data can enter or
-/// leave a device. Note that endpoints support either a single kind
+/// An service represents a single place where data can enter or
+/// leave a device. Note that services support either a single kind
 /// of input or a single kind of output. Devices that support both
 /// inputs or outputs, or several kinds of inputs, or several kinds of
-/// outputs, are represented as hubs containing several endpoints.
+/// outputs, are represented as nodes containing several services.
 #[derive(Debug, Clone)]
-pub struct EndPoint<IO> {
-    /// Tags describing the endpoint.
+pub struct Service<IO> {
+    /// Tags describing the service.
     ///
     /// These tags can be set by the user, adapters or
-    /// applications. They are used to regroup endpoints for rules.
+    /// applications. They are used to regroup services for rules.
     ///
     /// For instance "entrance".
     tags: Vec<String>,
 
-    /// An id unique to this endpoint.
-    id: EndPointId,
+    /// An id unique to this service.
+    id: ServiceId,
 
-    /// The hub owning this endpoint.
-    hub: HubId,
+    /// The node owning this service.
+    node: NodeId,
 
-    /// The update mechanism for this endpoint.
+    /// The update mechanism for this service.
     mechanism: IO,
 
     /// The last time the device was seen.
     last_seen: chrono::DateTime<chrono::UTC>,
 }
 
-impl<IO> EndPoint<IO> {
-    /// Tags describing the endpoint.
+impl<IO> Service<IO> {
+    /// Tags describing the service.
     ///
     /// These tags can be set by the user, adapters or
-    /// applications. They are used to regroup endpoints for rules.
+    /// applications. They are used to regroup services for rules.
     ///
     /// For instance "entrance".
     pub fn get_tags<'a>(&'a self) -> &'a Vec<String> {
         &self.tags
     }
 
-    /// An id unique to this endpoint.
-    pub fn get_id<'a>(&'a self) -> &'a EndPointId {
+    /// An id unique to this service.
+    pub fn get_id<'a>(&'a self) -> &'a ServiceId {
         &self.id
     }
 
-    /// The hub owning this endpoint.
-    pub fn get_hub_id<'a>(&'a self) -> &'a HubId {
-        &self.hub
+    /// The node owning this service.
+    pub fn get_node_id<'a>(&'a self) -> &'a NodeId {
+        &self.node
     }
 
-    /// The update mechanism for this endpoint.
+    /// The update mechanism for this service.
     pub fn get_mechanism<'a>(&'a self) -> &'a IO {
         &self.mechanism
     }

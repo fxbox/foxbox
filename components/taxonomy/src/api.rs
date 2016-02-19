@@ -19,11 +19,11 @@ use std::time::Duration;
 
 /// An error produced by one of the APIs in this module.
 pub enum Error {
-    /// There is no such hub connected to the Foxbox, even indirectly.
-    NoSuchHub(HubId),
+    /// There is no such node connected to the Foxbox, even indirectly.
+    NoSuchNode(NodeId),
 
-    /// There is no such endpoint connected to the Foxbox, even indirectly.
-    NoSuchEndPoint(EndPointId),
+    /// There is no such service connected to the Foxbox, even indirectly.
+    NoSuchService(ServiceId),
 
     /// Attempting to set a value with the wrong type
     TypeError,
@@ -38,29 +38,29 @@ pub struct Value; // FIXME: Define
 /// This API is subdivided in traits purely for the sake of
 /// namespacing.
 pub trait API {
-    /// The subset of the API dedicated to hubs.
-    type HubAPI: HubAPI;
-    fn get_hub_api(&self) -> Self::HubAPI;
+    /// The subset of the API dedicated to nodes.
+    type NodeAPI: NodeAPI;
+    fn get_node_api(&self) -> Self::NodeAPI;
 
-    /// The subset of the API dedicated to endpoints.
-    type EndPointAPI: EndPointAPI;
-    fn get_endpoint_api(&self) -> Self::EndPointAPI;
+    /// The subset of the API dedicated to services.
+    type ServiceAPI: ServiceAPI;
+    fn get_service_api(&self) -> Self::ServiceAPI;
 }
 
 // FIXME: We should probably use traits for building requests, as this
 // will be more future-proof.
-/// A request for one or more hubs.
-pub struct HubRequest {
-    /// If `Some(id)`, return only the hub with the corresponding id.
-    pub id: Option<HubId>,
+/// A request for one or more nodes.
+pub struct NodeRequest {
+    /// If `Some(id)`, return only the node with the corresponding id.
+    pub id: Option<NodeId>,
 
-    ///  Restrict results to hubs that have all the tags in `tags`.
+    ///  Restrict results to nodes that have all the tags in `tags`.
     pub tags: Vec<String>,
 
-    /// Restrict results to hubs that have all the inputs in `inputs`.
+    /// Restrict results to nodes that have all the inputs in `inputs`.
     pub inputs: Vec<InputRequest>,
 
-    /// Restrict results to hubs that have all the outputs in `outputs`.
+    /// Restrict results to nodes that have all the outputs in `outputs`.
     pub outputs: Vec<OutputRequest>,
 }
 
@@ -70,91 +70,91 @@ pub struct Period {
     pub max: Option<Duration>,
 }
 
-/// A request for one or more input endpoints.
+/// A request for one or more input services.
 pub struct InputRequest {
-    /// If `Some(id)`, return only the endpoint with the corresponding id.
-    pub id: Option<EndPointId>,
+    /// If `Some(id)`, return only the service with the corresponding id.
+    pub id: Option<ServiceId>,
 
-    /// If `Some(id)`, return only endpoints that are immediate children
-    /// of hub `id`.
-    pub parent: Option<HubId>,
+    /// If `Some(id)`, return only services that are immediate children
+    /// of node `id`.
+    pub parent: Option<NodeId>,
 
-    /// If `Some(id)`, return only endpoints that are descendants of hub
+    /// If `Some(id)`, return only services that are descendants of node
     /// `id`.
-    pub ancestor: Option<HubId>,
+    pub ancestor: Option<NodeId>,
 
-    ///  Restrict results to endpoints that have all the tags in `tags`.
+    ///  Restrict results to services that have all the tags in `tags`.
     pub tags: Vec<String>,
 
-    /// If `Some(k)`, restrict results to endpoints that produce values
+    /// If `Some(k)`, restrict results to services that produce values
     /// of kind `k`.
-    pub kind: Option<ValueKind>,
+    pub kind: Option<ServiceKind>,
 
-    /// If `Some(r)`, restrict results to endpoints that support polling
+    /// If `Some(r)`, restrict results to services that support polling
     /// with the acceptable period.
     pub poll: Option<Period>,
 
-    /// If `Some(r)`, restrict results to endpoints that support trigger
+    /// If `Some(r)`, restrict results to services that support trigger
     /// with the acceptable period.
     pub trigger: Option<Period>,
 }
 
-/// A request for one or more output endpoints.
+/// A request for one or more output services.
 pub struct OutputRequest {
-    /// If `Some(id)`, return only the endpoint with the corresponding id.
-    pub id: Option<EndPointId>,
+    /// If `Some(id)`, return only the service with the corresponding id.
+    pub id: Option<ServiceId>,
 
-    /// If `Some(id)`, return only endpoints that are immediate children
-    /// of hub `id`.
-    pub parent: Option<HubId>,
+    /// If `Some(id)`, return only services that are immediate children
+    /// of node `id`.
+    pub parent: Option<NodeId>,
 
-    /// If `Some(id)`, return only endpoints that are descendants of hub
+    /// If `Some(id)`, return only services that are descendants of node
     /// `id`.
-    pub ancestor: Option<HubId>,
+    pub ancestor: Option<NodeId>,
 
-    ///  Restrict results to endpoints that have all the tags in `tags`.
+    ///  Restrict results to services that have all the tags in `tags`.
     pub tags: Vec<String>,
 
-    /// If `Some(k)`, restrict results to endpoints that accept values
+    /// If `Some(k)`, restrict results to services that accept values
     /// of kind `k`.
-    pub kind: Option<ValueKind>,
+    pub kind: Option<ServiceKind>,
 
-    /// If `Some(r)`, restrict results to endpoints that support pushing
+    /// If `Some(r)`, restrict results to services that support pushing
     /// with the acceptable period.
     pub push: Option<Period>,
 }
 
 
-/// Hub-level API
-pub trait HubAPI {
-    /// Get a list of hubs matching some conditions
+/// Node-level API
+pub trait NodeAPI {
+    /// Get a list of nodes matching some conditions
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/hub/list`
-    fn get_list(&self, &HubRequest) -> Vec<Hub>;
+    /// `GET /api/v1/node/list`
+    fn get_list(&self, &NodeRequest) -> Vec<Node>;
 
-    /// Add a tag to an existing hub.
+    /// Add a tag to an existing node.
     ///
-    /// Tags can be used to locate hubs.
+    /// Tags can be used to locate nodes.
     ///
     /// # REST API
     ///
-    /// `PUT /api/v1/hub/tag/$HubId`
-    fn put_tag(&self, &HubId, String) -> Result<(), Error>;
+    /// `PUT /api/v1/node/tag/$NodeId`
+    fn put_tag(&self, &NodeId, String) -> Result<(), Error>;
 
-    /// Add a tag to an existing hub.
+    /// Add a tag to an existing node.
     ///
-    /// Tags can be used to locate hubs.
+    /// Tags can be used to locate nodes.
     ///
     /// # REST API
     ///
-    /// `DELETE /api/v1/hub/tag/$HubId`
-    fn delete_tag(&self, &HubId, String) -> Result<(), Error>;
+    /// `DELETE /api/v1/node/tag/$NodeId`
+    fn delete_tag(&self, &NodeId, String) -> Result<(), Error>;
 }
 
-/// Endpoint-level API
-pub trait EndPointAPI {
+/// Service-level API
+pub trait ServiceAPI {
     /// A value that causes a disconnection once it is dropped.
     type Guard;
     
@@ -162,52 +162,52 @@ pub trait EndPointAPI {
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/endpoint/list`
-    fn get_input_endpoints(&self, &InputRequest) -> Vec<EndPoint<Input>>;
-    fn get_output_endpoints(&self, &OutputRequest) -> Vec<EndPoint<Output>>;
+    /// `GET /api/v1/service/list`
+    fn get_input_services(&self, &InputRequest) -> Vec<Service<Input>>;
+    fn get_output_services(&self, &OutputRequest) -> Vec<Service<Output>>;
 
-    /// Add a tag to an existing endpoint.
+    /// Add a tag to an existing service.
     ///
-    /// Tags can be used to locate endpoint.
+    /// Tags can be used to locate service.
     ///
     /// # REST API
     ///
-    /// `PUT /api/v1/endpoint/tag/$EndPointId`
-    fn put_tag(&self, &EndPointId, String) -> Result<(), Error>;
+    /// `PUT /api/v1/service/tag/$ServiceId`
+    fn put_tag(&self, &ServiceId, String) -> Result<(), Error>;
 
-    /// Add a tag to an existing endpoint.
+    /// Add a tag to an existing service.
     ///
-    /// Tags can be used to locate endpoints.
+    /// Tags can be used to locate services.
     ///
     /// # REST API
     ///
-    /// `DELETE /api/v1/endpoint/tag/$EndPointId`
-    fn delete_tag(&self, &EndPointId, String) -> Result<(), Error>;
+    /// `DELETE /api/v1/service/tag/$ServiceId`
+    fn delete_tag(&self, &ServiceId, String) -> Result<(), Error>;
 
     /// Read one value from an input enpoint
     ///
     /// # REST API
     ///
-    /// GET /api/v1/endpoint/value/$EndpointId
-    fn get_endpoint_value(&self, &EndPoint<Input>) -> Result<Value, Error>;
+    /// GET /api/v1/service/value/$ServiceId
+    fn get_service_value(&self, &Service<Input>) -> Result<Value, Error>;
 
     /// Send one value to an output enpoint
     ///
     /// # REST API
     ///
-    /// `PUT /api/v1/endpoint/value/$EndpointId`
-    fn put_endpoint_value(&self, &EndPoint<Output>, Value) -> Result<(), Error>;
+    /// `PUT /api/v1/service/value/$ServiceId`
+    fn put_service_value(&self, &Service<Output>, Value) -> Result<(), Error>;
 
     /// Watch for any change
     ///
     /// # WebSocket API
     ///
-    /// `/api/v1/endpoint/watch/$EndPointId`
-    fn register_watch<F>(&self, &EndPoint<Input>, &WatchOptions, cb: F)
+    /// `/api/v1/service/watch/$ServiceId`
+    fn register_watch<F>(&self, &Service<Input>, &WatchOptions, cb: F)
                          -> Result<Self::Guard, Error>
         where F: Fn(Value) + Send;
 }
 
-/// Options for watching an endpoint.
+/// Options for watching a service.
 /// FIXME: Define.
 pub struct WatchOptions;
