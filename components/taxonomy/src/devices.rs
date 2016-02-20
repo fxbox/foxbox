@@ -1,4 +1,6 @@
 use std::time::Duration;
+use values;
+
 extern crate chrono;
 
 ///
@@ -146,14 +148,14 @@ pub enum ValueKind {
         nature: String,
 
         /// The data type of the value.
-        typ: Type
+        typ: values::Type
     }
 }
 
 impl ValueKind {
-    pub fn get_type(&self) -> Type {
+    pub fn get_type(&self) -> values::Type {
         use self::ValueKind::*;
-        use self::Type::*;
+        use values::Type::*;
         match *self {
             Ready => Unit,
             OnOff | OpenClosed => Bool,
@@ -338,42 +340,5 @@ impl<IO> EndPoint<IO> {
     pub fn get_last_seen(&self) -> chrono::DateTime<chrono::UTC> {
         self.last_seen
     }
-}
-
-///
-/// Values
-///
-
-#[derive(Debug, Clone)]
-pub enum Type {
-    ///
-    /// # Trivial values
-    ///
-
-    /// An empty value. Used for instance to inform that a countdown
-    /// has reached 0 or that a device is ready.
-    Unit,
-
-    /// A boolean. Used for instance for on-off switches, presence
-    /// detectors, etc.
-    Bool,
-
-    ///
-    /// # Time
-    ///
-
-    /// A duration. Used for instance in countdowns.
-    Duration,
-
-    /// A precise timestamp. Used for instance to determine when an
-    /// event has taken place.
-    TimeStamp,
-
-    Temperature,
-
-    ///
-    /// ...
-    ///
-    Color,
 }
 
