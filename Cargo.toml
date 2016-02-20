@@ -22,7 +22,7 @@ serde_json = "0.6.0"
 serde_macros = "0.6.13"
 staticfile = "0.1.0"
 uuid = "0.1.18"
-websocket = "0.15.0"
+ws = "0.4.5"
 
 [dev-dependencies]
 stainless = "0.1.4"

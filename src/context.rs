@@ -7,20 +7,21 @@ extern crate collections;
 
 use self::collections::vec::IntoIter;
 use service::Service;
-use std::collections::HashMap;
+use std::collections::{ HashMap, hash_map };
 use std::io::Error;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex };
+use ws;
 
 // The `global` context available to all.
 pub struct Context {
     pub verbose: bool,
-
-    hostname: String,
-    http_port: u16,
-    ws_port: u16,
-    services: HashMap<String, Box<Service>>
+    pub hostname: String,
+    pub http_port: u16,
+    pub ws_port: u16,
+    services: HashMap<String, Box<Service>>,
+    websockets: HashMap<ws::util::Token, ws::Sender>,
 }
 
 const DEFAULT_HTTP_PORT: u16 = 3000;
@@ -35,9 +36,12 @@ pub trait ContextTrait {
               ws_port: Option<u16>) -> Shared<Self>;
     fn add_service(&mut self, service: Box<Service>);
     fn remove_service(&mut self, id: String);
+    fn add_websocket(&mut self, socket_out: ws::Sender);
+    fn remove_websocket(&mut self, socket_out: ws::Sender);
     fn services_count(&self) -> usize;
     fn get_service(&self, id: &str) -> Option<&Box<Service>>;
     fn services_as_json(&self) -> Result<String, serde_json::error::Error>;
+    fn websockets_iter(&self) -> hash_map::Values<ws::util::Token, ws::Sender>;
     fn get_http_root_for_service(&self, service_id: String) -> String;
     fn get_ws_root_for_service(&self, service_id: String) -> String;
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error>;
@@ -51,6 +55,7 @@ impl ContextTrait for Context {
                http_port: Option<u16>, ws_port: Option<u16>) -> Self {
 
         Context { services: HashMap::new(),
+                  websockets: HashMap::new(),
                   verbose: verbose,
                   hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
                   http_port: http_port.unwrap_or(DEFAULT_HTTP_PORT),
@@ -72,6 +77,14 @@ impl ContextTrait for Context {
         self.services.remove(&id);
     }
 
+    fn add_websocket(&mut self, socket: ws::Sender) {
+        self.websockets.insert(socket.token(), socket);
+    }
+
+    fn remove_websocket(&mut self, socket: ws::Sender) {
+        self.websockets.remove(&socket.token());
+    }
+
     fn services_count(&self) -> usize {
         self.services.len()
     }
@@ -82,6 +95,10 @@ impl ContextTrait for Context {
 
     fn services_as_json(&self) -> Result<String, serde_json::error::Error> {
         serde_json::to_string(&self.services)
+    }
+
+    fn websockets_iter(&self) -> hash_map::Values<ws::util::Token, ws::Sender> {
+        self.websockets.values()
     }
 
     fn get_http_root_for_service(&self, service_id: String) -> String {

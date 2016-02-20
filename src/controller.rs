@@ -8,6 +8,7 @@ use context::{ ContextTrait, SharedContext };
 use dummy_adapter::DummyAdapter;
 use events::{ EventData, EventSender };
 use http_server::HttpServer;
+use ws_server::WsServer;
 use mio::EventLoop;
 use service::{ Service, ServiceAdapter };
 
@@ -37,6 +38,9 @@ impl Controller {
         let mut http_server = HttpServer::new(self.context.clone());
         http_server.start();
 
+        // Start the websocket server.
+        WsServer::start(self.context.clone());
+
         // Start the dummy adapter.
         let dummy_adapter = DummyAdapter::new(self.sender.clone(), self.context.clone());
         dummy_adapter.start();
@@ -53,6 +57,14 @@ impl mio::Handler for Controller {
         println!("Receiving a notification! {}", data.description());
 
         let mut context = self.context.lock().unwrap();
+
+        for socket in context.websockets_iter() {
+            match socket.send(data.description()) {
+                Ok(_) => (),
+                Err(err) => println!("Error sending to socket: {}", err)
+            }
+        }
+
         match data {
             EventData::ServiceStart { id } => {
                 // The service should be added already, panic if that's not the
