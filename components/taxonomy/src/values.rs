@@ -3,6 +3,7 @@
 //!
 
 use std::time::Duration;
+use std::cmp::{PartialOrd, Ordering};
 
 extern crate chrono;
 use self::chrono::{DateTime, Local};
@@ -12,7 +13,7 @@ extern crate serde_json;
 ///
 /// The type of values manipulated by endpoints.
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub enum Type {
     ///
     /// # Trivial values
@@ -50,7 +51,7 @@ pub enum Type {
 /// A temperature. Internal representation may be either Fahrenheit or
 /// Celcius. The FoxBox adapters are expected to perform conversions
 /// to the format requested by their devices.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Temperature {
     /// Fahrenheit
     F(f64),
@@ -70,18 +71,43 @@ impl Temperature {
     }
 }
 
+impl PartialOrd for Temperature {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.as_c().partial_cmp(&other.as_c())
+    }
+}
+
 /// A color. Internal representation may vary. The FoxBox adapters are
 /// expected to perform conversions to the format requested by their
 /// device.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Color {
     RGBA(f64, f64, f64, f64, f64)
 }
 
+/// Representation of an object in JSON. It is often (albeit not
+/// always) possible to choose a more precise data structure for
+/// representing values send/accepted by a service. If possible,
+/// adapters should rather pick such more precise data structure.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Json(serde_json::value::Value);
 
-/// An actual value that may be transmitted from/to a Service.
-#[derive(Debug, Clone)]
-pub enum Value {
+impl PartialOrd for Json {
+    /// Two Json objects are never comparable to each other.
+    fn partial_cmp(&self, _: &Self) -> Option<Ordering> {
+        None
+    }
+}
+
+/// Base definitions for actual values. Most API clients will rather
+/// use `Value`.
+///
+/// Splitting the defintion between `Value` and `ValueBase` is mostly
+/// a convenience to refine the automatically-derived `PartialOrd` on
+/// `ValueBase` into something that will never compare two values with
+/// different types.
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum ValueBase {
     Unit,
     Bool(bool),
     Duration(Duration),
@@ -90,21 +116,46 @@ pub enum Value {
     Color(Color),
 
     // FIXME: Add more as we identify needs
-    Json(serde_json::value::Value),
+    Json(Json),
     Binary {data: Vec<u8>, mimetype: String}
 }
 
-impl Value {
+impl ValueBase {
     pub fn get_type(&self) -> Type {
         match *self {
-            Value::Unit => Type::Unit,
-            Value::Bool(_) => Type::Bool,
-            Value::Duration(_) => Type::Duration,
-            Value::TimeStamp(_) => Type::TimeStamp,
-            Value::Temperature(_) => Type::Temperature,
-            Value::Color(_) => Type::Color,
-            Value::Json(_) => Type::Json,
-            Value::Binary{..} => Type::Binary,
+            ValueBase::Unit => Type::Unit,
+            ValueBase::Bool(_) => Type::Bool,
+            ValueBase::Duration(_) => Type::Duration,
+            ValueBase::TimeStamp(_) => Type::TimeStamp,
+            ValueBase::Temperature(_) => Type::Temperature,
+            ValueBase::Color(_) => Type::Color,
+            ValueBase::Json(_) => Type::Json,
+            ValueBase::Binary{..} => Type::Binary,
+        }
+    }
+}
+
+/// Representation of an actual value that can be sent to/received
+/// from a service.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Value(ValueBase);
+
+impl Value {
+    /// Get the type attached to a value.
+    pub fn get_type(&self) -> Type {
+        self.0.get_type()
+    }
+}
+
+impl PartialOrd for Value {
+    /// Two values of the same type can be compared using the usual
+    /// comparison for values of this type. Two values of distinct
+    /// types cannot be compared.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.get_type() != other.get_type() {
+            None
+        } else {
+            self.0.partial_cmp(&other.0)
         }
     }
 }
