@@ -134,15 +134,10 @@ impl PartialOrd for ExtNumeric {
     }
 }
 
-/// Base definitions for actual values. Most API clients will rather
-/// use `Value`.
-///
-/// Splitting the defintion between `Value` and `ValueBase` is mostly
-/// a convenience to refine the automatically-derived `PartialOrd` on
-/// `ValueBase` into something that will never compare two values with
-/// different types.
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub enum ValueBase {
+/// Representation of an actual value that can be sent to/received
+/// from a service.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Value {
     Unit,
     Bool(bool),
     Duration(Duration),
@@ -159,31 +154,19 @@ pub enum ValueBase {
     Binary {data: Vec<u8>, mimetype: String}
 }
 
-impl ValueBase {
+impl Value {
     pub fn get_type(&self) -> Type {
         match *self {
-            ValueBase::Unit => Type::Unit,
-            ValueBase::Bool(_) => Type::Bool,
-            ValueBase::Duration(_) => Type::Duration,
-            ValueBase::TimeStamp(_) => Type::TimeStamp,
-            ValueBase::Temperature(_) => Type::Temperature,
-            ValueBase::Color(_) => Type::Color,
-            ValueBase::Json(_) => Type::Json,
-            ValueBase::Binary{..} => Type::Binary,
-            ValueBase::ExtNumeric(_) => Type::ExtNumeric,
+            Value::Unit => Type::Unit,
+            Value::Bool(_) => Type::Bool,
+            Value::Duration(_) => Type::Duration,
+            Value::TimeStamp(_) => Type::TimeStamp,
+            Value::Temperature(_) => Type::Temperature,
+            Value::Color(_) => Type::Color,
+            Value::Json(_) => Type::Json,
+            Value::Binary{..} => Type::Binary,
+            Value::ExtNumeric(_) => Type::ExtNumeric,
         }
-    }
-}
-
-/// Representation of an actual value that can be sent to/received
-/// from a service.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Value(ValueBase);
-
-impl Value {
-    /// Get the type attached to a value.
-    pub fn get_type(&self) -> Type {
-        self.0.get_type()
     }
 }
 
@@ -192,10 +175,35 @@ impl PartialOrd for Value {
     /// comparison for values of this type. Two values of distinct
     /// types cannot be compared.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.get_type() != other.get_type() {
-            None
-        } else {
-            self.0.partial_cmp(&other.0)
+        use self::Value::*;
+        use std::cmp::Ordering::*;
+        match (self, other) {
+            (&Unit, &Unit) => Some(Equal),
+            (&Unit, _) => None,
+
+            (&Bool(a), &Bool(b)) => a.partial_cmp(&b),
+            (&Bool(_), _) => None,
+
+            (&Duration(ref a), &Duration(ref b)) => a.partial_cmp(b),
+            (&Duration(_), _) => None,
+
+            (&TimeStamp(ref a), &TimeStamp(ref b)) => a.partial_cmp(b),
+            (&TimeStamp(_), _) => None,
+
+            (&Temperature(ref a), &Temperature(ref b)) => a.partial_cmp(b),
+            (&Temperature(_), _) => None,
+
+            (&Color(ref a), &Color(ref b)) => a.partial_cmp(b),
+            (&Color(_), _) => None,
+
+            (&ExtNumeric(ref a), &ExtNumeric(ref b)) => a.partial_cmp(b),
+            (&ExtNumeric(_), _) => None,
+
+            (&Json(ref a), &Json(ref b)) => a.partial_cmp(b),
+            (&Json(_), _) => None,
+
+            (a@&Binary{..}, b@&Binary{..}) => a.partial_cmp(&b),
+            (&Binary{..}, _) => None,
         }
     }
 }
