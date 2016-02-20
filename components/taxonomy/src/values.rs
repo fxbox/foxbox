@@ -46,6 +46,7 @@ pub enum Type {
     Color,
     Json,
     Binary,
+    ExtNumeric,
 }
 
 /// A temperature. Internal representation may be either Fahrenheit or
@@ -99,6 +100,40 @@ impl PartialOrd for Json {
     }
 }
 
+/// A data structure holding a numeric value of a type that has not
+/// been standardized yet.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExtNumeric {
+    value: f64,
+
+    /// The vendor. Used for namespacing purposes, to avoid
+    /// confusing two incompatible extensions with similar
+    /// names. For instance, "foxlink@mozilla.com".
+    vendor: String,
+
+    /// Identification of the adapter introducing this value.
+    /// Designed to aid with tracing and debugging.
+    adapter: String,
+
+    /// A string describing the nature of the value, designed to
+    /// aid with type-checking.
+    ///
+    /// Examples: `"GroundHumidity"`.
+    kind: String,
+}
+
+impl PartialOrd for ExtNumeric {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.vendor != other.vendor {
+            return None;
+        } else if self.kind != other.kind {
+            return None;
+        } else {
+            self.value.partial_cmp(&other.value)
+        }
+    }
+}
+
 /// Base definitions for actual values. Most API clients will rather
 /// use `Value`.
 ///
@@ -116,6 +151,10 @@ pub enum ValueBase {
     Color(Color),
 
     // FIXME: Add more as we identify needs
+
+    /// A numeric value representing a unit that has not been
+    /// standardized yet into the API.
+    ExtNumeric(ExtNumeric),
     Json(Json),
     Binary {data: Vec<u8>, mimetype: String}
 }
@@ -131,6 +170,7 @@ impl ValueBase {
             ValueBase::Color(_) => Type::Color,
             ValueBase::Json(_) => Type::Json,
             ValueBase::Binary{..} => Type::Binary,
+            ValueBase::ExtNumeric(_) => Type::ExtNumeric,
         }
     }
 }
