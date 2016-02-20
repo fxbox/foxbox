@@ -104,22 +104,22 @@ impl PartialOrd for Json {
 /// been standardized yet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtNumeric {
-    value: f64,
+    pub value: f64,
 
     /// The vendor. Used for namespacing purposes, to avoid
     /// confusing two incompatible extensions with similar
     /// names. For instance, "foxlink@mozilla.com".
-    vendor: String,
+    pub vendor: String,
 
     /// Identification of the adapter introducing this value.
     /// Designed to aid with tracing and debugging.
-    adapter: String,
+    pub adapter: String,
 
     /// A string describing the nature of the value, designed to
     /// aid with type-checking.
     ///
     /// Examples: `"GroundHumidity"`.
-    kind: String,
+    pub kind: String,
 }
 
 impl PartialOrd for ExtNumeric {
