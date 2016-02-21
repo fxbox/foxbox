@@ -39,7 +39,7 @@ pub enum Type {
     TimeStamp,
 
     Temperature,
-
+    String, 
     ///
     /// ...
     ///
@@ -144,6 +144,7 @@ pub enum Value {
     TimeStamp(chrono::DateTime<Local>),
     Temperature(Temperature),
     Color(Color),
+    String(String),
 
     // FIXME: Add more as we identify needs
 
@@ -164,6 +165,7 @@ impl Value {
             Value::Temperature(_) => Type::Temperature,
             Value::Color(_) => Type::Color,
             Value::Json(_) => Type::Json,
+            Value::String(_) => Type::String,
             Value::Binary{..} => Type::Binary,
             Value::ExtNumeric(_) => Type::ExtNumeric,
         }
@@ -199,10 +201,14 @@ impl PartialOrd for Value {
             (&ExtNumeric(ref a), &ExtNumeric(ref b)) => a.partial_cmp(b),
             (&ExtNumeric(_), _) => None,
 
+            (&String(ref a), &String(ref b)) => a.partial_cmp(b),
+            (&String(_), _) => None,
+
             (&Json(ref a), &Json(ref b)) => a.partial_cmp(b),
             (&Json(_), _) => None,
 
-            (a@&Binary{..}, b@&Binary{..}) => a.partial_cmp(&b),
+            (&Binary{mimetype: ref a_mimetype, data: ref a_data},
+             &Binary{mimetype: ref b_mimetype, data: ref b_data}) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
             (&Binary{..}, _) => None,
         }
     }
