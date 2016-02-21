@@ -91,7 +91,7 @@ pub enum Color {
 /// representing values send/accepted by a service. If possible,
 /// adapters should rather pick such more precise data structure.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Json(serde_json::value::Value);
+pub struct Json(pub serde_json::value::Value);
 
 impl PartialOrd for Json {
     /// Two Json objects are never comparable to each other.
