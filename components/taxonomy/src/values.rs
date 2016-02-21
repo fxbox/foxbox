@@ -160,12 +160,12 @@ impl Value {
         match *self {
             Value::Unit => Type::Unit,
             Value::Bool(_) => Type::Bool,
+            Value::String(_) => Type::String,
             Value::Duration(_) => Type::Duration,
             Value::TimeStamp(_) => Type::TimeStamp,
             Value::Temperature(_) => Type::Temperature,
             Value::Color(_) => Type::Color,
             Value::Json(_) => Type::Json,
-            Value::String(_) => Type::String,
             Value::Binary{..} => Type::Binary,
             Value::ExtNumeric(_) => Type::ExtNumeric,
         }
