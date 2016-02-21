@@ -1,0 +1,51 @@
+{
+  "requirements": [
+    {
+      "kind": "clock",
+      "inputs": [
+        "ticks"
+      ]
+    },
+    {
+      "kind": "display device",
+      "outputs": [
+        "show"
+      ]
+    }
+  ],
+  "allocations": [
+    [
+      "built-in clock"
+    ],
+    [
+      "built-in display 1",
+      "built-in display 2"
+    ]
+  ],
+  "rules": [
+    {
+      "condition": [
+        {
+          "input": 0,
+          "capability": "ticks",
+          "range": [
+            {
+              "type": "Duration",
+              "s": 3
+            },
+            null
+          ]
+        }
+      ],
+      "action": [
+        {
+          "output": 1,
+          "capability": "show",
+          "args": {
+            "reached": true
+          }
+        }
+      ]
+    }
+  ]
+}
