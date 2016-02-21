@@ -6,14 +6,17 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, sync_channel, Sender};
 use std::thread;
 
-extern crate thinkerbell;
-use thinkerbell::dependencies::{DevEnv, ExecutableDevEnv, Watcher};
-use thinkerbell::values::{Value, Range, Number};
-use thinkerbell::ast::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression, UncheckedCtx, UncheckedEnv};
-use thinkerbell::run::Execution;
+extern crate fxbox_thinkerbell;
+use fxbox_thinkerbell::dependencies::{DevEnv, ExecutableDevEnv, Watcher};
+use fxbox_thinkerbell::values::Range;
+use fxbox_thinkerbell::ast::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression, UncheckedCtx, UncheckedEnv};
+use fxbox_thinkerbell::run::Execution;
+
+extern crate fxbox_taxonomy;
+use fxbox_taxonomy::values::Value;
 
 extern crate chrono;
-use self::chrono::Duration;
+use std::time::Duration;
 
 #[macro_use]
 extern crate lazy_static;
@@ -152,7 +155,7 @@ impl TestWatcher {
                         None => {},
                         Some(ref watcher) => {
                             println!("TestWatcher: Informing watcher");
-                            let val = Value::Num(Number::new(ticks as f64, ()));
+                            let val = Value::Duration(Duration::new(ticks, 0));
                             watcher(val);
                         }
                     }
@@ -213,9 +216,9 @@ fn test_compile_empty_script() {
 /// Attempt to compile a script with the wrong number of allocations.
 /// This should fail.
 fn test_compile_bad_number_of_allocations() {
-    use thinkerbell::compile::SourceError::*;
-    use thinkerbell::compile::Error::*;
-    use thinkerbell::run::Error::*;
+    use fxbox_thinkerbell::compile::SourceError::*;
+    use fxbox_thinkerbell::compile::Error::*;
+    use fxbox_thinkerbell::run::Error::*;
 
     let script : Script<UncheckedCtx, UncheckedEnv> = Script {
         metadata: (),
@@ -255,9 +258,9 @@ fn test_compile_bad_number_of_allocations() {
 /// Attempt to compile a script with a resource of a kind that doesn't exist on the box.
 /// This should fail.
 fn test_compile_wrong_kind() {
-    use thinkerbell::compile::DevAccessError::*;
-    use thinkerbell::compile::Error::*;
-    use thinkerbell::run::Error::*;
+    use fxbox_thinkerbell::compile::DevAccessError::*;
+    use fxbox_thinkerbell::compile::Error::*;
+    use fxbox_thinkerbell::run::Error::*;
 
     let script : Script<UncheckedCtx, UncheckedEnv> = Script {
         metadata: (),
@@ -382,7 +385,7 @@ fn test_watch_one_input() {
                 all: vec![Condition {
                     input: 0, // The first (and only) input
                     capability: "ticks".to_owned(),
-                    range: Range::Geq(Number::new(3.0, ())),
+                    range: Range::Geq(Value::Duration(Duration::new(3, 0))),
                     state: (),
                 }],
                 state: (),

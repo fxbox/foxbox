@@ -1,7 +1,7 @@
 /// Tests for parse.rs
 
-extern crate thinkerbell;
-use thinkerbell::parse::Parser;
+extern crate fxbox_thinkerbell;
+use fxbox_thinkerbell::parse::Parser;
 
 extern crate serde_json;
 
@@ -55,7 +55,8 @@ fn test_parse_one_input() {
               \"input\": 0,
               \"capability\": \"ticks\",
               \"range\": [
-                {\"value\": 3},
+                {\"type\": \"Duration\",
+                  \"s\": 3},
                 null
               ]
             }

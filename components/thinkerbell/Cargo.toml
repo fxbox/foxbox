@@ -1,5 +1,5 @@
 [package]
-name = "thinkerbell"
+name = "fxbox_thinkerbell"
 version = "0.1.0"
 authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
@@ -7,3 +7,4 @@ authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 serde_json = "0.6.0"
 chrono = "0.2.19"
 lazy_static = "0.1.15"
+fxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git",  rev="c630a34" }

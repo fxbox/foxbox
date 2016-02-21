@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use values::{Value, Range};
+use values::Range;
+
+extern crate fxbox_taxonomy;
+use self::fxbox_taxonomy::values::Value;
 
 /// APIs that we need to implement the code in module lang.
 

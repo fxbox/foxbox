@@ -2,7 +2,9 @@ use dependencies::{DevEnv, ExecutableDevEnv, Watcher};
 use ast::{Script, Trigger, Statement, Conjunction, Condition, Expression, UncheckedCtx, UncheckedEnv};
 use compile::{CompiledCtx, Precompiler, CompiledInput, DatedData};
 use compile;
-use values::Value;
+
+extern crate fxbox_taxonomy;
+use self::fxbox_taxonomy::values::Value;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::marker::PhantomData;
@@ -287,33 +289,7 @@ impl<Env> Condition<CompiledCtx<Env>, Env> where Env: DevEnv {
             let is_met = match *state {
                 None => { false /* We haven't received a measurement yet.*/ },
                 Some(ref data) => {
-                    use values::Range::*;
-                    use values::Value::*;
-
-                    match (&data.data, &self.range) {
-                        // Any always matches
-                        (_, &Any) => true,
-                        // Operations on bools and strings
-                        (&Bool(ref b), &EqBool(ref b2)) => b == b2,
-                        (&String(ref s), &EqString(ref s2)) => s == s2,
-
-                        // Numbers. FIXME: Implement physical units.
-                        (&Num(ref x), &Leq(ref max)) => x <= max,
-                        (&Num(ref x), &Geq(ref min)) => min <= x,
-                        (&Num(ref x), &BetweenEq{ref min, ref max}) => min <= x && x <= max,
-                        (&Num(ref x), &OutOfStrict{ref min, ref max}) => x < min || max < x,
-
-                        // Type errors don't match.
-                        (&Bool(_), _) => false,
-                        (&String(_), _) => false,
-                        (_, &EqBool(_)) => false,
-                        (_, &EqString(_)) => false,
-                        (&Vec(_), _) => false,
-
-                        // There is no such thing as a range on json or blob.
-                        (&Json(_), _) |
-                        (&Blob{..}, _) => false,
-                    }
+                    self.range.contains(&data.data)
                 }
             };
             if is_met {
@@ -347,8 +323,8 @@ impl<Env> Expression<CompiledCtx<Env>, Env> where Env: ExecutableDevEnv {
         match *self {
             Expression::Value(ref v) => v.clone(),
             Expression::Input(_) => panic!("Cannot read an input in an expression yet"),
-            Expression::Vec(ref vec) => {
-                Value::Vec(vec.iter().map(|expr| expr.eval()).collect())
+            Expression::Vec(_) => {
+                panic!("Cannot handle vectors of expressions yet");
             }
         }
     }

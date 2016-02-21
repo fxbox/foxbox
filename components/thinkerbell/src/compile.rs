@@ -4,8 +4,10 @@ use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
 
 use ast::{Script, Requirement, Resource, Trigger, Statement, Conjunction, Condition, Expression, Context, UncheckedCtx, UncheckedEnv};
-use values::Value;
 use util::map;
+
+extern crate fxbox_taxonomy;
+use self::fxbox_taxonomy::values::Value;
 
 extern crate chrono;
 use self::chrono::{DateTime, UTC};

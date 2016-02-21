@@ -1,12 +1,15 @@
 use ast::{Script, Requirement, Resource, Trigger, Conjunction, Condition, Statement, Expression, UncheckedCtx, UncheckedEnv};
-use values::{Number, Value, Range};
+use values::Range;
 use util::map;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::time::Duration;
 
 extern crate serde_json;
-
 pub type Json = self::serde_json::Value;
+
+extern crate fxbox_taxonomy;
+use self::fxbox_taxonomy::values::{ExtNumeric, Value, Temperature};
 
 #[derive(Debug)]
 pub enum StatementError {
@@ -20,6 +23,9 @@ pub enum StatementError {
 pub enum ExpressionError {
     InvalidStructure,
     InvalidNumber,
+    InvalidVendor,
+    InvalidAdapter,
+    InvalidKind,
 }
 
 #[derive(Debug)]
@@ -67,6 +73,18 @@ pub enum ScriptError {
 }
 
 #[derive(Debug)]
+pub enum ValueError {
+    InvalidNumber,
+    InvalidVendor,
+    InvalidAdapter,
+    InvalidKind,
+    InvalidField(String),
+    NoValue,
+    InvalidType,
+    InvalidStructure,
+}
+
+#[derive(Debug)]
 pub enum Error {
     Expression(ExpressionError),
     Statement(StatementError),
@@ -76,6 +94,7 @@ pub enum Error {
     Requirement(RequirementError),
     Resource(ResourceError),
     Script(ScriptError),
+    Value(ValueError),
 }
 
 // FIXME: Reading from a json::Parser instead of a json::Json would let us attach a position in the source code.
@@ -239,8 +258,6 @@ impl Parser {
             };
             let range = match obj.remove("range") {
                 None => Range::Any,
-                Some(Bool(b)) => Range::EqBool(b),
-                Some(String(s)) => Range::EqString(s),
                 Some(Array(mut a)) =>
                 // Unfortunately, no pattern-matching on arrays yet.
                     match a.len() {
@@ -248,13 +265,13 @@ impl Parser {
                             let max = a.pop().unwrap();
                             let min = a.pop().unwrap();
                             if min == Null {
-                                Range::Leq(try!(Self::parse_number(max)))
+                                Range::Leq(try!(Self::parse_value(max)))
                             } else if max == Null {
-                                Range::Geq(try!(Self::parse_number(min)))
+                                Range::Geq(try!(Self::parse_value(min)))
                             } else {
                                 Range::BetweenEq {
-                                    min: try!(Self::parse_number(min)),
-                                    max: try!(Self::parse_number(max))
+                                    min: try!(Self::parse_value(min)),
+                                    max: try!(Self::parse_value(max))
                                 }
                             }
                         }
@@ -265,8 +282,8 @@ impl Parser {
                             if let String(s) = tag {
                                 if &*s == "notin" {
                                     Range::OutOfStrict {
-                                        min: try!(Self::parse_number(min)),
-                                        max: try!(Self::parse_number(max)),
+                                        min: try!(Self::parse_value(min)),
+                                        max: try!(Self::parse_value(max)),
                                     }
                                 } else {
                                     return Err(Error::Condition(ConditionError::InvalidNotIn))
@@ -277,7 +294,7 @@ impl Parser {
                         }
                         _ => return Err(Error::Condition(ConditionError::InvalidRange))
                     },
-                _ => return Err(Error::Condition(ConditionError::InvalidRange))
+                Some(val) => Range::Eq(try!(Self::parse_value(val))),
             };
             Ok(Condition {
                 input: input,
@@ -328,41 +345,115 @@ impl Parser {
 
     pub fn parse_expression(source: Json) -> Result<Expression<UncheckedCtx, UncheckedEnv>, Error> {
         use self::serde_json::Value::*;
+        // FIXME: This should be entirely rewritten to take into account all values.
+        // FIXME: Or perhaps use serde-json.
         let result = match source {
-            String(s) => Expression::Value(Value::String(s)),
-            Bool(b) => Expression::Value(Value::Bool(b)),
             Array(a) => {
                 Expression::Vec(try!(map(a, |expr| {
                     Self::parse_expression(expr)
                 })))
-            }
-            Object(_) => {
-                Expression::Value(Value::Num(try!(Self::parse_number(source))))
-            }
-            _ => return Err(Error::Expression(ExpressionError::InvalidStructure)),
+            },
+            source@_ => Expression::Value(try!(Self::parse_value(source)))
         };
         Ok(result)
     }
 
-
-    pub fn parse_number(source: Json) -> Result<Number, Error> {
+    pub fn parse_value(source: Json) -> Result<Value, Error> { // FIXME: Handle other value kinds
         use self::serde_json::Value::*;
-        if let Object(mut obj) = source {
-            match (obj.remove("value"), obj.remove("unit")) {
-                (Some(value), None) => {
-                    let num = match value {
-                        U64(num) => num as f64,
-                        I64(num) => num as f64,
-                        F64(num) => num,
-                        _ => return Err(Error::Expression(ExpressionError::InvalidNumber))
-                    };
-                    Ok(Number::new(num, ()))
+        let result = match source {
+            String(s) => Value::String(s),
+            Bool(b) => Value::Bool(b),
+            Object(mut obj) => {
+                if obj.len() == 0 {
+                    Value::Unit
+                } else {
+                    match obj.remove("type") {
+                        Some(String(typ)) => {
+                            match &*typ {
+                                "ExtNumeric" => {
+                                    let value = match obj.remove("value") {
+                                        Some(U64(num)) => num as f64,
+                                        Some(I64(num)) => num as f64,
+                                        Some(F64(num)) => num,
+                                        _ => return Err(Error::Value(ValueError::InvalidNumber))
+                                    };
+                                    let vendor = match obj.remove("vendor") {
+                                        Some(String(s)) => s,
+                                        None => "<unknown vendor>".to_owned(),
+                                        _ => return Err(Error::Value(ValueError::InvalidVendor))
+                                    };
+                                    let adapter = match obj.remove("adapter") {
+                                        Some(String(s)) => s,
+                                        None => "<unknown adapter>".to_owned(),
+                                        _ => return Err(Error::Value(ValueError::InvalidAdapter))
+                                    };
+                                    let kind = match obj.remove("kind") {
+                                        Some(String(s)) => s,
+                                        _ => return Err(Error::Value(ValueError::InvalidKind))
+                                    };
+                                    Value::ExtNumeric(ExtNumeric {
+                                        value: value,
+                                        vendor: vendor,
+                                        adapter: adapter,
+                                        kind: kind,
+                                    })
+                                },
+                                "Duration" => {
+                                    let sec = match obj.remove("s") {
+                                        Some(U64(sec)) => sec,
+                                        None => 0,
+                                        _ => return Err(Error::Value(ValueError::InvalidField("s".to_owned())))
+                                    };
+                                    let ns = match obj.remove("nss") {
+                                        Some(U64(ns)) => ns,
+                                        None => 0,
+                                        _ => return Err(Error::Value(ValueError::InvalidField("ns".to_owned())))
+                                    };
+                                    Value::Duration(Duration::new(sec, ns as u32))
+                                },
+                                "Temperature" => {
+                                    let value = match obj.remove("value") {
+                                        Some(U64(num)) => num as f64,
+                                        Some(I64(num)) => num as f64,
+                                        Some(F64(num)) => num,
+                                        _ => return Err(Error::Value(ValueError::InvalidNumber))
+                                    };
+                                    let temp = match obj.remove("unit") {
+                                        Some(String(unit)) => {
+                                            match &*unit {
+                                                "F" => Temperature::F(value),
+                                                "C" => Temperature::C(value),
+                                                _ => return Err(Error::Value(ValueError::InvalidField("unit".to_owned())))
+                                            }
+                                        },
+                                        _ => return Err(Error::Value(ValueError::InvalidField("unit".to_owned())))
+                                    };
+                                    Value::Temperature(temp)
+                                },
+                                "Json" => {
+                                    match obj.remove("value") {
+                                        Some(value) => Value::Json(fxbox_taxonomy::values::Json(value)),
+                                        None => return Err(Error::Value(ValueError::NoValue))
+                                    }
+                                },
+                                "TimeStamp" => {
+                                    unimplemented!()                            
+                                },
+                                "Color" => {
+                                    unimplemented!()
+                                },
+                                "Binary" => {
+                                    unimplemented!()
+                                },
+                                _ => return Err(Error::Value(ValueError::InvalidType))
+                            }
+                        },
+                        _ => return Err(Error::Value(ValueError::InvalidType))                         }
                 }
-                _ => Err(Error::Expression(ExpressionError::InvalidNumber))
-            }
-        } else {
-            Err(Error::Expression(ExpressionError::InvalidNumber))
-        }
+            },
+            _ => return Err(Error::Value(ValueError::InvalidStructure)),
+        };
+        Ok(result)
     }
 
 }
