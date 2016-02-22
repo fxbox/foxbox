@@ -35,11 +35,13 @@ extern crate rustc_serialize;
 extern crate serde;
 extern crate staticfile;
 extern crate uuid;
+extern crate ws;
 
 mod context;
 mod dummy_adapter;
 mod events;
 mod http_server;
+mod ws_server;
 mod service;
 mod controller;
 mod service_router;
