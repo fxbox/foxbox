@@ -121,11 +121,27 @@ pub trait ServiceAPI {
     /// # WebSocket API
     ///
     /// `/api/v1/service/watch/$ServiceId`
-    fn register_watch<F>(&self, &Service<Input>, &WatchOptions, cb: F)
+    fn register_watch<F>(&self, &WatchOptions, cb: F)
                          -> Result<Self::Guard, Error>
         where F: Fn(Value) + Send;
 }
 
-/// Options for watching a service.
-/// FIXME: Define.
-pub struct WatchOptions;
+/// Options for watching changes in one or more services.
+pub struct WatchOptions {
+    source: InputRequest,
+}
+
+impl WatchOptions {
+    pub fn new() -> Self {
+        WatchOptions {
+            source: InputRequest::new(),
+        }
+    }
+
+    pub fn and(self, other: Self) -> Self {
+        WatchOptions {
+            source: self.source.and(other.source),
+            ..self
+        }
+    }
+}
