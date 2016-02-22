@@ -15,6 +15,7 @@
 
 use devices::*;
 use requests::*;
+use values::Value;
 
 /// An error produced by one of the APIs in this module.
 pub enum Error {
@@ -27,10 +28,6 @@ pub enum Error {
     /// Attempting to set a value with the wrong type
     TypeError,
 }
-
-/// A value that can be sent or received through this API.
-/// FIXME: Define.
-pub struct Value; // FIXME: Define
 
 /// The public API.
 ///
