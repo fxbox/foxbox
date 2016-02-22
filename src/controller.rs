@@ -2,90 +2,288 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+extern crate serde_json;
+extern crate collections;
 extern crate mio;
 
-use context::{ ContextTrait, SharedContext };
+use core::marker::Reflect;
 use dummy_adapter::DummyAdapter;
 use events::{ EventData, EventSender };
 use http_server::HttpServer;
+use iron::{Request, Response, IronResult};
+use iron::headers::{ ContentType, AccessControlAllowOrigin };
+use iron::status::Status;
+use mio::{ NotifyError, EventLoop };
+use self::collections::vec::IntoIter;
+use service::{ Service, ServiceAdapter, ServiceProperties };
+use std::collections::hash_map::HashMap;
+use std::io;
+use std::io::Error;
+use std::net::SocketAddr;
+use std::net::ToSocketAddrs;
+use std::sync::{ Arc, Mutex };
+use tunnel_controller:: { TunnelConfig, Tunnel };
 use ws_server::WsServer;
-use mio::EventLoop;
-use service::{ Service, ServiceAdapter };
+use ws;
 
-pub struct Controller {
-    sender: EventSender,
-    context: SharedContext
+#[derive(Clone)]
+pub struct FoxBox {
+    event_sender: Option<EventSender>,
+    pub verbose: bool,
+    hostname: String,
+    http_port: u16,
+    ws_port: u16,
+    services: Arc<Mutex<HashMap<String, Box<Service>>>>,
+    tunnel: Arc<Mutex<Option<Tunnel>>>,
+    websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
 }
 
-impl Controller {
-    /// Construct a new `Controller`.
-    ///
-    /// ```
-    /// # use service_manager::Controller;
-    /// let controller = Controller::new();
-    /// ```
-    pub fn new(sender: EventSender, context: SharedContext) -> Controller {
-        Controller {
-            sender: sender,
-            context: context
+const DEFAULT_HTTP_PORT: u16 = 3000;
+const DEFAULT_WS_PORT: u16 = 4000;
+const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
+
+pub trait Controller : Send + Sync + Clone + Reflect + 'static {
+    fn run(&mut self);
+    fn dispatch_service_request(&self, id: String, request: &Request) -> IronResult<Response>;
+    fn add_service(&self, service: Box<Service>);
+    fn remove_service(&self, id: String);
+    fn get_service_properties(&self, id: String) -> Option<ServiceProperties>;
+    fn services_count(&self) -> usize;
+    fn services_as_json(&self) -> Result<String, serde_json::error::Error>;
+    fn get_http_root_for_service(&self, service_id: String) -> String;
+    fn get_ws_root_for_service(&self, service_id: String) -> String;
+    fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error>;
+    fn send_event(&self, data: EventData) -> Result<(), NotifyError<EventData>>;
+
+    fn add_websocket(&mut self, socket: ws::Sender);
+    fn remove_websocket(&mut self, socket: ws::Sender);
+    fn broadcast_to_websockets(&self, data: String);
+
+    fn start_tunnel(&mut self) -> Result<(), Error>;
+    fn stop_tunnel(&mut self) -> Result<(), Error>;
+}
+
+impl FoxBox {
+
+    pub fn new(verbose: bool,
+               hostname: Option<String>,
+               http_port: Option<u16>,
+               ws_port: Option<u16>,
+               tunnel_host: Option<String>) -> Self {
+
+        let http_port = http_port.unwrap_or(DEFAULT_HTTP_PORT);
+        let tunnel = if let Some(host) = tunnel_host {
+            Some(Tunnel::new(TunnelConfig::new(http_port, host)))
+        } else {
+            None
+        };
+
+        FoxBox {
+            services: Arc::new(Mutex::new(HashMap::new())),
+            websockets: Arc::new(Mutex::new(HashMap::new())),
+            verbose: verbose,
+            hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
+            http_port: http_port,
+            ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT),
+
+            event_sender: None,
+            tunnel: Arc::new(Mutex::new(tunnel)),
         }
     }
+}
 
-    pub fn start(&self) {
+impl Controller for FoxBox {
+
+    fn run(&mut self) {
         println!("Starting controller");
 
-        // Start the http server.
-        let mut http_server = HttpServer::new(self.context.clone());
-        http_server.start();
+        let mut event_loop = mio::EventLoop::new().unwrap();
+        self.event_sender = Some(event_loop.channel());
 
-        // Start the websocket server.
-        WsServer::start(self.context.clone());
+        HttpServer::new(self.clone()).start();
+        WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
+        DummyAdapter::new(self.clone()).start();
+        self.start_tunnel().unwrap();
+        event_loop.run(&mut FoxBoxEventLoop { controller: self.clone() }).unwrap();
+    }
 
-        // Start the dummy adapter.
-        let dummy_adapter = DummyAdapter::new(self.sender.clone(), self.context.clone());
-        dummy_adapter.start();
-
-        {
-            let mut context = self.context.lock().unwrap();
-            context.start_tunnel().unwrap();
+    fn dispatch_service_request(&self, id: String, request: &Request) -> IronResult<Response> {
+        let services = self.services.lock().unwrap();
+        match services.get(&id) {
+            None => {
+                let mut response = Response::with(format!("No Such Service: {}", id));
+                response.status = Some(Status::BadRequest);
+                response.headers.set(AccessControlAllowOrigin::Any);
+                response.headers.set(ContentType::plaintext());
+                Ok(response)
+            }
+            Some(service) => {
+                service.process_request(&request)
+            }
         }
     }
-}
 
-impl mio::Handler for Controller {
-    type Timeout = ();
-    type Message = EventData;
+    fn send_event(&self, data: EventData) -> Result<(), NotifyError<EventData>> {
+        self.event_sender.clone().unwrap().send(data)
+    }
 
-    fn notify(&mut self,
-              _: &mut EventLoop<Controller>,
-              data: EventData) {
-        println!("Receiving a notification! {}", data.description());
+    fn add_service(&self, service: Box<Service>) {
+        let mut services = self.services.lock().unwrap();
+        let service_id = service.get_properties().id;
+        services.insert(service_id, service);
+    }
 
-        let mut context = self.context.lock().unwrap();
+    fn remove_service(&self, id: String) {
+        let mut services = self.services.lock().unwrap();
+        services.remove(&id);
+    }
 
-        for socket in context.websockets_iter() {
-            match socket.send(data.description()) {
+    fn services_count(&self) -> usize {
+        let services = self.services.lock().unwrap();
+        services.len()
+    }
+
+    fn get_service_properties(&self, id: String) -> Option<ServiceProperties> {
+        let services = self.services.lock().unwrap();
+        services.get(&id).map(|v| v.get_properties().clone() )
+    }
+
+    fn services_as_json(&self) -> Result<String, serde_json::error::Error> {
+        let services = self.services.lock().unwrap();
+        serde_json::to_string(&*services)
+    }
+
+    fn get_http_root_for_service(&self, service_id: String) -> String {
+        format!("http://{}:{}/services/{}/", self.hostname, self.http_port, service_id)
+    }
+
+    fn get_ws_root_for_service(&self, service_id: String) -> String {
+        format!("ws://{}:{}/services/{}/", self.hostname, self.ws_port, service_id)
+    }
+
+    fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
+        (self.hostname.as_str(), self.http_port).to_socket_addrs()
+    }
+
+    fn add_websocket(&mut self, socket: ws::Sender) {
+        self.websockets.lock().unwrap().insert(socket.token(), socket);
+    }
+
+    fn remove_websocket(&mut self, socket: ws::Sender) {
+        self.websockets.lock().unwrap().remove(&socket.token());
+    }
+
+    fn broadcast_to_websockets(&self, data: String) {
+        for socket in self.websockets.lock().unwrap().values() {
+            match socket.send(data.to_owned()) {
                 Ok(_) => (),
                 Err(err) => println!("Error sending to socket: {}", err)
             }
         }
+    }
+
+    fn start_tunnel(&mut self) -> Result<(), Error> {
+        match *self.tunnel.lock().unwrap() {
+            Some(ref mut tunnel) => tunnel.start(),
+            // If nothing is configured, just allow
+            _ => Ok(())
+        }
+    }
+
+    fn stop_tunnel(&mut self) -> Result<(), Error> {
+        match *self.tunnel.lock().unwrap() {
+            None => Ok(()),
+            Some(ref mut tunnel) => tunnel.stop(),
+        }
+    }
+}
+
+struct FoxBoxEventLoop {
+    controller: FoxBox
+}
+
+impl mio::Handler for FoxBoxEventLoop {
+    type Timeout = ();
+    type Message = EventData;
+
+    fn notify(&mut self, _: &mut EventLoop<Self>, data: EventData) {
+        println!("Receiving a notification! {}", data.description());
+
+        self.controller.broadcast_to_websockets(data.description());
 
         match data {
             EventData::ServiceStart { id } => {
-                // The service should be added already, panic if that's not the
-                // case.
-                match context.get_service(&id) {
-                    None => panic!(format!("Missing service with id {}", id)),
-                    Some(_) => {}
-                }
+                println!("Service started: {:?}",
+                         self.controller.get_service_properties(id.to_owned()));
 
-                println!("ServiceStart {} We now have {} services.", id, context.services_count());
+                println!("ServiceStart {} We now have {} services.",
+                         id, self.controller.services_count());
             }
             EventData::ServiceStop { id } => {
-                context.remove_service(id.clone());
-                println!("ServiceStop {} We now have {} services.", id, context.services_count());
+                self.controller.remove_service(id.clone());
+                println!("ServiceStop {} We now have {} services.",
+                         id, self.controller.services_count());
             }
             _ => { }
         }
+    }
+}
+
+
+#[cfg(test)]
+describe! controller {
+
+    before_each {
+        use stubs::service::ServiceStub;
+
+        let service = ServiceStub;
+        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None, None);
+    }
+
+    describe! add_service {
+        it "should increase number of services" {
+            controller.add_service(Box::new(service));
+            assert_eq!(controller.services_count(), 1);
+        }
+
+        it "should make service available" {
+            controller.add_service(Box::new(service));
+
+            match controller.get_service_properties("1".to_owned()) {
+                Some(props) => {
+                    assert_eq!(props.id, "1");
+                }
+                None => assert!(false, "No service with id 1")
+            }
+        }
+
+        it "should create http root" {
+            controller.add_service(Box::new(service));
+            assert_eq!(controller.get_http_root_for_service("1".to_string()),
+                       "http://localhost:3000/services/1/");
+        }
+
+        it "should create ws root" {
+            controller.add_service(Box::new(service));
+            assert_eq!(controller.get_ws_root_for_service("1".to_string()),
+                       "ws://localhost:4000/services/1/");
+        }
+
+        it "should return a json" {
+            controller.add_service(Box::new(service));
+
+            match controller.services_as_json() {
+                Ok(txt) => assert_eq!(txt, "{\"1\":{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}}"),
+                Err(err) => assert!(false, err)
+            }
+        }
+    }
+
+
+    it "should delete a service" {
+        controller.add_service(Box::new(service));
+        let id = "1".to_owned();
+        controller.remove_service(id);
+        assert_eq!(controller.services_count(), 0);
     }
 }

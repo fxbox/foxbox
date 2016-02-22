@@ -9,7 +9,7 @@ use self::serde::ser::{ Serialize, Serializer };
 
 pub type ServiceID = String;
 
-#[derive(Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ServiceProperties {
     pub id: ServiceID,
     pub name: String,
@@ -18,7 +18,7 @@ pub struct ServiceProperties {
     pub ws_url: String
 }
 
-pub trait Service : Send {
+pub trait Service : Send + Sync {
     fn get_properties(&self) -> ServiceProperties;
     fn start(&self);
     fn stop(&self);

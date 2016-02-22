@@ -2,22 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use context::{ ContextTrait, Shared };
+use controller::Controller;
 use iron::{Request, Response, IronResult};
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
 use router::Router;
-use core::marker::Reflect;
 
-
-pub fn create<T: Send + Reflect + ContextTrait + 'static> (context: Shared<T>) -> Router {
-
+pub fn create<T: Controller>(controller: T) -> Router {
     let mut router = Router::new();
-    let context1 = context.clone();
+
+    let c1 = controller.clone();
     router.get("list.json", move |_: &mut Request| -> IronResult<Response> {
         // Build a json representation of the services.
-        let ctx = context1.lock().unwrap();
-        let serialized = itry!(ctx.services_as_json());
+        let serialized = itry!(c1.services_as_json());
 
         let mut response = Response::with(serialized);
         response.status = Some(Status::Ok);
@@ -27,25 +24,13 @@ pub fn create<T: Send + Reflect + ContextTrait + 'static> (context: Shared<T>) -
         Ok(response)
     });
 
-    let context2 = context.clone();
+    let c2 = controller.clone();
     router.get(":service/:command", move |req: &mut Request| -> IronResult<Response> {
         // Call a function on a service.
-        let ctx = context2.lock().unwrap();
-
         let id = req.extensions.get::<Router>().unwrap().find("service").unwrap_or("");
-        match ctx.get_service(id) {
-            None => {
-                let mut response = Response::with(format!("No Such Service: {}", id));
-                response.status = Some(Status::BadRequest);
-                response.headers.set(AccessControlAllowOrigin::Any);
-                response.headers.set(ContentType::plaintext());
-                Ok(response)
-            }
-            Some(service) => {
-                service.process_request(req)
-            }
-        }
+        c2.dispatch_service_request(id.to_owned(), req)
     });
+
     router
 }
 
@@ -60,11 +45,11 @@ pub use self::iron_test::{request, response};
 #[cfg(test)]
 describe! service_router {
     before_each {
-        use stubs::context::ContextStub;
         use iron::Headers;
+        use controller::FoxBox;
 
-        let context = ContextStub::blank_shared();
-        let service_router = create(context);
+        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None, None);
+        let service_router = create(controller.clone());
     }
 
     it "should create list.json" {
@@ -77,6 +62,9 @@ describe! service_router {
     }
 
     it "should make service available" {
+        use controller::Controller;
+        use stubs::service::ServiceStub;
+        controller.add_service(Box::new(ServiceStub));
         let response = request::get("http://localhost:3000/1/a-command",
                         Headers::new(),
                         &service_router).unwrap();
