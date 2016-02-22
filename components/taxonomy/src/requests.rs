@@ -1,43 +1,8 @@
 use devices::{NodeId, ServiceId, ServiceKind};
+use util::Exactly;
 
 use std::time::Duration;
 use std::cmp;
-
-/// A marker for a request that a expects a specific value.
-#[derive(Clone, Debug)]
-enum Exactly<Id> {
-    /// No constraint.
-    Empty,
-
-    /// Expect a specific value.
-    Exactly(Id),
-
-    /// Two conflicting constraints (or more) have been put on the value.
-    Conflict,
-}
-
-impl<T> Exactly<T> where T: PartialEq {
-    /// Combine two constraints.
-    fn and(self, other: Self) -> Self {
-        use self::Exactly::*;
-        match (self, other) {
-            (Conflict, _) | (_, Conflict) => Conflict,
-            (Empty, x@_) | (x@_, Empty) => x,
-            (Exactly(x), Exactly(y)) =>
-                if x == y {
-                    Exactly(y)
-                } else {
-                    Conflict
-                }
-        }
-    }
-}
-
-impl<T> Default for Exactly<T> {
-    fn default() -> Self {
-        Exactly::Empty
-    }
-}
 
 fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
     a.append(&mut b);
