@@ -1,13 +1,14 @@
 [package]
 name = "fxbox_thinkerbell"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
+serde = "0.6.13"
 serde_json = "0.6.0"
+serde_macros = "0.6.14"
 chrono = "0.2.19"
-lazy_static = "0.1.15"
-fxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git",  rev="c630a34" }
+fxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git",  rev="f3f76f31bb2b5669e3f39f0506107dcae0136c7e" }
 
 [dev-dependencies]
 docopt = "0.6.78"

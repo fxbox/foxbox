@@ -1,24 +1,21 @@
-use dependencies::{DevEnv, ExecutableDevEnv, Watcher};
-use ast::{Script, Trigger, Statement, Conjunction, Condition, Expression, UncheckedCtx, UncheckedEnv};
-use compile::{CompiledCtx, Precompiler, CompiledInput, DatedData};
-use compile;
+//! Launching and running the script
 
-extern crate fxbox_taxonomy;
-use self::fxbox_taxonomy::values::Value;
+use ast::{Script, Statement, UncheckedCtx};
+use compile::{Compiler, CompiledCtx, ExecutableDevEnv};
+use compile;
+use values::Range;
+
+use fxbox_taxonomy;
+use fxbox_taxonomy::api;
+use fxbox_taxonomy::api::{API, WatchEvent};
+use fxbox_taxonomy::devices::ServiceId;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::marker::PhantomData;
 use std::result::Result;
 use std::result::Result::*;
 use std::thread;
-use std::sync::Arc;
-
-extern crate chrono;
-use self::chrono::UTC;
-
-///
-/// # Launching and running the script
-///
+use std::collections::HashMap;
 
 /// Running and controlling a single script.
 pub struct Execution<Env> where Env: ExecutableDevEnv + 'static {
@@ -39,25 +36,31 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + 'static {
     /// # Errors
     ///
     /// Produces RunningError:AlreadyRunning if the script is already running.
-    pub fn start<F>(&mut self, script: Script<UncheckedCtx, UncheckedEnv>, on_result: F) where F: FnOnce(Result<(), Error>) + Send + 'static {
+    pub fn start<F>(&mut self, api: Env::API, script: Script<UncheckedCtx>, on_event: F) where F: Fn(ExecutionEvent) + Send + 'static {
         if self.command_sender.is_some() {
-            on_result(Err(Error::RunningError(RunningError::AlreadyRunning)));
-            return;
-        }
-        let (tx, rx) = channel();
-        let tx2 = tx.clone();
-        self.command_sender = Some(tx);
-        thread::spawn(move || {
-            match ExecutionTask::<Env>::new(script, tx2, rx) {
-                Err(er) => {
-                    on_result(Err(er));
-                },
-                Ok(mut task) => {
-                    on_result(Ok(()));
-                    task.run();
+            on_event(ExecutionEvent::Starting {
+                result: Err(Error::RunningError(RunningError::AlreadyRunning))
+            });
+        } else {
+            let (tx, rx) = channel();
+            let tx2 = tx.clone();
+            self.command_sender = Some(tx);
+            thread::spawn(move || {
+                match ExecutionTask::<Env>::new(script, tx2, rx) {
+                    Err(er) => {
+                        on_event(ExecutionEvent::Starting {
+                            result: Err(er)
+                        });
+                    },
+                    Ok(mut task) => {
+                        on_event(ExecutionEvent::Starting {
+                            result: Ok(())
+                        });
+                        task.run(api, on_event);
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
 
@@ -87,26 +90,38 @@ impl<Env> Drop for Execution<Env> where Env: ExecutableDevEnv + 'static {
     }
 }
 
-/// A script ready to be executed.
-/// Each script is meant to be executed in an individual thread.
-pub struct ExecutionTask<Env> where Env: DevEnv {
-    /// The current state of execution the script.
-    state: Script<CompiledCtx<Env>, Env>,
+/// A script ready to be executed. Each script is meant to be
+/// executed in an individual thread.
+pub struct ExecutionTask<Env> where Env: ExecutableDevEnv {
+    script: Script<CompiledCtx<Env>>,
 
     /// Communicating with the thread running script.
     tx: Sender<ExecutionOp>,
     rx: Receiver<ExecutionOp>,
 }
 
-
-
-
+#[derive(Debug)]
+pub enum ExecutionEvent {
+    Starting {
+        result: Result<(), Error>,
+    },
+    Stopped {
+        result: Result<(), Error>
+    },
+    Updated {
+        event: WatchEvent,
+        rule_index: usize,
+        condition_index: usize
+    },
+    Sent {
+        rule_index: usize,
+        statement_index: usize,
+        result: Vec<(ServiceId, Result<(), Error>)>
+    }
+}
 
 enum ExecutionOp {
-    /// An input has been updated, time to check if we have triggers
-    /// ready to be executed.
-    Update {index: usize, value: Value},
-
+    Update { event: WatchEvent, rule_index: usize, condition_index: usize },
     /// Time to stop executing the script.
     Stop(Box<Fn(Result<(), Error>) + Send>)
 }
@@ -117,17 +132,12 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     ///
     /// The caller is responsible for spawning a new thread and
     /// calling `run()`.
-    fn new(script: Script<UncheckedCtx, UncheckedEnv>, tx: Sender<ExecutionOp>, rx: Receiver<ExecutionOp>) -> Result<Self, Error> {
-        // Prepare the script for execution:
-        // - replace instances of Input with InputDev, which map
-        //   to a specific device and cache the latest known value
-        //   on the input.
-        // - replace instances of Output with OutputDev
-        let precompiler = try!(Precompiler::new(&script).map_err(|err| Error::CompileError(err)));
-        let bound = try!(precompiler.rebind_script(script).map_err(|err| Error::CompileError(err)));
+    fn new(script: Script<UncheckedCtx>, tx: Sender<ExecutionOp>, rx: Receiver<ExecutionOp>) -> Result<Self, Error> {
+        let compiler = try!(Compiler::new().map_err(|err| Error::CompileError(err)));
+        let script = try!(compiler.compile(script).map_err(|err| Error::CompileError(err)));
         
         Ok(ExecutionTask {
-            state: bound,
+            script: script,
             rx: rx,
             tx: tx
         })
@@ -135,198 +145,170 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
     /// Execute the monitoring task.
     /// This currently expects to be executed in its own thread.
-    fn run(&mut self) {
-        let mut watcher = Env::get_watcher();
+    fn run<F>(&mut self, api: Env::API, on_event: F) where F: Fn(ExecutionEvent) {
         let mut witnesses = Vec::new();
-        
-        // A thread-safe indirection towards a single input state.
-        // We assume that `cells` never mutates again once we
-        // have finished the loop below.
-        let mut cells : Vec<Arc<CompiledInput<Env>>> = Vec::new();
 
-        // Start listening to all inputs that appear in conditions.
-        // Some inputs may appear only in expressions, so we are
-        // not interested in their value.
-        for rule in &self.state.rules  {
-            for condition in &rule.condition.all {
-                for single in &*condition.input {
-                    let tx = self.tx.clone();
-                    cells.push(single.clone());
-                    let index = cells.len() - 1;
+        struct ConditionState {
+            match_is_met: bool,
+            per_input: HashMap<ServiceId, bool>,
+            range: Range,
+        };
+        struct RuleState {
+            rule_is_met: bool,
+            per_condition: Vec<ConditionState>,
+        };
 
-                    witnesses.push(
-                        // We can end up watching several times the
-                        // same device + capability + range.  For the
-                        // moment, we do not attempt to optimize
-                        // either I/O (which we expect will be
-                        // optimized by `watcher`) or condition
-                        // checking (which we should eventually
-                        // optimize, if we find out that we end up
-                        // with large rulesets).
-                        watcher.add(
-                            &single.device,
-                            &condition.capability,
-                            &condition.range,
-                            move |value| {
-                                // One of the inputs has been updated.
-                                // Update `state` and determine
-                                // whether there is anything we need
-                                // to do.
-                                let _ignored = tx.send(ExecutionOp::Update {
-                                    value: value,
-                                    index: index
-                                });
-                                // If the thread is down, it is ok to ignore messages.
-                            }));
-                    }
+        // Generate the state of rules, conditions, inputs and start
+        // listening to changes in the inputs.
+
+        let mut per_rule : Vec<_> = self.script.rules.iter().zip(0 as usize..).map(|(rule, rule_index)| {
+            let per_condition = rule.conditions.iter().zip(0 as usize..).map(|(condition, condition_index)| {
+                let options: Vec<_> = condition.source.iter().map(|input| {
+                    fxbox_taxonomy::api::WatchOptions::new()
+                        .with_watch_values(true)
+                        .with_watch_topology(true)
+                        .with_inputs(input.clone())
+                }).collect();
+                // We will often end up watching several times the
+                // same service. For the moment, we do not attempt to
+                // optimize either I/O (which we expect will be
+                // optimized by `watcher`) or condition checking
+                // (which we should eventually optimize, if we find
+                // out that we end up with large rulesets).
+
+                let tx2 = self.tx.clone();
+                witnesses.push(
+                    api.register_service_watch(
+                        options,
+                        Box::new(move |event| {
+                            let _ignored = tx2.send(ExecutionOp::Update {
+                                event: event,
+                                rule_index: rule_index,
+                                condition_index: condition_index,
+                            });
+                            // We ignore the result. Errors simply
+                            // mean that the thread is already down,
+                            // in which case we don't care about
+                            // messages.
+                        })));
+                let range = condition.range.clone();
+                ConditionState {
+                    match_is_met: false,
+                    per_input: HashMap::new(),
+                    range: range,
+                }
+            }).collect();
+
+            RuleState {
+                rule_is_met: false,
+                per_condition: per_condition
             }
-        }
+        }).collect();
 
-        // Make sure that the vector never mutates past this
-        // point. This ensures that our `index` remains valid for the
-        // rest of the execution.
-        let cells = cells;
-
-        // FIXME: We are going to end up with stale data in some inputs.
-        // We need to find out how to get rid of it.
-
-        // Now, start handling events.
-        for msg in &self.rx {
-            use self::ExecutionOp::*;
+        for msg in self.rx.iter() {
             match msg {
-                Stop(f) => {
-                    // Leave the loop.
-                    // The watcher and the witnesses will be cleaned up on exit.
-                    // Any further message will be ignored.
-                    f(Ok(()));
+                ExecutionOp::Stop(cb) => {
+                    // Leave the loop. Watching will stop once
+                    // `witnesses` is dropped.
+                    cb(Ok(()));
                     return;
-                }
+                },
+                ExecutionOp::Update {
+                    event,
+                    rule_index,
+                    condition_index,
+                } => match event {
+                    WatchEvent::InputRemoved(id) => {
+                        per_rule[rule_index]
+                            .per_condition[condition_index]
+                            .per_input
+                            .remove(&id);
+                    },
+                    WatchEvent::InputAdded(id) => {
+                        // An input was added. Note that there is
+                        // a possibility that the input was not
+                        // empty, in case we received messages in
+                        // the wrong order.
+                        per_rule[rule_index]
+                            .per_condition[condition_index]
+                            .per_input
+                            .insert(id, false);
+                    }
+                    WatchEvent::Value{from: id, value} => {
+                        use std::mem::replace;
 
-                Update {value, index} => {
-                    let cell = &cells[index];
-                    *cell.state.write().unwrap() = Some(DatedData {
-                        updated: UTC::now(),
-                        data: value
-                    });
-                    // Note that we can unwrap() safely,
-                    // as it fails only if the thread is
-                    // already in panic.
+                        // An input was updated. Note that there is
+                        // a possibility that the input was
+                        // empty, in case we received messages in
+                        // the wrong order.
 
-                    // Find out if we should execute triggers.
-                    for mut rule in &mut self.state.rules {
-                        let is_met = rule.is_met();
-                        if !(is_met.new && !is_met.old) {
-                            // We should execute the trigger only if
-                            // it was false and is now true. Here,
-                            // either it was already true or it isn't
-                            // false yet.
-                            continue;
-                        }
+                        let input_is_met : bool =
+                            per_rule[rule_index]
+                            .per_condition[condition_index]
+                            .range
+                            .contains(&value);
 
-                        // Conditions were not met, now they are, so
-                        // it is time to start executing.
+                        per_rule[rule_index]
+                            .per_condition[condition_index]
+                            .per_input
+                            .insert(id, input_is_met); // FIXME: Could be used to optimize
 
-                        // FIXME: We do not want triggers to be
-                        // triggered too often. Handle cooldown.
-                        
-                        for statement in &rule.execute {
-                            let _ignored = statement.eval(); // FIXME: Log errors
+                        // 1. Is the match met?
+                        //
+                        // The match is met iff any of the inputs
+                        // meets the condition.
+                        let some_input_is_met = input_is_met ||
+                            per_rule[rule_index]
+                            .per_condition[condition_index]
+                            .per_input
+                            .values().find(|is_met| **is_met).is_some();
+
+                        per_rule[rule_index]
+                            .per_condition[condition_index]
+                            .match_is_met = some_input_is_met;
+
+                        // 2. Is the condition met?
+                        //
+                        // The condition is met iff all of the
+                        // matches are met.
+                        let condition_is_met =
+                            per_rule[rule_index]
+                            .per_condition
+                            .iter()
+                            .find(|condition_state| condition_state.match_is_met)
+                            .is_some();
+
+                        // 3. Are we in a case in which the
+                        // condition was not met and is now met?
+                        let condition_was_met =
+                            replace(&mut per_rule[rule_index].rule_is_met, condition_is_met);
+
+                        if !condition_was_met && condition_is_met {
+                            // Ahah, we have just triggered the statements!
+                            for (statement, statement_index) in self.script.rules[rule_index].execute.iter().zip(0..) {
+                                let result = statement.eval(&api);
+                                on_event(ExecutionEvent::Sent {
+                                    rule_index: rule_index,
+                                    statement_index: statement_index,
+                                    result: result,
+                                });
+                            }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-///
-/// # Evaluating conditions
-///
-
-struct IsMet {
-    old: bool,
-    new: bool,
-}
-
-impl<Env> Trigger<CompiledCtx<Env>, Env> where Env: DevEnv {
-    fn is_met(&mut self) -> IsMet {
-        self.condition.is_met()
-    }
-}
-
-
-impl<Env> Conjunction<CompiledCtx<Env>, Env> where Env: DevEnv {
-    /// For a conjunction to be true, all its components must be true.
-    fn is_met(&mut self) -> IsMet {
-        let old = self.state.is_met;
-        let mut new = true;
-
-        for mut single in &mut self.all {
-            if !single.is_met().new {
-                new = false;
-                // Don't break. We want to make sure that we update
-                // `is_met` of all individual conditions.
-            }
-        }
-        self.state.is_met = new;
-        IsMet {
-            old: old,
-            new: new,
-        }
-    }
-}
-
-
-impl<Env> Condition<CompiledCtx<Env>, Env> where Env: DevEnv {
-    /// Determine if one of the devices serving as input for this
-    /// condition meets the condition.
-    fn is_met(&mut self) -> IsMet {
-        let old = self.state.is_met;
-        let mut new = false;
-        for single in &*self.input {
-            // This will fail only if the thread has already panicked.
-            let state = single.state.read().unwrap();
-            let is_met = match *state {
-                None => { false /* We haven't received a measurement yet.*/ },
-                Some(ref data) => {
-                    self.range.contains(&data.data)
                 }
             };
-            if is_met {
-                new = true;
-                break;
-            }
-        }
-
-        self.state.is_met = new;
-        IsMet {
-            old: old,
-            new: new,
         }
     }
 }
 
-impl<Env> Statement<CompiledCtx<Env>, Env> where Env: ExecutableDevEnv {
-    fn eval(&self) -> Result<(), Error> {
-        let args = self.arguments.iter().map(|(k, v)| {
-            (k.clone(), v.eval())
-        }).collect();
-        for output in &self.destination {
-            Env::send(&output.device, &self.action, &args); // FIXME: Handle errors
-        }
-        return Ok(());
-    }
-}
 
-impl<Env> Expression<CompiledCtx<Env>, Env> where Env: ExecutableDevEnv {
-    fn eval(&self) -> Value {
-        match *self {
-            Expression::Value(ref v) => v.clone(),
-            Expression::Input(_) => panic!("Cannot read an input in an expression yet"),
-            Expression::Vec(_) => {
-                panic!("Cannot handle vectors of expressions yet");
-            }
-        }
+impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
+    fn eval(&self, api: &Env::API) ->  Vec<(ServiceId, Result<(), Error>)> {
+        api.put_service_value(&self.destination, self.value.clone())
+            .into_iter()
+            .map(|(id, result)|
+                 (id, result.map_err(|err| Error::APIError(err))))
+            .collect()
     }
 }
 
@@ -342,4 +324,6 @@ pub enum RunningError {
 pub enum Error {
     CompileError(compile::Error),
     RunningError(RunningError),
+    APIError(api::Error),
 }
+

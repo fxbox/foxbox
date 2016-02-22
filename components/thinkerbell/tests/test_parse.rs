@@ -1,86 +1,50 @@
-/// Tests for parse.rs
-
 extern crate fxbox_thinkerbell;
-use fxbox_thinkerbell::parse::Parser;
-
+extern crate fxbox_taxonomy;
 extern crate serde_json;
 
+use fxbox_thinkerbell::ast::*;
+use fxbox_thinkerbell::parse::*;
+use fxbox_thinkerbell::values::*;
+use fxbox_thinkerbell::util::*;
+
+use fxbox_taxonomy::requests::*;
+
 #[test]
-fn test_parse_empty_script() {
+fn test_parse_bad_field() {
     let src = "{
       \"requirements\": [],
       \"allocations\": [],
       \"rules\": []
-    }";
+    }".to_owned();
 
-    let json : self::serde_json::Value = self::serde_json::from_str(src).unwrap();
-    let result = Parser::parse(json);
-
-    let script = match result {
-        Ok(script) => script,
-        Err(err) => panic!("Script was parsed incorrectly {:?}", err)
+    let result = Parser::parse(src);
+    match result {
+        Err(serde_json::error::Error::SyntaxError(serde_json::error::ErrorCode::UnknownField(field), _, _)) => {
+            assert!(field == "requirements".to_owned() || field == "allocations".to_owned())
+        },
+        _ => assert!(false)
     };
-
-    assert!(script.requirements.len() == 0);
-    assert!(script.allocations.len() == 0);
-    assert!(script.rules.len() == 0);
 }
 
 #[test]
-fn test_parse_one_input() {
-    let src = "{
-      \"requirements\": [
-        {
-          \"kind\": \"clock\",
-          \"inputs\": [\"ticks\"]
-        },
-        {
-          \"kind\": \"display device\",
-          \"outputs\": [\"show\"]
-        }
-      ],
-      \"allocations\": [
-        [
-          \"built-in clock\"
-        ],
-        [
-          \"built-in display 1\",
-          \"built-in display 2\"
-        ]
-      ],
-      \"rules\": [
-        {
-          \"condition\": [
-            {
-              \"input\": 0,
-              \"capability\": \"ticks\",
-              \"range\": [
-                {\"type\": \"Duration\",
-                  \"s\": 3},
-                null
-              ]
-            }
-          ],
-          \"action\": [
-            {
-              \"output\": 1,
-              \"capability\": \"show\",
-              \"args\": {
-                \"reached\": true
-              }
-            }
-          ]
-        }
-      ]
-    }";
-
-    let json : self::serde_json::Value = self::serde_json::from_str(src).unwrap();
-    let result = Parser::parse(json);
-
-    let script = match result {
-        Ok(script) => script,
-        Err(err) => panic!("Script was parsed incorrectly {:?}", err)
-    };
-
+fn test_parse_empty() {
+    let src = "{ \"rules\": []}".to_owned();
+    let script = Parser::parse(src).unwrap();
+    assert_eq!(script.rules.len(), 0);
 }
-    
+
+#[test]
+fn test_parse_simple_rule() {
+    let src =
+"{
+  \"rules\": [
+    {
+      \"execute\": [],
+      \"conditions\": [
+      ]
+    }
+  ]
+}".to_owned();
+    Parser::parse(src).unwrap();
+}
+

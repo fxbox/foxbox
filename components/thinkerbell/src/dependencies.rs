@@ -1,24 +1,12 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
+use fxbox_taxonomy::api::API;
 
-use values::Range;
-
-extern crate fxbox_taxonomy;
-use self::fxbox_taxonomy::values::Value;
-
+use serde::de::Deserialize;
 /// APIs that we need to implement the code in module lang.
 
-/// The environment in which the code is meant to be executed.  This
-/// can typically be instantiated either with actual bindings to
-/// devices, or with a unit-testing framework.
-pub trait DevEnv: Send {
-    type DeviceKind: Clone + Send;
-    type Device: Clone + Send;
-    type InputCapability: Clone + Send;
-    type OutputCapability: Clone + Send;
-}
 
+/*
 pub trait ExecutableDevEnv: DevEnv {
     fn get_device_kind(&String) -> Option<Self::DeviceKind>;
     fn get_device(&String) -> Option<Self::Device>;
@@ -45,6 +33,6 @@ pub trait Watcher {
 }
 
 
-
+*/
 
 

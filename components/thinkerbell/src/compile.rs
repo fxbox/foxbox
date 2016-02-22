@@ -1,311 +1,196 @@
-use dependencies::{DevEnv, ExecutableDevEnv};
+//! A script compiler
+//!
+//! This compiler take untrusted code (`Script<UncheckedCtx>`) and
+//! performs the following transformations and checks:
+//!
+//! - Ensure that the `Script` has at least one `Rule`.
+//! - Ensure that each `Rule` has at least one `Match`.
+//! - Ensure that each `Rule` has at least one `Statement`.
+//! - Ensure that each `Match` has at least one `source`.
+//! - Ensure that each `Statement` has at least one `destination`.
+//! - Ensure that in each `Match`, the type of `range` matches
+//!   the `kind`.
+//! - Ensure that in each `Statement`, the type of `value` matches
+//!   the `kind`.
+//! - Transform each `Match` to make sure that the kind of the
+//!   `source` matches the `kind`, even if devices change.
+//! - Transform each `Statement` to make sure that the kind of the
+//!   `destination` matches the `kind`, even if devices change.
+
 use std::marker::PhantomData;
-use std::sync::{Arc, RwLock};
-use std::collections::HashMap;
 
-use ast::{Script, Requirement, Resource, Trigger, Statement, Conjunction, Condition, Expression, Context, UncheckedCtx, UncheckedEnv};
-use util::map;
+use ast::{Script, Rule, Statement, Match, Context, UncheckedCtx};
+use util::*;
 
-extern crate fxbox_taxonomy;
-use self::fxbox_taxonomy::values::Value;
+use fxbox_taxonomy::api::API;
 
-extern crate chrono;
-use self::chrono::{DateTime, UTC};
+use serde::ser::{Serialize, Serializer};
+use serde::de::{Deserialize, Deserializer};
+
+
+/// The environment in which the code is meant to be executed.  This
+/// can typically be instantiated either with actual bindings to
+/// devices, or with a unit-testing framework. // FIXME: Move this to run.rs
+pub trait ExecutableDevEnv: Serialize + Deserialize + Default + Send {
+    type WatchGuard;
+    type API: API<WatchGuard = Self::WatchGuard>;
+    fn api(&self) -> Self::API;
+}
+
 
 ///
 /// # Precompilation
 ///
 
-/// Data, labelled with its latest update.
-pub struct DatedData {
-    pub updated: DateTime<UTC>,
-    pub data: Value,
+#[derive(Serialize, Deserialize)]
+pub struct CompiledCtx<Env> where Env: Serialize + Deserialize {
+    phantom: Phantom<Env>,
 }
 
-
-pub struct CompiledCtx<DevEnv> {
-    phantom: PhantomData<DevEnv>,
+/// We implement `Default` to keep derive happy, but this code should
+/// be unreachable.
+impl<Env> Default for CompiledCtx<Env> where Env: Serialize + Deserialize {
+    fn default() -> Self {
+        panic!("Called CompledCtx<_>::default()");
+    }
 }
 
-pub struct CompiledInput<Env> where Env: DevEnv {
-    pub device: Env::Device,
-    pub state: RwLock<Option<DatedData>>,
+impl<Env> Context for CompiledCtx<Env> where Env: Serialize + Deserialize {
 }
-
-pub struct CompiledOutput<Env> where Env: DevEnv {
-    pub device: Env::Device,
-}
-
-pub type CompiledInputSet<Env> = Vec<Arc<CompiledInput<Env>>>;
-pub type CompiledOutputSet<Env> = Vec<Arc<CompiledOutput<Env>>>;
-pub struct CompiledConditionState {
-    pub is_met: bool
-}
-
-impl<Env> Context for CompiledCtx<Env> where Env: DevEnv {
-    type ConditionState = CompiledConditionState; // FIXME: We could share this
-    type OutputSet = CompiledOutputSet<Env>;
-    type InputSet = CompiledInputSet<Env>;
-}
-
 
 #[derive(Debug)]
 pub enum SourceError {
-    AllocationLengthError { allocations: usize, requirements: usize},
-    NoCapability, // FIXME: Add details
-    NoSuchInput, // FIXME: Add details
-    NoSuchOutput, // FIXME: Add details
+    /// The source doesn't define any rule.
+    NoRule,
+
+    /// A rule doesn't have any statements.
+    NoStatement,
+
+    /// A rule doesn't have any condition.
+    NoMatch,
+
+    /// A match doesn't have any source.
+    NoMatchSource,
+
+    /// A statement doesn't have any destination.
+    NoStatementDestination,
 }
 
 #[derive(Debug)]
-pub enum DevAccessError {
-    DeviceNotFound, // FIXME: Add details
-    DeviceKindNotFound, // FIXME: Add details
-    DeviceCapabilityNotFound, // FIXME: Add details
+pub enum TypeError {
+    /// The range cannot be typed.
+    InvalidRange,
+
+    /// The range has one type but this type is incompatible with the
+    /// kind of the `Match`.
+    KindAndRangeDoNotAgree,
+
+    /// The value has one type but this type is incompatible with the
+    /// kind of the `Statement`.
+    KindAndValueDoNotAgree,
 }
 
 #[derive(Debug)]
 pub enum Error {
     SourceError(SourceError),
-    DevAccessError(DevAccessError),
+    TypeError(TypeError),
 }
 
-pub struct Precompiler<Env> where Env: ExecutableDevEnv {
-    inputs: Vec<Option<CompiledInputSet<Env>>>,
-    outputs: Vec<Option<CompiledOutputSet<Env>>>,
+pub struct Compiler<Env> where Env: ExecutableDevEnv {
     phantom: PhantomData<Env>,
 }
 
-impl<Env> Precompiler<Env> where Env: ExecutableDevEnv {
-    pub fn new(source: &Script<UncheckedCtx, UncheckedEnv>) -> Result<Self, Error> {
-
-        use self::Error::*;
-        use self::SourceError::*;
-        use self::DevAccessError::*;
-
-        // In an UncheckedCtx, inputs and outputs are (unchecked)
-        // indices towards the vector of allocations. In this step,
-        // we 1/ check the indices, to make sure that they actually
-        // point inside the vector;
-        // 2/ prepare arrays `inputs` and `outputs`, which will later
-        // serve to replace the indices by pointers to the Arc containing
-        // details on the device and its state.
-
-        let mut inputs = Vec::new();
-        let mut outputs = Vec::new();
-
-        if source.allocations.len() != source.requirements.len() {
-            return Err(SourceError(AllocationLengthError {
-                allocations: source.allocations.len(),
-                requirements: source.requirements.len()
-            }));
-        }
-
-        for (alloc, req) in source.allocations.iter().zip(&source.requirements) {
-            let mut input = None;
-            let mut output = None;
-
-            let has_inputs = req.inputs.len() > 0;
-            let has_outputs = req.outputs.len() > 0;
-            if  !has_inputs && !has_outputs {
-                // An empty resource? This doesn't make sense.
-                return Err(SourceError(NoCapability));
-            }
-
-            if has_inputs {
-                let mut resolved = Vec::with_capacity(alloc.devices.len());
-                for dev in &alloc.devices {
-                    match Env::get_device(&dev) {
-                        None => return Err(DevAccessError(DeviceNotFound)),
-                        Some(d) => resolved.push(Arc::new(CompiledInput {
-                            device: d,
-                            state: RwLock::new(None)
-                        }))
-                    }
-                }
-                input = Some(resolved);
-            }
-            if has_outputs {
-                let mut resolved = Vec::with_capacity(alloc.devices.len());
-                for dev in &alloc.devices {
-                    match Env::get_device(&dev) {
-                        None => return Err(DevAccessError(DeviceNotFound)),
-                        Some(d) => resolved.push(Arc::new(CompiledOutput {
-                            device: d,
-                        }))
-                    }
-                }
-                output = Some(resolved);
-            }
-            inputs.push(input);
-            outputs.push(output);
-        }
-
-        Ok(Precompiler {
-            inputs: inputs,
-            outputs: outputs,
+impl<Env> Compiler<Env> where Env: ExecutableDevEnv {
+    pub fn new() -> Result<Self, Error> {
+        Ok(Compiler {
             phantom: PhantomData
         })
     }
 
-    pub fn rebind_script(&self, script: Script<UncheckedCtx, UncheckedEnv>) -> Result<Script<CompiledCtx<Env>, Env>, Error>
+    /// Attempt to compile a script.
+    pub fn compile(&self, script: Script<UncheckedCtx>)
+                   -> Result<Script<CompiledCtx<Env>>, Error> {
+        self.compile_script(script)
+    }
+
+    fn compile_script(&self, script: Script<UncheckedCtx>) -> Result<Script<CompiledCtx<Env>>, Error>
     {
-        let rules = try!(map(script.rules, |rule| self.rebind_trigger(rule)));
-
-        let allocations = try!(map(script.allocations, |res| {
-            let devices = try!(map(res.devices, |dev| {
-                self.rebind_device(dev)
-            }));
-            Ok(Resource {
-                devices: devices,
-                phantom: PhantomData,
-            })
+        if script.rules.len() == 0 {
+            return Err(Error::SourceError(SourceError::NoRule));
+        }
+        let rules = try!(map(script.rules, |rule| {
+            self.compile_rule(rule)
         }));
-
-        let requirements = try!(map(script.requirements, |req| {
-            let inputs = try!(map(req.inputs, |input| {
-                self.rebind_input_capability(input)
-            }));
-            let outputs = try!(map(req.outputs, |output| {
-                self.rebind_output_capability(output)
-            }));
-            Ok(Requirement {
-                kind: try!(self.rebind_device_kind(req.kind)),
-                inputs: inputs,
-                outputs: outputs,
-                phantom: PhantomData
-            })
-        }));
-
         Ok(Script {
-            metadata: (),
-            requirements: requirements,
-            allocations: allocations,
-            rules: rules
+            rules: rules,
+            phantom: Phantom::new()
         })
     }
 
-    fn rebind_trigger(&self, trigger: Trigger<UncheckedCtx, UncheckedEnv>) -> Result<Trigger<CompiledCtx<Env>, Env>, Error>
+    fn compile_rule(&self, trigger: Rule<UncheckedCtx>) -> Result<Rule<CompiledCtx<Env>>, Error>
     {
+        if trigger.execute.len() == 0 {
+            return Err(Error::SourceError(SourceError::NoStatement));
+        }
+        if trigger.conditions.len() == 0 {
+            return Err(Error::SourceError(SourceError::NoMatch));
+        }
+        let conditions = try!(map(trigger.conditions, |match_| {
+            self.compile_match(match_)
+        }));
         let execute = try!(map(trigger.execute, |statement| {
-            self.rebind_statement(statement)
+            self.compile_statement(statement)
         }));
-        Ok(Trigger {
+        Ok(Rule {
+            conditions: conditions,
             execute: execute,
-            condition: try!(self.rebind_conjunction(trigger.condition))
+            phantom: Phantom::new()
         })
     }
 
-    fn rebind_conjunction(&self, conjunction: Conjunction<UncheckedCtx, UncheckedEnv>) -> Result<Conjunction<CompiledCtx<Env>, Env>, Error>
+    fn compile_match(&self, match_: Match<UncheckedCtx>) -> Result<Match<CompiledCtx<Env>>, Error>
     {
-        let all = try!(map(conjunction.all, |condition| {
-            self.rebind_condition(condition)
-        }));
-        Ok(Conjunction {
-            all: all,
-            state: try!(self.rebind_condition_state(conjunction.state))
-        })
-    }
-
-    fn rebind_condition(&self, condition: Condition<UncheckedCtx, UncheckedEnv>) -> Result<Condition<CompiledCtx<Env>, Env>, Error>
-    {
-        Ok(Condition {
-            range: condition.range,
-            capability: try!(self.rebind_input_capability(condition.capability)),
-            input: try!(self.rebind_input(condition.input)),
-            state: try!(self.rebind_condition_state(condition.state))
-        })
-    }
-
-    fn rebind_statement(&self, statement: Statement<UncheckedCtx, UncheckedEnv>) -> Result<Statement<CompiledCtx<Env>, Env>, Error>
-    {
-        let mut arguments = HashMap::with_capacity(statement.arguments.len());
-        for (key, expr) in statement.arguments {
-            arguments.insert(key.clone(), try!(self.rebind_expression(expr)));
+        if match_.source.len() == 0 {
+            return Err(Error::SourceError(SourceError::NoMatchSource));
         }
-        Ok(Statement {
-            destination: try!(self.rebind_output(statement.destination)),
-            action: try!(self.rebind_output_capability(statement.action)),
-            arguments: arguments
-        })
-    }
-
-    fn rebind_expression(&self, expression: Expression<UncheckedCtx, UncheckedEnv>) -> Result<Expression<CompiledCtx<Env>, Env>, Error>
-    {
-        let expression = match expression {
-            Expression::Value(v) => Expression::Value(v),
-            Expression::Vec(v) => {
-                Expression::Vec(try!(map(v, |expr| {
-                    self.rebind_expression(expr)
-                })))
-            }
-            Expression::Input(_) => panic!("Not implemented yet")
+        let typ = match match_.range.get_type() {
+            Err(_) => return Err(Error::TypeError(TypeError::InvalidRange)),
+            Ok(typ) => typ
         };
-        Ok(expression)
-    }
-
-    fn rebind_device(&self, dev: <UncheckedEnv as DevEnv>::Device) -> Result<Env::Device, Error>
-    {
-        match Env::get_device(&dev) {
-            None => Err(Error::DevAccessError(DevAccessError::DeviceNotFound)),
-            Some(found) => Ok(found.clone())
+        if match_.kind.get_type() != typ {
+            return Err(Error::TypeError(TypeError::KindAndRangeDoNotAgree));
         }
-    }
-
-
-    fn rebind_device_kind(&self, kind: <UncheckedEnv as DevEnv>::DeviceKind) ->
-        Result<Env::DeviceKind, Error>
-    {
-        match Env::get_device_kind(&kind) {
-            None => Err(Error::DevAccessError(DevAccessError::DeviceKindNotFound)),
-            Some(found) => Ok(found.clone())
-        }
-    }
-    
-    fn rebind_input_capability(&self, cap: <UncheckedEnv as DevEnv>::InputCapability) ->
-        Result<Env::InputCapability, Error>
-    {
-        match Env::get_input_capability(&cap) {
-            None => Err(Error::DevAccessError(DevAccessError::DeviceCapabilityNotFound)),
-            Some(found) => Ok(found.clone())
-        }
-    }
-
-    fn rebind_output_capability(&self, cap: <UncheckedEnv as DevEnv>::OutputCapability) ->
-        Result<Env::OutputCapability, Error>
-    {
-        match Env::get_output_capability(&cap) {
-            None => Err(Error::DevAccessError(DevAccessError::DeviceCapabilityNotFound)),
-            Some(found) => Ok(found.clone())
-        }
-    }
-
-    // Rebinding the context
-    fn rebind_condition_state(&self, (): <UncheckedCtx as Context>::ConditionState) ->
-        Result<<CompiledCtx<Env> as Context>::ConditionState, Error>
-    {
-        // By default, conditions are not met.
-        Ok(CompiledConditionState {
-            is_met: false
+        let source = match_.source
+            .iter()
+            .map(|input| input.clone()
+                 .with_kind(match_.kind.clone()))
+            .collect();
+        Ok(Match {
+            source: source,
+            kind: match_.kind,
+            range: match_.range,
+            phantom: Phantom::new()
         })
     }
 
-    fn rebind_input(&self, index: <UncheckedCtx as Context>::InputSet) ->
-        Result<<CompiledCtx<Env> as Context>::InputSet, Error>
+    fn compile_statement(&self, statement: Statement<UncheckedCtx>) -> Result<Statement<CompiledCtx<Env>>, Error>
     {
-        match self.inputs[index] {
-            None => Err(Error::SourceError(SourceError::NoSuchInput)),
-            Some(ref input) => Ok(input.clone())
+        if statement.destination.len() == 0 {
+            return Err(Error::SourceError(SourceError::NoStatementDestination));
         }
-    }
-
-
-    fn rebind_output(&self, index: <UncheckedCtx as Context>::OutputSet) ->
-        Result<<CompiledCtx<Env> as Context>::OutputSet, Error>
-    {
-        match self.outputs[index] {
-            None => Err(Error::SourceError(SourceError::NoSuchOutput)),
-            Some(ref output) => Ok(output.clone())
+        if statement.kind.get_type() != statement.value.get_type() {
+            return Err(Error::TypeError(TypeError::KindAndValueDoNotAgree));
         }
+        let destination = statement.destination
+            .iter()
+            .map(|output| output.clone()
+                 .with_kind(statement.kind.clone()))
+            .collect();
+        Ok(Statement {
+            destination: destination,
+            value: statement.value,
+            kind: statement.kind,
+            phantom: Phantom::new()
+        })
     }
 }

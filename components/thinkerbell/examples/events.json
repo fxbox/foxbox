@@ -1,0 +1,108 @@
+[
+    {
+	"AddInputs": [{
+	    "tags": [],
+	    "id": "Clock #1",
+	    "node": "simulator",
+	    "mechanism": {
+		"kind": {
+		    "CurrentTimeOfDay": []
+		},
+		"trigger": "1000"
+	    }
+	}]
+    },
+    {
+	"AddOutputs": [{
+	    "tags": [],
+	    "id": "Ready #1",
+	    "node": "simulator",
+	    "mechanism": {
+		"kind": {
+		    "Ready": []
+		},
+		"push": "0"
+	    }
+	}]
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": "0"
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 1
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 2
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 3
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 4
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 5
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 6
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 7
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 8
+	    }
+	}
+    },
+    {
+	"InjectInputValue": {
+	    "id": "Clock #1",
+	    "value": {
+		"Duration": 9
+	    }
+	}
+    }
+]
