@@ -136,7 +136,7 @@ impl NodeRequest {
 /// use fxbox_taxonomy::devices::*;
 ///
 /// let request = InputRequest::new()
-///   .with_parent("foxbox".to_owned())
+///   .with_parent(NodeId::new("foxbox".to_owned()))
 ///   .with_kind(ServiceKind::CurrentTimeOfDay);
 /// ```
 #[derive(Clone, Debug, Default)]

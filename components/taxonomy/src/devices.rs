@@ -7,7 +7,16 @@ extern crate chrono;
 /// Nodes
 ///
 
-pub type NodeId = String;
+#[derive(Debug, Clone, PartialEq)]
+pub struct NodeId(String);
+impl NodeId {
+    pub fn new(id: String) -> Self {
+        NodeId(id)
+    }
+    pub fn as_string(&self) -> &String {
+        &self.0
+    }
+}
 
 /// Metadata on a node. A node is a device or collection of devices
 /// that may offer services. The FoxBox itself a node offering
@@ -70,7 +79,16 @@ impl Node {
 /// Services
 ///
 
-pub type ServiceId = String;
+#[derive(Debug, Clone, PartialEq)]
+pub struct ServiceId(String);
+impl ServiceId {
+    pub fn new(id: String) -> Self {
+        ServiceId(id)
+    }
+    pub fn as_string(&self) -> &String {
+        &self.0
+    }
+}
 
 /// The kind of the service, i.e. a strongly-typed description of
 /// _what_ the service can do. Used both for locating services
