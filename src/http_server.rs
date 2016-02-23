@@ -26,7 +26,7 @@ impl<T: Controller> HttpServer<T> {
         let mut mount = Mount::new();
         mount.mount("/", Static::new(Path::new("static")))
              .mount("/services", router)
-             .mount("/users_admin", UsersRouter::new());
+             .mount("/users", UsersRouter::init());
 
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
 
