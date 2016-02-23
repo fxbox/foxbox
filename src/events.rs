@@ -9,6 +9,7 @@ use service::ServiceID;
 pub enum EventData {
     AdapterStart { name: String },
     ServiceStart { id: ServiceID },
+    ServiceBip { i: String, id: ServiceID, msg: String },
     ServiceStop { id: ServiceID }
 }
 
@@ -18,6 +19,7 @@ impl EventData {
             EventData::AdapterStart { ref name } => name,
             EventData::ServiceStart { ref id }
             | EventData::ServiceStop { ref id } => id,
+            EventData::ServiceBip { ref i, ref id, ref msg } => msg,
         };
 
         description.to_string()

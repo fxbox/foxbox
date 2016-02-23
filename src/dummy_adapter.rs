@@ -20,11 +20,14 @@ struct DummyService {
 }
 
 impl DummyService {
+
     fn new(sender: EventSender, context: SharedContext, id: u32) -> DummyService {
         println!("Creating dummy service");
+
         let ctx_clone = context.clone();
         let ctx = ctx_clone.lock().unwrap();
         let service_id = Uuid::new_v4().to_simple_string();
+
         DummyService {
             properties: ServiceProperties {
                 id: service_id.clone(),
@@ -40,6 +43,7 @@ impl DummyService {
 }
 
 impl Service for DummyService {
+
     fn get_properties(&self) -> ServiceProperties {
         self.properties.clone()
     }
@@ -50,17 +54,29 @@ impl Service for DummyService {
         let sender = self.sender.clone();
         let props = self.properties.clone();
         let can_kill = !self.dont_kill;
+
         thread::spawn(move || {
             println!("Hello from dummy service thread!");
+
             let mut i = 0;
+
             loop {
                 thread::sleep(Duration::from_millis(1000));
+
                 println!("Bip #{} from {}", i, props.id);
+
+                sender.send(EventData::ServiceBip {
+                    i: i.to_string(),
+                    id: props.id.to_string(),
+                    msg: format!("Bip #{} from {}", i, props.id),
+                }).unwrap();
+
                 i += 1;
                 if i == 3 && can_kill {
                     break;
                 }
             }
+
             sender.send(EventData::ServiceStop { id: props.id.to_string() }).unwrap();
         });
     }
@@ -73,8 +89,10 @@ impl Service for DummyService {
     fn process_request(&self, req: &Request) -> IronResult<Response> {
         let cmd = req.extensions.get::<Router>().unwrap().find("command").unwrap_or("");
         let mut response = Response::with(format!("Got command {} at url {}", cmd, req.url));
+
         response.status = Some(Status::Ok);
         response.headers.set(ContentType::plaintext());
+
         Ok(response)
     }
 }
@@ -86,9 +104,12 @@ pub struct DummyAdapter {
 }
 
 impl DummyAdapter {
+
     pub fn new(sender: EventSender,
-           context: SharedContext) -> DummyAdapter {
+               context: SharedContext) -> DummyAdapter {
+
         println!("Creating dummy adapter");
+
         DummyAdapter { name: "DummyAdapter".to_owned(),
                        sender: sender,
                        context: context
@@ -97,6 +118,7 @@ impl DummyAdapter {
 }
 
 impl ServiceAdapter for DummyAdapter {
+
     fn get_name(&self) -> String {
         self.name.clone()
     }
@@ -105,14 +127,19 @@ impl ServiceAdapter for DummyAdapter {
         let sender = self.sender.clone();
         let mut id = 0;
         let context = self.context.clone();
+
         thread::spawn(move || {
             sender.send(EventData::AdapterStart { name: "Dummy Service Adapter".to_owned() }).unwrap();
+
             loop {
                 thread::sleep(Duration::from_millis(2000));
+
                 id += 1;
+
                 let service = DummyService::new(sender.clone(), context.clone(), id);
                 let service_id = service.get_properties().id;
                 service.start();
+
                 let mut ctx = context.lock().unwrap();
                 ctx.add_service(Box::new(service));
                 sender.send(EventData::ServiceStart { id: service_id }).unwrap();
