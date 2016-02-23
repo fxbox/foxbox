@@ -3,10 +3,15 @@ use values;
 
 extern crate chrono;
 
-///
-/// Nodes
-///
+//! This module defines the metadata on devices and services.
+//!
+//! Note that all the data structures in this module represent
+//! snapshots of subsets of the devices available. None of these data
+//! structures are live, so there is always the possibility that
+//! devices may have been added or removed from the FoxBox by the time
+//! these data structures are read.
 
+/// The unique Id of a node on the network.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeId(String);
 impl NodeId {
@@ -75,10 +80,7 @@ impl Node {
     }
 }
 
-///
-/// Services
-///
-
+/// The unique Id of a service on the network.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServiceId(String);
 impl ServiceId {

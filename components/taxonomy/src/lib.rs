@@ -1,3 +1,37 @@
+//! This crate defines the high-level API for accessing Connected Devices.
+//!
+//!
+//! # Taxonomy
+//!
+//! A network of Connected Devices is composed of `Node`s. Each node
+//! is essentially a collection of `Service<Input>`s, which provide
+//! data from the devices for use by applications, and
+//! `Service<Output>`s, which give applications the ability to send
+//! instructions to devices.
+//!
+//! Each `Service` has a `ServiceKind`, which determines the only
+//! feature provided by this service, as well as the type of messages
+//! that can be sent to/received from a service. The core list of
+//! `ServiceKind` is hardcoded, but open for extensions.
+//!
+//! 
+//!
+//! # Example
+//!
+//! The FoxBox itelf is a `Node`, which may offer the following services:
+//! - `Service<Input>`: `ServiceKind::CurrentTime`, `ServiceKind::CurrentTimeOfDay`, ...
+//! - `Service<Output>`: `ServiceKind::SMS`.
+//!
+//!
+//! # Example
+//!
+//! A light is a `Node`, which may offer:
+//! - a `Service<Output>` with `ServiceKind::OnOff`, to turn the light on or off;
+//! - a `Service<Input>` with `ServiceKind::OnOff`, to determine whether the light is on or off;
+//! - a `Service<Output>` with `ServiceKind::Color`, to change the color of the light;
+//! - ...
+
+
 /// Metadata on devices
 pub mod devices;
 
@@ -7,6 +41,8 @@ pub mod api;
 /// Requests for specific devices
 pub mod requests;
 
+/// Values that may be sent to/received from devices
 pub mod values;
 
+/// Various utilities
 pub mod util;
