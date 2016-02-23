@@ -1,6 +1,11 @@
 language: rust
 rust:
     - nightly-2016-02-13
+cache:
+    directories:
+        - $HOME/.cargo
+        - node_modules
+        - $TRAVIS_BUILD_DIR/target
 
 before_script:
     - "sh -e /etc/init.d/xvfb start"
