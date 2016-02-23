@@ -4,7 +4,7 @@
 
 use context::{ ContextTrait, Shared };
 use iron::{Request, Response, IronResult};
-use iron::headers::ContentType;
+use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
 use router::Router;
 use core::marker::Reflect;
@@ -21,6 +21,7 @@ pub fn create<T: Send + Reflect + ContextTrait + 'static> (context: Shared<T>) -
 
         let mut response = Response::with(serialized);
         response.status = Some(Status::Ok);
+        response.headers.set(AccessControlAllowOrigin::Any);
         response.headers.set(ContentType::json());
 
         Ok(response)
@@ -36,6 +37,7 @@ pub fn create<T: Send + Reflect + ContextTrait + 'static> (context: Shared<T>) -
             None => {
                 let mut response = Response::with(format!("No Such Service: {}", id));
                 response.status = Some(Status::BadRequest);
+                response.headers.set(AccessControlAllowOrigin::Any);
                 response.headers.set(ContentType::plaintext());
                 Ok(response)
             }

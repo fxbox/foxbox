@@ -38,12 +38,13 @@ extern crate uuid;
 extern crate ws;
 
 mod context;
+mod controller;
 mod dummy_adapter;
 mod events;
 mod http_server;
 mod ws_server;
 mod service;
-mod controller;
+mod registration;
 mod service_router;
 
 mod stubs {
@@ -58,23 +59,28 @@ use context::{ ContextTrait, Context };
 use controller::Controller;
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>]
+Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>]
 
 Options:
     -v, --verbose            Toggle verbose output.
     -n, --name <hostname>    Set local hostname.
     -p, --port <port>        Set port to listen on for http connections.
     -w, --wsport <wsport>    Set port to listen on for websocket.
+    -r, --register <url>     Change the url of the registration endpoint.
     -h, --help               Print this help menu.
 ",
         flag_name: Option<String>,
         flag_port: Option<u16>,
-        flag_wsport: Option<u16>);
+        flag_wsport: Option<u16>,
+        flag_register: Option<String>);
 
 fn main() {
     env_logger::init().unwrap();
 
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
+
+    let registrar = registration::Registrar::new();
+    registrar.start(args.flag_register);
 
     if let Ok(mut event_loop) = mio::EventLoop::new() {
         let sender = event_loop.channel();
