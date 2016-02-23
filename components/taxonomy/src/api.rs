@@ -113,7 +113,7 @@ pub trait API {
     /// # WebSocket API
     ///
     /// `/api/v1/service/watch/$ServiceId`
-    fn register_service_watch<F>(&self, &WatchOptions, cb: F)
+    fn register_service_watch<F>(&self, WatchOptions, cb: F)
                                  -> Result<Self::WatchGuard, Error>
         where F: Fn(WatchEvent) + Send;
 
@@ -122,7 +122,10 @@ pub trait API {
 }
 
 /// Options for watching changes in one or more services.
+#[derive(Clone, Debug, Default)]
 pub struct WatchOptions {
+    /// The set of inputs to watch. Note that the actual inputs in the
+    /// set may change over time.
     source: InputRequest,
 }
 
@@ -133,9 +136,16 @@ impl WatchOptions {
         }
     }
 
-    pub fn and(self, other: Self) -> Self {
+    /// Restrict to input services in a given set. Note that if all
+    /// the inputs do not have the same `ServiceKind`, the call to
+    /// `register_service_watch` will fail.
+    ///
+    /// Also note that the actual input services that are part of the
+    /// set may change with time, for instance if devices are added
+    /// ore removed.  as it changes.
+    pub fn with_inputs(self, req: InputRequest) -> Self {
         WatchOptions {
-            source: self.source.and(other.source),
+            source: self.source.and(req),
             ..self
         }
     }
