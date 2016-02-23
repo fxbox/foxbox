@@ -46,9 +46,6 @@ pub struct Node {
     /// An id unique to this node.
     id: NodeId,
 
-    /// Nodes depending on this node.
-    subnodes: Vec<Node>,
-
     /// Services connected directly to this node.
     inputs: Vec<Service<Input>>,
     outputs: Vec<Service<Output>>,
@@ -231,6 +228,7 @@ pub struct Input {
     /// - Long-running pollution or humidity sensors typically
     ///   do not accept requests and rather send batches of
     ///   data every 24h.
+    #[serde(default)]
     poll: Option<ValDuration>,
 
     /// If `Some(duration)`, this service can send the data to
@@ -239,6 +237,7 @@ pub struct Input {
     ///
     /// Otherwise, the service cannot send data to the FoxBox
     /// and needs to be polled.
+    #[serde(default)]
     trigger: Option<ValDuration>,
 
     /// Date at which the latest value was received, whether through
@@ -298,6 +297,7 @@ pub struct Output {
 
     /// If `Some(duration)`, this service supports pushing,
     /// i.e. the FoxBox can send values.
+    #[serde(default)]
     push: Option<ValDuration>,
 
     /// Date at which the latest value was sent to the service.
@@ -339,6 +339,7 @@ pub struct Service<IO> {
     /// applications. They are used to regroup services for rules.
     ///
     /// For instance "entrance".
+    #[serde(default)]
     tags: Vec<String>,
 
     /// An id unique to this service.

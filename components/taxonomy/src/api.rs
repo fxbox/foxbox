@@ -122,7 +122,7 @@ pub trait API {
 }
 
 /// Options for watching changes in one or more services.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WatchOptions {
     /// The set of inputs to watch. Note that the actual inputs in the
     /// set may change over time.

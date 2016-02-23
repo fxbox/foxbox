@@ -2,8 +2,8 @@ use devices::{NodeId, ServiceId, ServiceKind};
 use util::Exactly;
 use values;
 
-use serde::ser::{Serializer};
-use serde::de::{Deserializer, Error};
+use serde::ser::Serializer;
+use serde::de::Deserializer;
 
 use std::cmp;
 
@@ -30,15 +30,19 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct NodeRequest {
     /// If `Exactly(id)`, return only the node with the corresponding id.
+    #[serde(default)]
     id: Exactly<NodeId>,
 
     ///  Restrict results to nodes that have all the tags in `tags`.
+    #[serde(default)]
     tags: Vec<String>,
 
     /// Restrict results to nodes that have all the inputs in `inputs`.
+    #[serde(default)]
     inputs: Vec<InputRequest>,
 
     /// Restrict results to nodes that have all the outputs in `outputs`.
+    #[serde(default)]
     outputs: Vec<OutputRequest>,
 }
 
@@ -110,25 +114,31 @@ impl NodeRequest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct InputRequest {
     /// If `Exactly(id)`, return only the service with the corresponding id.
+    #[serde(default)]
     id: Exactly<ServiceId>,
 
     /// If `Eactly(id)`, return only services that are children of
     /// node `id`.
+    #[serde(default)]
     parent: Exactly<NodeId>,
 
     ///  Restrict results to services that have all the tags in `tags`.
+    #[serde(default)]
     tags: Vec<String>,
 
     /// If `Exatly(k)`, restrict results to services that produce values
     /// of kind `k`.
+    #[serde(default)]
     kind: Exactly<ServiceKind>,
 
     /// If `Some(r)`, restrict results to services that support polling
     /// with the acceptable period.
+    #[serde(default)]
     poll: Option<Period>,
 
     /// If `Some(r)`, restrict results to services that support trigger
     /// with the acceptable period.
+    #[serde(default)]
     trigger: Option<Period>,
 }
 
@@ -205,21 +215,26 @@ impl InputRequest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct OutputRequest {
     /// If `Exactly(id)`, return only the service with the corresponding id.
+    #[serde(default)]
     id: Exactly<ServiceId>,
 
     /// If `Exactly(id)`, return only services that are immediate children
     /// of node `id`.
+    #[serde(default)]
     parent: Exactly<NodeId>,
 
     ///  Restrict results to services that have all the tags in `tags`.
+    #[serde(default)]
     tags: Vec<String>,
 
     /// If `Exactly(k)`, restrict results to services that accept values
     /// of kind `k`.
+    #[serde(default)]
     kind: Exactly<ServiceKind>,
 
     /// If `Some(r)`, restrict results to services that support pushing
     /// with the acceptable period.
+    #[serde(default)]
     push: Option<Period>,
 }
 
@@ -285,7 +300,9 @@ impl OutputRequest {
 /// An acceptable interval of time.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Period {
+    #[serde(default)]
     pub min: Option<values::ValDuration>,
+    #[serde(default)]
     pub max: Option<values::ValDuration>,
 }
 impl Period {
