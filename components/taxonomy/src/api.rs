@@ -29,28 +29,26 @@ pub enum Error {
     TypeError,
 }
 
-/// The public API.
-///
-/// This API is subdivided in traits purely for the sake of
-/// namespacing.
-pub trait API {
-    /// The subset of the API dedicated to nodes.
-    type NodeAPI: NodeAPI;
-    fn get_node_api(&self) -> Self::NodeAPI;
+/// An event during watching.
+pub enum WatchEvent {
+    /// A new value is available.
+    Value(Value),
 
-    /// The subset of the API dedicated to services.
-    type ServiceAPI: ServiceAPI;
-    fn get_service_api(&self) -> Self::ServiceAPI;
+    /// The set of devices being watched has changed, typically either
+    /// because a tag was edited or because a device was connected or
+    /// disconnected. Value `SetChanged(n)` means that the set now
+    /// holds `n` input services.
+    SetChanged(usize),
 }
 
-/// Node-level API
-pub trait NodeAPI {
+/// The public API.
+pub trait API {
     /// Get a list of nodes matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/node/list`
-    fn get_list(&self, &NodeRequest) -> Vec<Node>;
+    fn get_nodes(&self, &NodeRequest) -> Vec<Node>;
 
     /// Add a tag to an existing node.
     ///
@@ -59,7 +57,7 @@ pub trait NodeAPI {
     /// # REST API
     ///
     /// `PUT /api/v1/node/tag/$NodeId`
-    fn put_tag(&self, &NodeId, String) -> Result<(), Error>;
+    fn put_node_tag(&self, &NodeId, String) -> Result<(), Error>;
 
     /// Add a tag to an existing node.
     ///
@@ -68,13 +66,7 @@ pub trait NodeAPI {
     /// # REST API
     ///
     /// `DELETE /api/v1/node/tag/$NodeId`
-    fn delete_tag(&self, &NodeId, String) -> Result<(), Error>;
-}
-
-/// Service-level API
-pub trait ServiceAPI {
-    /// A value that causes a disconnection once it is dropped.
-    type Guard;
+    fn delete_node_tag(&self, &NodeId, String) -> Result<(), Error>;
     
     /// Get a list of inputs matching some conditions
     ///
@@ -91,7 +83,7 @@ pub trait ServiceAPI {
     /// # REST API
     ///
     /// `PUT /api/v1/service/tag/$ServiceId`
-    fn put_tag(&self, &ServiceId, String) -> Result<(), Error>;
+    fn put_service_tag(&self, &ServiceId, String) -> Result<(), Error>;
 
     /// Add a tag to an existing service.
     ///
@@ -100,7 +92,7 @@ pub trait ServiceAPI {
     /// # REST API
     ///
     /// `DELETE /api/v1/service/tag/$ServiceId`
-    fn delete_tag(&self, &ServiceId, String) -> Result<(), Error>;
+    fn delete_service_tag(&self, &ServiceId, String) -> Result<(), Error>;
 
     /// Read one value from an input enpoint
     ///
@@ -121,9 +113,12 @@ pub trait ServiceAPI {
     /// # WebSocket API
     ///
     /// `/api/v1/service/watch/$ServiceId`
-    fn register_watch<F>(&self, &WatchOptions, cb: F)
-                         -> Result<Self::Guard, Error>
-        where F: Fn(Value) + Send;
+    fn register_service_watch<F>(&self, &WatchOptions, cb: F)
+                                 -> Result<Self::WatchGuard, Error>
+        where F: Fn(WatchEvent) + Send;
+
+    /// A value that causes a disconnection once it is dropped.
+    type WatchGuard;
 }
 
 /// Options for watching changes in one or more services.

@@ -1,8 +1,3 @@
-use std::time::Duration;
-use values;
-
-extern crate chrono;
-
 //! This module defines the metadata on devices and services.
 //!
 //! Note that all the data structures in this module represent
@@ -10,6 +5,11 @@ extern crate chrono;
 //! structures are live, so there is always the possibility that
 //! devices may have been added or removed from the FoxBox by the time
 //! these data structures are read.
+
+use std::time::Duration;
+use values;
+
+extern crate chrono;
 
 /// The unique Id of a node on the network.
 #[derive(Debug, Clone, PartialEq)]
