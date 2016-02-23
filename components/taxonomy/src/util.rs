@@ -1,5 +1,9 @@
+use serde::ser::Serializer;
+use serde::de::Deserializer;
+
+
 /// A marker for a request that a expects a specific value.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Exactly<Id> {
     /// No constraint.
     Empty,
@@ -24,6 +28,13 @@ impl<T> Exactly<T> where T: PartialEq {
                 } else {
                     Conflict
                 }
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match *self {
+            Exactly::Empty => true,
+            _ => false,
         }
     }
 }

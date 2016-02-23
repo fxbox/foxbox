@@ -6,13 +6,14 @@
 //! devices may have been added or removed from the FoxBox by the time
 //! these data structures are read.
 
-use std::time::Duration;
-use values;
+use values::*;
 
 extern crate chrono;
+use serde::ser::Serializer;
+use serde::de::{Deserializer, Error};
 
 /// The unique Id of a node on the network.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NodeId(String);
 impl NodeId {
     pub fn new(id: String) -> Self {
@@ -27,7 +28,7 @@ impl NodeId {
 /// that may offer services. The FoxBox itself a node offering
 /// services such as a clock, communication with the user through her
 /// smart devices, etc.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     /// Tags describing the node.
     ///
@@ -81,7 +82,7 @@ impl Node {
 }
 
 /// The unique Id of a service on the network.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ServiceId(String);
 impl ServiceId {
     pub fn new(id: String) -> Self {
@@ -104,7 +105,10 @@ impl ServiceId {
 /// pre-existing constructors. For this purpose, this enumeration
 /// offers a constructor `Extension`, designed to describe novel
 /// services.
-#[derive(Debug, Clone, PartialEq)]
+//
+// Important: If you add constructors, don't forget to update `from_string`.
+//
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ServiceKind {
     ///
     /// # No payload
@@ -172,13 +176,13 @@ pub enum ServiceKind {
         kind: String,
 
         /// The data type of the value.
-        typ: values::Type
+        typ: Type
     }
 }
 
 impl ServiceKind {
     /// Get the type of values used to communicate with this service.
-    pub fn get_type(&self) -> values::Type {
+    pub fn get_type(&self) -> Type {
         use self::ServiceKind::*;
         use values::Type::*;
         match *self {
@@ -190,11 +194,26 @@ impl ServiceKind {
             Extension { ref typ, ..} => typ.clone(),
         }
     }
+
+    pub fn from_string(s: String) -> Option<Self> {
+        use self::ServiceKind::*;
+        match &*s {
+            "Ready" => Some(Ready),
+            "OnOff" => Some(OnOff),
+            "OpenClosed" => Some(OpenClosed),
+            "CurrentTime" => Some(CurrentTime),
+            "CurrentTimeOfDay" => Some(CurrentTimeOfDay),
+            "RemainingTime" => Some(RemainingTime),
+            "Thermostat" => Some(Thermostat),
+            "ActualTemperature" => Some(ActualTemperature),
+            _ => None,
+        }
+    }
 }
 
 
 /// An input operation available on an service.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Input {
     /// The kind of value that can be obtained from this service.
     kind: ServiceKind,
@@ -212,7 +231,7 @@ pub struct Input {
     /// - Long-running pollution or humidity sensors typically
     ///   do not accept requests and rather send batches of
     ///   data every 24h.
-    poll: Option<Duration>,
+    poll: Option<ValDuration>,
 
     /// If `Some(duration)`, this service can send the data to
     /// the FoxBox whenever it is updated. Parameter `duration`
@@ -220,11 +239,11 @@ pub struct Input {
     ///
     /// Otherwise, the service cannot send data to the FoxBox
     /// and needs to be polled.
-    trigger: Option<Duration>,
+    trigger: Option<ValDuration>,
 
     /// Date at which the latest value was received, whether through
     /// polling or through a trigger.
-    updated: chrono::DateTime<chrono::UTC>,
+    updated: TimeStamp,
 }
 
 impl Input {
@@ -246,7 +265,7 @@ impl Input {
     /// - Long-running pollution or humidity sensors typically
     ///   do not accept requests and rather send batches of
     ///   data every 24h.
-    pub fn get_poll(&self) -> Option<Duration> {
+    pub fn get_poll(&self) -> Option<ValDuration> {
         self.poll.clone()
     }
 
@@ -256,7 +275,7 @@ impl Input {
     ///
     /// Otherwise, the service cannot send data to the FoxBox
     /// and needs to be polled.
-    pub fn get_trigger(&self) -> Option<Duration> {
+    pub fn get_trigger(&self) -> Option<ValDuration> {
         self.trigger.clone()
     }
 
@@ -266,23 +285,23 @@ impl Input {
     /// # Limitation
     ///
     /// This is *not* a live view.
-    pub fn get_updated(&self) -> chrono::DateTime<chrono::UTC> {
+    pub fn get_updated(&self) -> TimeStamp {
         self.updated.clone()
     }
 }
 
 /// An output operation available on an service.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Output {
     /// The kind of value that can be sent to this service.
     kind: ServiceKind,
 
     /// If `Some(duration)`, this service supports pushing,
     /// i.e. the FoxBox can send values.
-    push: Option<Duration>,
+    push: Option<ValDuration>,
 
     /// Date at which the latest value was sent to the service.
-    updated: chrono::DateTime<chrono::UTC>,
+    updated: TimeStamp,
 }
 
 impl Output {
@@ -293,7 +312,7 @@ impl Output {
 
     /// If `Some(duration)`, this service supports pushing,
     /// i.e. the FoxBox can send values.
-    pub fn get_push(&self) -> Option<Duration> {
+    pub fn get_push(&self) -> Option<ValDuration> {
         self.push.clone()
     }
 
@@ -302,7 +321,7 @@ impl Output {
     /// # Limitation
     ///
     /// This is *not* a live view.
-    pub fn get_updated(&self) -> chrono::DateTime<chrono::UTC> {
+    pub fn get_updated(&self) -> TimeStamp {
         self.updated.clone()
     }
 }
@@ -312,7 +331,7 @@ impl Output {
 /// of input or a single kind of output. Devices that support both
 /// inputs or outputs, or several kinds of inputs, or several kinds of
 /// outputs, are represented as nodes containing several services.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Service<IO> {
     /// Tags describing the service.
     ///
@@ -332,7 +351,7 @@ pub struct Service<IO> {
     mechanism: IO,
 
     /// The last time the device was seen.
-    last_seen: chrono::DateTime<chrono::UTC>,
+    last_seen: TimeStamp,
 }
 
 impl<IO> Service<IO> {
@@ -362,8 +381,8 @@ impl<IO> Service<IO> {
     }
 
     /// The last time the device was seen.
-    pub fn get_last_seen(&self) -> chrono::DateTime<chrono::UTC> {
-        self.last_seen
+    pub fn get_last_seen(&self) -> TimeStamp {
+        self.last_seen.clone()
     }
 }
 

@@ -1,19 +1,19 @@
 //!
-//! Values manipulated by endpoints
+//! Values manipulated by services
 //!
-
-use std::time::Duration;
 use std::cmp::{PartialOrd, Ordering};
+use std::time::Duration;
+use std::str::FromStr;
 
-extern crate chrono;
-use self::chrono::{DateTime, Local};
-
-extern crate serde_json;
+use serde_json;
+use chrono;
+use serde::ser::{Serialize, Serializer};
+use serde::de::{Deserialize, Deserializer, Error};
 
 ///
 /// The type of values manipulated by endpoints.
 ///
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub enum Type {
     ///
     /// # Trivial values
@@ -52,7 +52,7 @@ pub enum Type {
 /// A temperature. Internal representation may be either Fahrenheit or
 /// Celcius. The FoxBox adapters are expected to perform conversions
 /// to the format requested by their devices.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Temperature {
     /// Fahrenheit
     F(f64),
@@ -81,7 +81,7 @@ impl PartialOrd for Temperature {
 /// A color. Internal representation may vary. The FoxBox adapters are
 /// expected to perform conversions to the format requested by their
 /// device.
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Color {
     RGBA(f64, f64, f64, f64, f64)
 }
@@ -90,7 +90,7 @@ pub enum Color {
 /// always) possible to choose a more precise data structure for
 /// representing values send/accepted by a service. If possible,
 /// adapters should rather pick such more precise data structure.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Json(pub serde_json::value::Value);
 
 impl PartialOrd for Json {
@@ -102,7 +102,7 @@ impl PartialOrd for Json {
 
 /// A data structure holding a numeric value of a type that has not
 /// been standardized yet.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExtNumeric {
     pub value: f64,
 
@@ -136,12 +136,12 @@ impl PartialOrd for ExtNumeric {
 
 /// Representation of an actual value that can be sent to/received
 /// from a service.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Unit,
     Bool(bool),
-    Duration(Duration),
-    TimeStamp(chrono::DateTime<Local>),
+    Duration(ValDuration),
+    TimeStamp(TimeStamp),
     Temperature(Temperature),
     Color(Color),
     String(String),
@@ -210,6 +210,46 @@ impl PartialOrd for Value {
             (&Binary{mimetype: ref a_mimetype, data: ref a_data},
              &Binary{mimetype: ref b_mimetype, data: ref b_data}) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
             (&Binary{..}, _) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+pub struct ValDuration(Duration);
+impl Serialize for ValDuration {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer {
+        let as_ms : u64 = self.0.as_secs() * 1000
+            + (self.0.subsec_nanos() as u64) / 1_000_000;
+        as_ms.serialize(serializer)
+    }
+}
+impl Deserialize for ValDuration {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer {
+        let as_ms : u64 = try!(u64::deserialize(deserializer));
+        let as_sec = as_ms / 1000;
+        let as_ns = (as_ms / 1_000_000) as u32;
+        Ok(ValDuration(Duration::new(as_sec, as_ns)))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+pub struct TimeStamp(chrono::DateTime<chrono::Local>);
+impl Serialize for TimeStamp {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer {
+        let str = self.0.to_rfc3339();
+        str.serialize(serializer)
+    }
+}
+impl Deserialize for TimeStamp {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer {
+        let str = try!(String::deserialize(deserializer));
+        match chrono::DateTime::<chrono::Local>::from_str(&str) {
+            Ok(dt) => Ok(TimeStamp(dt)),
+            Err(_) => Err(D::Error::syntax("Invalid date"))
         }
     }
 }

@@ -30,7 +30,12 @@
 //! - a `Service<Input>` with `ServiceKind::OnOff`, to determine whether the light is on or off;
 //! - a `Service<Output>` with `ServiceKind::Color`, to change the color of the light;
 //! - ...
+#![feature(custom_derive, plugin)]
+#![plugin(serde_macros)]
 
+extern crate chrono;
+extern crate serde;
+extern crate serde_json;
 
 /// Metadata on devices
 pub mod devices;

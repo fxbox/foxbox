@@ -1,7 +1,10 @@
 use devices::{NodeId, ServiceId, ServiceKind};
 use util::Exactly;
+use values;
 
-use std::time::Duration;
+use serde::ser::{Serializer};
+use serde::de::{Deserializer, Error};
+
 use std::cmp;
 
 fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
@@ -24,7 +27,7 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 ///   .with_tags(vec!["entrance".to_owned()])
 ///   .with_inputs(vec![InputRequest::new() /* can be more restrictive */]);
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct NodeRequest {
     /// If `Exactly(id)`, return only the node with the corresponding id.
     id: Exactly<NodeId>,
@@ -104,7 +107,7 @@ impl NodeRequest {
 ///   .with_parent(NodeId::new("foxbox".to_owned()))
 ///   .with_kind(ServiceKind::CurrentTimeOfDay);
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct InputRequest {
     /// If `Exactly(id)`, return only the service with the corresponding id.
     id: Exactly<ServiceId>,
@@ -199,7 +202,7 @@ impl InputRequest {
 }
 
 /// A request for one or more output services.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct OutputRequest {
     /// If `Exactly(id)`, return only the service with the corresponding id.
     id: Exactly<ServiceId>,
@@ -280,10 +283,10 @@ impl OutputRequest {
 }
 
 /// An acceptable interval of time.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Period {
-    pub min: Option<Duration>,
-    pub max: Option<Duration>,
+    pub min: Option<values::ValDuration>,
+    pub max: Option<values::ValDuration>,
 }
 impl Period {
     fn and(self, other: Self) -> Self {
