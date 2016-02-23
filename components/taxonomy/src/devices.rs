@@ -9,8 +9,8 @@
 use values::*;
 
 extern crate chrono;
-use serde::ser::Serializer;
-use serde::de::{Deserializer, Error};
+use serde::ser::{Serialize, Serializer};
+use serde::de::{Deserialize, Deserializer, Error};
 
 /// The unique Id of a node on the network.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -244,7 +244,8 @@ pub struct Input {
     /// polling or through a trigger.
     updated: TimeStamp,
 }
-
+impl IOMechanism for Input {
+}
 impl Input {
     /// The kind of value that can be obtained from this service.
     pub fn get_kind(&self) -> ServiceKind {
@@ -303,7 +304,8 @@ pub struct Output {
     /// Date at which the latest value was sent to the service.
     updated: TimeStamp,
 }
-
+impl IOMechanism for Output {
+}
 impl Output {
     /// The kind of value that can be sent to this service.
     pub fn get_kind(&self) -> ServiceKind {
@@ -332,7 +334,7 @@ impl Output {
 /// inputs or outputs, or several kinds of inputs, or several kinds of
 /// outputs, are represented as nodes containing several services.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Service<IO> {
+pub struct Service<IO> where IO: IOMechanism {
     /// Tags describing the service.
     ///
     /// These tags can be set by the user, adapters or
@@ -355,7 +357,7 @@ pub struct Service<IO> {
     last_seen: TimeStamp,
 }
 
-impl<IO> Service<IO> {
+impl<IO> Service<IO> where IO: IOMechanism {
     /// Tags describing the service.
     ///
     /// These tags can be set by the user, adapters or
@@ -387,3 +389,7 @@ impl<IO> Service<IO> {
     }
 }
 
+/// A mechanism used for communicating between the application and the
+/// service.
+pub trait IOMechanism: Deserialize + Serialize {
+}
