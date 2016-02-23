@@ -12,6 +12,7 @@ use std::io::Error;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex };
+use tunnel_controller:: { TunnelConfig, Tunnel };
 use ws;
 
 // The `global` context available to all.
@@ -21,6 +22,7 @@ pub struct Context {
     pub http_port: u16,
     pub ws_port: u16,
     services: HashMap<String, Box<Service>>,
+    tunnel: Option<Tunnel>,
     websockets: HashMap<ws::util::Token, ws::Sender>,
 }
 
@@ -30,10 +32,11 @@ const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 
 pub trait ContextTrait {
     fn new(verbose: bool, hostname: Option<String>,
-           http_port: Option<u16>, ws_port: Option<u16>) -> Self;
+           http_port: Option<u16>, ws_port: Option<u16>,
+           tunnel_host: Option<String>) -> Self;
     fn shared(verbose: bool, hostname: Option<String>,
-              http_port: Option<u16>,
-              ws_port: Option<u16>) -> Shared<Self>;
+              http_port: Option<u16>, ws_port: Option<u16>,
+              tunnel_host: Option<String>) -> Shared<Self>;
     fn add_service(&mut self, service: Box<Service>);
     fn remove_service(&mut self, id: String);
     fn add_websocket(&mut self, socket_out: ws::Sender);
@@ -45,6 +48,8 @@ pub trait ContextTrait {
     fn get_http_root_for_service(&self, service_id: String) -> String;
     fn get_ws_root_for_service(&self, service_id: String) -> String;
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error>;
+    fn start_tunnel(&mut self) -> Result<(), Error>;
+    fn stop_tunnel(&mut self) -> Result<(), Error>;
 }
 
 pub type Shared<T> = Arc<Mutex<T>>;
@@ -52,20 +57,30 @@ pub type SharedContext = Shared<Context>;
 
 impl ContextTrait for Context {
     fn new(verbose: bool, hostname: Option<String>,
-               http_port: Option<u16>, ws_port: Option<u16>) -> Self {
+               http_port: Option<u16>, ws_port: Option<u16>,
+               tunnel_host: Option<String>) -> Self {
+
+        let http_port = http_port.unwrap_or(DEFAULT_HTTP_PORT);
+
+        let tunnel = if let Some(host) = tunnel_host {
+            Some(Tunnel::new(TunnelConfig::new(http_port, host)))
+        } else {
+            None
+        };
 
         Context { services: HashMap::new(),
                   websockets: HashMap::new(),
+                  tunnel: tunnel,
                   verbose: verbose,
                   hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
-                  http_port: http_port.unwrap_or(DEFAULT_HTTP_PORT),
+                  http_port: http_port,
                   ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT) }
     }
 
     fn shared(verbose: bool, hostname: Option<String>,
-                  http_port: Option<u16>,
-                  ws_port: Option<u16>) -> Shared<Self> {
-        Arc::new(Mutex::new(Context::new(verbose, hostname, http_port, ws_port)))
+                  http_port: Option<u16>, ws_port: Option<u16>,
+                  tunnel_host: Option<String>) -> SharedContext {
+        Arc::new(Mutex::new(Context::new(verbose, hostname, http_port, ws_port, tunnel_host)))
     }
 
     fn add_service(&mut self, service: Box<Service>) {
@@ -112,6 +127,21 @@ impl ContextTrait for Context {
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, Error> {
         (self.hostname.as_str(), self.http_port).to_socket_addrs()
     }
+
+    fn start_tunnel(&mut self) -> Result<(), Error> {
+        match self.tunnel {
+            Some(ref mut tunnel) => tunnel.start(),
+            // If nothing is configured, just allow
+            _ => Ok(())
+        }
+    }
+
+    fn stop_tunnel(&mut self) -> Result<(), Error> {
+        match self.tunnel {
+            None => Ok(()),
+            Some(ref mut tunnel) => tunnel.stop(),
+        }
+    }
 }
 
 
@@ -122,7 +152,7 @@ describe! context {
         use stubs::service::ServiceStub;
 
         let service = ServiceStub;
-        let context = Context::shared(false, Some("localhost".to_owned()), None, None);
+        let context = Context::shared(false, Some("localhost".to_owned()), None, None, None);
         let mut locked_context = context.lock().unwrap();
     }
 
