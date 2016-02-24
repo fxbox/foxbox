@@ -30,15 +30,26 @@ pub enum Error {
 }
 
 /// An event during watching.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum WatchEvent {
     /// A new value is available.
-    Value{from: ServiceId, value: Value},
+    Value {
+        /// The service that sent the value.
+        from: ServiceId,
+
+        /// The actual value.
+        value: Value
+    },
 
     /// The set of devices being watched has changed, typically either
-    /// because a tag was edited or because a device was connected or
-    /// disconnected. Value `SetChanged(n)` means that the set now
-    /// holds `n` input services.
-    SetChanged(usize),
+    /// because a tag was edited or because a device was
+    /// removed. Payload is the id of the device that was removed.
+    InputRemoved(ServiceId),
+
+    /// The set of devices being watched has changed, typically either
+    /// because a tag was edited or because a device was
+    /// added. Payload is the id of the device that was added.
+    InputAdded(ServiceId),
 }
 
 /// The public API.
