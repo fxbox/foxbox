@@ -59,6 +59,67 @@ pub trait API {
     /// # REST API
     ///
     /// `GET /api/v1/node/list`
+    ///
+    /// ## Inputs
+    ///
+    /// Any JSON that can be deserialized to a `NodeRequest`. See
+    /// the implementation of `NodeRequest` for details.
+    ///
+    /// ### Example
+    ///
+    /// Request all doors in the entrance (tags `door`, `entrance`)
+    /// that support output service `OpenClose`
+    ///
+    /// ```json
+    /// {
+    ///   "tags": ["entrance", "door"],
+    ///   "inputs": [
+    ///     {
+    ///       "kind": {
+    ///         "Exactly": {
+    ///           "OpenClose": []
+    ///         }
+    ///       }
+    ///     }
+    ///   ]
+    /// }
+    /// ```
+    ///
+    ///
+    /// ## Errors
+    ///
+    /// In case of syntax error, Error 400, accompanied with a JSON
+    /// string detailing the error.
+    ///
+    /// ## Success
+    ///
+    /// A JSON representing an array of `Node`. See the implementation
+    /// of `Node` for details.
+    ///
+    /// ### Example
+    ///
+    /// ```json
+    /// {
+    ///   "tags": ["entrance", "door", "somevendor"],
+    ///   "id: "some-node-id",
+    ///   "inputs": [],
+    ///   "outputs": [
+    ///     "tags": [...],
+    ///     "id": "some-service-id",
+    ///     "node": "some-node-id",
+    ///     "last_seen": "some-date",
+    ///     "mechanism": {
+    ///       "Output":  {
+    ///         "kind": {
+    ///           "OnOff": []
+    ///         },
+    ///         "push": [5000],
+    ///         "updated": "some-date",
+    ///       }
+    ///     }
+    ///   ]
+    /// }
+    /// ```
     fn get_nodes(&NodeRequest) -> Vec<Node>;
 
     /// Add a tag to an existing node.
