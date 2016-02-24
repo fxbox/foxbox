@@ -81,6 +81,7 @@ impl Tunnel {
     }
 
     /// Stop the tunnel process if it is runnnig
+    #[allow(dead_code)]
     pub fn stop(&mut self) -> Result<()> {
         match self.tunnel_process.take() {
             None => Ok(()),
