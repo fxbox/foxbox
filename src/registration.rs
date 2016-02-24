@@ -87,7 +87,8 @@ impl Registrar {
             for iface in ifaces {
                 if ! (iface.name.starts_with("eth") ||
                       iface.name.starts_with("wlan") ||
-                      iface.name.starts_with("en")) {
+                      iface.name.starts_with("en") ||
+                      iface.name.starts_with("wlp3s")) {
                     continue;
                 }
                 if let IfAddr::V4(ref v4) = iface.addr {
