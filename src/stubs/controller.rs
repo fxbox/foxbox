@@ -19,6 +19,7 @@ use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use tls::CertificateManager;
 use upnp::UpnpManager;
 use ws;
 
@@ -84,5 +85,12 @@ impl Controller for ControllerStub {
     }
     fn get_profile(&self) -> &ProfileService {
         &self.profile_service
+    }
+    fn get_tls_enabled(&self) -> bool {
+        false
+    }
+
+    fn get_certificate_manager(&self) -> CertificateManager {
+       CertificateManager::new()
     }
 }

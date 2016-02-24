@@ -68,8 +68,9 @@ describe! service_router {
         use iron::Headers;
         use iron_test::request;
         use mount::Mount;
+        use tls::TlsOption;
 
-        let controller = FoxBox::new(false, Some("localhost".to_owned()), 1234, 5678);
+        let controller = FoxBox::new(false, Some("localhost".to_owned()), 1234, 5678, TlsOption::Disabled);
         let service_router = create(controller.clone());
 
         let mut mount = Mount::new();

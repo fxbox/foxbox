@@ -20,13 +20,14 @@ foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "3db32f0" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
 multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
-iron = "0.2.6"
 iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "137d42f" }
 libc = "0.2.7"
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
 mount = "0.0.10"
 nix = { git = "https://github.com/nix-rust/nix.git", rev = "138080" } # Until 0.5.1 is released
+openssl = "0.7.6"
+openssl-sys = "0.7.6"
 router = "0.1.0"
 rust-crypto = "0.2.34"
 rustc-serialize = "0.3"
@@ -39,9 +40,14 @@ unicase = "1.3.0"
 time = "0.1"
 timer = "0.1.6"
 uuid = "0.1.18"
-url = "0.5.5"
+url = "0.5.7"
 ws = { git = "https://github.com/housleyjk/ws-rs.git", rev = "d154fc5" }
 xml-rs = "0.3.0"
+
+[dependencies.iron]
+version = "0.2.6"
+default-features = true
+features = ["ssl"]
 
 [dev-dependencies]
 stainless = "0.1.4"
