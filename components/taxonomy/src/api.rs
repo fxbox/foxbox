@@ -62,7 +62,7 @@ pub trait API {
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/node/list`
+    /// `GET /api/v1/nodes`
     ///
     /// ## Inputs
     ///
@@ -142,7 +142,7 @@ pub trait API {
     ///
     /// # REST API
     ///
-    /// `PUT /api/v1/node/tag`
+    /// `POST /api/v1/nodes/tag`
     ///
     /// ## Inputs
     ///
@@ -162,7 +162,7 @@ pub trait API {
     ///
     /// ## Success
     ///
-    /// A JSON representing a number.
+    /// A JSON string representing a number.
     fn put_node_tag(set: &Vec<NodeRequest>, tags: &Vec<String>) -> usize;
 
     /// Remove a set of tags from a set of nodes.
@@ -181,7 +181,7 @@ pub trait API {
     ///
     /// # REST API
     ///
-    /// `DELETE /api/v1/node/tag`
+    /// `DELETE /api/v1/nodes/tag`
     ///
     /// ## Inputs
     ///
@@ -208,7 +208,7 @@ pub trait API {
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/service/list`
+    /// `GET /api/v1/services`
     fn get_input_services(&Vec<InputRequest>) -> Vec<Service<Input>>;
     fn get_output_services(&Vec<OutputRequest>) -> Vec<Service<Output>>;
 
@@ -228,7 +228,7 @@ pub trait API {
     ///
     /// # REST API
     ///
-    /// `PUT /api/v1/service/tag`
+    /// `POST /api/v1/services/tag`
     ///
     /// ## Inputs
     ///
@@ -275,7 +275,7 @@ pub trait API {
     ///
     /// # REST API
     ///
-    /// `DELETE /api/v1/node/tag`
+    /// `DELETE /api/v1/services/tag`
     ///
     /// ## Inputs
     ///
@@ -310,21 +310,21 @@ pub trait API {
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/service/value`
+    /// `GET /api/v1/services/value`
     fn get_service_value(&Vec<InputRequest>) -> Vec<(ServiceId, Result<Value, Error>)>;
 
     /// Send one value to a set of services
     ///
     /// # REST API
     ///
-    /// `PUT /api/v1/service/value`
+    /// `POST /api/v1/services/value`
     fn put_service_value(&Vec<OutputRequest>, Value) -> Vec<(ServiceId, Result<(), Error>)>;
 
     /// Watch for any change
     ///
     /// # WebSocket API
     ///
-    /// `/api/v1/service/watch`
+    /// `/api/v1/services/watch`
     fn register_service_watch<F>(Vec<WatchOptions>, cb: F) -> Self::WatchGuard
         where F: FnMut(WatchEvent) + Send + Sync;
 
