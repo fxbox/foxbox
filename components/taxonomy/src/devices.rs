@@ -393,3 +393,4 @@ impl<IO> Service<IO> where IO: IOMechanism {
 /// service.
 pub trait IOMechanism: Deserialize + Serialize {
 }
+

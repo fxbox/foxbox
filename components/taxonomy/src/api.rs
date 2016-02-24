@@ -48,7 +48,7 @@ pub trait API {
     /// # REST API
     ///
     /// `GET /api/v1/node/list`
-    fn get_nodes(&self, &NodeRequest) -> Vec<Node>;
+    fn get_nodes(&NodeRequest) -> Vec<Node>;
 
     /// Add a tag to an existing node.
     ///
@@ -57,7 +57,7 @@ pub trait API {
     /// # REST API
     ///
     /// `PUT /api/v1/node/tag/$NodeId`
-    fn put_node_tag(&self, &NodeId, String) -> Result<(), Error>;
+    fn put_node_tag(&NodeId, String) -> Result<(), Error>;
 
     /// Add a tag to an existing node.
     ///
@@ -66,15 +66,15 @@ pub trait API {
     /// # REST API
     ///
     /// `DELETE /api/v1/node/tag/$NodeId`
-    fn delete_node_tag(&self, &NodeId, String) -> Result<(), Error>;
+    fn delete_node_tag(&NodeId, String) -> Result<(), Error>;
     
     /// Get a list of inputs matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/service/list`
-    fn get_input_services(&self, &InputRequest) -> Vec<Service<Input>>;
-    fn get_output_services(&self, &OutputRequest) -> Vec<Service<Output>>;
+    fn get_input_services(&InputRequest) -> Vec<Service<Input>>;
+    fn get_output_services(&OutputRequest) -> Vec<Service<Output>>;
 
     /// Add a tag to an existing service.
     ///
@@ -83,7 +83,7 @@ pub trait API {
     /// # REST API
     ///
     /// `PUT /api/v1/service/tag/$ServiceId`
-    fn put_service_tag(&self, &ServiceId, String) -> Result<(), Error>;
+    fn put_service_tag(&ServiceId, String) -> Result<(), Error>;
 
     /// Add a tag to an existing service.
     ///
@@ -92,28 +92,28 @@ pub trait API {
     /// # REST API
     ///
     /// `DELETE /api/v1/service/tag/$ServiceId`
-    fn delete_service_tag(&self, &ServiceId, String) -> Result<(), Error>;
+    fn delete_service_tag(&ServiceId, String) -> Result<(), Error>;
 
     /// Read one value from an input enpoint
     ///
     /// # REST API
     ///
     /// GET /api/v1/service/value/$ServiceId
-    fn get_service_value(&self, &Service<Input>) -> Result<Value, Error>;
+    fn get_service_value(&Service<Input>) -> Result<Value, Error>;
 
     /// Send one value to an output enpoint
     ///
     /// # REST API
     ///
     /// `PUT /api/v1/service/value/$ServiceId`
-    fn put_service_value(&self, &Service<Output>, Value) -> Result<(), Error>;
+    fn put_service_value(&Service<Output>, Value) -> Result<(), Error>;
 
     /// Watch for any change
     ///
     /// # WebSocket API
     ///
     /// `/api/v1/service/watch/$ServiceId`
-    fn register_service_watch<F>(&self, WatchOptions, cb: F)
+    fn register_service_watch<F>(WatchOptions, cb: F)
                                  -> Result<Self::WatchGuard, Error>
         where F: Fn(WatchEvent) + Send;
 
