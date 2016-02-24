@@ -12,7 +12,7 @@ use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error};
 
 /// The unique Id of a node on the network.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct NodeId(String);
 impl NodeId {
     pub fn new(id: String) -> Self {
@@ -78,7 +78,7 @@ impl Node {
 }
 
 /// The unique Id of a service on the network.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct ServiceId(String);
 impl ServiceId {
     pub fn new(id: String) -> Self {
