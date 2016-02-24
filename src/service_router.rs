@@ -48,7 +48,7 @@ describe! service_router {
         use iron::Headers;
         use controller::FoxBox;
 
-        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None, None);
+        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
         let service_router = create(controller.clone());
     }
 

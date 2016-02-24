@@ -22,7 +22,6 @@ use std::io::Error;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex };
-use tunnel_controller:: { TunnelConfig, Tunnel };
 use ws_server::WsServer;
 use ws;
 
@@ -34,11 +33,10 @@ pub struct FoxBox {
     http_port: u16,
     ws_port: u16,
     services: Arc<Mutex<HashMap<String, Box<Service>>>>,
-    tunnel: Arc<Mutex<Option<Tunnel>>>,
     websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
 }
 
-const DEFAULT_HTTP_PORT: u16 = 3000;
+pub const DEFAULT_HTTP_PORT: u16 = 3000;
 const DEFAULT_WS_PORT: u16 = 4000;
 const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 
@@ -58,9 +56,6 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn add_websocket(&mut self, socket: ws::Sender);
     fn remove_websocket(&mut self, socket: ws::Sender);
     fn broadcast_to_websockets(&self, data: String);
-
-    fn start_tunnel(&mut self) -> Result<(), Error>;
-    fn stop_tunnel(&mut self) -> Result<(), Error>;
 }
 
 impl FoxBox {
@@ -68,26 +63,17 @@ impl FoxBox {
     pub fn new(verbose: bool,
                hostname: Option<String>,
                http_port: Option<u16>,
-               ws_port: Option<u16>,
-               tunnel_host: Option<String>) -> Self {
-
-        let http_port = http_port.unwrap_or(DEFAULT_HTTP_PORT);
-        let tunnel = if let Some(host) = tunnel_host {
-            Some(Tunnel::new(TunnelConfig::new(http_port, host)))
-        } else {
-            None
-        };
+               ws_port: Option<u16>) -> Self {
 
         FoxBox {
             services: Arc::new(Mutex::new(HashMap::new())),
             websockets: Arc::new(Mutex::new(HashMap::new())),
             verbose: verbose,
             hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
-            http_port: http_port,
+            http_port: http_port.unwrap_or(DEFAULT_HTTP_PORT),
             ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT),
 
-            event_sender: None,
-            tunnel: Arc::new(Mutex::new(tunnel)),
+            event_sender: None
         }
     }
 }
@@ -103,7 +89,6 @@ impl Controller for FoxBox {
         HttpServer::new(self.clone()).start();
         WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
         DummyAdapter::new(self.clone()).start();
-        self.start_tunnel().unwrap();
         event_loop.run(&mut FoxBoxEventLoop { controller: self.clone() }).unwrap();
     }
 
@@ -181,21 +166,6 @@ impl Controller for FoxBox {
             }
         }
     }
-
-    fn start_tunnel(&mut self) -> Result<(), Error> {
-        match *self.tunnel.lock().unwrap() {
-            Some(ref mut tunnel) => tunnel.start(),
-            // If nothing is configured, just allow
-            _ => Ok(())
-        }
-    }
-
-    fn stop_tunnel(&mut self) -> Result<(), Error> {
-        match *self.tunnel.lock().unwrap() {
-            None => Ok(()),
-            Some(ref mut tunnel) => tunnel.stop(),
-        }
-    }
 }
 
 struct FoxBoxEventLoop {
@@ -237,7 +207,7 @@ describe! controller {
         use stubs::service::ServiceStub;
 
         let service = ServiceStub;
-        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None, None);
+        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
     }
 
     describe! add_service {
