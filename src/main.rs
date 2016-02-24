@@ -59,7 +59,8 @@ mod stubs {
     pub mod service;
 }
 
-use controller::{ Controller, FoxBox };
+use controller::{ Controller, FoxBox, DEFAULT_HTTP_PORT };
+use tunnel_controller:: { TunnelConfig, Tunnel };
 
 docopt!(Args derive Debug, "
 Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-t <tunnel>]
@@ -87,8 +88,15 @@ fn main() {
     let registrar = registration::Registrar::new();
     registrar.start(args.flag_register);
 
+    // Start the tunnel.
+    if let Some(host) = args.flag_tunnel {
+        let mut tunnel =
+            Tunnel::new(TunnelConfig::new(args.flag_port.unwrap_or(DEFAULT_HTTP_PORT), host));
+        tunnel.start().unwrap();
+    }
+
     let mut controller = FoxBox::new(
-        args.flag_verbose, args.flag_name, args.flag_port, args.flag_wsport, args.flag_tunnel);
+        args.flag_verbose, args.flag_name, args.flag_port, args.flag_wsport);
 
     controller.run();
 }
