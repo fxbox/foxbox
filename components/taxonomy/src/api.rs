@@ -32,7 +32,7 @@ pub enum Error {
 /// An event during watching.
 pub enum WatchEvent {
     /// A new value is available.
-    Value(Value),
+    Value{from: ServiceId, value: Value},
 
     /// The set of devices being watched has changed, typically either
     /// because a tag was edited or because a device was connected or
