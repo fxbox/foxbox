@@ -8,7 +8,7 @@
 // For Docopt macro
 #![plugin(docopt_macros)]
 
-// Needed for IntoIter in context.rs
+// Needed for IntoIter in controller.rs
 #![feature(collections)]
 
 // Needed for time functions
@@ -41,7 +41,6 @@ extern crate staticfile;
 extern crate uuid;
 extern crate ws;
 
-mod context;
 mod controller;
 mod dummy_adapter;
 mod events;
@@ -58,11 +57,9 @@ mod stubs {
     #![allow(unused_variables)]
     #![allow(boxed_local)]
     pub mod service;
-    pub mod context;
 }
 
-use context::{ ContextTrait, Context };
-use controller::Controller;
+use controller::{ Controller, FoxBox };
 
 docopt!(Args derive Debug, "
 Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-t <tunnel>]
@@ -90,20 +87,10 @@ fn main() {
     let registrar = registration::Registrar::new();
     registrar.start(args.flag_register);
 
-    if let Ok(mut event_loop) = mio::EventLoop::new() {
-        let sender = event_loop.channel();
+    let mut controller = FoxBox::new(
+        args.flag_verbose, args.flag_name, args.flag_port, args.flag_wsport, args.flag_tunnel);
 
-        let context = Context::shared(args.flag_verbose, args.flag_name,
-                                      args.flag_port, args.flag_wsport,
-                                      args.flag_tunnel);
-        let mut controller = Controller::new(sender, context);
-        controller.start();
-
-        event_loop.run(&mut controller)
-                  .unwrap_or_else(|_| {  panic!("Starting the event loop failed!"); });
-    } else {
-        panic!("Creating the event loop failed!");
-    }
+    controller.run();
 }
 
 #[test]

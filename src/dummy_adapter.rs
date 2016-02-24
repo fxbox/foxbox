@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use context::{ ContextTrait, SharedContext };
+use controller::Controller;
 use events::*;
 use iron::{ Request, Response, IronResult };
 use iron::headers::ContentType;
@@ -13,33 +13,31 @@ use std::time::Duration;
 use std::thread;
 use uuid::Uuid;
 
-struct DummyService {
+struct DummyService<T> {
+    controller: T,
     properties: ServiceProperties,
-    sender: EventSender,
     dont_kill: bool
 }
 
-impl DummyService {
-    fn new(sender: EventSender, context: SharedContext, id: u32) -> DummyService {
+impl<T: Controller> DummyService<T> {
+    fn new(controller: T, id: u32) -> Self {
         println!("Creating dummy service");
-        let ctx_clone = context.clone();
-        let ctx = ctx_clone.lock().unwrap();
         let service_id = Uuid::new_v4().to_simple_string();
         DummyService {
+            controller: controller.clone(),
             properties: ServiceProperties {
                 id: service_id.clone(),
                 name: "dummy service".to_owned(),
                 description: "really nothing to see".to_owned(),
-                http_url: ctx.get_http_root_for_service(service_id.clone()),
-                ws_url: ctx.get_ws_root_for_service(service_id)
+                http_url: controller.get_http_root_for_service(service_id.clone()),
+                ws_url: controller.get_ws_root_for_service(service_id)
             },
-            sender: sender,
             dont_kill: id % 3 == 0
         }
     }
 }
 
-impl Service for DummyService {
+impl<T: Controller> Service for DummyService<T> {
     fn get_properties(&self) -> ServiceProperties {
         self.properties.clone()
     }
@@ -47,9 +45,9 @@ impl Service for DummyService {
     // Starts the service, it will just spawn a thread and send messages once
     // in a while.
     fn start(&self) {
-        let sender = self.sender.clone();
         let props = self.properties.clone();
         let can_kill = !self.dont_kill;
+        let controller = self.controller.clone();
         thread::spawn(move || {
             println!("Hello from dummy service thread!");
             let mut i = 0;
@@ -61,7 +59,8 @@ impl Service for DummyService {
                     break;
                 }
             }
-            sender.send(EventData::ServiceStop { id: props.id.to_string() }).unwrap();
+            controller.send_event(
+                EventData::ServiceStop { id: props.id.to_string() }).unwrap();
         });
     }
 
@@ -79,43 +78,38 @@ impl Service for DummyService {
     }
 }
 
-pub struct DummyAdapter {
+pub struct DummyAdapter<T> {
     name: String,
-    sender: EventSender,
-    context: SharedContext
+    controller: T
 }
 
-impl DummyAdapter {
-    pub fn new(sender: EventSender,
-           context: SharedContext) -> DummyAdapter {
+impl<T: Controller> DummyAdapter<T> {
+    pub fn new(controller: T) -> Self {
         println!("Creating dummy adapter");
         DummyAdapter { name: "DummyAdapter".to_owned(),
-                       sender: sender,
-                       context: context
-                     }
+                       controller: controller }
     }
 }
 
-impl ServiceAdapter for DummyAdapter {
+impl<T: Controller> ServiceAdapter for DummyAdapter<T> {
     fn get_name(&self) -> String {
         self.name.clone()
     }
 
     fn start(&self) {
-        let sender = self.sender.clone();
         let mut id = 0;
-        let context = self.context.clone();
+        let controller = self.controller.clone();
         thread::spawn(move || {
-            sender.send(EventData::AdapterStart { name: "Dummy Service Adapter".to_owned() }).unwrap();
+            controller.send_event(
+                EventData::AdapterStart { name: "Dummy Service Adapter".to_owned() }).unwrap();
             loop {
                 thread::sleep(Duration::from_millis(2000));
                 id += 1;
-                let service = DummyService::new(sender.clone(), context.clone(), id);
+                let service = DummyService::new(controller.clone(), id);
                 let service_id = service.get_properties().id;
                 service.start();
-                let mut ctx = context.lock().unwrap();
-                ctx.add_service(Box::new(service));
-                sender.send(EventData::ServiceStart { id: service_id }).unwrap();
+                controller.add_service(Box::new(service));
+                controller.send_event(EventData::ServiceStart { id: service_id }).unwrap();
 
                 // Create at most 7 dummy services.
                 if id == 7 {

@@ -3,48 +3,36 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::thread;
-use context::{ ContextTrait, SharedContext };
 use ws::{ Handler, Sender, Result, Message, Handshake, CloseCode, Error };
-
 use ws::listen;
+use controller::Controller;
 
 pub struct WsServer;
 
-pub struct WsHandler {
+pub struct WsHandler<T> {
     pub out: Sender,
-    pub context: SharedContext
+    pub controller: T
 }
 
 impl WsServer {
 
-    pub fn start(context: SharedContext) {
+    pub fn start<T: Controller>(controller: T, hostname: String, port: u16) {
         thread::Builder::new().name("WsServer".to_owned()).spawn(move || {
-
-            let hostname;
-            let port;
-            {
-                let ctx = context.lock().unwrap();
-                hostname = ctx.hostname.clone();
-                port = ctx.ws_port;
-            }
-
             listen((&hostname as &str, port), |out| {
                 WsHandler {
                     out: out,
-                    context: context.clone(),
+                    controller: controller.clone(),
                 }
             }).unwrap();
         }).unwrap();
     }
 }
 
-impl Handler for WsHandler {
+impl<T: Controller> Handler for WsHandler<T> {
 
     fn on_open(&mut self, _: Handshake) -> Result<()> {
         println!("Hello new ws connection");
-
-        self.context.lock().unwrap().add_websocket(self.out.clone());
-
+        self.controller.add_websocket(self.out.clone());
         Ok(())
     }
 
@@ -61,7 +49,7 @@ impl Handler for WsHandler {
             _ => println!("The ws client encountered an error: {}.", reason),
         }
 
-        self.context.lock().unwrap().remove_websocket(self.out.clone());
+        self.controller.remove_websocket(self.out.clone());
     }
 
     fn on_error(&mut self, err: Error) {
