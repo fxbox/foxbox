@@ -18,7 +18,6 @@ use self::collections::vec::IntoIter;
 use service::{ Service, ServiceAdapter, ServiceProperties };
 use std::collections::hash_map::HashMap;
 use std::io;
-use std::io::Error;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex };
@@ -135,7 +134,11 @@ impl Controller for FoxBox {
 
     fn services_as_json(&self) -> Result<String, serde_json::error::Error> {
         let services = self.services.lock().unwrap();
-        serde_json::to_string(&*services)
+        let mut array: Vec<&Box<Service>> = vec!();
+        for service in services.values() {
+            array.push(service);
+        }
+        serde_json::to_string(&array)
     }
 
     fn get_http_root_for_service(&self, service_id: String) -> String {
@@ -243,7 +246,7 @@ describe! controller {
             controller.add_service(Box::new(service));
 
             match controller.services_as_json() {
-                Ok(txt) => assert_eq!(txt, "{\"1\":{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}}"),
+                Ok(txt) => assert_eq!(txt, "[{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}]"),
                 Err(err) => assert!(false, err)
             }
         }

@@ -58,7 +58,7 @@ describe! service_router {
                         &service_router).unwrap();
 
         let result = response::extract_body_to_string(response);
-        assert_eq!(result, "{}");
+        assert_eq!(result, "[]");
     }
 
     it "should make service available" {
