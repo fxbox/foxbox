@@ -126,7 +126,7 @@ pub trait API {
     /// `/api/v1/service/watch/$ServiceId`
     fn register_service_watch<F>(WatchOptions, cb: F)
                                  -> Result<Self::WatchGuard, Error>
-        where F: Fn(WatchEvent) + Send;
+        where F: FnMut(WatchEvent) + Send + Sync;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
