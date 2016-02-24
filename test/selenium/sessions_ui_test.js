@@ -4,7 +4,15 @@
 'use strict';
 
 var webdriver = require('selenium-webdriver'),
-    assert    = require('assert');
+    assert    = require('assert'),
+    util      = require('util');
+
+var HOST_URL = util.format(
+    'http://%s:%s/',
+    process.env.BOX_HOST_NAME ? 
+        (process.env.BOX_HOST_NAME + '.local') : 'localhost',
+    process.env.BOX_PORT || '3000'
+);
 
 describe('sessions ui', function() {
   var driver;
@@ -21,7 +29,8 @@ describe('sessions ui', function() {
   });
 
   beforeEach(function() {
-    driver.get('http://localhost:3000/');
+    driver.get(HOST_URL);
+
     screens = {
       signup: driver.findElement(webdriver.By.id('signup')),
       signupSuccess: driver.findElement(webdriver.By.id('signup-success')),

@@ -75,6 +75,20 @@ $ cd foxbox
 $ cargo run
 ```
 
+To run with custom local host name (eg. foxbox.local):
+
+```bash
+$ cargo run -- -n foxbox
+```
+
+__NOTE:__ currently changing of host name is done via ```avahi-daemon``` and therefore supported only on Linux platform. To be able to change local host machine name user must be either included into ```netdev``` group or allow any other suitable user group to manage host name by adding the following policy to ```/etc/dbus-1/system.d/avahi-dbus.conf```:
+```xml
+<policy group="any_suitable_group_name">
+  <allow send_destination="org.freedesktop.Avahi"/>
+  <allow receive_sender="org.freedesktop.Avahi"/>
+</policy>
+```
+
 Alternatively you can build the app without running it via:
 
 ```bash
@@ -103,6 +117,11 @@ Then you can run the Selenium tests via:
 $ npm test
 ```
 
+It is equal to:
+
+```bash
+$ BOX_HOST_NAME=localhost BOX_PORT=3000 npm test
+```
 
 ## Cross compiling to ARM
 

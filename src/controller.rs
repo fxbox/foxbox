@@ -38,6 +38,7 @@ pub struct FoxBox {
 pub const DEFAULT_HTTP_PORT: u16 = 3000;
 const DEFAULT_WS_PORT: u16 = 4000;
 const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
+const DEFAULT_DOMAIN: &'static str = ".local";
 
 pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn run(&mut self);
@@ -68,7 +69,9 @@ impl FoxBox {
             services: Arc::new(Mutex::new(HashMap::new())),
             websockets: Arc::new(Mutex::new(HashMap::new())),
             verbose: verbose,
-            hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
+            hostname: hostname.map_or(DEFAULT_HOSTNAME.to_owned(), |name| {
+                format!("{}{}", name, DEFAULT_DOMAIN)
+            }),
             http_port: http_port.unwrap_or(DEFAULT_HTTP_PORT),
             ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT),
 
@@ -210,7 +213,7 @@ describe! controller {
         use stubs::service::ServiceStub;
 
         let service = ServiceStub;
-        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
+        let controller = FoxBox::new(false, Some("foxbox".to_owned()), None, None);
     }
 
     describe! add_service {
@@ -233,13 +236,13 @@ describe! controller {
         it "should create http root" {
             controller.add_service(Box::new(service));
             assert_eq!(controller.get_http_root_for_service("1".to_string()),
-                       "http://localhost:3000/services/1/");
+                       "http://foxbox.local:3000/services/1/");
         }
 
         it "should create ws root" {
             controller.add_service(Box::new(service));
             assert_eq!(controller.get_ws_root_for_service("1".to_string()),
-                       "ws://localhost:4000/services/1/");
+                       "ws://foxbox.local:4000/services/1/");
         }
 
         it "should return a json" {
