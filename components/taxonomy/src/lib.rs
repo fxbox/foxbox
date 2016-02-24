@@ -19,6 +19,7 @@
 //! # Example
 //!
 //! The FoxBox itelf is a `Node`, which may offer the following services:
+//!
 //! - `Service<Input>`: `ServiceKind::CurrentTime`, `ServiceKind::CurrentTimeOfDay`, ...
 //! - `Service<Output>`: `ServiceKind::SMS`.
 //!
@@ -26,6 +27,7 @@
 //! # Example
 //!
 //! A light is a `Node`, which may offer:
+//!
 //! - a `Service<Output>` with `ServiceKind::OnOff`, to turn the light on or off;
 //! - a `Service<Input>` with `ServiceKind::OnOff`, to determine whether the light is on or off;
 //! - a `Service<Output>` with `ServiceKind::Color`, to change the color of the light;
