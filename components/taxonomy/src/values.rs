@@ -215,7 +215,7 @@ impl PartialOrd for Value {
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
-pub struct ValDuration(Duration);
+pub struct ValDuration(pub Duration);
 impl Serialize for ValDuration {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {

@@ -101,9 +101,6 @@ impl ServiceId {
 /// pre-existing constructors. For this purpose, this enumeration
 /// offers a constructor `Extension`, designed to describe novel
 /// services.
-//
-// Important: If you add constructors, don't forget to update `from_string`.
-//
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ServiceKind {
     ///
