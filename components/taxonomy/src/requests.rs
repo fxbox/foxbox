@@ -31,19 +31,19 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 pub struct NodeRequest {
     /// If `Exactly(id)`, return only the node with the corresponding id.
     #[serde(default)]
-    id: Exactly<NodeId>,
+    pub id: Exactly<NodeId>,
 
     ///  Restrict results to nodes that have all the tags in `tags`.
     #[serde(default)]
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 
     /// Restrict results to nodes that have all the inputs in `inputs`.
     #[serde(default)]
-    inputs: Vec<InputRequest>,
+    pub inputs: Vec<InputRequest>,
 
     /// Restrict results to nodes that have all the outputs in `outputs`.
     #[serde(default)]
-    outputs: Vec<OutputRequest>,
+    pub outputs: Vec<OutputRequest>,
 }
 
 
@@ -115,33 +115,32 @@ impl NodeRequest {
 pub struct InputRequest {
     /// If `Exactly(id)`, return only the service with the corresponding id.
     #[serde(default)]
-    id: Exactly<ServiceId>,
+    pub id: Exactly<ServiceId>,
 
     /// If `Eactly(id)`, return only services that are children of
     /// node `id`.
     #[serde(default)]
-    parent: Exactly<NodeId>,
+    pub parent: Exactly<NodeId>,
 
     ///  Restrict results to services that have all the tags in `tags`.
     #[serde(default)]
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 
     /// If `Exatly(k)`, restrict results to services that produce values
     /// of kind `k`.
     #[serde(default)]
-    kind: Exactly<ServiceKind>,
+    pub kind: Exactly<ServiceKind>,
 
     /// If `Some(r)`, restrict results to services that support polling
     /// with the acceptable period.
     #[serde(default)]
-    poll: Option<Period>,
+    pub poll: Option<Period>,
 
     /// If `Some(r)`, restrict results to services that support trigger
     /// with the acceptable period.
     #[serde(default)]
-    trigger: Option<Period>,
+    pub trigger: Option<Period>,
 }
-
 impl InputRequest {
     /// Create a new request that accepts all input services.
     pub fn new() -> Self {
@@ -216,26 +215,26 @@ impl InputRequest {
 pub struct OutputRequest {
     /// If `Exactly(id)`, return only the service with the corresponding id.
     #[serde(default)]
-    id: Exactly<ServiceId>,
+    pub id: Exactly<ServiceId>,
 
     /// If `Exactly(id)`, return only services that are immediate children
     /// of node `id`.
     #[serde(default)]
-    parent: Exactly<NodeId>,
+    pub parent: Exactly<NodeId>,
 
     ///  Restrict results to services that have all the tags in `tags`.
     #[serde(default)]
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 
     /// If `Exactly(k)`, restrict results to services that accept values
     /// of kind `k`.
     #[serde(default)]
-    kind: Exactly<ServiceKind>,
+    pub kind: Exactly<ServiceKind>,
 
     /// If `Some(r)`, restrict results to services that support pushing
     /// with the acceptable period.
     #[serde(default)]
-    push: Option<Period>,
+    pub push: Option<Period>,
 }
 
 impl OutputRequest {
