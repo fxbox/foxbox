@@ -149,7 +149,7 @@ pub trait API {
     ///
     /// Any JSON that can be deserialized to
     ///
-    /// ```rust
+    /// ```ignore
     /// {
     ///   set: Vec<NodeRequest>,
     ///   tags: Vec<String>,
@@ -188,7 +188,7 @@ pub trait API {
     ///
     /// Any JSON that can be deserialized to
     ///
-    /// ```rust
+    /// ```ignore
     /// {
     ///   set: Vec<NodeRequest>,
     ///   tags: Vec<String>,
@@ -235,14 +235,14 @@ pub trait API {
     ///
     /// Any JSON that can be deserialized to
     ///
-    /// ```rust
+    /// ```ignore
     /// {
     ///   set: Vec<InputRequest>,
     ///   tags: Vec<String>,
     /// }
     /// ```
     /// or
-    /// ```rust
+    /// ```ignore
     /// {
     ///   set: Vec<OutputRequest>,
     ///   tags: Vec<String>,
@@ -282,14 +282,14 @@ pub trait API {
     ///
     /// Any JSON that can be deserialized to
     ///
-    /// ```rust
+    /// ```ignore
     /// {
     ///   set: Vec<InputRequest>,
     ///   tags: Vec<String>,
     /// }
     /// ```
     /// or
-    /// ```rust
+    /// ```ignore
     /// {
     ///   set: Vec<OutputRequest>,
     ///   tags: Vec<String>,

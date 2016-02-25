@@ -44,6 +44,10 @@ pub struct NodeRequest {
     /// Restrict results to nodes that have all the outputs in `outputs`.
     #[serde(default)]
     pub outputs: Vec<OutputRequest>,
+
+    /// Make sure that we can't instantiate from another crate.
+    #[serde(default, skip_serializing)]
+    private: (),
 }
 
 
@@ -92,6 +96,7 @@ impl NodeRequest {
             tags: merge(self.tags, other.tags),
             inputs: {self.inputs.append(&mut other.inputs); self.inputs},
             outputs: {self.outputs.append(&mut other.outputs); self.outputs},
+            private: (),
         }
     }
 }
@@ -140,6 +145,10 @@ pub struct InputRequest {
     /// with the acceptable period.
     #[serde(default)]
     pub trigger: Option<Period>,
+
+    /// Make sure that we can't instantiate from another crate.
+    #[serde(default, skip_serializing)]
+    private: (),
 }
 impl InputRequest {
     /// Create a new request that accepts all input services.
@@ -206,6 +215,7 @@ impl InputRequest {
             kind: self.kind.and(other.kind),
             poll: Period::and_option(self.poll, other.poll),
             trigger: Period::and_option(self.trigger, other.trigger),
+            private: (),
         }
     }
 }
@@ -235,6 +245,10 @@ pub struct OutputRequest {
     /// with the acceptable period.
     #[serde(default)]
     pub push: Option<Period>,
+
+    /// Make sure that we can't instantiate from another crate.
+    #[serde(default, skip_serializing)]
+    private: (),
 }
 
 impl OutputRequest {
@@ -292,6 +306,7 @@ impl OutputRequest {
             tags: merge(self.tags, other.tags),
             kind: self.kind.and(other.kind),
             push: Period::and_option(self.push, other.push),
+            private: (),
         }
     }
 }
