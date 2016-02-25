@@ -337,13 +337,17 @@ pub trait API: Send {
 pub struct WatchOptions {
     /// The set of inputs to watch. Note that the actual inputs in the
     /// set may change over time.
-    source: InputRequest,
+    pub source: InputRequest,
 
     /// If `true`, watch as new values become available.
-    should_watch_values: bool,
+    pub should_watch_values: bool,
 
     /// If `true`, watch as nodes are connected/disconnected.
-    should_watch_topology: bool,
+    pub should_watch_topology: bool,
+
+    /// Make sure that we can't instantiate from another crate.
+    #[serde(default, skip_serializing)]
+    private: (),
 }
 
 impl WatchOptions {
@@ -352,6 +356,7 @@ impl WatchOptions {
             source: InputRequest::new(),
             should_watch_values: false,
             should_watch_topology: false,
+            private: (),
         }
     }
 
