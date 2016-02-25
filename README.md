@@ -8,12 +8,26 @@
 
 ### Rust
 
-We're using Rust for the daemon/server. Currently v1.8.x nightly is required. As
-of 2016-02-24:
+We're using Rust for the daemon/server. Currently v1.8.x nightly is required.
 
+To determine which version of rust is being used, check the
+[.travis.yml](https://github.com/fxbox/foxbox/blob/master/.travis.yml) file.
+
+Look for these 2 lines near the top of the file:
+```yaml
+rust:
+    - nightly-2016-02-22
+```
+You should then be able to then use:
+```
+multirust override nightly-2016-02-22
+```
+to get the same version of toolchain that's being used for the travis tests.
+
+Incidently, nightly-2016-02-22 corresponds to:
 ```bash
 $ rustc -V
-rustc 1.8.0-nightly (c8fc4817d 2016-02-22)
+rustc 1.8.0-nightly (c92e910c1 2016-02-21)
 ```
 
 It's recommended that you use [`multirust`](https://github.com/brson/multirust)
