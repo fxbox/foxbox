@@ -4,6 +4,7 @@
 use std::cmp::{PartialOrd, Ordering};
 use std::time::Duration;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use serde_json;
 use chrono;
@@ -144,15 +145,25 @@ pub enum Value {
     TimeStamp(TimeStamp),
     Temperature(Temperature),
     Color(Color),
-    String(String),
+    String(Arc<String>),
 
     // FIXME: Add more as we identify needs
 
     /// A numeric value representing a unit that has not been
     /// standardized yet into the API.
     ExtNumeric(ExtNumeric),
-    Json(Json),
-    Binary {data: Vec<u8>, mimetype: String}
+
+    /// A Json value. We put it behind an `Arc` to make sure that
+    /// cloning remains unexpensive.
+    Json(Arc<Json>),
+
+    /// Binary data.
+    Binary {
+        /// The actual data. We put it behind an `Arc` to make sure
+        /// that cloning remains unexpensive.
+        data: Arc<Vec<u8>>,
+        mimetype: String
+    }
 }
 
 impl Value {

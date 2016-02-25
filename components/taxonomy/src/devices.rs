@@ -48,33 +48,10 @@ pub struct Node {
     /// Services connected directly to this node.
     inputs: Vec<Service<Input>>,
     outputs: Vec<Service<Output>>,
-}
 
-impl Node {
-    /// Tags describing the node.
-    ///
-    /// These tags can be set by the user, adapters or
-    /// applications. They are used by applications.
-    ///
-    /// For instance "entrance".
-    pub fn get_tags<'a>(&'a self) -> &'a Vec<String> {
-        &self.tags
-    }
-
-    /// An id unique to this node.
-    pub fn get_id<'a>(&'a self) -> &'a NodeId {
-        &self.id
-    }
-
-    /// Input services connected directly to this node.
-    pub fn get_inputs<'a>(&'a self) -> &'a Vec<Service<Input>> {
-        &self.inputs
-    }
-
-    /// Output services connected directly to this node.
-    pub fn get_outputs<'a>(&'a self) -> &'a Vec<Service<Output>> {
-        &self.outputs
-    }
+    /// Make sure that we can't instantiate from another crate.
+    #[serde(default, skip_serializing)]
+    private: (),
 }
 
 /// The unique Id of a service on the network.
@@ -187,21 +164,6 @@ impl ServiceKind {
             Extension { ref typ, ..} => typ.clone(),
         }
     }
-
-    pub fn from_string(s: String) -> Option<Self> {
-        use self::ServiceKind::*;
-        match &*s {
-            "Ready" => Some(Ready),
-            "OnOff" => Some(OnOff),
-            "OpenClosed" => Some(OpenClosed),
-            "CurrentTime" => Some(CurrentTime),
-            "CurrentTimeOfDay" => Some(CurrentTimeOfDay),
-            "RemainingTime" => Some(RemainingTime),
-            "Thermostat" => Some(Thermostat),
-            "ActualTemperature" => Some(ActualTemperature),
-            _ => None,
-        }
-    }
 }
 
 
@@ -209,7 +171,7 @@ impl ServiceKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Input {
     /// The kind of value that can be obtained from this service.
-    kind: ServiceKind,
+    pub kind: ServiceKind,
 
     /// If `Some(duration)`, this service can be polled, i.e. it
     /// will respond when the FoxBox requests the latest value.
@@ -225,7 +187,7 @@ pub struct Input {
     ///   do not accept requests and rather send batches of
     ///   data every 24h.
     #[serde(default)]
-    poll: Option<ValDuration>,
+    pub poll: Option<ValDuration>,
 
     /// If `Some(duration)`, this service can send the data to
     /// the FoxBox whenever it is updated. Parameter `duration`
@@ -234,94 +196,38 @@ pub struct Input {
     /// Otherwise, the service cannot send data to the FoxBox
     /// and needs to be polled.
     #[serde(default)]
-    trigger: Option<ValDuration>,
+    pub trigger: Option<ValDuration>,
 
     /// Date at which the latest value was received, whether through
     /// polling or through a trigger.
-    updated: TimeStamp,
+    pub updated: TimeStamp,
+
+    /// Make sure that we can't instantiate from another crate.
+    #[serde(default, skip_serializing)]
+    private: (),
 }
 impl IOMechanism for Input {
-}
-impl Input {
-    /// The kind of value that can be obtained from this service.
-    pub fn get_kind(&self) -> ServiceKind {
-        self.kind.clone()
-    }
-
-    /// If `Some(duration)`, this service can be polled, i.e. it
-    /// will respond when the FoxBox requests the latest value.
-    /// Parameter `duration` indicates the smallest interval
-    /// between two updates.
-    ///
-    /// Otherwise, the service cannot be polled and will push
-    /// data to the FoxBox when it is available.
-    ///
-    /// # Examples
-    ///
-    /// - Long-running pollution or humidity sensors typically
-    ///   do not accept requests and rather send batches of
-    ///   data every 24h.
-    pub fn get_poll(&self) -> Option<ValDuration> {
-        self.poll.clone()
-    }
-
-    /// If `Some(duration)`, this service can send the data to
-    /// the FoxBox whenever it is updated. Parameter `duration`
-    /// indicates the smallest interval between two updates.
-    ///
-    /// Otherwise, the service cannot send data to the FoxBox
-    /// and needs to be polled.
-    pub fn get_trigger(&self) -> Option<ValDuration> {
-        self.trigger.clone()
-    }
-
-    /// Date at which the latest value was received, whether through
-    /// polling or through a trigger.
-    ///
-    /// # Limitation
-    ///
-    /// This is *not* a live view.
-    pub fn get_updated(&self) -> TimeStamp {
-        self.updated.clone()
-    }
 }
 
 /// An output operation available on an service.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Output {
     /// The kind of value that can be sent to this service.
-    kind: ServiceKind,
+    pub kind: ServiceKind,
 
     /// If `Some(duration)`, this service supports pushing,
     /// i.e. the FoxBox can send values.
     #[serde(default)]
-    push: Option<ValDuration>,
+    pub push: Option<ValDuration>,
 
     /// Date at which the latest value was sent to the service.
-    updated: TimeStamp,
+    pub updated: TimeStamp,
+
+    /// Make sure that we can't instantiate from another crate.
+    #[serde(default, skip_serializing)]
+    private: (),
 }
 impl IOMechanism for Output {
-}
-impl Output {
-    /// The kind of value that can be sent to this service.
-    pub fn get_kind(&self) -> ServiceKind {
-        self.kind.clone()
-    }
-
-    /// If `Some(duration)`, this service supports pushing,
-    /// i.e. the FoxBox can send values.
-    pub fn get_push(&self) -> Option<ValDuration> {
-        self.push.clone()
-    }
-
-    /// Date at which the latest value was sent.
-    ///
-    /// # Limitation
-    ///
-    /// This is *not* a live view.
-    pub fn get_updated(&self) -> TimeStamp {
-        self.updated.clone()
-    }
 }
 
 /// An service represents a single place where data can enter or
@@ -338,51 +244,23 @@ pub struct Service<IO> where IO: IOMechanism {
     ///
     /// For instance "entrance".
     #[serde(default)]
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 
     /// An id unique to this service.
-    id: ServiceId,
+    pub id: ServiceId,
 
     /// The node owning this service.
-    node: NodeId,
+    pub node: NodeId,
 
     /// The update mechanism for this service.
-    mechanism: IO,
+    pub mechanism: IO,
 
     /// The last time the device was seen.
-    last_seen: TimeStamp,
-}
+    pub last_seen: TimeStamp,
 
-impl<IO> Service<IO> where IO: IOMechanism {
-    /// Tags describing the service.
-    ///
-    /// These tags can be set by the user, adapters or
-    /// applications. They are used to regroup services for rules.
-    ///
-    /// For instance "entrance".
-    pub fn get_tags<'a>(&'a self) -> &'a Vec<String> {
-        &self.tags
-    }
-
-    /// An id unique to this service.
-    pub fn get_id<'a>(&'a self) -> &'a ServiceId {
-        &self.id
-    }
-
-    /// The node owning this service.
-    pub fn get_node_id<'a>(&'a self) -> &'a NodeId {
-        &self.node
-    }
-
-    /// The update mechanism for this service.
-    pub fn get_mechanism<'a>(&'a self) -> &'a IO {
-        &self.mechanism
-    }
-
-    /// The last time the device was seen.
-    pub fn get_last_seen(&self) -> TimeStamp {
-        self.last_seen.clone()
-    }
+    /// Make sure that we can't instantiate from another crate.
+    #[serde(default, skip_serializing)]
+    private: (),
 }
 
 /// A mechanism used for communicating between the application and the
