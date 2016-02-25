@@ -40,14 +40,14 @@ pub struct Node {
     /// controlling blue lights. An adapter may set tags "plugged" or
     /// "battery" to devices that respectively depend on a plugged
     /// power source or on a battery.
-    tags: Vec<String>,
+    pub tags: Vec<String>,
 
     /// An id unique to this node.
-    id: NodeId,
+    pub id: NodeId,
 
     /// Services connected directly to this node.
-    inputs: Vec<Service<Input>>,
-    outputs: Vec<Service<Output>>,
+    pub inputs: Vec<Service<Input>>,
+    pub outputs: Vec<Service<Output>>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
