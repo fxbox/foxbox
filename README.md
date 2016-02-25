@@ -9,11 +9,11 @@
 ### Rust
 
 We're using Rust for the daemon/server. Currently v1.8.x nightly is required. As
-of 2016-02-04:
+of 2016-02-24:
 
 ```bash
 $ rustc -V
-rustc 1.8.0-nightly (fae516277 2016-02-13)
+rustc 1.8.0-nightly (c8fc4817d 2016-02-22)
 ```
 
 It's recommended that you use [`multirust`](https://github.com/brson/multirust)
