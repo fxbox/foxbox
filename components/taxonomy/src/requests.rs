@@ -358,4 +358,14 @@ impl Period {
         }
         return true;
     }
+
+    pub fn matches_option(period: &Option<Self>, duration: &Option<values::ValDuration>) -> bool {
+        match (period, duration) {
+            (&Some(ref period), &Some(ref duration))
+                if !period.matches(duration) =>
+                return false,
+            (&None, &Some(_)) => return false,
+            _ => return true
+        }
+    }
 }
