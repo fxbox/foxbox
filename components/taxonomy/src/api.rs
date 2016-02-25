@@ -53,8 +53,8 @@ pub enum WatchEvent {
     InputAdded(ServiceId),
 }
 
-/// The public API.
-pub trait API {
+/// A handle to the public API.
+pub trait API: Clone {
     /// Get the metadata on nodes matching some conditions.
     ///
     /// A call to `API::get_nodes(vec![req1, req2, ...])` will return
