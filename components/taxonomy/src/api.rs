@@ -125,7 +125,7 @@ pub trait API {
     ///   ]
     /// }]
     /// ```
-    fn get_nodes(&Vec<NodeRequest>) -> Vec<Node>;
+    fn get_nodes(&self, &Vec<NodeRequest>) -> Vec<Node>;
 
     /// Label a set of nodes with a set of tags.
     ///
@@ -164,7 +164,7 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON string representing a number.
-    fn put_node_tag(set: &Vec<NodeRequest>, tags: &Vec<String>) -> usize;
+    fn put_node_tag(&self, set: &Vec<NodeRequest>, tags: &Vec<String>) -> usize;
 
     /// Remove a set of tags from a set of nodes.
     ///
@@ -203,15 +203,15 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn delete_node_tag(set: &Vec<NodeRequest>, tags: String) -> usize;
+    fn delete_node_tag(&self, set: &Vec<NodeRequest>, tags: String) -> usize;
     
     /// Get a list of inputs matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/services`
-    fn get_input_services(&Vec<InputRequest>) -> Vec<Service<Input>>;
-    fn get_output_services(&Vec<OutputRequest>) -> Vec<Service<Output>>;
+    fn get_input_services(&self, &Vec<InputRequest>) -> Vec<Service<Input>>;
+    fn get_output_services(&self, &Vec<OutputRequest>) -> Vec<Service<Output>>;
 
     /// Label a set of services with a set of tags.
     ///
@@ -257,8 +257,8 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn put_input_tag(&Vec<InputRequest>, &Vec<String>) -> usize;
-    fn put_output_tag(&Vec<OutputRequest>, &Vec<String>) -> usize;
+    fn put_input_tag(&self, &Vec<InputRequest>, &Vec<String>) -> usize;
+    fn put_output_tag(&self, &Vec<OutputRequest>, &Vec<String>) -> usize;
 
     /// Remove a set of tags from a set of services.
     ///
@@ -304,30 +304,29 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn delete_input_tag(&Vec<InputRequest>, &Vec<String>) -> usize;
-    fn delete_output_tag(&Vec<InputRequest>, &Vec<String>) -> usize;
+    fn delete_input_tag(&self, &Vec<InputRequest>, &Vec<String>) -> usize;
+    fn delete_output_tag(&self, &Vec<InputRequest>, &Vec<String>) -> usize;
 
     /// Read the latest value from a set of services
     ///
     /// # REST API
     ///
     /// `GET /api/v1/services/value`
-    fn get_service_value(&Vec<InputRequest>) -> Vec<(ServiceId, Result<Value, Error>)>;
+    fn get_service_value(&self, &Vec<InputRequest>) -> Vec<(ServiceId, Result<Value, Error>)>;
 
     /// Send one value to a set of services
     ///
     /// # REST API
     ///
     /// `POST /api/v1/services/value`
-    fn put_service_value(&Vec<OutputRequest>, Value) -> Vec<(ServiceId, Result<(), Error>)>;
+    fn put_service_value(&self, &Vec<OutputRequest>, Value) -> Vec<(ServiceId, Result<(), Error>)>;
 
     /// Watch for any change
     ///
     /// # WebSocket API
     ///
     /// `/api/v1/services/watch`
-    fn register_service_watch<F>(Vec<WatchOptions>, cb: F) -> Self::WatchGuard
-        where F: FnMut(WatchEvent) + Send + 'static;
+    fn register_service_watch(&self, Vec<WatchOptions>, cb: Box<FnMut(WatchEvent) + Send + 'static>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
