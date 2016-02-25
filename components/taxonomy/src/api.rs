@@ -18,6 +18,7 @@ use requests::*;
 use values::Value;
 
 /// An error produced by one of the APIs in this module.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Error {
     /// There is no such node connected to the Foxbox, even indirectly.
     NoSuchNode(NodeId),
