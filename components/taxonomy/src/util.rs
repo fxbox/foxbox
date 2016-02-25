@@ -4,12 +4,12 @@ use serde::de::Deserializer;
 
 /// A marker for a request that a expects a specific value.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Exactly<Id> {
+pub enum Exactly<T> {
     /// No constraint.
     Empty,
 
     /// Expect a specific value.
-    Exactly(Id),
+    Exactly(T),
 
     /// Two conflicting constraints (or more) have been put on the value.
     Conflict,
@@ -35,6 +35,14 @@ impl<T> Exactly<T> where T: PartialEq {
         match *self {
             Exactly::Empty => true,
             _ => false,
+        }
+    }
+
+    pub fn matches(&self, value: &T) -> bool {
+        match *self {
+            Exactly::Exactly(ref id) => id == value,
+            Exactly::Empty => true,
+            _ => false
         }
     }
 }
