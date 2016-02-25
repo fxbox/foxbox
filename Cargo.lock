@@ -23,7 +23,7 @@ dependencies = [
  "stainless 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "staticfile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "ws 0.4.5 (git+https://github.com/hfiguiere/ws-rs.git)",
+ "ws 0.4.5 (git+https://github.com/housleyjk/ws-rs.git)",
 ]
 
 [[package]]
@@ -766,7 +766,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "ws"
 version = "0.4.5"
-source = "git+https://github.com/hfiguiere/ws-rs.git#c9e65393b0d389689f5051755c5929fa10438285"
+source = "git+https://github.com/housleyjk/ws-rs.git#d154fc56e8dd06d9172efd08ef0db9c244668cbf"
 dependencies = [
  "httparse 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",

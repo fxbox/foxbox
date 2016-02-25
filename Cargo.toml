@@ -25,7 +25,7 @@ serde_json = "0.6.0"
 serde_macros = "0.6.14"
 staticfile = "0.1.0"
 uuid = "0.1.18"
-ws = { git = "https://github.com/hfiguiere/ws-rs.git" }
+ws = { git = "https://github.com/housleyjk/ws-rs.git" }
 
 [dev-dependencies]
 stainless = "0.1.4"
