@@ -225,19 +225,10 @@ impl<T: Controller> Service for HueLightService<T> {
     // Starts the service, it will just spawn a thread and send messages once
     // in a while.
     fn start(&self) {
-        let props = self.properties.clone();
-        let controller = self.controller.clone();
-        let light = self.light.clone();
-        thread::spawn(move || {
-            controller.send_event(
-                EventData::ServiceStart { id: props.id.to_string() }).unwrap();
-            info!("Service {} started for Philips Hue light \"{}\" on bridge {}",
-                props.id, light.hue_id, light.hub_id);
-            loop {
-                // TODO: Monitor and manage state changes.
-                thread::sleep(Duration::from_millis(60000));
-            }
-        });
+        self.controller.send_event(
+                EventData::ServiceStart { id: self.properties.id.to_string() }).unwrap();
+        info!("Service {} started for Philips Hue light \"{}\" on bridge {}",
+            self.properties.id, self.light.hue_id, self.light.hub_id);
     }
 
     fn stop(&self) {
