@@ -320,7 +320,7 @@ pub struct Period {
     pub max: Option<values::ValDuration>,
 }
 impl Period {
-    fn and(self, other: Self) -> Self {
+    pub fn and(self, other: Self) -> Self {
         let min = match (self.min, other.min) {
             (None, x@_) => x,
             (x@_, None) => x,
@@ -337,11 +337,25 @@ impl Period {
         }
     }
 
-    fn and_option(a: Option<Self>, b: Option<Self>) -> Option<Self> {
+    pub fn and_option(a: Option<Self>, b: Option<Self>) -> Option<Self> {
         match (a, b) {
             (None, x@_) => x,
             (x@_, None) => x,
             (Some(a), Some(b)) => Some(a.and(b))
         }
+    }
+
+    pub fn matches(&self, duration: &values::ValDuration) -> bool {
+        if let Some(ref min) = self.min {
+            if min > duration {
+                return false;
+            }
+        }
+        if let Some(ref max) = self.max {
+            if max < duration {
+                return false;
+            }
+        }
+        return true;
     }
 }
