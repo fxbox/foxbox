@@ -5,7 +5,7 @@
 use controller::Controller;
 use events::*;
 use iron::{ Request, Response, IronResult };
-use iron::headers::ContentType;
+use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
 use router::Router;
 use service::{ Service, ServiceAdapter, ServiceProperties };
@@ -21,7 +21,7 @@ struct DummyService<T> {
 
 impl<T: Controller> DummyService<T> {
     fn new(controller: T, id: u32) -> Self {
-        println!("Creating dummy service");
+        debug!("Creating dummy service");
         let service_id = Uuid::new_v4().to_simple_string();
         DummyService {
             controller: controller.clone(),
@@ -49,11 +49,11 @@ impl<T: Controller> Service for DummyService<T> {
         let can_kill = !self.dont_kill;
         let controller = self.controller.clone();
         thread::spawn(move || {
-            println!("Hello from dummy service thread!");
+            info!("Dummy service thread started");
             let mut i = 0;
             loop {
                 thread::sleep(Duration::from_millis(1000));
-                println!("Bip #{} from {}", i, props.id);
+                info!("Bip #{} from {}", i, props.id);
                 i += 1;
                 if i == 3 && can_kill {
                     break;
@@ -65,15 +65,17 @@ impl<T: Controller> Service for DummyService<T> {
     }
 
     fn stop(&self) {
-        println!("Stopping dummy service");
+        info!("Stopping dummy service");
     }
 
     // Processes a http request.
-    fn process_request(&self, req: &Request) -> IronResult<Response> {
+    fn process_request(&self, req: &mut Request) -> IronResult<Response> {
         let cmd = req.extensions.get::<Router>().unwrap().find("command").unwrap_or("");
-        let mut response = Response::with(format!("Got command {} at url {}", cmd, req.url));
+        debug!("Dummy Adapter {} received command {}", req.url, cmd);
+        let mut response = Response::with("{\"type\": \"device/dummy\"}".to_owned());
         response.status = Some(Status::Ok);
-        response.headers.set(ContentType::plaintext());
+        response.headers.set(ContentType::json());
+        response.headers.set(AccessControlAllowOrigin::Any);
         Ok(response)
     }
 }
@@ -85,7 +87,7 @@ pub struct DummyAdapter<T> {
 
 impl<T: Controller> DummyAdapter<T> {
     pub fn new(controller: T) -> Self {
-        println!("Creating dummy adapter");
+        debug!("Creating dummy adapter");
         DummyAdapter { name: "DummyAdapter".to_owned(),
                        controller: controller }
     }
@@ -120,6 +122,6 @@ impl<T: Controller> ServiceAdapter for DummyAdapter<T> {
     }
 
     fn stop(&self) {
-        println!("Stopping dummy adapter");
+        debug!("Stopping dummy adapter");
     }
 }

@@ -7,7 +7,7 @@ extern crate collections;
 extern crate mio;
 
 use core::marker::Reflect;
-use dummy_adapter::DummyAdapter;
+use adapters::AdapterManager;
 use events::{ EventData, EventSender };
 use http_server::HttpServer;
 use iron::{Request, Response, IronResult};
@@ -41,7 +41,7 @@ const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 
 pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn run(&mut self);
-    fn dispatch_service_request(&self, id: String, request: &Request) -> IronResult<Response>;
+    fn dispatch_service_request(&self, id: String, request: &mut Request) -> IronResult<Response>;
     fn add_service(&self, service: Box<Service>);
     fn remove_service(&self, id: String);
     fn get_service_properties(&self, id: String) -> Option<ServiceProperties>;
@@ -87,11 +87,11 @@ impl Controller for FoxBox {
 
         HttpServer::new(self.clone()).start();
         WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
-        DummyAdapter::new(self.clone()).start();
+        AdapterManager::new(self.clone()).start();
         event_loop.run(&mut FoxBoxEventLoop { controller: self.clone() }).unwrap();
     }
 
-    fn dispatch_service_request(&self, id: String, request: &Request) -> IronResult<Response> {
+    fn dispatch_service_request(&self, id: String, request: &mut Request) -> IronResult<Response> {
         let services = self.services.lock().unwrap();
         match services.get(&id) {
             None => {
@@ -102,7 +102,7 @@ impl Controller for FoxBox {
                 Ok(response)
             }
             Some(service) => {
-                service.process_request(&request)
+                service.process_request(request)
             }
         }
     }

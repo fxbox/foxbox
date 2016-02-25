@@ -6,8 +6,10 @@ extern crate mio;
 
 use service::ServiceID;
 
+#[allow(dead_code)]
 pub enum EventData {
     AdapterStart { name: String },
+    AdapterNotification { info: String },
     ServiceStart { id: ServiceID },
     ServiceStop { id: ServiceID }
 }
@@ -16,6 +18,7 @@ impl EventData {
     pub fn description(&self) -> String {
         let description = match *self {
             EventData::AdapterStart { ref name } => name,
+            EventData::AdapterNotification { ref info } => info,
             EventData::ServiceStart { ref id }
             | EventData::ServiceStop { ref id } => id,
         };

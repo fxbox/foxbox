@@ -20,7 +20,7 @@ impl Service for ServiceStub {
     }
     fn start(&self)  {}
     fn stop(&self) {}
-    fn process_request(&self, _: &Request) -> IronResult<Response> {
+    fn process_request(&self, _: &mut Request) -> IronResult<Response> {
         Ok(Response::with("request processed"))
     }
 }
