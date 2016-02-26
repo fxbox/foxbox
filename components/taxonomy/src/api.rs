@@ -326,7 +326,7 @@ pub trait API: Send {
     /// # WebSocket API
     ///
     /// `/api/v1/services/watch`
-    fn register_service_watch(&self, Vec<WatchOptions>, cb: Box<FnMut(WatchEvent) + Send + 'static>) -> Self::WatchGuard;
+    fn register_service_watch(&self, Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
