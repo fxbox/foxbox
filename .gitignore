@@ -12,3 +12,6 @@
 
 # Used in selenium tests
 node_modules
+
+# Database files
+*.sqlite

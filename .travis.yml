@@ -19,7 +19,8 @@ before_script:
     - npm install
 
 script:
+    - rm -f *sqlite
     - cargo build # Linter is also executed here
     - RUST_BACKTRACE=1 cargo test
-    - jshint static/*.js test/selenium/*.js
+    - jshint static/js/*.js test/selenium/*.js
     - (cargo run &> /dev/null &) ; npm test

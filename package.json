@@ -6,7 +6,7 @@
     "node": ">=4.0.0"
   },
   "scripts": {
-    "test": "./node_modules/.bin/mocha test/selenium/ftu_test.js"
+    "test": "rm -f *sqlite && ./node_modules/.bin/mocha test/selenium/*_test.js"
   },
   "repository": {
     "type": "git",
