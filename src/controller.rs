@@ -80,7 +80,7 @@ impl FoxBox {
 impl Controller for FoxBox {
 
     fn run(&mut self) {
-        println!("Starting controller");
+        debug!("Starting controller");
 
         let mut event_loop = mio::EventLoop::new().unwrap();
         self.event_sender = Some(event_loop.channel());
@@ -165,7 +165,7 @@ impl Controller for FoxBox {
         for socket in self.websockets.lock().unwrap().values() {
             match socket.send(data.to_owned()) {
                 Ok(_) => (),
-                Err(err) => println!("Error sending to socket: {}", err)
+                Err(err) => error!("Error sending to socket: {}", err)
             }
         }
     }
@@ -180,21 +180,21 @@ impl mio::Handler for FoxBoxEventLoop {
     type Message = EventData;
 
     fn notify(&mut self, _: &mut EventLoop<Self>, data: EventData) {
-        println!("Receiving a notification! {}", data.description());
+        info!("Receiving a notification! {}", data.description());
 
         self.controller.broadcast_to_websockets(data.description());
 
         match data {
             EventData::ServiceStart { id } => {
-                println!("Service started: {:?}",
+                debug!("Service started: {:?}",
                          self.controller.get_service_properties(id.to_owned()));
 
-                println!("ServiceStart {} We now have {} services.",
+                info!("ServiceStart {} We now have {} services.",
                          id, self.controller.services_count());
             }
             EventData::ServiceStop { id } => {
                 self.controller.remove_service(id.clone());
-                println!("ServiceStop {} We now have {} services.",
+                info!("ServiceStop {} We now have {} services.",
                          id, self.controller.services_count());
             }
             _ => { }

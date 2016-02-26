@@ -31,28 +31,28 @@ impl WsServer {
 impl<T: Controller> Handler for WsHandler<T> {
 
     fn on_open(&mut self, _: Handshake) -> Result<()> {
-        println!("Hello new ws connection");
+        info!("Hello new ws connection");
         self.controller.add_websocket(self.out.clone());
         Ok(())
     }
 
     fn on_message(&mut self, msg: Message) -> Result<()> {
-        println!("Message from websocket ({:?}): {}", self.out.token(), msg);
+        info!("Message from websocket ({:?}): {}", self.out.token(), msg);
 
         Ok(())
     }
 
     fn on_close(&mut self, code: CloseCode, reason: &str) {
         match code {
-            CloseCode::Normal => println!("The ws client is done with the connection."),
-            CloseCode::Away => println!("The ws client is leaving the site."),
-            _ => println!("The ws client encountered an error: {}.", reason),
+            CloseCode::Normal => info!("The ws client is done with the connection."),
+            CloseCode::Away => info!("The ws client is leaving the site."),
+            _ => error!("The ws client encountered an error: {}.", reason),
         }
 
         self.controller.remove_websocket(self.out.clone());
     }
 
     fn on_error(&mut self, err: Error) {
-        println!("The ws server encountered an error: {:?}", err);
+        error!("The ws server encountered an error: {:?}", err);
     }
 }
