@@ -63,7 +63,7 @@ use controller::{ Controller, FoxBox, DEFAULT_HTTP_PORT };
 use tunnel_controller:: { TunnelConfig, Tunnel };
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-t <tunnel>]
+Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>]
 
 Options:
     -v, --verbose            Toggle verbose output.
@@ -71,12 +71,14 @@ Options:
     -p, --port <port>        Set port to listen on for http connections.
     -w, --wsport <wsport>    Set port to listen on for websocket.
     -r, --register <url>     Change the url of the registration endpoint.
+    -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
     -h, --help               Print this help menu.
 ",
         flag_name: Option<String>,
         flag_port: Option<u16>,
         flag_wsport: Option<u16>,
+        flag_iface: Option<String>,
         flag_register: Option<String>,
         flag_tunnel: Option<String>);
 
@@ -86,7 +88,7 @@ fn main() {
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
     let registrar = registration::Registrar::new();
-    registrar.start(args.flag_register);
+    registrar.start(args.flag_register, args.flag_iface);
 
     // Start the tunnel.
     if let Some(host) = args.flag_tunnel {
