@@ -1,4 +1,4 @@
-use devices::{NodeId, ServiceId, ServiceKind};
+use devices::{NodeId, ServiceId, ServiceKind, Service, Input, Output};
 use util::Exactly;
 use values;
 
@@ -218,6 +218,29 @@ impl InputRequest {
             private: (),
         }
     }
+
+    /// Determine if a service is matched by this request.
+    pub fn matches(&self, service: &Service<Input>) -> bool {
+        if !self.id.matches(&service.id) {
+            return false;
+        }
+        if !self.parent.matches(&service.node) {
+            return false;
+        }
+        if !self.kind.matches(&service.mechanism.kind) {
+            return false;
+        }
+        if !Period::matches_option(&self.poll, &service.mechanism.poll) {
+            return false;
+        }
+        if !Period::matches_option(&self.trigger, &service.mechanism.trigger) {
+            return false;
+        }
+        if !has_requested_tags(&self.tags, &service.tags) {
+            return false;
+        }
+        return true;
+    }
 }
 
 /// A request for one or more output services.
@@ -309,6 +332,26 @@ impl OutputRequest {
             private: (),
         }
     }
+
+    /// Determine if a service is matched by this request.
+    pub fn matches(&self, service: &Service<Output>) -> bool {
+        if !self.id.matches(&service.id) {
+            return false;
+        }
+        if !self.parent.matches(&service.node) {
+            return false;
+        }
+        if !self.kind.matches(&service.mechanism.kind) {
+            return false;
+        }
+        if !Period::matches_option(&self.push, &service.mechanism.push) {
+            return false;
+        }
+        if !has_requested_tags(&self.tags, &service.tags) {
+            return false;
+        }
+        return true;
+    }
 }
 
 /// An acceptable interval of time.
@@ -368,4 +411,13 @@ impl Period {
             _ => return true
         }
     }
+}
+
+fn has_requested_tags(actual: &Vec<String>, requested: &Vec<String>) -> bool {
+    for tag in &*actual {
+        if requested.iter().find(|x| *x == tag).is_none() {
+            return false;
+        }
+    }
+    return true;
 }
