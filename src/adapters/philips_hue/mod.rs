@@ -56,20 +56,17 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
             let nupnp_hubs = nupnp::query();
             debug!("nUPnP reported Philips Hue bridges: {:?}", nupnp_hubs);
 
-            let available_hubs = nupnp_hubs
-                .iter()
-                .filter(|hub| hub.is_available())
-                .collect::<Vec<_>>();
+            for hub in nupnp_hubs {
+                if !hub.is_available() {
+                    continue;
+                }
 
-            let paired_hubs = available_hubs
-                .iter()
-                .filter(|hub| {
-                    info!("Philips Hue bridge {} at {}", hub.id, hub.ip);
-
-                    // Querying the settings fails when not paired with the bridge
-                    if hub.is_paired() {
-                        true
-                    } else {
+                // For each Hub, spawn a thread that will check availability and
+                // pairing.
+                let controller = controller.clone();
+                thread::spawn(move || {
+                    // If the Hub is not paired, try pairing.
+                    if !hub.is_paired() {
                         info!("Push pairing button on Philips Hue Bridge ID {}", hub.id);
 
                         // Try pairing for 120 seconds.
@@ -94,7 +91,6 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
                                          "{{\"adapter\": \"philips_hue\", \"message\": \"PairingSuccess\", \"hub\": \"{}\"}}",
                                          hub.id)
                                  }).unwrap();
-                            true
                         } else {
                             warn!("Pairing timeout with Philips Hue Bridge ID {}", hub.id);
                             controller.send_event(
@@ -103,32 +99,31 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
                                          "{{\"adapter\": \"philips_hue\", \"message\": \"PairingTimeout\", \"hub\": \"{}\"}}",
                                          hub.id)
                                  }).unwrap();
-                            false
+                            // Giving up for this Hub.
+                            return;
                         }
                     }
-                })
-                .collect::<Vec<_>>();
 
-            for hub in &paired_hubs {
-                hub.is_available();
-                // Extract and log some info
-                let setting = hub.get_settings();
-                let hs = HueHubSettings::new(&setting).unwrap(); // TODO: no unwrap
-                info!(
-                    "Connected to Philips Hue bridge model {}, ID {}, software version {}, IP address {}",
-                    hs.config.modelid, hs.config.bridgeid, hs.config.swversion,
-                    hs.config.ipaddress);
+                    // We have a paired Hub, instanciate the lights services.
+                    // Extract and log some info
+                    let setting = hub.get_settings();
+                    let hs = HueHubSettings::new(&setting).unwrap(); // TODO: no unwrap
+                    info!(
+                        "Connected to Philips Hue bridge model {}, ID {}, software version {}, IP address {}",
+                        hs.config.modelid, hs.config.bridgeid, hs.config.swversion,
+                        hs.config.ipaddress);
 
-                let lights = hub.get_lights();
-                for light in lights {
-                    debug!("Spawning service for {:?}", light);
-                    id += 1;
-                    let service = HueLightService::new(controller.clone(), id, light);
-                    let service_id = service.get_properties().id;
-                    service.start();
-                    controller.add_service(Box::new(service));
-                    controller.send_event(EventData::ServiceStart { id: service_id }).unwrap();
-                }
+                    let lights = hub.get_lights();
+                    for light in lights {
+                        debug!("Creating service for {:?}", light);
+                        id += 1;
+                        let service = HueLightService::new(controller.clone(), id, light);
+                        let service_id = service.get_properties().id;
+                        service.start();
+                        controller.add_service(Box::new(service));
+                        controller.send_event(EventData::ServiceStart { id: service_id }).unwrap();
+                    }
+                });
             }
         });
     }
