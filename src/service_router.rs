@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use controller::Controller;
-use iron::{AfterMiddleware, headers, IronResult, Request, Response};
+use iron::{ AfterMiddleware, headers, IronResult, Request, Response };
 use iron::headers::ContentType;
 use iron::method::Method;
 use iron::method::Method::*;
@@ -68,8 +68,9 @@ impl AfterMiddleware for CORS {
             ]
         ));
         res.headers.set(headers::AccessControlAllowMethods(
-            vec![Get, Post, Options, Put]
+            vec![Get, Post, Put]
         ));
+        res.status = Some(Status::Ok);
         Ok(res)
     }
 }
