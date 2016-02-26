@@ -95,6 +95,15 @@ Alternatively you can build the app without running it via:
 $ cargo build
 ```
 
+## Build time options
+### Disable authentication
+You may want to disable endpoints authentication to ease your development process. You can do that by removing `authentication` from the `default` feature in the `Cargo.toml` file.
+
+```conf
+[features]
+default = []
+authentication = []
+```
 
 ## Rust tests
 
