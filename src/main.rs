@@ -23,6 +23,8 @@
 
 #![feature(reflect_marker)]
 
+#![feature(associated_consts)]
+
 extern crate core;
 extern crate docopt;
 extern crate env_logger;
@@ -38,6 +40,7 @@ extern crate router;
 extern crate rustc_serialize;
 extern crate serde;
 extern crate staticfile;
+extern crate unicase;
 extern crate uuid;
 extern crate ws;
 
