@@ -150,4 +150,26 @@ describe! service_router {
         let result = response::extract_body_to_string(response);
         assert_eq!(result, "No Such Service: unknown-id");
     }
+
+    it "should get the appropriate CORS headers" {
+        use iron::headers;
+        use super::CORS;
+
+        for endpoint in CORS::ENDPOINTS {
+            let (_, path) = *endpoint;
+            let path = "http://localhost:3000/".to_owned() +
+                       &(path.join("/").replace("*", "foo"));
+            match request::options(&path, Headers::new(), &service_router) {
+                Ok(res) => {
+                    let headers = &res.headers;
+                    assert!(headers.has::<headers::AccessControlAllowOrigin>());
+                    assert!(headers.has::<headers::AccessControlAllowHeaders>());
+                    assert!(headers.has::<headers::AccessControlAllowMethods>());
+                },
+                _ => {
+                    assert!(false)
+                }
+            }
+        }
+    }
 }
