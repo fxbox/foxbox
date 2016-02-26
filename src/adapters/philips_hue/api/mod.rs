@@ -12,8 +12,7 @@ use adapters::philips_hue::http;
 use std;
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::hash::{Hash, SipHasher, Hasher};
-
+use std::hash::{ Hash, SipHasher, Hasher };
 
 #[derive(Debug, Hash)]
 struct HueHubApiToken {
@@ -114,7 +113,7 @@ impl HueHubApi {
         // [{"success":{"username":"foxboxb-001788fffe25681a"}}]
         // [{"error":{"type":101,"address":"/","description":"link button not pressed"}}]
         let url = "api".to_owned();
-        let req = format!("{{\"username\": \"{}\", \"devicetype\": \"foxbox_hub\"}}", self.token);
+        let req = json!({ username: self.token, devicetype: "foxbox_hub"});
         let response = self.post_unauth(url.clone(),
             req.clone()).unwrap_or("".to_owned()); // TODO: no unwrap
         response.contains("success")
@@ -142,8 +141,7 @@ impl HueHubApi {
 
     pub fn set_light_color(&self, light_id: &String, hue: u32, sat: u32, val: u32, on: bool) {
         let url = format!("lights/{}/state", light_id);
-        let cmd = format!("{{\"hue\":{}, \"sat\":{}, \"bri\":{}, \"on\": {}}}",
-            hue, sat, val, on);
+        let cmd = json!({ hue: hue, sat: sat, bri: val, on: on });
         let _ = self.put(url, cmd);
     }
 
