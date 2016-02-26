@@ -216,7 +216,7 @@ describe! service_router {
                             &mount).unwrap();
 
             let result = response::extract_body_to_string(response);
-            assert_eq!(result, "No Such Service: unknown-id");
+            assert_eq!(result, r#"{"error":"NoSuchService","id":"unknown-id"}"#);
         }
     }
 

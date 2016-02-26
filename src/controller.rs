@@ -97,10 +97,10 @@ impl Controller for FoxBox {
         let services = self.services.lock().unwrap();
         match services.get(&id) {
             None => {
-                let mut response = Response::with(format!("No Such Service: {}", id));
+                let mut response = Response::with(json!({ error: "NoSuchService", id: id }));
                 response.status = Some(Status::BadRequest);
                 response.headers.set(AccessControlAllowOrigin::Any);
-                response.headers.set(ContentType::plaintext());
+                response.headers.set(ContentType::json());
                 Ok(response)
             }
             Some(service) => {
