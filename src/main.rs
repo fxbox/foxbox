@@ -41,16 +41,20 @@ extern crate staticfile;
 extern crate uuid;
 extern crate ws;
 
+// Need to be declared first so to let the macros be visible from other modules.
+#[macro_use]
+mod utils;
+
 mod controller;
 mod adapters;
 mod events;
 mod http_server;
 mod managed_process;
-mod ws_server;
-mod service;
 mod registration;
-mod tunnel_controller;
+mod service;
 mod service_router;
+mod tunnel_controller;
+mod ws_server;
 
 mod stubs {
     #![allow(dead_code)]
