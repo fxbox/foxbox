@@ -41,6 +41,7 @@ macro_rules! json {
 macro_rules! json_value {
     ({ $($i:ident: $v:expr),* }) => {
         {
+            use std::collections::BTreeMap;
             let mut map: BTreeMap<String, serde_json::Value> = BTreeMap::new();
             $(
                 map.insert(String::from(stringify!($i)), serde_json::to_value(&$v));
