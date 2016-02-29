@@ -3,12 +3,79 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use controller::Controller;
-use iron::{Request, Response, IronResult};
-use iron::headers::{ ContentType, AccessControlAllowOrigin };
+use iron::{ AfterMiddleware, headers, IronResult, Request, Response };
+use iron::headers::ContentType;
+use iron::method::Method;
+use iron::method::Method::*;
+use iron::prelude::Chain;
 use iron::status::Status;
 use router::Router;
+use unicase::UniCase;
 
-pub fn create<T: Controller>(controller: T) -> Router {
+type Endpoint = (&'static[Method], &'static[&'static str]);
+
+struct CORS;
+
+impl CORS {
+    // Only endpoints listed here will allow CORS.
+    // Endpoints containing a variable path part can use '*' like in:
+    // &["bar", "*"] for a URL like https://foo.com/bar/123
+    pub const ENDPOINTS: &'static[Endpoint] = &[
+        (&[Method::Get], &["list.json"]),
+        (&[Method::Get, Method::Post, Method::Put], &["*", "*"])
+    ];
+}
+
+impl AfterMiddleware for CORS {
+    fn after(&self, req: &mut Request, mut res: Response)
+        -> IronResult<Response> {
+
+        let mut is_cors_endpoint = false;
+        for endpoint in CORS::ENDPOINTS {
+            let (ref methods, path) = *endpoint;
+
+            if !methods.contains(&req.method) &&
+               req.method != Method::Options {
+                continue;
+            }
+
+            if path.len() != req.url.path.len() {
+                continue;
+            }
+
+            for (i, path) in path.iter().enumerate() {
+                is_cors_endpoint = false;
+                if req.url.path[i] != path.to_owned() &&
+                   "*" != path.to_owned() {
+                    break;
+                }
+                is_cors_endpoint = true;
+            }
+            if is_cors_endpoint {
+                break;
+            }
+        }
+
+        if !is_cors_endpoint {
+            return Ok(res);
+        }
+
+        res.headers.set(headers::AccessControlAllowOrigin::Any);
+        res.headers.set(headers::AccessControlAllowHeaders(
+            vec![
+                UniCase(String::from("accept")),
+                UniCase(String::from("content-type"))
+            ]
+        ));
+        res.headers.set(headers::AccessControlAllowMethods(
+            vec![Get, Post, Put]
+        ));
+        res.status = Some(Status::Ok);
+        Ok(res)
+    }
+}
+
+pub fn create<T: Controller>(controller: T) -> Chain {
     let mut router = Router::new();
 
     let c1 = controller.clone();
@@ -18,7 +85,6 @@ pub fn create<T: Controller>(controller: T) -> Router {
 
         let mut response = Response::with(serialized);
         response.status = Some(Status::Ok);
-        response.headers.set(AccessControlAllowOrigin::Any);
         response.headers.set(ContentType::json());
 
         Ok(response)
@@ -32,8 +98,10 @@ pub fn create<T: Controller>(controller: T) -> Router {
         c2.dispatch_service_request(id, req)
     });
 
+    let mut chain = Chain::new(router);
+    chain.link_after(CORS);
 
-    router
+    chain
 }
 
 
@@ -82,5 +150,27 @@ describe! service_router {
 
         let result = response::extract_body_to_string(response);
         assert_eq!(result, "No Such Service: unknown-id");
+    }
+
+    it "should get the appropriate CORS headers" {
+        use iron::headers;
+        use super::CORS;
+
+        for endpoint in CORS::ENDPOINTS {
+            let (_, path) = *endpoint;
+            let path = "http://localhost:3000/".to_owned() +
+                       &(path.join("/").replace("*", "foo"));
+            match request::options(&path, Headers::new(), &service_router) {
+                Ok(res) => {
+                    let headers = &res.headers;
+                    assert!(headers.has::<headers::AccessControlAllowOrigin>());
+                    assert!(headers.has::<headers::AccessControlAllowHeaders>());
+                    assert!(headers.has::<headers::AccessControlAllowMethods>());
+                },
+                _ => {
+                    assert!(false)
+                }
+            }
+        }
     }
 }
