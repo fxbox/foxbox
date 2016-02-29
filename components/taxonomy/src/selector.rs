@@ -221,24 +221,32 @@ impl InputSelector {
 
     /// Determine if a service is matched by this selector.
     pub fn matches(&self, service: &Service<Input>) -> bool {
+        println!("InputSelector::match");
         if !self.id.matches(&service.id) {
+            println!("InputSelector::match => id don't match");
             return false;
         }
         if !self.parent.matches(&service.node) {
+            println!("InputSelector::match => parents don't match");
             return false;
         }
         if !self.kind.matches(&service.mechanism.kind) {
+            println!("InputSelector::match => kinds don't match");
             return false;
         }
         if !Period::matches_option(&self.poll, &service.mechanism.poll) {
+            println!("InputSelector::match => poll don't match");
             return false;
         }
         if !Period::matches_option(&self.trigger, &service.mechanism.trigger) {
+            println!("InputSelector::match => trigger don't match");
             return false;
         }
         if !has_selected_tags(&self.tags, &service.tags) {
+            println!("InputSelector::match => tags don't match");
             return false;
         }
+        println!("InputSelector::match => everything matches");
         return true;
     }
 }
@@ -389,26 +397,29 @@ impl Period {
     }
 
     pub fn matches(&self, duration: &values::ValDuration) -> bool {
+        println!("Period::matches");
         if let Some(ref min) = self.min {
             if min > duration {
+                println!("Period:: matches => min > duration");
                 return false;
             }
         }
         if let Some(ref max) = self.max {
             if max < duration {
+                println!("Period:: matches => max < duration");
                 return false;
             }
         }
+        println!("Period:: matches => min > ok");
         return true;
     }
 
     pub fn matches_option(period: &Option<Self>, duration: &Option<values::ValDuration>) -> bool {
         match (period, duration) {
             (&Some(ref period), &Some(ref duration))
-                if !period.matches(duration) =>
-                return false,
-            (&None, &Some(_)) => return false,
-            _ => return true
+                if !period.matches(duration) => false,
+            (&Some(_), &None) => false,
+            _ => true,
         }
     }
 }
