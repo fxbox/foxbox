@@ -2,7 +2,9 @@ use std::marker::PhantomData;
 
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer};
+
 use std::cmp::PartialEq;
+use std::hash::{Hash, Hasher};
 
 /// A marker for a request that a expects a specific value.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -111,7 +113,13 @@ impl<T> PartialEq for Id<T> {
         self.id.eq(&other.id)
     }
 }
-
+impl<T> Eq for Id<T> {
+}
+impl<T> Hash for Id<T> {
+    fn hash<H>(&self, state: &mut H) where H: Hasher {
+        self.id.hash(state)
+    }
+}
 impl<T> Serialize for Id<T> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {
