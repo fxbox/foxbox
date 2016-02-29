@@ -14,21 +14,21 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
     a
 }
 
-/// A request for one or more nodes.
+/// A selector for one or more nodes.
 ///
 ///
 /// # Example
 ///
 /// ```
-/// use fxbox_taxonomy::requests::*;
+/// use fxbox_taxonomy::selectors::*;
 /// use fxbox_taxonomy::devices::*;
 ///
-/// let request = NodeRequest::new()
+/// let selector = NodeSelector::new()
 ///   .with_tags(vec!["entrance".to_owned()])
-///   .with_inputs(vec![InputRequest::new() /* can be more restrictive */]);
+///   .with_inputs(vec![InputSelector::new() /* can be more restrictive */]);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct NodeRequest {
+pub struct NodeSelector {
     /// If `Exactly(id)`, return only the node with the corresponding id.
     #[serde(default)]
     pub id: Exactly<NodeId>,
@@ -39,11 +39,11 @@ pub struct NodeRequest {
 
     /// Restrict results to nodes that have all the inputs in `inputs`.
     #[serde(default)]
-    pub inputs: Vec<InputRequest>,
+    pub inputs: Vec<InputSelector>,
 
     /// Restrict results to nodes that have all the outputs in `outputs`.
     #[serde(default)]
-    pub outputs: Vec<OutputRequest>,
+    pub outputs: Vec<OutputSelector>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
@@ -51,15 +51,15 @@ pub struct NodeRequest {
 }
 
 
-impl NodeRequest {
-    /// Create a new request that accepts all nodes.
+impl NodeSelector {
+    /// Create a new selector that accepts all nodes.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Request for a node with a specific id.
+    /// Selector for a node with a specific id.
     pub fn with_id(self, id: NodeId) -> Self {
-        NodeRequest {
+        NodeSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
         }
@@ -67,31 +67,31 @@ impl NodeRequest {
 
     ///  Restrict results to nodes that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<String>) -> Self {
-        NodeRequest {
+        NodeSelector {
             tags: merge(self.tags, tags),
             .. self
         }
     }
 
     /// Restrict results to nodes that have all the inputs in `inputs`.
-    pub fn with_inputs(mut self, mut inputs: Vec<InputRequest>) -> Self {
-        NodeRequest {
+    pub fn with_inputs(mut self, mut inputs: Vec<InputSelector>) -> Self {
+        NodeSelector {
             inputs: {self.inputs.append(&mut inputs); self.inputs},
             .. self
         }
     }
 
     /// Restrict results to nodes that have all the outputs in `outputs`.
-    pub fn with_outputs(mut self, mut outputs: Vec<OutputRequest>) -> Self {
-        NodeRequest {
+    pub fn with_outputs(mut self, mut outputs: Vec<OutputSelector>) -> Self {
+        NodeSelector {
             outputs: {self.outputs.append(&mut outputs); self.outputs},
             .. self
         }
     }
 
-    /// Restrict results to nodes that are accepted by two requests.
-    pub fn and(mut self, mut other: NodeRequest) -> Self {
-        NodeRequest {
+    /// Restrict results to nodes that are accepted by two selectors.
+    pub fn and(mut self, mut other: NodeSelector) -> Self {
+        NodeSelector {
             id: self.id.and(other.id),
             tags: merge(self.tags, other.tags),
             inputs: {self.inputs.append(&mut other.inputs); self.inputs},
@@ -103,21 +103,21 @@ impl NodeRequest {
 
 
 
-/// A request for one or more input services.
+/// A selector for one or more input services.
 ///
 ///
 /// # Example
 ///
 /// ```
-/// use fxbox_taxonomy::requests::*;
+/// use fxbox_taxonomy::selectors::*;
 /// use fxbox_taxonomy::devices::*;
 ///
-/// let request = InputRequest::new()
+/// let selector = InputSelector::new()
 ///   .with_parent(NodeId::new("foxbox".to_owned()))
 ///   .with_kind(ServiceKind::CurrentTimeOfDay);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct InputRequest {
+pub struct InputSelector {
     /// If `Exactly(id)`, return only the service with the corresponding id.
     #[serde(default)]
     pub id: Exactly<ServiceId>,
@@ -150,15 +150,15 @@ pub struct InputRequest {
     #[serde(default, skip_serializing)]
     private: (),
 }
-impl InputRequest {
-    /// Create a new request that accepts all input services.
+impl InputSelector {
+    /// Create a new selector that accepts all input services.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Restrict to a service with a specific id.
     pub fn with_id(self, id: ServiceId) -> Self {
-        InputRequest {
+        InputSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
         }
@@ -166,7 +166,7 @@ impl InputRequest {
 
     /// Restrict to a service with a specific parent.
     pub fn with_parent(self, id: NodeId) -> Self {
-        InputRequest {
+        InputSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
         }
@@ -174,7 +174,7 @@ impl InputRequest {
 
     /// Restrict to a service with a specific kind.
     pub fn with_kind(self, kind: ServiceKind) -> Self {
-        InputRequest {
+        InputSelector {
             kind: self.kind.and(Exactly::Exactly(kind)),
             .. self
         }
@@ -182,7 +182,7 @@ impl InputRequest {
 
     ///  Restrict to services that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<String>) -> Self {
-        InputRequest {
+        InputSelector {
             tags: merge(self.tags, tags),
             .. self
         }
@@ -191,7 +191,7 @@ impl InputRequest {
     /// Restrict to services that support polling with the acceptable
     /// period
     pub fn with_poll(self, period: Period) -> Self {
-        InputRequest {
+        InputSelector {
             poll: Period::and_option(self.poll, Some(period)),
             .. self
         }
@@ -200,15 +200,15 @@ impl InputRequest {
     /// Restrict to services that support trigger with the acceptable
     /// period
     pub fn with_trigger(self, period: Period) -> Self {
-        InputRequest {
+        InputSelector {
             trigger: Period::and_option(self.trigger, Some(period)),
             .. self
         }
     }
 
-    /// Restrict to services that are accepted by two requests.
+    /// Restrict to services that are accepted by two selectors.
     pub fn and(self, other: Self) -> Self {
-        InputRequest {
+        InputSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
             tags: merge(self.tags, other.tags),
@@ -219,7 +219,7 @@ impl InputRequest {
         }
     }
 
-    /// Determine if a service is matched by this request.
+    /// Determine if a service is matched by this selector.
     pub fn matches(&self, service: &Service<Input>) -> bool {
         if !self.id.matches(&service.id) {
             return false;
@@ -236,16 +236,16 @@ impl InputRequest {
         if !Period::matches_option(&self.trigger, &service.mechanism.trigger) {
             return false;
         }
-        if !has_requested_tags(&self.tags, &service.tags) {
+        if !has_selected_tags(&self.tags, &service.tags) {
             return false;
         }
         return true;
     }
 }
 
-/// A request for one or more output services.
+/// A selector for one or more output services.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct OutputRequest {
+pub struct OutputSelector {
     /// If `Exactly(id)`, return only the service with the corresponding id.
     #[serde(default)]
     pub id: Exactly<ServiceId>,
@@ -274,31 +274,31 @@ pub struct OutputRequest {
     private: (),
 }
 
-impl OutputRequest {
-    /// Create a new request that accepts all input services.
+impl OutputSelector {
+    /// Create a new selector that accepts all input services.
     pub fn new() -> Self {
-        OutputRequest::default()
+        OutputSelector::default()
     }
 
-    /// Request to a service with a specific id.
+    /// Selector to a service with a specific id.
     pub fn with_id(self, id: ServiceId) -> Self {
-        OutputRequest {
+        OutputSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
         }
     }
 
-    /// Request to services with a specific parent.
+    /// Selector to services with a specific parent.
     pub fn with_parent(self, id: NodeId) -> Self {
-        OutputRequest {
+        OutputSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
         }
     }
 
-    /// Request to services with a specific kind.
+    /// Selector to services with a specific kind.
     pub fn with_kind(self, kind: ServiceKind) -> Self {
-        OutputRequest {
+        OutputSelector {
             kind: self.kind.and(Exactly::Exactly(kind)),
             .. self
         }
@@ -306,7 +306,7 @@ impl OutputRequest {
 
     ///  Restrict to services that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<String>) -> Self {
-        OutputRequest {
+        OutputSelector {
             tags: merge(self.tags, tags),
             .. self
         }
@@ -315,15 +315,15 @@ impl OutputRequest {
     /// Restrict to services that support push with the acceptable
     /// period
     pub fn with_push(self, period: Period) -> Self {
-        OutputRequest {
+        OutputSelector {
             push: Period::and_option(self.push, Some(period)),
             .. self
         }
     }
 
-    /// Restrict results to services that are accepted by two requests.
+    /// Restrict results to services that are accepted by two selectors.
     pub fn and(self, other: Self) -> Self {
-        OutputRequest {
+        OutputSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
             tags: merge(self.tags, other.tags),
@@ -333,7 +333,7 @@ impl OutputRequest {
         }
     }
 
-    /// Determine if a service is matched by this request.
+    /// Determine if a service is matched by this selector.
     pub fn matches(&self, service: &Service<Output>) -> bool {
         if !self.id.matches(&service.id) {
             return false;
@@ -347,7 +347,7 @@ impl OutputRequest {
         if !Period::matches_option(&self.push, &service.mechanism.push) {
             return false;
         }
-        if !has_requested_tags(&self.tags, &service.tags) {
+        if !has_selected_tags(&self.tags, &service.tags) {
             return false;
         }
         return true;
@@ -413,7 +413,7 @@ impl Period {
     }
 }
 
-fn has_requested_tags(actual: &Vec<String>, requested: &Vec<String>) -> bool {
+fn has_selected_tags(actual: &Vec<String>, requested: &Vec<String>) -> bool {
     for tag in &*actual {
         if requested.iter().find(|x| *x == tag).is_none() {
             return false;

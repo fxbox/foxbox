@@ -14,7 +14,7 @@
 //!
 
 use devices::*;
-use requests::*;
+use selector::*;
 use values::Value;
 
 /// An error produced by one of the APIs in this module.
@@ -67,12 +67,12 @@ pub trait API: Send {
     ///
     /// ## Inputs
     ///
-    /// Any JSON that can be deserialized to a `Vec<NodeRequest>`. See
-    /// the implementation of `NodeRequest` for details.
+    /// Any JSON that can be deserialized to a `Vec<NodeSelector>`. See
+    /// the implementation of `NodeSelector` for details.
     ///
     /// ### Example
     ///
-    /// Request all doors in the entrance (tags `door`, `entrance`)
+    /// Selector all doors in the entrance (tags `door`, `entrance`)
     /// that support output service `OpenClose`
     ///
     /// ```json
@@ -125,14 +125,14 @@ pub trait API: Send {
     ///   ]
     /// }]
     /// ```
-    fn get_nodes(&self, &Vec<NodeRequest>) -> Vec<Node>;
+    fn get_nodes(&self, &Vec<NodeSelector>) -> Vec<Node>;
 
     /// Label a set of nodes with a set of tags.
     ///
     /// A call to `API::put_node_tag(vec![req1, req2, ...], vec![tag1,
     /// ...])` will label all the nodes matching _either_ `req1` or
     /// `req2` or ... with `tag1`, ... and return the number of nodes
-    /// matching any of the requests.
+    /// matching any of the selectors.
     ///
     /// Some of the nodes may already be labelled with `tag1`, or
     /// `tag2`, ... They will not change state. They are counted in
@@ -151,7 +151,7 @@ pub trait API: Send {
     ///
     /// ```ignore
     /// {
-    ///   set: Vec<NodeRequest>,
+    ///   set: Vec<NodeSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
@@ -164,14 +164,14 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON string representing a number.
-    fn put_node_tag(&self, set: &Vec<NodeRequest>, tags: &Vec<String>) -> usize;
+    fn put_node_tag(&self, set: &Vec<NodeSelector>, tags: &Vec<String>) -> usize;
 
     /// Remove a set of tags from a set of nodes.
     ///
     /// A call to `API::delete_node_tag(vec![req1, req2, ...], vec![tag1,
     /// ...])` will remove from all the nodes matching _either_ `req1` or
     /// `req2` or ... all of the tags `tag1`, ... and return the number of nodes
-    /// matching any of the requests.
+    /// matching any of the selectors.
     ///
     /// Some of the nodes may not be labelled with `tag1`, or `tag2`,
     /// ... They will not change state. They are counted in the
@@ -190,7 +190,7 @@ pub trait API: Send {
     ///
     /// ```ignore
     /// {
-    ///   set: Vec<NodeRequest>,
+    ///   set: Vec<NodeSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
@@ -203,22 +203,22 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn delete_node_tag(&self, set: &Vec<NodeRequest>, tags: String) -> usize;
+    fn delete_node_tag(&self, set: &Vec<NodeSelector>, tags: String) -> usize;
     
     /// Get a list of inputs matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/services`
-    fn get_input_services(&self, &Vec<InputRequest>) -> Vec<Service<Input>>;
-    fn get_output_services(&self, &Vec<OutputRequest>) -> Vec<Service<Output>>;
+    fn get_input_services(&self, &Vec<InputSelector>) -> Vec<Service<Input>>;
+    fn get_output_services(&self, &Vec<OutputSelector>) -> Vec<Service<Output>>;
 
     /// Label a set of services with a set of tags.
     ///
     /// A call to `API::put_{input, output}_tag(vec![req1, req2, ...], vec![tag1,
     /// ...])` will label all the services matching _either_ `req1` or
     /// `req2` or ... with `tag1`, ... and return the number of services
-    /// matching any of the requests.
+    /// matching any of the selectors.
     ///
     /// Some of the services may already be labelled with `tag1`, or
     /// `tag2`, ... They will not change state. They are counted in
@@ -237,14 +237,14 @@ pub trait API: Send {
     ///
     /// ```ignore
     /// {
-    ///   set: Vec<InputRequest>,
+    ///   set: Vec<InputSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
     /// or
     /// ```ignore
     /// {
-    ///   set: Vec<OutputRequest>,
+    ///   set: Vec<OutputSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
@@ -257,15 +257,15 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn put_input_tag(&self, &Vec<InputRequest>, &Vec<String>) -> usize;
-    fn put_output_tag(&self, &Vec<OutputRequest>, &Vec<String>) -> usize;
+    fn put_input_tag(&self, &Vec<InputSelector>, &Vec<String>) -> usize;
+    fn put_output_tag(&self, &Vec<OutputSelector>, &Vec<String>) -> usize;
 
     /// Remove a set of tags from a set of services.
     ///
     /// A call to `API::delete_{input, output}_tag(vec![req1, req2, ...], vec![tag1,
     /// ...])` will remove from all the services matching _either_ `req1` or
     /// `req2` or ... all of the tags `tag1`, ... and return the number of services
-    /// matching any of the requests.
+    /// matching any of the selectors.
     ///
     /// Some of the services may not be labelled with `tag1`, or `tag2`,
     /// ... They will not change state. They are counted in the
@@ -284,14 +284,14 @@ pub trait API: Send {
     ///
     /// ```ignore
     /// {
-    ///   set: Vec<InputRequest>,
+    ///   set: Vec<InputSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
     /// or
     /// ```ignore
     /// {
-    ///   set: Vec<OutputRequest>,
+    ///   set: Vec<OutputSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
@@ -304,22 +304,22 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn delete_input_tag(&self, &Vec<InputRequest>, &Vec<String>) -> usize;
-    fn delete_output_tag(&self, &Vec<InputRequest>, &Vec<String>) -> usize;
+    fn delete_input_tag(&self, &Vec<InputSelector>, &Vec<String>) -> usize;
+    fn delete_output_tag(&self, &Vec<InputSelector>, &Vec<String>) -> usize;
 
     /// Read the latest value from a set of services
     ///
     /// # REST API
     ///
     /// `GET /api/v1/services/value`
-    fn get_service_value(&self, &Vec<InputRequest>) -> Vec<(ServiceId, Result<Value, Error>)>;
+    fn get_service_value(&self, &Vec<InputSelector>) -> Vec<(ServiceId, Result<Value, Error>)>;
 
     /// Send one value to a set of services
     ///
     /// # REST API
     ///
     /// `POST /api/v1/services/value`
-    fn put_service_value(&self, &Vec<OutputRequest>, Value) -> Vec<(ServiceId, Result<(), Error>)>;
+    fn put_service_value(&self, &Vec<OutputSelector>, Value) -> Vec<(ServiceId, Result<(), Error>)>;
 
     /// Watch for any change
     ///
@@ -337,7 +337,7 @@ pub trait API: Send {
 pub struct WatchOptions {
     /// The set of inputs to watch. Note that the actual inputs in the
     /// set may change over time.
-    pub source: InputRequest,
+    pub source: InputSelector,
 
     /// If `true`, watch as new values become available.
     pub should_watch_values: bool,
@@ -353,7 +353,7 @@ pub struct WatchOptions {
 impl WatchOptions {
     pub fn new() -> Self {
         WatchOptions {
-            source: InputRequest::new(),
+            source: InputSelector::new(),
             should_watch_values: false,
             should_watch_topology: false,
             private: (),
@@ -364,9 +364,9 @@ impl WatchOptions {
     ///
     /// Also note that the actual input services that are part of the
     /// set may change with time, for instance if devices are added
-    /// ore removed.  The request _is live_, i.e. the service watch
+    /// ore removed.  The selector _is live_, i.e. the service watch
     /// will continue watching any input services that match `req`.
-    pub fn with_inputs(self, req: InputRequest) -> Self {
+    pub fn with_inputs(self, req: InputSelector) -> Self {
         WatchOptions {
             source: self.source.and(req),
             ..self

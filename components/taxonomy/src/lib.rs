@@ -45,8 +45,8 @@ pub mod devices;
 /// Public-facing API
 pub mod api;
 
-/// Requests for specific devices
-pub mod requests;
+/// Selecting one or more devices. Exposed through the API.
+pub mod selector;
 
 /// Values that may be sent to/received from devices
 pub mod values;
