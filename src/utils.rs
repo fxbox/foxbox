@@ -27,7 +27,6 @@ macro_rules! json {
 
     ([ $($v:expr),* ]) => {
         {
-            use std::collections::BTreeMap;
             let mut vec: Vec<serde_json::Value> = Vec::new();
             $(
                 vec.push(serde_json::to_value(&$v));
