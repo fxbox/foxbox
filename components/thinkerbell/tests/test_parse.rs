@@ -2,12 +2,7 @@ extern crate fxbox_thinkerbell;
 extern crate fxbox_taxonomy;
 extern crate serde_json;
 
-use fxbox_thinkerbell::ast::*;
 use fxbox_thinkerbell::parse::*;
-use fxbox_thinkerbell::values::*;
-use fxbox_thinkerbell::util::*;
-
-use fxbox_taxonomy::requests::*;
 
 #[test]
 fn test_parse_bad_field() {
