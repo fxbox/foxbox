@@ -1,4 +1,8 @@
-//! Definition of Thinkerbell scripts
+//! Definition of Thinkerbell scripts.
+//!
+//! Typical applications will not interact with script
+//! objects. Rather, they will use module `parse` to parse a script
+//! and module `run` to execute it.
 
 use values::Range;
 use util::Phantom;
