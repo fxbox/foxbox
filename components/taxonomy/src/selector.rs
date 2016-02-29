@@ -20,7 +20,7 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 /// # Example
 ///
 /// ```
-/// use fxbox_taxonomy::selectors::*;
+/// use fxbox_taxonomy::selector::*;
 /// use fxbox_taxonomy::devices::*;
 ///
 /// let selector = NodeSelector::new()
@@ -89,7 +89,7 @@ impl NodeSelector {
         }
     }
 
-    /// Restrict results to nodes that are accepted by two selectors.
+    /// Restrict results to nodes that are accepted by two selector.
     pub fn and(mut self, mut other: NodeSelector) -> Self {
         NodeSelector {
             id: self.id.and(other.id),
@@ -109,7 +109,7 @@ impl NodeSelector {
 /// # Example
 ///
 /// ```
-/// use fxbox_taxonomy::selectors::*;
+/// use fxbox_taxonomy::selector::*;
 /// use fxbox_taxonomy::devices::*;
 ///
 /// let selector = InputSelector::new()
@@ -206,7 +206,7 @@ impl InputSelector {
         }
     }
 
-    /// Restrict to services that are accepted by two selectors.
+    /// Restrict to services that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
         InputSelector {
             id: self.id.and(other.id),
@@ -321,7 +321,7 @@ impl OutputSelector {
         }
     }
 
-    /// Restrict results to services that are accepted by two selectors.
+    /// Restrict results to services that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
         OutputSelector {
             id: self.id.and(other.id),
