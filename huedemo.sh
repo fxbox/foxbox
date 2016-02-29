@@ -32,10 +32,14 @@ case $cmd in
 			sleep 2
 		done
 		;;
+	off)
+		curl -s -X PUT http://localhost:3000/services/$2/state -d '{"on": false}'
+		;;
 	*)
 		echo "usage: $0 <cmd> [<id>]"
 		echo "  cmd: status      - list status of all available lights"
 		echo "       disco <id>  - well, ... disco!"
+		echo "       off <id>    - turn off the lights!"
 esac
 
 
