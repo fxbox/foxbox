@@ -8,12 +8,10 @@ extern crate mio;
 
 use core::marker::Reflect;
 use adapters::AdapterManager;
-use events::{ EventData, EventSender };
 use http_server::HttpServer;
 use iron::{Request, Response, IronResult};
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
-use mio::{ NotifyError, EventLoop };
 use self::collections::vec::IntoIter;
 use service::{ Service, ServiceAdapter, ServiceProperties };
 use std::collections::hash_map::HashMap;
@@ -26,7 +24,6 @@ use ws;
 
 #[derive(Clone)]
 pub struct FoxBox {
-    event_sender: Option<EventSender>,
     pub verbose: bool,
     hostname: String,
     http_port: u16,
@@ -42,6 +39,8 @@ const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn run(&mut self);
     fn dispatch_service_request(&self, id: String, request: &mut Request) -> IronResult<Response>;
+    fn adapter_started(&self, adapter: String);
+    fn adapter_notification(&self, notification: serde_json::value::Value);
     fn add_service(&self, service: Box<Service>);
     fn remove_service(&self, id: String);
     fn get_service_properties(&self, id: String) -> Option<ServiceProperties>;
@@ -50,11 +49,10 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn get_http_root_for_service(&self, service_id: String) -> String;
     fn get_ws_root_for_service(&self, service_id: String) -> String;
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error>;
-    fn send_event(&self, data: EventData) -> Result<(), NotifyError<EventData>>;
 
     fn add_websocket(&mut self, socket: ws::Sender);
     fn remove_websocket(&mut self, socket: ws::Sender);
-    fn broadcast_to_websockets(&self, data: String);
+    fn broadcast_to_websockets(&self, data: serde_json::value::Value);
 }
 
 impl FoxBox {
@@ -70,9 +68,7 @@ impl FoxBox {
             verbose: verbose,
             hostname:  hostname.unwrap_or(DEFAULT_HOSTNAME.to_owned()),
             http_port: http_port.unwrap_or(DEFAULT_HTTP_PORT),
-            ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT),
-
-            event_sender: None
+            ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT)
         }
     }
 }
@@ -83,7 +79,6 @@ impl Controller for FoxBox {
         debug!("Starting controller");
 
         let mut event_loop = mio::EventLoop::new().unwrap();
-        self.event_sender = Some(event_loop.channel());
 
         HttpServer::new(self.clone()).start();
         WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
@@ -107,19 +102,25 @@ impl Controller for FoxBox {
         }
     }
 
-    fn send_event(&self, data: EventData) -> Result<(), NotifyError<EventData>> {
-        self.event_sender.clone().unwrap().send(data)
+    fn adapter_started(&self, adapter: String) {
+        self.broadcast_to_websockets(json_value!({ type: "core/adapter/start", name: adapter }));
+    }
+
+    fn adapter_notification(&self, notification: serde_json::value::Value) {
+        self.broadcast_to_websockets(json_value!({ type: "core/adapter/notification", message: notification }));
     }
 
     fn add_service(&self, service: Box<Service>) {
         let mut services = self.services.lock().unwrap();
         let service_id = service.get_properties().id;
-        services.insert(service_id, service);
+        services.insert(service_id.clone(), service);
+        self.broadcast_to_websockets(json_value!({ type: "core/service/start", id: service_id }));
     }
 
     fn remove_service(&self, id: String) {
         let mut services = self.services.lock().unwrap();
         services.remove(&id);
+        self.broadcast_to_websockets(json_value!({ type: "core/service/stop", id: id }));
     }
 
     fn services_count(&self) -> usize {
@@ -161,9 +162,11 @@ impl Controller for FoxBox {
         self.websockets.lock().unwrap().remove(&socket.token());
     }
 
-    fn broadcast_to_websockets(&self, data: String) {
+    fn broadcast_to_websockets(&self, data: serde_json::value::Value) {
+        let serialized = serde_json::to_string(&data).unwrap_or("{}".to_owned());
+        debug!("broadcast_to_websockets {}", serialized.clone());
         for socket in self.websockets.lock().unwrap().values() {
-            match socket.send(data.to_owned()) {
+            match socket.send(serialized.clone()) {
                 Ok(_) => (),
                 Err(err) => error!("Error sending to socket: {}", err)
             }
@@ -177,29 +180,7 @@ struct FoxBoxEventLoop {
 
 impl mio::Handler for FoxBoxEventLoop {
     type Timeout = ();
-    type Message = EventData;
-
-    fn notify(&mut self, _: &mut EventLoop<Self>, data: EventData) {
-        info!("Receiving a notification! {}", data.description());
-
-        self.controller.broadcast_to_websockets(data.description());
-
-        match data {
-            EventData::ServiceStart { id } => {
-                debug!("Service started: {:?}",
-                         self.controller.get_service_properties(id.to_owned()));
-
-                info!("ServiceStart {} We now have {} services.",
-                         id, self.controller.services_count());
-            }
-            EventData::ServiceStop { id } => {
-                self.controller.remove_service(id.clone());
-                info!("ServiceStop {} We now have {} services.",
-                         id, self.controller.services_count());
-            }
-            _ => { }
-        }
-    }
+    type Message = ();
 }
 
 

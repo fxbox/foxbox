@@ -59,8 +59,7 @@ impl<T: Controller> Service for DummyService<T> {
                     break;
                 }
             }
-            controller.send_event(
-                EventData::ServiceStop { id: props.id.to_string() }).unwrap();
+            controller.remove_service(props.id.to_string());
         });
     }
 
@@ -111,7 +110,6 @@ impl<T: Controller> ServiceAdapter for DummyAdapter<T> {
                 let service_id = service.get_properties().id;
                 service.start();
                 controller.add_service(Box::new(service));
-                controller.send_event(EventData::ServiceStart { id: service_id }).unwrap();
 
                 // Create at most 7 dummy services.
                 if id == 7 {

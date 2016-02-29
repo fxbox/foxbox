@@ -11,7 +11,6 @@ mod api;
 use adapters::philips_hue::api::structs::*;
 use adapters::philips_hue::api::HueLight;
 use controller::Controller;
-use events::*;
 use iron::{ Request, Response, IronResult };
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
@@ -48,10 +47,7 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
         let controller = self.controller.clone();
 
         thread::spawn(move || {
-            controller.send_event(
-                EventData::AdapterStart {
-                    name: "Philips Hue Service Adapter".to_owned()
-                }).unwrap();
+            controller.adapter_started("Philips Hue Service Adapter".to_owned());
 
             let nupnp_hubs = nupnp::query();
             debug!("nUPnP reported Philips Hue bridges: {:?}", nupnp_hubs);
@@ -71,12 +67,8 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
 
                         // Try pairing for 120 seconds.
                         for _ in 0..120 {
-                            controller.send_event(
-                                EventData::AdapterNotification {
-                                    info: format!(
-                                        "{{\"adapter\": \"philips_hue\", \"message\": \"NeedsPairing\", \"hub\": \"{}\"}}",
-                                        hub.id)
-                                }).unwrap();
+                            controller.adapter_notification(
+                                json_value!({ adapter: "philips_hue", message: "NeedsPairing", hub: hub.id }));
                             if hub.try_pairing() {
                                 break;
                             }
@@ -85,20 +77,12 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
 
                         if hub.is_paired() {
                             info!("Paired with Philips Hue Bridge ID {}", hub.id);
-                            controller.send_event(
-                                EventData::AdapterNotification {
-                                    info: format!(
-                                         "{{\"adapter\": \"philips_hue\", \"message\": \"PairingSuccess\", \"hub\": \"{}\"}}",
-                                         hub.id)
-                                 }).unwrap();
+                            controller.adapter_notification(
+                                json_value!({ adapter: "philips_hue", message: "PairingSuccess", hub: hub.id }));
                         } else {
                             warn!("Pairing timeout with Philips Hue Bridge ID {}", hub.id);
-                            controller.send_event(
-                                EventData::AdapterNotification {
-                                    info: format!(
-                                         "{{\"adapter\": \"philips_hue\", \"message\": \"PairingTimeout\", \"hub\": \"{}\"}}",
-                                         hub.id)
-                                 }).unwrap();
+                            controller.adapter_notification(
+                                json_value!({ adapter: "philips_hue", message: "PairingTimeout", hub: hub.id }));
                             // Giving up for this Hub.
                             return;
                         }
@@ -118,10 +102,8 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
                         debug!("Creating service for {:?}", light);
                         id += 1;
                         let service = HueLightService::new(controller.clone(), id, light);
-                        let service_id = service.get_properties().id;
                         service.start();
                         controller.add_service(Box::new(service));
-                        controller.send_event(EventData::ServiceStart { id: service_id }).unwrap();
                     }
                 });
             }
@@ -165,11 +147,13 @@ impl<T: Controller> HueLightService<T> {
                 // internal design change.
                 let status = self.light.get_settings();
                 let light_state = self.light.get_state();
-                let json = format!(
-                    "{{\"type\": \"{}\", \"available\": {}, \"on\": {}, \"hue\": {}, \"sat\": {}, \"val\": {}}}",
-                    "device/light/colorlight",
-                    status.state.reachable, status.state.on,
-                    light_state.hue, light_state.sat, light_state.val);
+                let json = json!(
+                    { type: "device/light/colorlight",
+                      available: status.state.reachable,
+                      on: status.state.on,
+                      hue: light_state.hue,
+                      sat: light_state.sat,
+                      val: light_state.val });
                 let mut response = Response::with(json);
                 response.status = Some(Status::Ok);
                 response.headers.set(ContentType::json());
@@ -220,8 +204,6 @@ impl<T: Controller> Service for HueLightService<T> {
     // Starts the service, it will just spawn a thread and send messages once
     // in a while.
     fn start(&self) {
-        self.controller.send_event(
-                EventData::ServiceStart { id: self.properties.id.to_string() }).unwrap();
         info!("Service {} started for Philips Hue light \"{}\" on bridge {}",
             self.properties.id, self.light.hue_id, self.light.hub_id);
     }

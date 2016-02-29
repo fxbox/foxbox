@@ -50,7 +50,6 @@ mod utils;
 
 mod controller;
 mod adapters;
-mod events;
 mod http_server;
 mod managed_process;
 mod registration;
