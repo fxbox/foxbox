@@ -114,7 +114,7 @@ impl NodeSelector {
 /// use fxbox_taxonomy::util::Id;
 ///
 /// let selector = InputSelector::new()
-///   .with_parent(Id<NodeId>::new("foxbox".to_owned()))
+///   .with_parent(Id::new("foxbox".to_owned()))
 ///   .with_kind(ServiceKind::CurrentTimeOfDay);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
