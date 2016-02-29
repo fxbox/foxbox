@@ -42,23 +42,23 @@ pub struct Rule<Ctx> where Ctx: Context {
 
 /// An individual match.
 ///
-/// Matchs always take the form: "data received from input service
+/// Matchs always take the form: "data received from input channel
 /// is in given range".
 ///
-/// A condition is true if *any* of the corresponding input services
+/// A condition is true if *any* of the corresponding input channels
 /// yielded a value that is in the given range.
 #[derive(Serialize, Deserialize)]
 pub struct Match<Ctx> where Ctx: Context {
     /// The set of inputs to watch. Note that the set of inputs may
     /// change (e.g. when devices are added/removed) without rebooting
     /// the script.
-    pub source: Vec<InputSelector>,
+    pub source: Vec<GetSelector>,
 
-    /// The kind of service expected from `source`, e.g. "the current
+    /// The kind of channel expected from `source`, e.g. "the current
     /// time of day", "is the door opened?", etc. During compilation,
     /// we make sure that we restrict to the elements of `source` that
     /// offer `kind`.
-    pub kind: ServiceKind,
+    pub kind: ChannelKind,
 
     /// The range of values for which the condition is considered met.
     /// During compilation, we check that the type of `range` is
@@ -77,18 +77,18 @@ pub struct Statement<Ctx> where Ctx: Context {
     /// The set of outputs to which to send a command. Note that the
     /// set of outputs may change (e.g. when devices are
     /// added/removed) without rebooting the script.
-    pub destination: Vec<OutputSelector>,
+    pub destination: Vec<SetSelector>,
 
     /// Data to send to the resource. During compilation, we check
     /// that the type of `value` is compatible with that of
     /// `destination`.
     pub value: Value,
 
-    /// The kind of service expected from `destination`, e.g. "close
+    /// The kind of channel expected from `destination`, e.g. "close
     /// the door", "set the temperature", etc. During compilation, we
     /// make sure that we restrict to the elements of `destination` that
     /// offer `kind`.
-    pub kind: ServiceKind,
+    pub kind: ChannelKind,
 
     #[serde(default)]
     #[allow(dead_code)]

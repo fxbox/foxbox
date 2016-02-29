@@ -1,6 +1,6 @@
 [
     {
-	"AddInputs": [{
+	"AddGets": [{
 	    "tags": [],
 	    "id": "Clock #1",
 	    "node": "simulator",
@@ -13,7 +13,7 @@
 	}]
     },
     {
-	"AddOutputs": [{
+	"AddSets": [{
 	    "tags": [],
 	    "id": "Ready #1",
 	    "node": "simulator",
@@ -26,7 +26,7 @@
 	}]
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": "0"
@@ -34,7 +34,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 1
@@ -42,7 +42,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 2
@@ -50,7 +50,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 3
@@ -58,7 +58,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 4
@@ -66,7 +66,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 5
@@ -74,7 +74,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 6
@@ -82,7 +82,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 7
@@ -90,7 +90,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 8
@@ -98,7 +98,7 @@
 	}
     },
     {
-	"InjectInputValue": {
+	"InjectGetValue": {
 	    "id": "Clock #1",
 	    "value": {
 		"Duration": 9

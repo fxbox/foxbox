@@ -71,18 +71,18 @@ impl TestEnv {
 /// Instructions given to the simulator.
 pub enum Instruction {
     AddNodes(Vec<Node>),
-    AddInputs(Vec<Service<Input>>),
-    AddOutputs(Vec<Service<Output>>),
-    InjectInputValue{id: Id<Input>, value: Value},
+    AddGets(Vec<Channel<Get>>),
+    AddSets(Vec<Channel<Set>>),
+    InjectGetValue{id: Id<Get>, value: Value},
 }
 impl Instruction {
     fn as_op(self) -> Op {
         use Instruction::*;
         match self {
             AddNodes(vec) => Op::AddNodes(vec),
-            AddInputs(vec) => Op::AddInputs(vec),
-            AddOutputs(vec) => Op::AddOutputs(vec),
-            InjectInputValue{id, value} => Op::InjectInputValue{id:id, value: value}
+            AddGets(vec) => Op::AddGets(vec),
+            AddSets(vec) => Op::AddSets(vec),
+            InjectGetValue{id, value} => Op::InjectGetValue{id:id, value: value}
         }
     }
 }
@@ -91,25 +91,25 @@ impl Instruction {
 /// Operations internal to the simulator.
 enum Op {
     AddNodes(Vec<Node>),
-    AddInputs(Vec<Service<Input>>),
-    AddOutputs(Vec<Service<Output>>),
+    AddGets(Vec<Channel<Get>>),
+    AddSets(Vec<Channel<Set>>),
     AddWatch{options: Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>},
-    SendValue{selectors: Vec<OutputSelector>, value: Value, cb: Box<Fn(Vec<(Id<Output>, Result<(), APIError>)>) + Send>},
-    InjectInputValue{id: Id<Input>, value: Value},
+    SendValue{selectors: Vec<SetSelector>, value: Value, cb: Box<Fn(Vec<(Id<Set>, Result<(), APIError>)>) + Send>},
+    InjectGetValue{id: Id<Get>, value: Value},
 }
 
 #[derive(Debug)]
 enum Update {
-    Put { id: Id<Output>, value: Value, result: Result<(), String> },
+    Put { id: Id<Set>, value: Value, result: Result<(), String> },
     Done,
 }
 
 #[derive(Debug)]
-struct InputWithState {
-    input: Service<Input>,
+struct GetWithState {
+    input: Channel<Get>,
     state: Option<Value>,
 }
-impl InputWithState {
+impl GetWithState {
     fn set_state(&mut self, val: Value) {
         self.state = Some(val);
     }
@@ -117,8 +117,8 @@ impl InputWithState {
 
 struct APIBackEnd {
     nodes: HashMap<Id<NodeId>, Node>,
-    inputs: HashMap<Id<Input>, InputWithState>,
-    outputs: HashMap<Id<Output>, Service<Output>>,
+    inputs: HashMap<Id<Get>, GetWithState>,
+    outputs: HashMap<Id<Set>, Channel<Set>>,
     watchers: Vec<(WatchOptions, Arc<Box<Fn(WatchEvent)>>)>,
     post_updates: Arc<Fn(Update)>
 }
@@ -143,24 +143,24 @@ impl APIBackEnd {
         }
         // In a real implementation, this should update all NodeSelector
     }
-    fn add_inputs(&mut self, inputs: Vec<Service<Input>>) {
+    fn add_inputs(&mut self, inputs: Vec<Channel<Get>>) {
         for input in inputs {
             let previous = self.inputs.insert(
                 input.id.clone(),
-                InputWithState {
+                GetWithState {
                     input:input,
                     state: None
                 });
             assert!(previous.is_none());
         }
-        // In a real implementation, this should update all InputSelectors
+        // In a real implementation, this should update all GetSelectors
     }
-    fn add_outputs(&mut self, outputs: Vec<Service<Output>>)  {
+    fn add_outputs(&mut self, outputs: Vec<Channel<Set>>)  {
         for output in outputs {
             let previous = self.outputs.insert(output.id.clone(), output);
             assert!(previous.is_none());
         }
-        // In a real implementation, this should update all OutputSelectors
+        // In a real implementation, this should update all SetSelectors
     }
 
     fn add_watch(&mut self, options: Vec<WatchOptions>, cb: Box<Fn(WatchEvent)>) {
@@ -170,7 +170,7 @@ impl APIBackEnd {
         }
     }
 
-    fn inject_input_value(&mut self, id: Id<Input>, value: Value) {
+    fn inject_input_value(&mut self, id: Id<Get>, value: Value) {
         let mut input = self.inputs.get_mut(&id).unwrap();
         input.set_state(value.clone());
 
@@ -188,9 +188,9 @@ impl APIBackEnd {
     }
 
     fn put_value(&mut self,
-                 selectors: Vec<OutputSelector>,
+                 selectors: Vec<SetSelector>,
                  value: Value,
-                 cb: Box<Fn(Vec<(Id<Output>, Result<(), APIError>)>)>)
+                 cb: Box<Fn(Vec<(Id<Set>, Result<(), APIError>)>)>)
     {
         // Very suboptimal implementation.
         let outputs = self.outputs
@@ -251,11 +251,11 @@ impl APIFrontEnd {
                 use Op::*;
                 match msg {
                     AddNodes(vec) => api.add_nodes(vec),
-                    AddInputs(vec) => api.add_inputs(vec),
-                    AddOutputs(vec) => api.add_outputs(vec),
+                    AddGets(vec) => api.add_inputs(vec),
+                    AddSets(vec) => api.add_outputs(vec),
                     AddWatch{options, cb} => api.add_watch(options, cb),
                     SendValue{selectors, value, cb} => api.put_value(selectors, value, cb),
-                    InjectInputValue{id, value} => api.inject_input_value(id, value),
+                    InjectGetValue{id, value} => api.inject_input_value(id, value),
                 }
                 (*api.post_updates)(Update::Done)
             }
@@ -281,28 +281,28 @@ impl API for APIFrontEnd {
         unimplemented!()
     }
 
-    fn get_input_services(&self, _: &Vec<InputSelector>) -> Vec<Service<Input>> {
+    fn get_input_channels(&self, _: &Vec<GetSelector>) -> Vec<Channel<Get>> {
         unimplemented!()
     }
-    fn get_output_services(&self, _: &Vec<OutputSelector>) -> Vec<Service<Output>> {
+    fn get_output_channels(&self, _: &Vec<SetSelector>) -> Vec<Channel<Set>> {
         unimplemented!()
     }
-    fn put_input_tag(&self, _: &Vec<InputSelector>, _: &Vec<String>) -> usize {
+    fn put_input_tag(&self, _: &Vec<GetSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn put_output_tag(&self, _: &Vec<OutputSelector>, _: &Vec<String>) -> usize {
+    fn put_output_tag(&self, _: &Vec<SetSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn delete_input_tag(&self, _: &Vec<InputSelector>, _: &Vec<String>) -> usize {
+    fn delete_input_tag(&self, _: &Vec<GetSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn delete_output_tag(&self, _: &Vec<InputSelector>, _: &Vec<String>) -> usize {
+    fn delete_output_tag(&self, _: &Vec<GetSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn get_service_value(&self, _: &Vec<InputSelector>) -> Vec<(Id<Input>, Result<Value, APIError>)> {
+    fn get_channel_value(&self, _: &Vec<GetSelector>) -> Vec<(Id<Get>, Result<Value, APIError>)> {
         unimplemented!()
     }
-    fn put_service_value(&self, selectors: &Vec<OutputSelector>, value: Value) -> Vec<(Id<Output>, Result<(), APIError>)> {
+    fn put_channel_value(&self, selectors: &Vec<SetSelector>, value: Value) -> Vec<(Id<Set>, Result<(), APIError>)> {
         let (tx, rx) = channel();
         self.tx.send(Op::SendValue {
             selectors: selectors.clone(),
@@ -311,7 +311,7 @@ impl API for APIFrontEnd {
         }).unwrap();
         rx.recv().unwrap()
     }
-    fn register_service_watch(&self, options: Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>) -> Self::WatchGuard {
+    fn register_channel_watch(&self, options: Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>) -> Self::WatchGuard {
         self.tx.send(Op::AddWatch {
             options: options,
             cb: cb

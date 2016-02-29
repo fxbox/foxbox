@@ -7,7 +7,7 @@ use compile;
 use fxbox_taxonomy;
 use fxbox_taxonomy::api;
 use fxbox_taxonomy::api::{API, WatchEvent};
-use fxbox_taxonomy::devices::{Input, Output};
+use fxbox_taxonomy::devices::{Get, Set};
 use fxbox_taxonomy::util::Id;
 use fxbox_taxonomy::values::Range;
 
@@ -117,7 +117,7 @@ pub enum ExecutionEvent {
     Sent {
         rule_index: usize,
         statement_index: usize,
-        result: Vec<(Id<Output>, Result<(), Error>)>
+        result: Vec<(Id<Set>, Result<(), Error>)>
     }
 }
 
@@ -151,7 +151,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
         struct ConditionState {
             match_is_met: bool,
-            per_input: HashMap<Id<Input>, bool>,
+            per_input: HashMap<Id<Get>, bool>,
             range: Range,
         };
         struct RuleState {
@@ -171,7 +171,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                         .with_inputs(input.clone())
                 }).collect();
                 // We will often end up watching several times the
-                // same service. For the moment, we do not attempt to
+                // same channel. For the moment, we do not attempt to
                 // optimize either I/O (which we expect will be
                 // optimized by `watcher`) or condition checking
                 // (which we should eventually optimize, if we find
@@ -179,7 +179,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
                 let tx2 = self.tx.clone();
                 witnesses.push(
-                    api.register_service_watch(
+                    api.register_channel_watch(
                         options,
                         Box::new(move |event| {
                             let _ignored = tx2.send(ExecutionOp::Update {
@@ -219,13 +219,13 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                     rule_index,
                     condition_index,
                 } => match event {
-                    WatchEvent::InputRemoved(id) => {
+                    WatchEvent::GetRemoved(id) => {
                         per_rule[rule_index]
                             .per_condition[condition_index]
                             .per_input
                             .remove(&id);
                     },
-                    WatchEvent::InputAdded(id) => {
+                    WatchEvent::GetAdded(id) => {
                         // An input was added. Note that there is
                         // a possibility that the input was not
                         // empty, in case we received messages in
@@ -304,8 +304,8 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
 
 impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
-    fn eval(&self, api: &Env::API) ->  Vec<(Id<Output>, Result<(), Error>)> {
-        api.put_service_value(&self.destination, self.value.clone())
+    fn eval(&self, api: &Env::API) ->  Vec<(Id<Set>, Result<(), Error>)> {
+        api.put_channel_value(&self.destination, self.value.clone())
             .into_iter()
             .map(|(id, result)|
                  (id, result.map_err(|err| Error::APIError(err))))
