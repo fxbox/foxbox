@@ -243,10 +243,8 @@ impl Serialize for ValDuration {
 impl Deserialize for ValDuration {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer {
-        let as_ms : u64 = try!(u64::deserialize(deserializer));
-        let as_sec = as_ms / 1000;
-        let as_ns = (as_ms / 1_000_000) as u32;
-        Ok(ValDuration(Duration::new(as_sec, as_ns)))
+        let as_sec : f64 = try!(f64::deserialize(deserializer));
+        Ok(ValDuration(Duration::new(as_sec as u64, as_sec.fract() as u32)))
     }
 }
 
