@@ -5,7 +5,7 @@
 extern crate serde_json;
 
 // Macros to help with json serializing of undeclared structs.
-// json_value!({ }) retunns a serde_json::value::Value from an anonymous struct.
+// json_value!({ }) returns a serde_json::value::Value from an anonymous struct.
 // json!({ }) returns a string from an anonymous struct.
 // Combining both macros let you build arbitrary complex json objects easily.
 //
@@ -40,6 +40,7 @@ macro_rules! json {
 macro_rules! json_value {
     ({ $($i:ident: $v:expr),* }) => {
         {
+            use std::collections::BTreeMap;
             let mut map: BTreeMap<String, serde_json::Value> = BTreeMap::new();
             $(
                 map.insert(String::from(stringify!($i)), serde_json::to_value(&$v));
@@ -59,18 +60,63 @@ macro_rules! json_value {
     }
 }
 
+#[cfg(test)]
+#[macro_use]
+describe! json {
+    before_each {
+        extern crate serde_json;
+    }
 
-#[test]
-fn test_json_macro() {
-    // Object tests.
-    assert_eq!(json!({ foo: "bar" }), "{\"foo\":\"bar\"}");
-    assert_eq!(json!({ val: 1.02 }), "{\"val\":1.02}");
-    assert_eq!(json!({ type: "light", value: 1.2, on: true }), "{\"on\":true,\"type\":\"light\",\"value\":1.2}");
-    assert_eq!(json!({ array: vec![1, 2, 3]}), "{\"array\":[1,2,3]}");
-    assert_eq!(json!({ type: "complex", sub: json_value!({ a: 1, b: "foo" }) }), "{\"sub\":{\"a\":1,\"b\":\"foo\"},\"type\":\"complex\"}");
+    describe! objects {
+        it "should support string attributes" {
+            assert_eq!(json!({ foo: "bar" }), r#"{"foo":"bar"}"#);
+        }
 
-    // Array tests.
-    assert_eq!(json!([1, 100, 1000]), "[1,100,1000]");
-    assert_eq!(json!(["one", "two", json_value!(["three", "four"]), 5]), "[\"one\",\"two\",[\"three\",\"four\"],5]");
-    assert_eq!(json!(["one", 2, 3.33, false]), "[\"one\",2,3.33,false]");
+        it "should support numbers" {
+            assert_eq!(json!({ val: 1.02 }), r#"{"val":1.02}"#);
+        }
+
+        it "should support mixed types" {
+            assert_eq!(json!({ type: "light", value: 1.2, on: true }),
+                        r#"{"on":true,"type":"light","value":1.2}"#);
+        }
+
+        it "should support arrays" {
+            assert_eq!(json!({ array: vec![1, 2, 3]}), r#"{"array":[1,2,3]}"#);
+        }
+
+        it "should support sub-objects" {
+            assert_eq!(json!({ type: "complex", sub: json_value!({ a: 1, b: "foo" }) }),
+                        r#"{"sub":{"a":1,"b":"foo"},"type":"complex"}"#);
+        }
+
+        it "should support sub-sub-objects" {
+            assert_eq!(json!({ one: json_value!({ two: json_value!({ three: 3 }) }) }),
+                        r#"{"one":{"two":{"three":3}}}"#);
+        }
+    }
+
+    describe! arrays {
+        it "should support numbers" {
+            assert_eq!(json!([1, 100, 1000]), r#"[1,100,1000]"#);
+        }
+
+        it "should support sub-arrays" {
+            assert_eq!(json!(["one", "two", json_value!(["three", "four"]), 5]),
+                        r#"["one","two",["three","four"],5]"#);
+        }
+
+        it "should support sub-sub-arrays" {
+            assert_eq!(json!(["one", json_value!(["two", json_value!(["three"]) ]) ]),
+                        r#"["one",["two",["three"]]]"#);
+        }
+
+        it "should support mixed types" {
+            assert_eq!(json!(["one", 2, 3.33, false]), r#"["one",2,3.33,false]"#);
+        }
+
+        it "should support objects" {
+            assert_eq!(json!([ json_value!({foo: "bar"}) ]), r#"[{"foo":"bar"}]"#);
+        }
+    }
 }
