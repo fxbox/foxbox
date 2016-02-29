@@ -31,6 +31,8 @@ extern crate env_logger;
 extern crate foxbox_users;
 #[macro_use]
 extern crate iron;
+#[cfg(test)]
+extern crate iron_test;
 extern crate libc;
 #[macro_use]
 extern crate log;
