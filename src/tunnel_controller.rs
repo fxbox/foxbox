@@ -10,9 +10,18 @@ use managed_process::ManagedProcess;
 
 pub type TunnelProcess = ManagedProcess;
 
-pub struct Tunnel {
-    config: TunnelConfig,
+pub struct Tunnel<T> where T: TunnelConfigTrait {
+    config: T,
     pub tunnel_process: Option<TunnelProcess>
+}
+
+pub trait TunnelConfigTrait {
+    fn new(tunnel_url: String,
+           tunnel_secret: String,
+           local_http_port: u16,
+           local_ws_port: u16,
+           remote_name: String) -> Self;
+    fn spawn(&self) -> Result<Child>;
 }
 
 #[derive(Clone, Debug)]
@@ -24,12 +33,12 @@ pub struct TunnelConfig {
     remote_name: String
 }
 
-impl TunnelConfig {
-    pub fn new(tunnel_url: String,
-               tunnel_secret: String,
-               local_http_port: u16,
-               local_ws_port: u16,
-               remote_name: String) -> Self {
+impl TunnelConfigTrait for TunnelConfig {
+    fn new(tunnel_url: String,
+           tunnel_secret: String,
+           local_http_port: u16,
+           local_ws_port: u16,
+           remote_name: String) -> Self {
         TunnelConfig {
             tunnel_url: tunnel_url,
             tunnel_secret: tunnel_secret,
@@ -49,7 +58,7 @@ impl TunnelConfig {
     /// XXX We will move to DNS authentication after the first prototype if
     /// we keep using pagekite.
     /// https://github.com/fxbox/foxbox/issues/177#issuecomment-194778308
-    pub fn spawn(&self) -> Result<Child> {
+    fn spawn(&self) -> Result<Child> {
         Command::new("pagekite.py")
                 .arg(format!("--frontend={}", self.tunnel_url))
                 // XXX remove http service once we support https
@@ -65,10 +74,10 @@ impl TunnelConfig {
     }
 }
 
-impl Tunnel {
+impl<T> Tunnel<T> where T: TunnelConfigTrait + Clone + Send + 'static {
     /// Create a new Tunnel object containing the necessary
     /// configuration
-    pub fn new(config: TunnelConfig) -> Tunnel {
+    pub fn new(config: T) -> Self {
         Tunnel {
             config: config,
             tunnel_process: None
@@ -96,6 +105,54 @@ impl Tunnel {
         match self.tunnel_process.take() {
             None => Ok(()),
             Some(process) => process.shutdown()
+        }
+    }
+}
+
+
+#[cfg(test)]
+describe! tunnel {
+
+    before_each {
+        use std::thread::sleep;
+        use std::time::Duration;
+        use stubs::tunnel::TunnelConfigStub;
+
+        let config = TunnelConfigStub::stub();
+        let mut tunnel = super::Tunnel::new(config.clone());
+
+        tunnel.start().unwrap();
+        // XXX Sleep needed otherwise the process is not started in time
+        sleep(Duration::from_millis(100));
+    }
+
+    after_each {
+        tunnel.stop().unwrap();
+    }
+
+    describe! start {
+        it "should start a new tunnel" {
+            let count = *config.spawn_called_count.lock().unwrap();
+            assert_eq!(count, 1);
+        }
+
+        it "should not start a new tunnel if one is already present" {
+            tunnel.start().unwrap();
+            sleep(Duration::from_millis(100));
+
+            let count = *config.spawn_called_count.lock().unwrap();
+            assert_eq!(count, 1);
+        }
+    }
+
+    describe! stop {
+        it "should stop a tunnel" {
+            tunnel.stop().unwrap();
+            tunnel.start().unwrap();
+            sleep(Duration::from_millis(100));
+
+            let count = *config.spawn_called_count.lock().unwrap();
+            assert_eq!(count, 2);
         }
     }
 }

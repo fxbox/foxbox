@@ -78,11 +78,12 @@ mod stubs {
     #![allow(unused_variables)]
     #![allow(boxed_local)]
     pub mod service;
+    pub mod tunnel;
 }
 
 use controller::{ Controller, FoxBox };
 use env_logger::LogBuilder;
-use tunnel_controller:: { TunnelConfig, Tunnel };
+use tunnel_controller::{ TunnelConfigTrait, TunnelConfig, Tunnel };
 use libc::SIGINT;
 use log::{ LogRecord, LogLevelFilter };
 
@@ -190,7 +191,7 @@ fn main() {
     registrar.start(args.flag_register, args.flag_iface);
 
     // Start the tunnel.
-    let mut tunnel: Option<Tunnel> = None;
+    let mut tunnel: Option<Tunnel<TunnelConfig>> = None;
     if let Some(tunnel_url) = args.flag_tunnel {
         if let Some(remote_name) = args.flag_remote_name {
             tunnel = Some(Tunnel::new(TunnelConfig::new(tunnel_url,
