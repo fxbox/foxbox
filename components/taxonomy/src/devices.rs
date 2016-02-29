@@ -200,7 +200,7 @@ pub struct Input {
 
     /// Date at which the latest value was received, whether through
     /// polling or through a trigger.
-    pub updated: TimeStamp,
+    pub updated: Option<TimeStamp>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
@@ -221,7 +221,8 @@ pub struct Output {
     pub push: Option<ValDuration>,
 
     /// Date at which the latest value was sent to the service.
-    pub updated: TimeStamp,
+    #[serde(default)]
+    pub updated: Option<TimeStamp>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
@@ -256,7 +257,8 @@ pub struct Service<IO> where IO: IOMechanism {
     pub mechanism: IO,
 
     /// The last time the device was seen.
-    pub last_seen: TimeStamp,
+    #[serde(default)]
+    pub last_seen: Option<TimeStamp>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
