@@ -36,3 +36,4 @@ ws = { git = "https://github.com/housleyjk/ws-rs.git", rev = "d154fc5" }
 [dev-dependencies]
 stainless = "0.1.4"
 iron-test = "0.2.0"
+regex = "0.1.54"
