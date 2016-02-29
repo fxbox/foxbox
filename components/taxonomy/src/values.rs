@@ -252,6 +252,15 @@ impl Deserialize for ValDuration {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub struct TimeStamp(chrono::DateTime<chrono::Local>);
+impl TimeStamp {
+    pub fn from_s(s: i64) -> Self {
+        use chrono::*;
+        let naive = chrono::naive::datetime::NaiveDateTime::from_timestamp(s, 0);
+        let offset = chrono::offset::fixed::FixedOffset::east(0);
+        let date = DateTime::<Local>::from_utc(naive, offset);
+        TimeStamp(date)
+    }
+}
 impl Serialize for TimeStamp {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {
