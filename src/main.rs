@@ -43,6 +43,7 @@ extern crate staticfile;
 extern crate unicase;
 extern crate uuid;
 extern crate ws;
+extern crate multicast_dns;
 
 // Need to be declared first so to let the macros be visible from other modules.
 #[macro_use]
@@ -67,6 +68,7 @@ mod stubs {
 
 use controller::{ Controller, FoxBox, DEFAULT_HTTP_PORT };
 use tunnel_controller:: { TunnelConfig, Tunnel };
+use multicast_dns::host::HostManager;
 
 docopt!(Args derive Debug, "
 Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>]
@@ -88,6 +90,29 @@ Options:
         flag_register: Option<String>,
         flag_tunnel: Option<String>);
 
+/// Updates local host name with the provided host name string. If requested host name
+/// is not available (used by anyone else on the same network) then collision
+/// resolution logic is triggered and alternative name is chosen automatically
+/// (host name plus "-2", "-3" and etc. postfix). This function blocks until host name
+/// is updated and returns actual host name.
+///
+/// # Panics
+///
+/// Panics if provided host name is not valid non-FQDN host name.
+///
+/// # Arguments
+///
+/// * `hostname` - host name name we'd like to set (should be a valid non-FQDN host name).
+fn update_hostname(hostname: String) -> Option<String> {
+    let host_manager = HostManager::new();
+
+    if !host_manager.is_valid_name(&hostname) {
+        panic!("Host name `{}` is not a valid host name!", &hostname);
+    }
+
+    Some(host_manager.set_name(&hostname))
+}
+
 fn main() {
     env_logger::init().unwrap();
 
@@ -104,7 +129,8 @@ fn main() {
     }
 
     let mut controller = FoxBox::new(
-        args.flag_verbose, args.flag_name, args.flag_port, args.flag_wsport);
+        args.flag_verbose, args.flag_name.map_or(None, update_hostname), args.flag_port,
+        args.flag_wsport);
 
     controller.run();
 }

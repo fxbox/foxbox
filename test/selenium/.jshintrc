@@ -3,5 +3,6 @@
   "predef": [
     "require"
   ],
-  "mocha": true
+  "mocha": true,
+  "node": true
 }

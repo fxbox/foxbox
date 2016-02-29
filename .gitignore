@@ -15,3 +15,7 @@ node_modules
 
 # Database files
 *.sqlite
+
+# Folders created by various IDEs
+.vscode
+.idea
