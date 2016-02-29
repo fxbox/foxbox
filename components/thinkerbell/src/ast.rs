@@ -4,9 +4,7 @@
 //! objects. Rather, they will use module `parse` to parse a script
 //! and module `run` to execute it.
 
-use values::Range;
-
-use fxbox_taxonomy::values::Value;
+use fxbox_taxonomy::values::*;
 use fxbox_taxonomy::devices::*;
 use fxbox_taxonomy::selector::*;
 use fxbox_taxonomy::util::Phantom;

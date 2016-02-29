@@ -17,9 +17,6 @@ extern crate serde_json;
 
 extern crate fxbox_taxonomy;
 
-/// Dealing with values provided by the devices.
-pub mod values;
-
 /// Definition of the AST.
 pub mod ast;
 

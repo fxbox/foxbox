@@ -3,13 +3,13 @@
 use ast::{Script, Statement, UncheckedCtx};
 use compile::{Compiler, CompiledCtx, ExecutableDevEnv};
 use compile;
-use values::Range;
 
 use fxbox_taxonomy;
 use fxbox_taxonomy::api;
 use fxbox_taxonomy::api::{API, WatchEvent};
 use fxbox_taxonomy::devices::{Input, Output};
 use fxbox_taxonomy::util::Id;
+use fxbox_taxonomy::values::Range;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::marker::PhantomData;
