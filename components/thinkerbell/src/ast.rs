@@ -5,11 +5,11 @@
 //! and module `run` to execute it.
 
 use values::Range;
-use util::Phantom;
 
 use fxbox_taxonomy::values::Value;
 use fxbox_taxonomy::devices::*;
 use fxbox_taxonomy::selector::*;
+use fxbox_taxonomy::util::Phantom;
 
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error};

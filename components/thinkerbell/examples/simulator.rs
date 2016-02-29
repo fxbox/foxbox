@@ -16,6 +16,7 @@ use fxbox_taxonomy::devices::*;
 use fxbox_taxonomy::selector::*;
 use fxbox_taxonomy::values::*;
 use fxbox_taxonomy::api::{API, WatchEvent, WatchOptions};
+use fxbox_taxonomy::util::Id;
 
 type APIError = fxbox_taxonomy::api::Error;
 
@@ -72,7 +73,7 @@ pub enum Instruction {
     AddNodes(Vec<Node>),
     AddInputs(Vec<Service<Input>>),
     AddOutputs(Vec<Service<Output>>),
-    InjectInputValue{id: ServiceId, value: Value},
+    InjectInputValue{id: Id<Input>, value: Value},
 }
 impl Instruction {
     fn as_op(self) -> Op {
@@ -93,14 +94,13 @@ enum Op {
     AddInputs(Vec<Service<Input>>),
     AddOutputs(Vec<Service<Output>>),
     AddWatch{options: Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>},
-    SendValue{selectors: Vec<OutputSelector>, value: Value, cb: Box<Fn(Vec<(ServiceId, Result<(), APIError>)>) + Send>},
-    InjectInputValue{id: ServiceId, value: Value},
+    SendValue{selectors: Vec<OutputSelector>, value: Value, cb: Box<Fn(Vec<(Id<Output>, Result<(), APIError>)>) + Send>},
+    InjectInputValue{id: Id<Input>, value: Value},
 }
 
 #[derive(Debug)]
 enum Update {
-    Put { id: ServiceId, value: Value, result: Result<(), String> },
-//    Inject { id: ServiceId, value: Value, result: Result<(), String> },
+    Put { id: Id<Output>, value: Value, result: Result<(), String> },
     Done,
 }
 
@@ -116,9 +116,9 @@ impl InputWithState {
 }
 
 struct APIBackEnd {
-    nodes: HashMap<NodeId, Node>,
-    inputs: HashMap<ServiceId, InputWithState>,
-    outputs: HashMap<ServiceId, Service<Output>>,
+    nodes: HashMap<Id<NodeId>, Node>,
+    inputs: HashMap<Id<Input>, InputWithState>,
+    outputs: HashMap<Id<Output>, Service<Output>>,
     watchers: Vec<(WatchOptions, Arc<Box<Fn(WatchEvent)>>)>,
     post_updates: Arc<Fn(Update)>
 }
@@ -170,7 +170,7 @@ impl APIBackEnd {
         }
     }
 
-    fn inject_input_value(&mut self, id: ServiceId, value: Value) {
+    fn inject_input_value(&mut self, id: Id<Input>, value: Value) {
         let mut input = self.inputs.get_mut(&id).unwrap();
         input.set_state(value.clone());
 
@@ -190,7 +190,7 @@ impl APIBackEnd {
     fn put_value(&mut self,
                  selectors: Vec<OutputSelector>,
                  value: Value,
-                 cb: Box<Fn(Vec<(ServiceId, Result<(), APIError>)>)>)
+                 cb: Box<Fn(Vec<(Id<Output>, Result<(), APIError>)>)>)
     {
         // Very suboptimal implementation.
         let outputs = self.outputs
@@ -299,10 +299,10 @@ impl API for APIFrontEnd {
     fn delete_output_tag(&self, _: &Vec<InputSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn get_service_value(&self, _: &Vec<InputSelector>) -> Vec<(ServiceId, Result<Value, APIError>)> {
+    fn get_service_value(&self, _: &Vec<InputSelector>) -> Vec<(Id<Input>, Result<Value, APIError>)> {
         unimplemented!()
     }
-    fn put_service_value(&self, selectors: &Vec<OutputSelector>, value: Value) -> Vec<(ServiceId, Result<(), APIError>)> {
+    fn put_service_value(&self, selectors: &Vec<OutputSelector>, value: Value) -> Vec<(Id<Output>, Result<(), APIError>)> {
         let (tx, rx) = channel();
         self.tx.send(Op::SendValue {
             selectors: selectors.clone(),

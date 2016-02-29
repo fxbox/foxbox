@@ -8,7 +8,8 @@ use values::Range;
 use fxbox_taxonomy;
 use fxbox_taxonomy::api;
 use fxbox_taxonomy::api::{API, WatchEvent};
-use fxbox_taxonomy::devices::ServiceId;
+use fxbox_taxonomy::devices::{Input, Output};
+use fxbox_taxonomy::util::Id;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::marker::PhantomData;
@@ -116,7 +117,7 @@ pub enum ExecutionEvent {
     Sent {
         rule_index: usize,
         statement_index: usize,
-        result: Vec<(ServiceId, Result<(), Error>)>
+        result: Vec<(Id<Output>, Result<(), Error>)>
     }
 }
 
@@ -150,7 +151,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
         struct ConditionState {
             match_is_met: bool,
-            per_input: HashMap<ServiceId, bool>,
+            per_input: HashMap<Id<Input>, bool>,
             range: Range,
         };
         struct RuleState {
@@ -303,7 +304,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
 
 impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
-    fn eval(&self, api: &Env::API) ->  Vec<(ServiceId, Result<(), Error>)> {
+    fn eval(&self, api: &Env::API) ->  Vec<(Id<Output>, Result<(), Error>)> {
         api.put_service_value(&self.destination, self.value.clone())
             .into_iter()
             .map(|(id, result)|
