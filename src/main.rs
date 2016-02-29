@@ -51,8 +51,9 @@ extern crate multicast_dns;
 #[macro_use]
 mod utils;
 
-mod controller;
 mod adapters;
+mod config_store;
+mod controller;
 mod http_server;
 mod managed_process;
 mod registration;
