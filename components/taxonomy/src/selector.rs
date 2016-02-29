@@ -1,5 +1,5 @@
-use devices::{NodeId, ServiceId, ServiceKind, Service, Input, Output};
-use util::Exactly;
+use devices::{NodeId, ServiceKind, Service, Input, Output};
+use util::{Exactly, Id};
 use values;
 
 use serde::ser::Serializer;
@@ -31,7 +31,7 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 pub struct NodeSelector {
     /// If `Exactly(id)`, return only the node with the corresponding id.
     #[serde(default)]
-    pub id: Exactly<NodeId>,
+    pub id: Exactly<Id<NodeId>>,
 
     ///  Restrict results to nodes that have all the tags in `tags`.
     #[serde(default)]
@@ -58,7 +58,7 @@ impl NodeSelector {
     }
 
     /// Selector for a node with a specific id.
-    pub fn with_id(self, id: NodeId) -> Self {
+    pub fn with_id(self, id: Id<NodeId>) -> Self {
         NodeSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
@@ -113,19 +113,19 @@ impl NodeSelector {
 /// use fxbox_taxonomy::devices::*;
 ///
 /// let selector = InputSelector::new()
-///   .with_parent(NodeId::new("foxbox".to_owned()))
+///   .with_parent(Id<NodeId>::new("foxbox".to_owned()))
 ///   .with_kind(ServiceKind::CurrentTimeOfDay);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct InputSelector {
     /// If `Exactly(id)`, return only the service with the corresponding id.
     #[serde(default)]
-    pub id: Exactly<ServiceId>,
+    pub id: Exactly<Id<Input>>,
 
     /// If `Eactly(id)`, return only services that are children of
     /// node `id`.
     #[serde(default)]
-    pub parent: Exactly<NodeId>,
+    pub parent: Exactly<Id<NodeId>>,
 
     ///  Restrict results to services that have all the tags in `tags`.
     #[serde(default)]
@@ -157,7 +157,7 @@ impl InputSelector {
     }
 
     /// Restrict to a service with a specific id.
-    pub fn with_id(self, id: ServiceId) -> Self {
+    pub fn with_id(self, id: Id<Input>) -> Self {
         InputSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
@@ -165,7 +165,7 @@ impl InputSelector {
     }
 
     /// Restrict to a service with a specific parent.
-    pub fn with_parent(self, id: NodeId) -> Self {
+    pub fn with_parent(self, id: Id<NodeId>) -> Self {
         InputSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
@@ -221,32 +221,24 @@ impl InputSelector {
 
     /// Determine if a service is matched by this selector.
     pub fn matches(&self, service: &Service<Input>) -> bool {
-        println!("InputSelector::match");
         if !self.id.matches(&service.id) {
-            println!("InputSelector::match => id don't match");
             return false;
         }
         if !self.parent.matches(&service.node) {
-            println!("InputSelector::match => parents don't match");
             return false;
         }
         if !self.kind.matches(&service.mechanism.kind) {
-            println!("InputSelector::match => kinds don't match");
             return false;
         }
         if !Period::matches_option(&self.poll, &service.mechanism.poll) {
-            println!("InputSelector::match => poll don't match");
             return false;
         }
         if !Period::matches_option(&self.trigger, &service.mechanism.trigger) {
-            println!("InputSelector::match => trigger don't match");
             return false;
         }
         if !has_selected_tags(&self.tags, &service.tags) {
-            println!("InputSelector::match => tags don't match");
             return false;
         }
-        println!("InputSelector::match => everything matches");
         return true;
     }
 }
@@ -256,12 +248,12 @@ impl InputSelector {
 pub struct OutputSelector {
     /// If `Exactly(id)`, return only the service with the corresponding id.
     #[serde(default)]
-    pub id: Exactly<ServiceId>,
+    pub id: Exactly<Id<Output>>,
 
     /// If `Exactly(id)`, return only services that are immediate children
     /// of node `id`.
     #[serde(default)]
-    pub parent: Exactly<NodeId>,
+    pub parent: Exactly<Id<NodeId>>,
 
     ///  Restrict results to services that have all the tags in `tags`.
     #[serde(default)]
@@ -289,7 +281,7 @@ impl OutputSelector {
     }
 
     /// Selector to a service with a specific id.
-    pub fn with_id(self, id: ServiceId) -> Self {
+    pub fn with_id(self, id: Id<Output>) -> Self {
         OutputSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
@@ -297,7 +289,7 @@ impl OutputSelector {
     }
 
     /// Selector to services with a specific parent.
-    pub fn with_parent(self, id: NodeId) -> Self {
+    pub fn with_parent(self, id: Id<NodeId>) -> Self {
         OutputSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
@@ -397,20 +389,16 @@ impl Period {
     }
 
     pub fn matches(&self, duration: &values::ValDuration) -> bool {
-        println!("Period::matches");
         if let Some(ref min) = self.min {
             if min > duration {
-                println!("Period:: matches => min > duration");
                 return false;
             }
         }
         if let Some(ref max) = self.max {
             if max < duration {
-                println!("Period:: matches => max < duration");
                 return false;
             }
         }
-        println!("Period:: matches => min > ok");
         return true;
     }
 

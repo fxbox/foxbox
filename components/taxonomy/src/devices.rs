@@ -7,21 +7,16 @@
 //! these data structures are read.
 
 use values::*;
+use util::Id;
 
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error};
 
-/// The unique Id of a node on the network.
+
+/// A marker for Id.
+/// Only useful for writing `Id<NodeId>`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
-pub struct NodeId(String);
-impl NodeId {
-    pub fn new(id: String) -> Self {
-        NodeId(id)
-    }
-    pub fn as_string(&self) -> &String {
-        &self.0
-    }
-}
+pub struct NodeId;
 
 /// Metadata on a node. A node is a device or collection of devices
 /// that may offer services. The FoxBox itself a node offering
@@ -43,7 +38,7 @@ pub struct Node {
     pub tags: Vec<String>,
 
     /// An id unique to this node.
-    pub id: NodeId,
+    pub id: Id<NodeId>,
 
     /// Services connected directly to this node.
     pub inputs: Vec<Service<Input>>,
@@ -54,17 +49,6 @@ pub struct Node {
     private: (),
 }
 
-/// The unique Id of a service on the network.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
-pub struct ServiceId(String);
-impl ServiceId {
-    pub fn new(id: String) -> Self {
-        ServiceId(id)
-    }
-    pub fn as_string(&self) -> &String {
-        &self.0
-    }
-}
 
 /// The kind of the service, i.e. a strongly-typed description of
 /// _what_ the service can do. Used both for locating services
@@ -248,10 +232,10 @@ pub struct Service<IO> where IO: IOMechanism {
     pub tags: Vec<String>,
 
     /// An id unique to this service.
-    pub id: ServiceId,
+    pub id: Id<IO>,
 
     /// The node owning this service.
-    pub node: NodeId,
+    pub node: Id<NodeId>,
 
     /// The update mechanism for this service.
     pub mechanism: IO,

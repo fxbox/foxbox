@@ -16,15 +16,19 @@
 use devices::*;
 use selector::*;
 use values::Value;
+use util::Id;
 
 /// An error produced by one of the APIs in this module.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Error {
     /// There is no such node connected to the Foxbox, even indirectly.
-    NoSuchNode(NodeId),
+    NoSuchNode(Id<NodeId>),
 
-    /// There is no such service connected to the Foxbox, even indirectly.
-    NoSuchService(ServiceId),
+    /// There is no such input service connected to the Foxbox, even indirectly.
+    NoSuchInput(Id<Input>),
+
+    /// There is no such output service connected to the Foxbox, even indirectly.
+    NoSuchOutput(Id<Output>),
 
     /// Attempting to set a value with the wrong type
     TypeError,
@@ -36,7 +40,7 @@ pub enum WatchEvent {
     /// A new value is available.
     Value {
         /// The service that sent the value.
-        from: ServiceId,
+        from: Id<Input>,
 
         /// The actual value.
         value: Value
@@ -45,12 +49,12 @@ pub enum WatchEvent {
     /// The set of devices being watched has changed, typically either
     /// because a tag was edited or because a device was
     /// removed. Payload is the id of the device that was removed.
-    InputRemoved(ServiceId),
+    InputRemoved(Id<Input>),
 
     /// The set of devices being watched has changed, typically either
     /// because a tag was edited or because a device was
     /// added. Payload is the id of the device that was added.
-    InputAdded(ServiceId),
+    InputAdded(Id<Input>),
 }
 
 /// A handle to the public API.
@@ -312,14 +316,14 @@ pub trait API: Send {
     /// # REST API
     ///
     /// `GET /api/v1/services/value`
-    fn get_service_value(&self, &Vec<InputSelector>) -> Vec<(ServiceId, Result<Value, Error>)>;
+    fn get_service_value(&self, &Vec<InputSelector>) -> Vec<(Id<Input>, Result<Value, Error>)>;
 
     /// Send one value to a set of services
     ///
     /// # REST API
     ///
     /// `POST /api/v1/services/value`
-    fn put_service_value(&self, &Vec<OutputSelector>, Value) -> Vec<(ServiceId, Result<(), Error>)>;
+    fn put_service_value(&self, &Vec<OutputSelector>, Value) -> Vec<(Id<Output>, Result<(), Error>)>;
 
     /// Watch for any change
     ///
