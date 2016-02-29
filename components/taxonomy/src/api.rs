@@ -24,10 +24,10 @@ pub enum Error {
     /// There is no such node connected to the Foxbox, even indirectly.
     NoSuchNode(Id<NodeId>),
 
-    /// There is no such input service connected to the Foxbox, even indirectly.
+    /// There is no such input channel connected to the Foxbox, even indirectly.
     NoSuchGet(Id<Get>),
 
-    /// There is no such output service connected to the Foxbox, even indirectly.
+    /// There is no such output channel connected to the Foxbox, even indirectly.
     NoSuchSet(Id<Set>),
 
     /// Attempting to set a value with the wrong type
@@ -39,7 +39,7 @@ pub enum Error {
 pub enum WatchEvent {
     /// A new value is available.
     Value {
-        /// The service that sent the value.
+        /// The channel that sent the value.
         from: Id<Get>,
 
         /// The actual value.
@@ -77,7 +77,7 @@ pub trait API: Send {
     /// ### Example
     ///
     /// Selector all doors in the entrance (tags `door`, `entrance`)
-    /// that support output service `OpenClose`
+    /// that support output channel `OpenClose`
     ///
     /// ```json
     /// [{
@@ -114,7 +114,7 @@ pub trait API: Send {
     ///   "inputs": [],
     ///   "outputs": [
     ///     "tags": [...],
-    ///     "id": "some-service-id",
+    ///     "id": "some-channel-id",
     ///     "node": "some-node-id",
     ///     "last_seen": "some-date",
     ///     "mechanism": {
@@ -213,27 +213,27 @@ pub trait API: Send {
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/services`
-    fn get_input_services(&self, &Vec<GetSelector>) -> Vec<Channel<Get>>;
-    fn get_output_services(&self, &Vec<SetSelector>) -> Vec<Channel<Set>>;
+    /// `GET /api/v1/channels`
+    fn get_input_channels(&self, &Vec<GetSelector>) -> Vec<Channel<Get>>;
+    fn get_output_channels(&self, &Vec<SetSelector>) -> Vec<Channel<Set>>;
 
-    /// Label a set of services with a set of tags.
+    /// Label a set of channels with a set of tags.
     ///
     /// A call to `API::put_{input, output}_tag(vec![req1, req2, ...], vec![tag1,
-    /// ...])` will label all the services matching _either_ `req1` or
-    /// `req2` or ... with `tag1`, ... and return the number of services
+    /// ...])` will label all the channels matching _either_ `req1` or
+    /// `req2` or ... with `tag1`, ... and return the number of channels
     /// matching any of the selectors.
     ///
-    /// Some of the services may already be labelled with `tag1`, or
+    /// Some of the channels may already be labelled with `tag1`, or
     /// `tag2`, ... They will not change state. They are counted in
     /// the resulting `usize` nevertheless.
     ///
-    /// Note that this call is _not live_. In other words, if services
+    /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
     ///
     /// # REST API
     ///
-    /// `POST /api/v1/services/tag`
+    /// `POST /api/v1/channels/tag`
     ///
     /// ## Gets
     ///
@@ -264,23 +264,23 @@ pub trait API: Send {
     fn put_input_tag(&self, &Vec<GetSelector>, &Vec<String>) -> usize;
     fn put_output_tag(&self, &Vec<SetSelector>, &Vec<String>) -> usize;
 
-    /// Remove a set of tags from a set of services.
+    /// Remove a set of tags from a set of channels.
     ///
     /// A call to `API::delete_{input, output}_tag(vec![req1, req2, ...], vec![tag1,
-    /// ...])` will remove from all the services matching _either_ `req1` or
-    /// `req2` or ... all of the tags `tag1`, ... and return the number of services
+    /// ...])` will remove from all the channels matching _either_ `req1` or
+    /// `req2` or ... all of the tags `tag1`, ... and return the number of channels
     /// matching any of the selectors.
     ///
-    /// Some of the services may not be labelled with `tag1`, or `tag2`,
+    /// Some of the channels may not be labelled with `tag1`, or `tag2`,
     /// ... They will not change state. They are counted in the
     /// resulting `usize` nevertheless.
     ///
-    /// Note that this call is _not live_. In other words, if services
+    /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
     ///
     /// # REST API
     ///
-    /// `DELETE /api/v1/services/tag`
+    /// `DELETE /api/v1/channels/tag`
     ///
     /// ## Gets
     ///
@@ -311,32 +311,32 @@ pub trait API: Send {
     fn delete_input_tag(&self, &Vec<GetSelector>, &Vec<String>) -> usize;
     fn delete_output_tag(&self, &Vec<GetSelector>, &Vec<String>) -> usize;
 
-    /// Read the latest value from a set of services
+    /// Read the latest value from a set of channels
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/services/value`
-    fn get_service_value(&self, &Vec<GetSelector>) -> Vec<(Id<Get>, Result<Value, Error>)>;
+    /// `GET /api/v1/channels/value`
+    fn get_channel_value(&self, &Vec<GetSelector>) -> Vec<(Id<Get>, Result<Value, Error>)>;
 
-    /// Send one value to a set of services
+    /// Send one value to a set of channels
     ///
     /// # REST API
     ///
-    /// `POST /api/v1/services/value`
-    fn put_service_value(&self, &Vec<SetSelector>, Value) -> Vec<(Id<Set>, Result<(), Error>)>;
+    /// `POST /api/v1/channels/value`
+    fn put_channel_value(&self, &Vec<SetSelector>, Value) -> Vec<(Id<Set>, Result<(), Error>)>;
 
     /// Watch for any change
     ///
     /// # WebSocket API
     ///
-    /// `/api/v1/services/watch`
-    fn register_service_watch(&self, Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>) -> Self::WatchGuard;
+    /// `/api/v1/channels/watch`
+    fn register_channel_watch(&self, Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
 }
 
-/// Options for watching changes in one or more services.
+/// Options for watching changes in one or more channels.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WatchOptions {
     /// The set of inputs to watch. Note that the actual inputs in the
@@ -364,12 +364,12 @@ impl WatchOptions {
         }
     }
 
-    /// Restrict to input services in a given set.
+    /// Restrict to input channels in a given set.
     ///
-    /// Also note that the actual input services that are part of the
+    /// Also note that the actual input channels that are part of the
     /// set may change with time, for instance if devices are added
-    /// ore removed.  The selector _is live_, i.e. the service watch
-    /// will continue watching any input services that match `req`.
+    /// ore removed.  The selector _is live_, i.e. the channel watch
+    /// will continue watching any input channels that match `req`.
     pub fn with_inputs(self, req: GetSelector) -> Self {
         WatchOptions {
             source: self.source.and(req),
