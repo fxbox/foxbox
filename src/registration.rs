@@ -98,6 +98,7 @@ impl Registrar {
                                want_iface: &Option<String>) -> Option<String> {
 
         let mut ip_addr: Option<String> = None;
+        let mut ipv6_addr: Option<String> = None;
 
         for iface in ifaces {
             match want_iface.as_ref() {
@@ -118,11 +119,19 @@ impl Registrar {
             if let IfAddr::V4(ref v4) = iface.addr {
                 ip_addr = Some(format!("{}", v4.ip));
                 break;
+            } else if ipv6_addr.is_none() {
+                if let IfAddr::V6(ref v6) = iface.addr {
+                    ipv6_addr = Some(format!("{}", v6.ip));
+                }
             }
         }
 
         if ip_addr.is_none() {
-            error!("No IP interfaces found!");
+            if ipv6_addr.is_none() {
+                error!("No IP interfaces found!");
+            } else {
+                ip_addr = ipv6_addr;
+            }
         }
         ip_addr
     }
@@ -132,13 +141,12 @@ impl Registrar {
 #[test]
 fn check_ip_addr() {
     use self::get_if_addrs::*;
-    use std::net::Ipv4Addr;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
     let registrar = Registrar::new();
     let ip_addr = registrar.get_ip_addr(&None);
     assert!(ip_addr != None);
 
-    // XXX add IPv6 whenever
     let ifaces1: Vec<Interface> = vec![
         Interface {
             name: "lo".to_owned(),
@@ -165,6 +173,25 @@ fn check_ip_addr() {
                                         netmask: Ipv4Addr::new(255,255,255,0),
                                         broadcast: Some(
                                             Ipv4Addr::new(192,160,0,255)) })
+        },
+        Interface {
+            name: "lo".to_owned(),
+            addr: IfAddr::V6(Ifv6Addr { ip: Ipv6Addr::new(1,0,0,0,0,0,0,0),
+                                        netmask: Ipv6Addr::new(0xffff,0xffff,
+                                                               0xffff,0xffff,
+                                                               0xffff,0xffff,
+                                                               0xffff,0xffff),
+                                        broadcast: None })
+        },
+        Interface {
+            name: "eth1".to_owned(),
+            addr: IfAddr::V6(Ifv6Addr { ip: Ipv6Addr::new(0,0,0,0,0,0xffff,
+                                                          0xc0a8,0x4),
+                                        netmask: Ipv6Addr::new(0xffff,0xffff,
+                                                               0xffff,0xffff,
+                                                               0xffff,0xffff,
+                                                               0xffff,0xffff),
+                                        broadcast: None })
         }
         ];
 
@@ -183,4 +210,43 @@ fn check_ip_addr() {
     let ip_addr = registrar.get_ip_addr_from_ifaces(&ifaces1,
                                                     &Some("docker0".to_owned()));
     assert!(ip_addr == Some("172.18.1.42".to_owned()));
+    // we should get eth1 which is IPv6
+    let ip_addr = registrar.get_ip_addr_from_ifaces(&ifaces1,
+                                                    &Some("eth1".to_owned()));
+    assert!(ip_addr == Some("::ffff:192.168.0.4".to_owned()));
+
+    let ifaces2: Vec<Interface> = vec![
+        Interface {
+            name: "lo".to_owned(),
+            addr: IfAddr::V4(Ifv4Addr { ip: Ipv4Addr::new(127,0,0,1),
+                                        netmask: Ipv4Addr::new(255,0,0,0),
+                                        broadcast: None })
+        },
+        Interface {
+            name: "docker0".to_owned(),
+            addr: IfAddr::V4(Ifv4Addr { ip: Ipv4Addr::new(172,18,1,42),
+                                        netmask: Ipv4Addr::new(255,255,255,0),
+                                        broadcast: None })
+        },
+        Interface {
+            name: "eth0".to_owned(),
+            addr: IfAddr::V6(Ifv6Addr { ip: Ipv6Addr::new(0,0,0,0,0,0xffff,
+                                                          0xc0a8,0x4),
+                                        netmask: Ipv6Addr::new(0xffff,0xffff,
+                                                               0xffff,0xffff,
+                                                               0xffff,0xffff,
+                                                               0xffff,0xffff),
+                                        broadcast: None })
+        },
+        Interface {
+            name: "eth0".to_owned(),
+            addr: IfAddr::V4(Ifv4Addr { ip: Ipv4Addr::new(192,168,0,4),
+                                        netmask: Ipv4Addr::new(255,255,255,0),
+                                        broadcast: Some(
+                                            Ipv4Addr::new(192,160,0,255)) })
+        },
+        ];
+    // we should get eth0 in IPv4
+    let ip_addr = registrar.get_ip_addr_from_ifaces(&ifaces2, &None);
+    assert!(ip_addr == Some("192.168.0.4".to_owned()));
 }
