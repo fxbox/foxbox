@@ -1,4 +1,4 @@
-use devices::{NodeId, ServiceKind, Service, Input, Output};
+use devices::{NodeId, ChannelKind, Channel, Get, Set};
 use util::{Exactly, Id};
 use values;
 
@@ -25,7 +25,7 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 ///
 /// let selector = NodeSelector::new()
 ///   .with_tags(vec!["entrance".to_owned()])
-///   .with_inputs(vec![InputSelector::new() /* can be more restrictive */]);
+///   .with_inputs(vec![GetSelector::new() /* can be more restrictive */]);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct NodeSelector {
@@ -39,11 +39,11 @@ pub struct NodeSelector {
 
     /// Restrict results to nodes that have all the inputs in `inputs`.
     #[serde(default)]
-    pub inputs: Vec<InputSelector>,
+    pub inputs: Vec<GetSelector>,
 
     /// Restrict results to nodes that have all the outputs in `outputs`.
     #[serde(default)]
-    pub outputs: Vec<OutputSelector>,
+    pub outputs: Vec<SetSelector>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
@@ -74,7 +74,7 @@ impl NodeSelector {
     }
 
     /// Restrict results to nodes that have all the inputs in `inputs`.
-    pub fn with_inputs(mut self, mut inputs: Vec<InputSelector>) -> Self {
+    pub fn with_inputs(mut self, mut inputs: Vec<GetSelector>) -> Self {
         NodeSelector {
             inputs: {self.inputs.append(&mut inputs); self.inputs},
             .. self
@@ -82,7 +82,7 @@ impl NodeSelector {
     }
 
     /// Restrict results to nodes that have all the outputs in `outputs`.
-    pub fn with_outputs(mut self, mut outputs: Vec<OutputSelector>) -> Self {
+    pub fn with_outputs(mut self, mut outputs: Vec<SetSelector>) -> Self {
         NodeSelector {
             outputs: {self.outputs.append(&mut outputs); self.outputs},
             .. self
@@ -103,7 +103,7 @@ impl NodeSelector {
 
 
 
-/// A selector for one or more input services.
+/// A selector for one or more input channels.
 ///
 ///
 /// # Example
@@ -113,36 +113,36 @@ impl NodeSelector {
 /// use fxbox_taxonomy::devices::*;
 /// use fxbox_taxonomy::util::Id;
 ///
-/// let selector = InputSelector::new()
+/// let selector = GetSelector::new()
 ///   .with_parent(Id::new("foxbox".to_owned()))
-///   .with_kind(ServiceKind::CurrentTimeOfDay);
+///   .with_kind(ChannelKind::CurrentTimeOfDay);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct InputSelector {
-    /// If `Exactly(id)`, return only the service with the corresponding id.
+pub struct GetSelector {
+    /// If `Exactly(id)`, return only the channel with the corresponding id.
     #[serde(default)]
-    pub id: Exactly<Id<Input>>,
+    pub id: Exactly<Id<Get>>,
 
-    /// If `Eactly(id)`, return only services that are children of
+    /// If `Eactly(id)`, return only channels that are children of
     /// node `id`.
     #[serde(default)]
     pub parent: Exactly<Id<NodeId>>,
 
-    ///  Restrict results to services that have all the tags in `tags`.
+    ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
     pub tags: Vec<String>,
 
-    /// If `Exatly(k)`, restrict results to services that produce values
+    /// If `Exatly(k)`, restrict results to channels that produce values
     /// of kind `k`.
     #[serde(default)]
-    pub kind: Exactly<ServiceKind>,
+    pub kind: Exactly<ChannelKind>,
 
-    /// If `Some(r)`, restrict results to services that support polling
+    /// If `Some(r)`, restrict results to channels that support polling
     /// with the acceptable period.
     #[serde(default)]
     pub poll: Option<Period>,
 
-    /// If `Some(r)`, restrict results to services that support trigger
+    /// If `Some(r)`, restrict results to channels that support trigger
     /// with the acceptable period.
     #[serde(default)]
     pub trigger: Option<Period>,
@@ -151,65 +151,65 @@ pub struct InputSelector {
     #[serde(default, skip_serializing)]
     private: (),
 }
-impl InputSelector {
-    /// Create a new selector that accepts all input services.
+impl GetSelector {
+    /// Create a new selector that accepts all input channels.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Restrict to a service with a specific id.
-    pub fn with_id(self, id: Id<Input>) -> Self {
-        InputSelector {
+    /// Restrict to a channel with a specific id.
+    pub fn with_id(self, id: Id<Get>) -> Self {
+        GetSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
         }
     }
 
-    /// Restrict to a service with a specific parent.
+    /// Restrict to a channel with a specific parent.
     pub fn with_parent(self, id: Id<NodeId>) -> Self {
-        InputSelector {
+        GetSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
         }
     }
 
-    /// Restrict to a service with a specific kind.
-    pub fn with_kind(self, kind: ServiceKind) -> Self {
-        InputSelector {
+    /// Restrict to a channel with a specific kind.
+    pub fn with_kind(self, kind: ChannelKind) -> Self {
+        GetSelector {
             kind: self.kind.and(Exactly::Exactly(kind)),
             .. self
         }
     }
 
-    ///  Restrict to services that have all the tags in `tags`.
+    ///  Restrict to channels that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<String>) -> Self {
-        InputSelector {
+        GetSelector {
             tags: merge(self.tags, tags),
             .. self
         }
     }
 
-    /// Restrict to services that support polling with the acceptable
+    /// Restrict to channels that support polling with the acceptable
     /// period
     pub fn with_poll(self, period: Period) -> Self {
-        InputSelector {
+        GetSelector {
             poll: Period::and_option(self.poll, Some(period)),
             .. self
         }
     }
 
-    /// Restrict to services that support trigger with the acceptable
+    /// Restrict to channels that support trigger with the acceptable
     /// period
     pub fn with_trigger(self, period: Period) -> Self {
-        InputSelector {
+        GetSelector {
             trigger: Period::and_option(self.trigger, Some(period)),
             .. self
         }
     }
 
-    /// Restrict to services that are accepted by two selector.
+    /// Restrict to channels that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
-        InputSelector {
+        GetSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
             tags: merge(self.tags, other.tags),
@@ -220,52 +220,52 @@ impl InputSelector {
         }
     }
 
-    /// Determine if a service is matched by this selector.
-    pub fn matches(&self, service: &Service<Input>) -> bool {
-        if !self.id.matches(&service.id) {
+    /// Determine if a channel is matched by this selector.
+    pub fn matches(&self, channel: &Channel<Get>) -> bool {
+        if !self.id.matches(&channel.id) {
             return false;
         }
-        if !self.parent.matches(&service.node) {
+        if !self.parent.matches(&channel.node) {
             return false;
         }
-        if !self.kind.matches(&service.mechanism.kind) {
+        if !self.kind.matches(&channel.mechanism.kind) {
             return false;
         }
-        if !Period::matches_option(&self.poll, &service.mechanism.poll) {
+        if !Period::matches_option(&self.poll, &channel.mechanism.poll) {
             return false;
         }
-        if !Period::matches_option(&self.trigger, &service.mechanism.trigger) {
+        if !Period::matches_option(&self.trigger, &channel.mechanism.trigger) {
             return false;
         }
-        if !has_selected_tags(&self.tags, &service.tags) {
+        if !has_selected_tags(&self.tags, &channel.tags) {
             return false;
         }
         return true;
     }
 }
 
-/// A selector for one or more output services.
+/// A selector for one or more output channels.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct OutputSelector {
-    /// If `Exactly(id)`, return only the service with the corresponding id.
+pub struct SetSelector {
+    /// If `Exactly(id)`, return only the channel with the corresponding id.
     #[serde(default)]
-    pub id: Exactly<Id<Output>>,
+    pub id: Exactly<Id<Set>>,
 
-    /// If `Exactly(id)`, return only services that are immediate children
+    /// If `Exactly(id)`, return only channels that are immediate children
     /// of node `id`.
     #[serde(default)]
     pub parent: Exactly<Id<NodeId>>,
 
-    ///  Restrict results to services that have all the tags in `tags`.
+    ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
     pub tags: Vec<String>,
 
-    /// If `Exactly(k)`, restrict results to services that accept values
+    /// If `Exactly(k)`, restrict results to channels that accept values
     /// of kind `k`.
     #[serde(default)]
-    pub kind: Exactly<ServiceKind>,
+    pub kind: Exactly<ChannelKind>,
 
-    /// If `Some(r)`, restrict results to services that support pushing
+    /// If `Some(r)`, restrict results to channels that support pushing
     /// with the acceptable period.
     #[serde(default)]
     pub push: Option<Period>,
@@ -275,56 +275,56 @@ pub struct OutputSelector {
     private: (),
 }
 
-impl OutputSelector {
-    /// Create a new selector that accepts all input services.
+impl SetSelector {
+    /// Create a new selector that accepts all input channels.
     pub fn new() -> Self {
-        OutputSelector::default()
+        SetSelector::default()
     }
 
-    /// Selector to a service with a specific id.
-    pub fn with_id(self, id: Id<Output>) -> Self {
-        OutputSelector {
+    /// Selector to a channel with a specific id.
+    pub fn with_id(self, id: Id<Set>) -> Self {
+        SetSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
         }
     }
 
-    /// Selector to services with a specific parent.
+    /// Selector to channels with a specific parent.
     pub fn with_parent(self, id: Id<NodeId>) -> Self {
-        OutputSelector {
+        SetSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
         }
     }
 
-    /// Selector to services with a specific kind.
-    pub fn with_kind(self, kind: ServiceKind) -> Self {
-        OutputSelector {
+    /// Selector to channels with a specific kind.
+    pub fn with_kind(self, kind: ChannelKind) -> Self {
+        SetSelector {
             kind: self.kind.and(Exactly::Exactly(kind)),
             .. self
         }
     }
 
-    ///  Restrict to services that have all the tags in `tags`.
+    ///  Restrict to channels that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<String>) -> Self {
-        OutputSelector {
+        SetSelector {
             tags: merge(self.tags, tags),
             .. self
         }
     }
 
-    /// Restrict to services that support push with the acceptable
+    /// Restrict to channels that support push with the acceptable
     /// period
     pub fn with_push(self, period: Period) -> Self {
-        OutputSelector {
+        SetSelector {
             push: Period::and_option(self.push, Some(period)),
             .. self
         }
     }
 
-    /// Restrict results to services that are accepted by two selector.
+    /// Restrict results to channels that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
-        OutputSelector {
+        SetSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
             tags: merge(self.tags, other.tags),
@@ -334,21 +334,21 @@ impl OutputSelector {
         }
     }
 
-    /// Determine if a service is matched by this selector.
-    pub fn matches(&self, service: &Service<Output>) -> bool {
-        if !self.id.matches(&service.id) {
+    /// Determine if a channel is matched by this selector.
+    pub fn matches(&self, channel: &Channel<Set>) -> bool {
+        if !self.id.matches(&channel.id) {
             return false;
         }
-        if !self.parent.matches(&service.node) {
+        if !self.parent.matches(&channel.node) {
             return false;
         }
-        if !self.kind.matches(&service.mechanism.kind) {
+        if !self.kind.matches(&channel.mechanism.kind) {
             return false;
         }
-        if !Period::matches_option(&self.push, &service.mechanism.push) {
+        if !Period::matches_option(&self.push, &channel.mechanism.push) {
             return false;
         }
-        if !has_selected_tags(&self.tags, &service.tags) {
+        if !has_selected_tags(&self.tags, &channel.tags) {
             return false;
         }
         return true;

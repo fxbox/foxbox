@@ -40,9 +40,9 @@ pub struct Node {
     /// An id unique to this node.
     pub id: Id<NodeId>,
 
-    /// Services connected directly to this node.
-    pub inputs: Vec<Service<Input>>,
-    pub outputs: Vec<Service<Output>>,
+    /// Channels connected directly to this node.
+    pub inputs: Vec<Channel<Get>>,
+    pub outputs: Vec<Channel<Set>>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
@@ -63,7 +63,7 @@ pub struct Node {
 /// offers a constructor `Extension`, designed to describe novel
 /// services.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ServiceKind {
+pub enum ChannelKind {
     ///
     /// # No payload
     ///
@@ -134,10 +134,10 @@ pub enum ServiceKind {
     }
 }
 
-impl ServiceKind {
+impl ChannelKind {
     /// Get the type of values used to communicate with this service.
     pub fn get_type(&self) -> Type {
-        use self::ServiceKind::*;
+        use self::ChannelKind::*;
         use values::Type::*;
         match *self {
             Ready => Unit,
@@ -153,9 +153,9 @@ impl ServiceKind {
 
 /// An input operation available on an service.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Input {
+pub struct Get {
     /// The kind of value that can be obtained from this service.
-    pub kind: ServiceKind,
+    pub kind: ChannelKind,
 
     /// If `Some(duration)`, this service can be polled, i.e. it
     /// will respond when the FoxBox requests the latest value.
@@ -190,14 +190,14 @@ pub struct Input {
     #[serde(default, skip_serializing)]
     private: (),
 }
-impl IOMechanism for Input {
+impl IOMechanism for Get {
 }
 
 /// An output operation available on an service.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Output {
+pub struct Set {
     /// The kind of value that can be sent to this service.
-    pub kind: ServiceKind,
+    pub kind: ChannelKind,
 
     /// If `Some(duration)`, this service supports pushing,
     /// i.e. the FoxBox can send values.
@@ -212,7 +212,7 @@ pub struct Output {
     #[serde(default, skip_serializing)]
     private: (),
 }
-impl IOMechanism for Output {
+impl IOMechanism for Set {
 }
 
 /// An service represents a single place where data can enter or
@@ -221,7 +221,7 @@ impl IOMechanism for Output {
 /// inputs or outputs, or several kinds of inputs, or several kinds of
 /// outputs, are represented as nodes containing several services.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Service<IO> where IO: IOMechanism {
+pub struct Channel<IO> where IO: IOMechanism {
     /// Tags describing the service.
     ///
     /// These tags can be set by the user, adapters or

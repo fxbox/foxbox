@@ -25,10 +25,10 @@ pub enum Error {
     NoSuchNode(Id<NodeId>),
 
     /// There is no such input service connected to the Foxbox, even indirectly.
-    NoSuchInput(Id<Input>),
+    NoSuchGet(Id<Get>),
 
     /// There is no such output service connected to the Foxbox, even indirectly.
-    NoSuchOutput(Id<Output>),
+    NoSuchSet(Id<Set>),
 
     /// Attempting to set a value with the wrong type
     TypeError,
@@ -40,7 +40,7 @@ pub enum WatchEvent {
     /// A new value is available.
     Value {
         /// The service that sent the value.
-        from: Id<Input>,
+        from: Id<Get>,
 
         /// The actual value.
         value: Value
@@ -49,12 +49,12 @@ pub enum WatchEvent {
     /// The set of devices being watched has changed, typically either
     /// because a tag was edited or because a device was
     /// removed. Payload is the id of the device that was removed.
-    InputRemoved(Id<Input>),
+    GetRemoved(Id<Get>),
 
     /// The set of devices being watched has changed, typically either
     /// because a tag was edited or because a device was
     /// added. Payload is the id of the device that was added.
-    InputAdded(Id<Input>),
+    GetAdded(Id<Get>),
 }
 
 /// A handle to the public API.
@@ -69,7 +69,7 @@ pub trait API: Send {
     ///
     /// `GET /api/v1/nodes`
     ///
-    /// ## Inputs
+    /// ## Gets
     ///
     /// Any JSON that can be deserialized to a `Vec<NodeSelector>`. See
     /// the implementation of `NodeSelector` for details.
@@ -118,7 +118,7 @@ pub trait API: Send {
     ///     "node": "some-node-id",
     ///     "last_seen": "some-date",
     ///     "mechanism": {
-    ///       "Output":  {
+    ///       "Set":  {
     ///         "kind": {
     ///           "OnOff": []
     ///         },
@@ -149,7 +149,7 @@ pub trait API: Send {
     ///
     /// `POST /api/v1/nodes/tag`
     ///
-    /// ## Inputs
+    /// ## Gets
     ///
     /// Any JSON that can be deserialized to
     ///
@@ -188,7 +188,7 @@ pub trait API: Send {
     ///
     /// `DELETE /api/v1/nodes/tag`
     ///
-    /// ## Inputs
+    /// ## Gets
     ///
     /// Any JSON that can be deserialized to
     ///
@@ -214,8 +214,8 @@ pub trait API: Send {
     /// # REST API
     ///
     /// `GET /api/v1/services`
-    fn get_input_services(&self, &Vec<InputSelector>) -> Vec<Service<Input>>;
-    fn get_output_services(&self, &Vec<OutputSelector>) -> Vec<Service<Output>>;
+    fn get_input_services(&self, &Vec<GetSelector>) -> Vec<Channel<Get>>;
+    fn get_output_services(&self, &Vec<SetSelector>) -> Vec<Channel<Set>>;
 
     /// Label a set of services with a set of tags.
     ///
@@ -235,20 +235,20 @@ pub trait API: Send {
     ///
     /// `POST /api/v1/services/tag`
     ///
-    /// ## Inputs
+    /// ## Gets
     ///
     /// Any JSON that can be deserialized to
     ///
     /// ```ignore
     /// {
-    ///   set: Vec<InputSelector>,
+    ///   set: Vec<GetSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
     /// or
     /// ```ignore
     /// {
-    ///   set: Vec<OutputSelector>,
+    ///   set: Vec<SetSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
@@ -261,8 +261,8 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn put_input_tag(&self, &Vec<InputSelector>, &Vec<String>) -> usize;
-    fn put_output_tag(&self, &Vec<OutputSelector>, &Vec<String>) -> usize;
+    fn put_input_tag(&self, &Vec<GetSelector>, &Vec<String>) -> usize;
+    fn put_output_tag(&self, &Vec<SetSelector>, &Vec<String>) -> usize;
 
     /// Remove a set of tags from a set of services.
     ///
@@ -282,20 +282,20 @@ pub trait API: Send {
     ///
     /// `DELETE /api/v1/services/tag`
     ///
-    /// ## Inputs
+    /// ## Gets
     ///
     /// Any JSON that can be deserialized to
     ///
     /// ```ignore
     /// {
-    ///   set: Vec<InputSelector>,
+    ///   set: Vec<GetSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
     /// or
     /// ```ignore
     /// {
-    ///   set: Vec<OutputSelector>,
+    ///   set: Vec<SetSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
@@ -308,22 +308,22 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn delete_input_tag(&self, &Vec<InputSelector>, &Vec<String>) -> usize;
-    fn delete_output_tag(&self, &Vec<InputSelector>, &Vec<String>) -> usize;
+    fn delete_input_tag(&self, &Vec<GetSelector>, &Vec<String>) -> usize;
+    fn delete_output_tag(&self, &Vec<GetSelector>, &Vec<String>) -> usize;
 
     /// Read the latest value from a set of services
     ///
     /// # REST API
     ///
     /// `GET /api/v1/services/value`
-    fn get_service_value(&self, &Vec<InputSelector>) -> Vec<(Id<Input>, Result<Value, Error>)>;
+    fn get_service_value(&self, &Vec<GetSelector>) -> Vec<(Id<Get>, Result<Value, Error>)>;
 
     /// Send one value to a set of services
     ///
     /// # REST API
     ///
     /// `POST /api/v1/services/value`
-    fn put_service_value(&self, &Vec<OutputSelector>, Value) -> Vec<(Id<Output>, Result<(), Error>)>;
+    fn put_service_value(&self, &Vec<SetSelector>, Value) -> Vec<(Id<Set>, Result<(), Error>)>;
 
     /// Watch for any change
     ///
@@ -341,7 +341,7 @@ pub trait API: Send {
 pub struct WatchOptions {
     /// The set of inputs to watch. Note that the actual inputs in the
     /// set may change over time.
-    pub source: InputSelector,
+    pub source: GetSelector,
 
     /// If `true`, watch as new values become available.
     pub should_watch_values: bool,
@@ -357,7 +357,7 @@ pub struct WatchOptions {
 impl WatchOptions {
     pub fn new() -> Self {
         WatchOptions {
-            source: InputSelector::new(),
+            source: GetSelector::new(),
             should_watch_values: false,
             should_watch_topology: false,
             private: (),
@@ -370,7 +370,7 @@ impl WatchOptions {
     /// set may change with time, for instance if devices are added
     /// ore removed.  The selector _is live_, i.e. the service watch
     /// will continue watching any input services that match `req`.
-    pub fn with_inputs(self, req: InputSelector) -> Self {
+    pub fn with_inputs(self, req: GetSelector) -> Self {
         WatchOptions {
             source: self.source.and(req),
             ..self
