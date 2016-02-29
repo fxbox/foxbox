@@ -111,6 +111,7 @@ impl NodeSelector {
 /// ```
 /// use fxbox_taxonomy::selector::*;
 /// use fxbox_taxonomy::devices::*;
+/// use fxbox_taxonomy::util::Id;
 ///
 /// let selector = InputSelector::new()
 ///   .with_parent(Id<NodeId>::new("foxbox".to_owned()))
