@@ -42,17 +42,17 @@ pub struct Rule<Ctx> where Ctx: Context {
 
 /// An individual match.
 ///
-/// Matchs always take the form: "data received from input channel
+/// Matchs always take the form: "data received from getter channel
 /// is in given range".
 ///
-/// A condition is true if *any* of the corresponding input channels
+/// A condition is true if *any* of the corresponding getter channels
 /// yielded a value that is in the given range.
 #[derive(Serialize, Deserialize)]
 pub struct Match<Ctx> where Ctx: Context {
-    /// The set of inputs to watch. Note that the set of inputs may
+    /// The set of getters to watch. Note that the set of getters may
     /// change (e.g. when devices are added/removed) without rebooting
     /// the script.
-    pub source: Vec<GetSelector>,
+    pub source: Vec<GetterSelector>,
 
     /// The kind of channel expected from `source`, e.g. "the current
     /// time of day", "is the door opened?", etc. During compilation,
@@ -62,7 +62,7 @@ pub struct Match<Ctx> where Ctx: Context {
 
     /// The range of values for which the condition is considered met.
     /// During compilation, we check that the type of `range` is
-    /// compatible with that of `input`.
+    /// compatible with that of `getter`.
     pub range: Range,
 
     #[serde(default)]
@@ -74,10 +74,10 @@ pub struct Match<Ctx> where Ctx: Context {
 /// Stuff to actually do. In practice, this means placing calls to devices.
 #[derive(Serialize, Deserialize)]
 pub struct Statement<Ctx> where Ctx: Context {
-    /// The set of outputs to which to send a command. Note that the
-    /// set of outputs may change (e.g. when devices are
+    /// The set of setters to which to send a command. Note that the
+    /// set of setters may change (e.g. when devices are
     /// added/removed) without rebooting the script.
-    pub destination: Vec<SetSelector>,
+    pub destination: Vec<SetterSelector>,
 
     /// Data to send to the resource. During compilation, we check
     /// that the type of `value` is compatible with that of

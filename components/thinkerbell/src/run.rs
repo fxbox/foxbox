@@ -7,7 +7,7 @@ use compile;
 use foxbox_taxonomy;
 use foxbox_taxonomy::api;
 use foxbox_taxonomy::api::{API, WatchEvent};
-use foxbox_taxonomy::devices::{Get, Set};
+use foxbox_taxonomy::devices::{Getter, Setter};
 use foxbox_taxonomy::util::Id;
 use foxbox_taxonomy::values::Range;
 
@@ -117,7 +117,7 @@ pub enum ExecutionEvent {
     Sent {
         rule_index: usize,
         statement_index: usize,
-        result: Vec<(Id<Set>, Result<(), Error>)>
+        result: Vec<(Id<Setter>, Result<(), Error>)>
     }
 }
 
@@ -151,7 +151,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
         struct ConditionState {
             match_is_met: bool,
-            per_input: HashMap<Id<Get>, bool>,
+            per_getter: HashMap<Id<Getter>, bool>,
             range: Range,
         };
         struct RuleState {
@@ -159,16 +159,16 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
             per_condition: Vec<ConditionState>,
         };
 
-        // Generate the state of rules, conditions, inputs and start
-        // listening to changes in the inputs.
+        // Generate the state of rules, conditions, getters and start
+        // listening to changes in the getters.
 
         let mut per_rule : Vec<_> = self.script.rules.iter().zip(0 as usize..).map(|(rule, rule_index)| {
             let per_condition = rule.conditions.iter().zip(0 as usize..).map(|(condition, condition_index)| {
-                let options: Vec<_> = condition.source.iter().map(|input| {
+                let options: Vec<_> = condition.source.iter().map(|getter| {
                     foxbox_taxonomy::api::WatchOptions::new()
                         .with_watch_values(true)
                         .with_watch_topology(true)
-                        .with_inputs(input.clone())
+                        .with_getters(getter.clone())
                 }).collect();
                 // We will often end up watching several times the
                 // same channel. For the moment, we do not attempt to
@@ -195,7 +195,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                 let range = condition.range.clone();
                 ConditionState {
                     match_is_met: false,
-                    per_input: HashMap::new(),
+                    per_getter: HashMap::new(),
                     range: range,
                 }
             }).collect();
@@ -219,31 +219,31 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                     rule_index,
                     condition_index,
                 } => match event {
-                    WatchEvent::GetRemoved(id) => {
+                    WatchEvent::GetterRemoved(id) => {
                         per_rule[rule_index]
                             .per_condition[condition_index]
-                            .per_input
+                            .per_getter
                             .remove(&id);
                     },
-                    WatchEvent::GetAdded(id) => {
-                        // An input was added. Note that there is
-                        // a possibility that the input was not
+                    WatchEvent::GetterAdded(id) => {
+                        // An getter was added. Note that there is
+                        // a possibility that the getter was not
                         // empty, in case we received messages in
                         // the wrong order.
                         per_rule[rule_index]
                             .per_condition[condition_index]
-                            .per_input
+                            .per_getter
                             .insert(id, false);
                     }
                     WatchEvent::Value{from: id, value} => {
                         use std::mem::replace;
 
-                        // An input was updated. Note that there is
-                        // a possibility that the input was
+                        // An getter was updated. Note that there is
+                        // a possibility that the getter was
                         // empty, in case we received messages in
                         // the wrong order.
 
-                        let input_is_met : bool =
+                        let getter_is_met : bool =
                             per_rule[rule_index]
                             .per_condition[condition_index]
                             .range
@@ -251,22 +251,22 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
                         per_rule[rule_index]
                             .per_condition[condition_index]
-                            .per_input
-                            .insert(id, input_is_met); // FIXME: Could be used to optimize
+                            .per_getter
+                            .insert(id, getter_is_met); // FIXME: Could be used to optimize
 
                         // 1. Is the match met?
                         //
-                        // The match is met iff any of the inputs
+                        // The match is met iff any of the getters
                         // meets the condition.
-                        let some_input_is_met = input_is_met ||
+                        let some_getter_is_met = getter_is_met ||
                             per_rule[rule_index]
                             .per_condition[condition_index]
-                            .per_input
+                            .per_getter
                             .values().find(|is_met| **is_met).is_some();
 
                         per_rule[rule_index]
                             .per_condition[condition_index]
-                            .match_is_met = some_input_is_met;
+                            .match_is_met = some_getter_is_met;
 
                         // 2. Is the condition met?
                         //
@@ -304,7 +304,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
 
 impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
-    fn eval(&self, api: &Env::API) ->  Vec<(Id<Set>, Result<(), Error>)> {
+    fn eval(&self, api: &Env::API) ->  Vec<(Id<Setter>, Result<(), Error>)> {
         api.put_channel_value(&self.destination, self.value.clone())
             .into_iter()
             .map(|(id, result)|
