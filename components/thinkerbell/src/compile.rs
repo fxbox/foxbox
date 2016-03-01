@@ -22,8 +22,8 @@ use std::marker::PhantomData;
 use ast::{Script, Rule, Statement, Match, Context, UncheckedCtx};
 use util::*;
 
-use fxbox_taxonomy::api::API;
-use fxbox_taxonomy::util::Phantom;
+use foxbox_taxonomy::api::API;
+use foxbox_taxonomy::util::Phantom;
 
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer};

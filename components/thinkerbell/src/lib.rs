@@ -15,7 +15,7 @@ extern crate chrono;
 extern crate serde;
 extern crate serde_json;
 
-extern crate fxbox_taxonomy;
+extern crate foxbox_taxonomy;
 
 /// Definition of the AST.
 pub mod ast;

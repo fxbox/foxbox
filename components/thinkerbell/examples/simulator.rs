@@ -5,20 +5,20 @@ extern crate docopt;
 extern crate serde;
 extern crate serde_json;
 
-extern crate fxbox_thinkerbell;
-extern crate fxbox_taxonomy;
+extern crate foxbox_thinkerbell;
+extern crate foxbox_taxonomy;
 
-use fxbox_thinkerbell::compile::ExecutableDevEnv;
-use fxbox_thinkerbell::run::Execution;
-use fxbox_thinkerbell::parse::Parser;
+use foxbox_thinkerbell::compile::ExecutableDevEnv;
+use foxbox_thinkerbell::run::Execution;
+use foxbox_thinkerbell::parse::Parser;
 
-use fxbox_taxonomy::devices::*;
-use fxbox_taxonomy::selector::*;
-use fxbox_taxonomy::values::*;
-use fxbox_taxonomy::api::{API, WatchEvent, WatchOptions};
-use fxbox_taxonomy::util::Id;
+use foxbox_taxonomy::devices::*;
+use foxbox_taxonomy::selector::*;
+use foxbox_taxonomy::values::*;
+use foxbox_taxonomy::api::{API, WatchEvent, WatchOptions};
+use foxbox_taxonomy::util::Id;
 
-type APIError = fxbox_taxonomy::api::Error;
+type APIError = foxbox_taxonomy::api::Error;
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -206,7 +206,7 @@ impl APIBackEnd {
                 result = Ok(());
                 internal_result = Ok(());
             } else {
-                result = Err(fxbox_taxonomy::api::Error::TypeError);
+                result = Err(foxbox_taxonomy::api::Error::TypeError);
                 internal_result = Err(format!("Invalid type, expected {:?}, got {:?}", value.get_type(), output.mechanism.kind.get_type()));
             }
             (*self.post_updates)(Update::Put {
@@ -321,7 +321,7 @@ impl API for APIFrontEnd {
 
 }
 fn main () {
-    use fxbox_thinkerbell::run::ExecutionEvent::*;
+    use foxbox_thinkerbell::run::ExecutionEvent::*;
 
     println!("Preparing simulator.");
     let (tx, rx) = channel();

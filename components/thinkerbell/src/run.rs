@@ -4,12 +4,12 @@ use ast::{Script, Statement, UncheckedCtx};
 use compile::{Compiler, CompiledCtx, ExecutableDevEnv};
 use compile;
 
-use fxbox_taxonomy;
-use fxbox_taxonomy::api;
-use fxbox_taxonomy::api::{API, WatchEvent};
-use fxbox_taxonomy::devices::{Get, Set};
-use fxbox_taxonomy::util::Id;
-use fxbox_taxonomy::values::Range;
+use foxbox_taxonomy;
+use foxbox_taxonomy::api;
+use foxbox_taxonomy::api::{API, WatchEvent};
+use foxbox_taxonomy::devices::{Get, Set};
+use foxbox_taxonomy::util::Id;
+use foxbox_taxonomy::values::Range;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::marker::PhantomData;
@@ -165,7 +165,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
         let mut per_rule : Vec<_> = self.script.rules.iter().zip(0 as usize..).map(|(rule, rule_index)| {
             let per_condition = rule.conditions.iter().zip(0 as usize..).map(|(condition, condition_index)| {
                 let options: Vec<_> = condition.source.iter().map(|input| {
-                    fxbox_taxonomy::api::WatchOptions::new()
+                    foxbox_taxonomy::api::WatchOptions::new()
                         .with_watch_values(true)
                         .with_watch_topology(true)
                         .with_inputs(input.clone())

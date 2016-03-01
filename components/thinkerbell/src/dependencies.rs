@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use fxbox_taxonomy::api::API;
+use foxbox_taxonomy::api::API;
 
 use serde::de::Deserialize;
 /// APIs that we need to implement the code in module lang.

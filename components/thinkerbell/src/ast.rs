@@ -4,10 +4,10 @@
 //! objects. Rather, they will use module `parse` to parse a script
 //! and module `run` to execute it.
 
-use fxbox_taxonomy::values::*;
-use fxbox_taxonomy::devices::*;
-use fxbox_taxonomy::selector::*;
-use fxbox_taxonomy::util::Phantom;
+use foxbox_taxonomy::values::*;
+use foxbox_taxonomy::devices::*;
+use foxbox_taxonomy::selector::*;
+use foxbox_taxonomy::util::Phantom;
 
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error};
