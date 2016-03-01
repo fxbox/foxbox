@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use controller::Controller;
+use foxbox_users::auth_middleware::{ AuthEndpoint, AuthMiddleware };
 use iron::{ AfterMiddleware, headers, IronResult, Request, Response };
 use iron::headers::ContentType;
 use iron::method::Method;
@@ -70,6 +71,7 @@ impl AfterMiddleware for CORS {
         res.headers.set(headers::AccessControlAllowHeaders(
             vec![
                 UniCase(String::from("accept")),
+                UniCase(String::from("authorization")),
                 UniCase(String::from("content-type"))
             ]
         ));
@@ -98,13 +100,34 @@ pub fn create<T: Controller>(controller: T) -> Chain {
 
     let c2 = controller.clone();
     router.any(":service/:command", move |req: &mut Request| -> IronResult<Response> {
-        // Call a function on a service.
-        let id = req.extensions.get::<Router>().unwrap()
-            .find("service").unwrap_or("").to_owned();
-        c2.dispatch_service_request(id, req)
+        match req.method {
+            Method::Get |
+            Method::Post |
+            Method::Put => {
+                // Call a function on a service.
+                let id = req.extensions.get::<Router>().unwrap()
+                    .find("service").unwrap_or("").to_owned();
+                c2.dispatch_service_request(id, req)
+            },
+            _ => Ok(Response::with(Status::NotImplemented))
+        }
     });
 
+    let auth_endpoints = if cfg!(feature = "authentication") {
+        vec![
+            AuthEndpoint(vec![Method::Get], "list.json".to_owned()),
+            AuthEndpoint(vec![Method::Get, Method::Post, Method::Put],
+                         ":service/:command".to_owned())
+        ]
+    } else {
+        vec![]
+    };
+
     let mut chain = Chain::new(router);
+    chain.around(AuthMiddleware {
+        auth_endpoints: auth_endpoints
+    });
+
     chain.link_after(CORS);
 
     chain
@@ -113,23 +136,63 @@ pub fn create<T: Controller>(controller: T) -> Chain {
 #[cfg(test)]
 describe! service_router {
     before_each {
-        use iron::Headers;
         use controller::FoxBox;
+        use foxbox_users::users_router::UsersRouter;
+        use iron::Headers;
         use iron_test::request;
+        use mount::Mount;
 
         let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
         let service_router = create(controller.clone());
+
+        let mut mount = Mount::new();
+        mount.mount("", service_router)
+             .mount("/users", UsersRouter::init());
     }
 
     describe! services {
         before_each {
+            extern crate serde_json;
+
+            use foxbox_users::users_db::{ UserBuilder, UsersDb };
+            use iron::headers::{ Authorization, Basic, Bearer };
             use iron_test::response;
+
+            let db = UsersDb::new();
+            db.clear().ok();
+            let user = UserBuilder::new()
+                .id(1).name(String::from("username"))
+                .password(String::from("password"))
+                .email(String::from("username@example.com"))
+                .finalize().unwrap();
+            db.create(&user).ok();
+            let mut headers = Headers::new();
+            headers.set(Authorization(Basic {
+                username: "username".to_owned(),
+                password: Some("password".to_owned())
+            }));
+            let response = request::post("http://localhost:3000/users/login",
+                                         headers,
+                                         "{}",
+                                         &mount).unwrap();
+            #[derive(Debug, PartialEq, Serialize, Deserialize)]
+            struct Token {
+                session_token: String
+            };
+
+            let result: Token = serde_json::from_str(
+                &response::extract_body_to_string(response)
+            ).unwrap();
+            let mut auth_header = Headers::new();
+            auth_header.set(Authorization(Bearer {
+                token: result.session_token
+            }));
         }
 
         it "should create list.json" {
             let response = request::get("http://localhost:3000/list.json",
-                            Headers::new(),
-                            &service_router).unwrap();
+                            auth_header,
+                            &mount).unwrap();
 
             let result = response::extract_body_to_string(response);
             assert_eq!(result, "[]");
@@ -140,8 +203,8 @@ describe! service_router {
             use stubs::service::ServiceStub;
             controller.add_service(Box::new(ServiceStub));
             let response = request::get("http://localhost:3000/1/a-command",
-                            Headers::new(),
-                            &service_router).unwrap();
+                            auth_header,
+                            &mount).unwrap();
 
             let result = response::extract_body_to_string(response);
             assert_eq!(result, "request processed");
@@ -149,8 +212,8 @@ describe! service_router {
 
         it "should return an error if no service was found" {
             let response = request::get("http://localhost:3000/unknown-id/a-command",
-                            Headers::new(),
-                            &service_router).unwrap();
+                            auth_header,
+                            &mount).unwrap();
 
             let result = response::extract_body_to_string(response);
             assert_eq!(result, "No Such Service: unknown-id");
@@ -168,9 +231,7 @@ describe! service_router {
                 let (_, path) = *endpoint;
                 let path = "http://localhost:3000/".to_owned() +
                            &(path.replace(":", "foo"));
-                let response = request::options(&path,
-                                                Headers::new(),
-                                                &service_router).unwrap();
+                let response = request::options(&path, Headers::new(), &mount).unwrap();
                 let headers = &response.headers;
                 assert!(headers.has::<headers::AccessControlAllowOrigin>());
                 assert!(headers.has::<headers::AccessControlAllowHeaders>());
