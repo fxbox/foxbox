@@ -104,72 +104,69 @@ pub fn create<T: Controller>(controller: T) -> Chain {
     chain
 }
 
-
-// FIXME: Declare this crate in the test module, and avoid the use of pub
-// When this comment was written, putting these 2 lines in before_each returns a compile error:
-// ``` error: unresolved import `self::iron_test::request`. Could not find `iron_test` in
-// service_router::service_router` [E0432] ```
-extern crate iron_test;
-pub use self::iron_test::{request, response};
-
 #[cfg(test)]
 describe! service_router {
     before_each {
         use iron::Headers;
         use controller::FoxBox;
+        use iron_test::request;
 
         let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
         let service_router = create(controller.clone());
     }
 
-    it "should create list.json" {
-        let response = request::get("http://localhost:3000/list.json",
-                        Headers::new(),
-                        &service_router).unwrap();
+    describe! services {
+        before_each {
+            use iron_test::response;
+        }
 
-        let result = response::extract_body_to_string(response);
-        assert_eq!(result, "[]");
+        it "should create list.json" {
+            let response = request::get("http://localhost:3000/list.json",
+                            Headers::new(),
+                            &service_router).unwrap();
+
+            let result = response::extract_body_to_string(response);
+            assert_eq!(result, "[]");
+        }
+
+        it "should make service available" {
+            use controller::Controller;
+            use stubs::service::ServiceStub;
+            controller.add_service(Box::new(ServiceStub));
+            let response = request::get("http://localhost:3000/1/a-command",
+                            Headers::new(),
+                            &service_router).unwrap();
+
+            let result = response::extract_body_to_string(response);
+            assert_eq!(result, "request processed");
+        }
+
+        it "should return an error if no service was found" {
+            let response = request::get("http://localhost:3000/unknown-id/a-command",
+                            Headers::new(),
+                            &service_router).unwrap();
+
+            let result = response::extract_body_to_string(response);
+            assert_eq!(result, "No Such Service: unknown-id");
+        }
     }
 
-    it "should make service available" {
-        use controller::Controller;
-        use stubs::service::ServiceStub;
-        controller.add_service(Box::new(ServiceStub));
-        let response = request::get("http://localhost:3000/1/a-command",
-                        Headers::new(),
-                        &service_router).unwrap();
+    describe! cors {
+        before_each {
+            use iron::headers;
+            use super::super::CORS;
+        }
 
-        let result = response::extract_body_to_string(response);
-        assert_eq!(result, "request processed");
-    }
-
-    it "should return an error if no service was found" {
-        let response = request::get("http://localhost:3000/unknown-id/a-command",
-                        Headers::new(),
-                        &service_router).unwrap();
-
-        let result = response::extract_body_to_string(response);
-        assert_eq!(result, "No Such Service: unknown-id");
-    }
-
-    it "should get the appropriate CORS headers" {
-        use iron::headers;
-        use super::CORS;
-
-        for endpoint in CORS::ENDPOINTS {
-            let (_, path) = *endpoint;
-            let path = "http://localhost:3000/".to_owned() +
-                       &(path.join("/").replace("*", "foo"));
-            match request::options(&path, Headers::new(), &service_router) {
-                Ok(res) => {
-                    let headers = &res.headers;
-                    assert!(headers.has::<headers::AccessControlAllowOrigin>());
-                    assert!(headers.has::<headers::AccessControlAllowHeaders>());
-                    assert!(headers.has::<headers::AccessControlAllowMethods>());
-                },
-                _ => {
-                    assert!(false)
-                }
+        it "should get the appropriate CORS headers" {
+            for endpoint in CORS::ENDPOINTS {
+                let (_, path) = *endpoint;
+                let path = "http://localhost:3000/".to_owned() +
+                           &(path.join("/").replace("*", "foo"));
+                let response = request::options(&path, Headers::new(), &service_router).unwrap();
+                let headers = &response.headers;
+                assert!(headers.has::<headers::AccessControlAllowOrigin>());
+                assert!(headers.has::<headers::AccessControlAllowHeaders>());
+                assert!(headers.has::<headers::AccessControlAllowMethods>());
             }
         }
     }
