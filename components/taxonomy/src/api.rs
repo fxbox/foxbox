@@ -24,10 +24,10 @@ pub enum Error {
     /// There is no such node connected to the Foxbox, even indirectly.
     NoSuchNode(Id<NodeId>),
 
-    /// There is no such input channel connected to the Foxbox, even indirectly.
+    /// There is no such getter channel connected to the Foxbox, even indirectly.
     NoSuchGetter(Id<Getter>),
 
-    /// There is no such output channel connected to the Foxbox, even indirectly.
+    /// There is no such setter channel connected to the Foxbox, even indirectly.
     NoSuchSetter(Id<Setter>),
 
     /// Attempting to set a value with the wrong type
@@ -77,12 +77,12 @@ pub trait API: Send {
     /// ### Example
     ///
     /// Selector all doors in the entrance (tags `door`, `entrance`)
-    /// that support output channel `OpenClose`
+    /// that support setter channel `OpenClose`
     ///
     /// ```json
     /// [{
     ///   "tags": ["entrance", "door"],
-    ///   "inputs": [
+    ///   "getters": [
     ///     {
     ///       "kind": {
     ///         "Exactly": {
@@ -111,8 +111,8 @@ pub trait API: Send {
     /// [{
     ///   "tags": ["entrance", "door", "somevendor"],
     ///   "id: "some-node-id",
-    ///   "inputs": [],
-    ///   "outputs": [
+    ///   "getters": [],
+    ///   "setters": [
     ///     "tags": [...],
     ///     "id": "some-channel-id",
     ///     "node": "some-node-id",
@@ -209,17 +209,17 @@ pub trait API: Send {
     /// A JSON representing a number.
     fn delete_node_tag(&self, set: &Vec<NodeSelector>, tags: String) -> usize;
     
-    /// Get a list of inputs matching some conditions
+    /// Get a list of getters matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels`
-    fn get_input_channels(&self, &Vec<GetterSelector>) -> Vec<Channel<Getter>>;
-    fn get_output_channels(&self, &Vec<SetterSelector>) -> Vec<Channel<Setter>>;
+    fn get_getter_channels(&self, &Vec<GetterSelector>) -> Vec<Channel<Getter>>;
+    fn get_setter_channels(&self, &Vec<SetterSelector>) -> Vec<Channel<Setter>>;
 
     /// Label a set of channels with a set of tags.
     ///
-    /// A call to `API::put_{input, output}_tag(vec![req1, req2, ...], vec![tag1,
+    /// A call to `API::put_{getter, setter}_tag(vec![req1, req2, ...], vec![tag1,
     /// ...])` will label all the channels matching _either_ `req1` or
     /// `req2` or ... with `tag1`, ... and return the number of channels
     /// matching any of the selectors.
@@ -261,12 +261,12 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn put_input_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
-    fn put_output_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
+    fn put_getter_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
+    fn put_setter_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
 
     /// Remove a set of tags from a set of channels.
     ///
-    /// A call to `API::delete_{input, output}_tag(vec![req1, req2, ...], vec![tag1,
+    /// A call to `API::delete_{getter, setter}_tag(vec![req1, req2, ...], vec![tag1,
     /// ...])` will remove from all the channels matching _either_ `req1` or
     /// `req2` or ... all of the tags `tag1`, ... and return the number of channels
     /// matching any of the selectors.
@@ -308,8 +308,8 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn delete_input_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
-    fn delete_output_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
+    fn delete_getter_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
+    fn delete_setter_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
 
     /// Read the latest value from a set of channels
     ///
@@ -339,7 +339,7 @@ pub trait API: Send {
 /// Options for watching changes in one or more channels.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WatchOptions {
-    /// The set of inputs to watch. Note that the actual inputs in the
+    /// The set of getters to watch. Note that the actual getters in the
     /// set may change over time.
     pub source: GetterSelector,
 
@@ -364,13 +364,13 @@ impl WatchOptions {
         }
     }
 
-    /// Restrict to input channels in a given set.
+    /// Restrict to getter channels in a given set.
     ///
-    /// Also note that the actual input channels that are part of the
+    /// Also note that the actual getter channels that are part of the
     /// set may change with time, for instance if devices are added
     /// ore removed.  The selector _is live_, i.e. the channel watch
-    /// will continue watching any input channels that match `req`.
-    pub fn with_inputs(self, req: GetterSelector) -> Self {
+    /// will continue watching any getter channels that match `req`.
+    pub fn with_getters(self, req: GetterSelector) -> Self {
         WatchOptions {
             source: self.source.and(req),
             ..self
