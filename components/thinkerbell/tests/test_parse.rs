@@ -1,8 +1,8 @@
-extern crate fxbox_thinkerbell;
-extern crate fxbox_taxonomy;
+extern crate foxbox_thinkerbell;
+extern crate foxbox_taxonomy;
 extern crate serde_json;
 
-use fxbox_thinkerbell::parse::*;
+use foxbox_thinkerbell::parse::*;
 
 #[test]
 fn test_parse_bad_field() {

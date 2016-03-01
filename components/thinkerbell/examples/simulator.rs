@@ -71,18 +71,18 @@ impl TestEnv {
 /// Instructions given to the simulator.
 pub enum Instruction {
     AddNodes(Vec<Node>),
-    AddGets(Vec<Channel<Get>>),
-    AddSets(Vec<Channel<Set>>),
-    InjectGetValue{id: Id<Get>, value: Value},
+    AddGetters(Vec<Channel<Getter>>),
+    AddSetters(Vec<Channel<Setter>>),
+    InjectGetterValue{id: Id<Getter>, value: Value},
 }
 impl Instruction {
     fn as_op(self) -> Op {
         use Instruction::*;
         match self {
             AddNodes(vec) => Op::AddNodes(vec),
-            AddGets(vec) => Op::AddGets(vec),
-            AddSets(vec) => Op::AddSets(vec),
-            InjectGetValue{id, value} => Op::InjectGetValue{id:id, value: value}
+            AddGetters(vec) => Op::AddGetters(vec),
+            AddSetters(vec) => Op::AddSetters(vec),
+            InjectGetterValue{id, value} => Op::InjectGetterValue{id:id, value: value}
         }
     }
 }
@@ -91,25 +91,25 @@ impl Instruction {
 /// Operations internal to the simulator.
 enum Op {
     AddNodes(Vec<Node>),
-    AddGets(Vec<Channel<Get>>),
-    AddSets(Vec<Channel<Set>>),
+    AddGetters(Vec<Channel<Getter>>),
+    AddSetters(Vec<Channel<Setter>>),
     AddWatch{options: Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>},
-    SendValue{selectors: Vec<SetSelector>, value: Value, cb: Box<Fn(Vec<(Id<Set>, Result<(), APIError>)>) + Send>},
-    InjectGetValue{id: Id<Get>, value: Value},
+    SendValue{selectors: Vec<SetterSelector>, value: Value, cb: Box<Fn(Vec<(Id<Setter>, Result<(), APIError>)>) + Send>},
+    InjectGetterValue{id: Id<Getter>, value: Value},
 }
 
 #[derive(Debug)]
 enum Update {
-    Put { id: Id<Set>, value: Value, result: Result<(), String> },
+    Put { id: Id<Setter>, value: Value, result: Result<(), String> },
     Done,
 }
 
 #[derive(Debug)]
-struct GetWithState {
-    input: Channel<Get>,
+struct GetterWithState {
+    getter: Channel<Getter>,
     state: Option<Value>,
 }
-impl GetWithState {
+impl GetterWithState {
     fn set_state(&mut self, val: Value) {
         self.state = Some(val);
     }
@@ -117,8 +117,8 @@ impl GetWithState {
 
 struct APIBackEnd {
     nodes: HashMap<Id<NodeId>, Node>,
-    inputs: HashMap<Id<Get>, GetWithState>,
-    outputs: HashMap<Id<Set>, Channel<Set>>,
+    getters: HashMap<Id<Getter>, GetterWithState>,
+    setters: HashMap<Id<Setter>, Channel<Setter>>,
     watchers: Vec<(WatchOptions, Arc<Box<Fn(WatchEvent)>>)>,
     post_updates: Arc<Fn(Update)>
 }
@@ -127,8 +127,8 @@ impl APIBackEnd {
         where F: Fn(Update) + Send + 'static {
         APIBackEnd {
             nodes: HashMap::new(),
-            inputs: HashMap::new(),
-            outputs: HashMap::new(),
+            getters: HashMap::new(),
+            setters: HashMap::new(),
             watchers: Vec::new(),
             post_updates: Arc::new(cb)
         }
@@ -143,24 +143,24 @@ impl APIBackEnd {
         }
         // In a real implementation, this should update all NodeSelector
     }
-    fn add_inputs(&mut self, inputs: Vec<Channel<Get>>) {
-        for input in inputs {
-            let previous = self.inputs.insert(
-                input.id.clone(),
-                GetWithState {
-                    input:input,
+    fn add_getters(&mut self, getters: Vec<Channel<Getter>>) {
+        for getter in getters {
+            let previous = self.getters.insert(
+                getter.id.clone(),
+                GetterWithState {
+                    getter:getter,
                     state: None
                 });
             assert!(previous.is_none());
         }
-        // In a real implementation, this should update all GetSelectors
+        // In a real implementation, this should update all GetterSelectors
     }
-    fn add_outputs(&mut self, outputs: Vec<Channel<Set>>)  {
-        for output in outputs {
-            let previous = self.outputs.insert(output.id.clone(), output);
+    fn add_setters(&mut self, setters: Vec<Channel<Setter>>)  {
+        for setter in setters {
+            let previous = self.setters.insert(setter.id.clone(), setter);
             assert!(previous.is_none());
         }
-        // In a real implementation, this should update all SetSelectors
+        // In a real implementation, this should update all SetterSelectors
     }
 
     fn add_watch(&mut self, options: Vec<WatchOptions>, cb: Box<Fn(WatchEvent)>) {
@@ -170,14 +170,14 @@ impl APIBackEnd {
         }
     }
 
-    fn inject_input_value(&mut self, id: Id<Get>, value: Value) {
-        let mut input = self.inputs.get_mut(&id).unwrap();
-        input.set_state(value.clone());
+    fn inject_getter_value(&mut self, id: Id<Getter>, value: Value) {
+        let mut getter = self.getters.get_mut(&id).unwrap();
+        getter.set_state(value.clone());
 
-        // The list of watchers watching for new values on this input.
+        // The list of watchers watching for new values on this getter.
         let watchers = self.watchers.iter().filter(|&&(ref options, _)| {
             options.should_watch_values &&
-                options.source.matches(&input.input)
+                options.source.matches(&getter.getter)
         });
         for watcher in watchers {
             watcher.1(WatchEvent::Value {
@@ -188,33 +188,33 @@ impl APIBackEnd {
     }
 
     fn put_value(&mut self,
-                 selectors: Vec<SetSelector>,
+                 selectors: Vec<SetterSelector>,
                  value: Value,
-                 cb: Box<Fn(Vec<(Id<Set>, Result<(), APIError>)>)>)
+                 cb: Box<Fn(Vec<(Id<Setter>, Result<(), APIError>)>)>)
     {
         // Very suboptimal implementation.
-        let outputs = self.outputs
+        let setters = self.setters
             .values()
-            .filter(|output|
+            .filter(|setter|
                     selectors.iter()
-                    .find(|selector| selector.matches(output))
+                    .find(|selector| selector.matches(setter))
                     .is_some());
-        let results = outputs.map(|output| {
+        let results = setters.map(|setter| {
             let result;
             let internal_result;
-            if value.get_type() == output.mechanism.kind.get_type() {
+            if value.get_type() == setter.mechanism.kind.get_type() {
                 result = Ok(());
                 internal_result = Ok(());
             } else {
                 result = Err(foxbox_taxonomy::api::Error::TypeError);
-                internal_result = Err(format!("Invalid type, expected {:?}, got {:?}", value.get_type(), output.mechanism.kind.get_type()));
+                internal_result = Err(format!("Invalid type, expected {:?}, got {:?}", value.get_type(), setter.mechanism.kind.get_type()));
             }
             (*self.post_updates)(Update::Put {
-                id: output.id.clone(),
+                id: setter.id.clone(),
                 value: value.clone(),
                 result: internal_result
             });
-            (output.id.clone(), result)
+            (setter.id.clone(), result)
         }).collect();
         cb(results)
     }
@@ -251,11 +251,11 @@ impl APIFrontEnd {
                 use Op::*;
                 match msg {
                     AddNodes(vec) => api.add_nodes(vec),
-                    AddGets(vec) => api.add_inputs(vec),
-                    AddSets(vec) => api.add_outputs(vec),
+                    AddGetters(vec) => api.add_getters(vec),
+                    AddSetters(vec) => api.add_setters(vec),
                     AddWatch{options, cb} => api.add_watch(options, cb),
                     SendValue{selectors, value, cb} => api.put_value(selectors, value, cb),
-                    InjectGetValue{id, value} => api.inject_input_value(id, value),
+                    InjectGetterValue{id, value} => api.inject_getter_value(id, value),
                 }
                 (*api.post_updates)(Update::Done)
             }
@@ -281,28 +281,28 @@ impl API for APIFrontEnd {
         unimplemented!()
     }
 
-    fn get_input_channels(&self, _: &Vec<GetSelector>) -> Vec<Channel<Get>> {
+    fn get_getter_channels(&self, _: &Vec<GetterSelector>) -> Vec<Channel<Getter>> {
         unimplemented!()
     }
-    fn get_output_channels(&self, _: &Vec<SetSelector>) -> Vec<Channel<Set>> {
+    fn get_setter_channels(&self, _: &Vec<SetterSelector>) -> Vec<Channel<Setter>> {
         unimplemented!()
     }
-    fn put_input_tag(&self, _: &Vec<GetSelector>, _: &Vec<String>) -> usize {
+    fn put_getter_tag(&self, _: &Vec<GetterSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn put_output_tag(&self, _: &Vec<SetSelector>, _: &Vec<String>) -> usize {
+    fn put_setter_tag(&self, _: &Vec<SetterSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn delete_input_tag(&self, _: &Vec<GetSelector>, _: &Vec<String>) -> usize {
+    fn delete_getter_tag(&self, _: &Vec<GetterSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn delete_output_tag(&self, _: &Vec<GetSelector>, _: &Vec<String>) -> usize {
+    fn delete_setter_tag(&self, _: &Vec<SetterSelector>, _: &Vec<String>) -> usize {
         unimplemented!()
     }
-    fn get_channel_value(&self, _: &Vec<GetSelector>) -> Vec<(Id<Get>, Result<Value, APIError>)> {
+    fn get_channel_value(&self, _: &Vec<GetterSelector>) -> Vec<(Id<Getter>, Result<Value, APIError>)> {
         unimplemented!()
     }
-    fn put_channel_value(&self, selectors: &Vec<SetSelector>, value: Value) -> Vec<(Id<Set>, Result<(), APIError>)> {
+    fn put_channel_value(&self, selectors: &Vec<SetterSelector>, value: Value) -> Vec<(Id<Setter>, Result<(), APIError>)> {
         let (tx, rx) = channel();
         self.tx.send(Op::SendValue {
             selectors: selectors.clone(),
