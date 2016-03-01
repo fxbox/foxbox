@@ -20,8 +20,8 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 /// # Example
 ///
 /// ```
-/// use fxbox_taxonomy::selector::*;
-/// use fxbox_taxonomy::devices::*;
+/// use foxbox_taxonomy::selector::*;
+/// use foxbox_taxonomy::devices::*;
 ///
 /// let selector = NodeSelector::new()
 ///   .with_tags(vec!["entrance".to_owned()])
@@ -109,9 +109,9 @@ impl NodeSelector {
 /// # Example
 ///
 /// ```
-/// use fxbox_taxonomy::selector::*;
-/// use fxbox_taxonomy::devices::*;
-/// use fxbox_taxonomy::util::Id;
+/// use foxbox_taxonomy::selector::*;
+/// use foxbox_taxonomy::devices::*;
+/// use foxbox_taxonomy::util::Id;
 ///
 /// let selector = GetSelector::new()
 ///   .with_parent(Id::new("foxbox".to_owned()))
