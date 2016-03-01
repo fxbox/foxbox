@@ -43,10 +43,6 @@ pub struct Service {
     /// Channels connected directly to this service.
     pub getters: Vec<Channel<Getter>>,
     pub setters: Vec<Channel<Setter>>,
-
-    /// Make sure that we can't instantiate from another crate.
-    #[serde(default, skip_serializing)]
-    private: (),
 }
 
 
@@ -190,10 +186,6 @@ pub struct Getter {
     /// Date at which the latest value was received, whether through
     /// polling or through a trigger.
     pub updated: Option<TimeStamp>,
-
-    /// Make sure that we can't instantiate from another crate.
-    #[serde(default, skip_serializing)]
-    private: (),
 }
 impl IOMechanism for Getter {
 }
@@ -212,10 +204,6 @@ pub struct Setter {
     /// Date at which the latest value was sent to the channel.
     #[serde(default)]
     pub updated: Option<TimeStamp>,
-
-    /// Make sure that we can't instantiate from another crate.
-    #[serde(default, skip_serializing)]
-    private: (),
 }
 impl IOMechanism for Setter {
 }
@@ -248,10 +236,6 @@ pub struct Channel<IO> where IO: IOMechanism {
     /// The last time the device was seen.
     #[serde(default)]
     pub last_seen: Option<TimeStamp>,
-
-    /// Make sure that we can't instantiate from another crate.
-    #[serde(default, skip_serializing)]
-    private: (),
 }
 
 /// The communication mechanism used by the channel.
