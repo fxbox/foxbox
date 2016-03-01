@@ -1,9 +1,22 @@
 #!/bin/bash
 
+HOST="localhost:3000"
+VAL=0.2
+
+
+huecmd() {
+	id=$1
+	cmd=$2
+	echo -n "$cmd -> "
+	curl -s -X PUT "http://$HOST/services/$id/state" -d "$cmd"
+	echo
+}
+
 cmd=$1
 
 case $cmd in
 	status)
+		echo "Talking to FoxBox at http://$HOST/services"
 		curl -s -X GET http://localhost:3000/services/list.json \
 			| tr '{' \\012 \
 			| cut -d, -f1 \
@@ -17,23 +30,22 @@ case $cmd in
 			  done
 		;;
 	disco)
+		echo "Talking to FoxBox at http://$HOST/services"
 		id=$2
-		curl -s -X PUT http://localhost:3000/services/$id/state -d '{"on": true}'
-		echo
+		huecmd $id '{"on": true}'
 		while true ; do 
-			curl -s -X PUT http://localhost:3000/services/$id/state -d '{"hue": 0.0, "sat": 1.0, "val": 1}'
-			echo
+			huecmd $id '{"hue": 0.0, "sat": 1.0, "val": '$VAL'}'
 			sleep 2
-			curl -s -X PUT http://localhost:3000/services/$id/state -d '{"hue": 120, "sat": 1.0, "val": 1}'
-			echo
+			huecmd $id '{"hue": 120, "sat": 1.0, "val": '$VAL'}'
 			sleep 2
-			curl -s -X PUT http://localhost:3000/services/$id/state -d '{"hue": 240, "sat": 1.0, "val": 1}' 
-			echo
+			huecmd $id '{"hue": 240, "sat": 1.0, "val": '$VAL'}'
 			sleep 2
 		done
 		;;
 	off)
-		curl -s -X PUT http://localhost:3000/services/$2/state -d '{"on": false}'
+		echo "Talking to FoxBox at http://$HOST/services"
+		id=$2
+		huecmd $id '{"on": false}'
 		;;
 	*)
 		echo "usage: $0 <cmd> [<id>]"
@@ -41,5 +53,4 @@ case $cmd in
 		echo "       disco <id>  - well, ... disco!"
 		echo "       off <id>    - turn off the lights!"
 esac
-
 
