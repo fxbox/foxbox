@@ -249,13 +249,15 @@ impl Deserialize for ValDuration {
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
-pub struct TimeStamp(chrono::DateTime<chrono::Local>);
+pub struct TimeStamp(chrono::DateTime<chrono::UTC>);
 impl TimeStamp {
+    pub fn from_datetime(datetime: chrono::DateTime<chrono::UTC>) -> Self {
+        TimeStamp(datetime)
+    }
     pub fn from_s(s: i64) -> Self {
         use chrono::*;
         let naive = chrono::naive::datetime::NaiveDateTime::from_timestamp(s, 0);
-        let offset = chrono::offset::fixed::FixedOffset::east(0);
-        let date = DateTime::<Local>::from_utc(naive, offset);
+        let date = DateTime::<UTC>::from_utc(naive, chrono::UTC);
         TimeStamp(date)
     }
 }
@@ -270,7 +272,7 @@ impl Deserialize for TimeStamp {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer {
         let str = try!(String::deserialize(deserializer));
-        match chrono::DateTime::<chrono::Local>::from_str(&str) {
+        match chrono::DateTime::<chrono::UTC>::from_str(&str) {
             Ok(dt) => Ok(TimeStamp(dt)),
             Err(_) => Err(D::Error::syntax("Invalid date"))
         }
