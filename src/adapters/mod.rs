@@ -6,6 +6,7 @@ mod ip_camera_adapter;
 
 /// An adapter dedicated to the Philips Hue
 mod philips_hue;
+mod web_server;
 
 /// An adapter providing time services.
 mod clock;
@@ -13,6 +14,7 @@ mod clock;
 use controller::Controller;
 use self::ip_camera_adapter::IpCameraAdapter;
 use self::philips_hue::PhilipsHueAdapter;
+use self::web_server::WebServerAdapter;
 use service::ServiceAdapter;
 use adapt::*;
 
@@ -37,6 +39,7 @@ impl<T: Controller> AdapterManager<T> {
     pub fn start(&mut self) {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
         self.start_adapter(Box::new(PhilipsHueAdapter::new(c.clone())));
+        self.start_adapter(Box::new(WebServerAdapter::new(c.clone())));
         self.start_adapter(Box::new(IpCameraAdapter::new(c)));
         clock::Clock::init(&self.control, Box::new(|_result| {})); // FIXME: We should have a way to report errors
     }
