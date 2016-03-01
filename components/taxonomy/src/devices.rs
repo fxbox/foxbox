@@ -41,8 +41,8 @@ pub struct Node {
     pub id: Id<NodeId>,
 
     /// Channels connected directly to this node.
-    pub inputs: Vec<Channel<Get>>,
-    pub outputs: Vec<Channel<Set>>,
+    pub getters: Vec<Channel<Getter>>,
+    pub setters: Vec<Channel<Setter>>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
@@ -151,18 +151,18 @@ impl ChannelKind {
 }
 
 
-/// An input operation available on an service.
+/// A getter operation available on a channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Get {
-    /// The kind of value that can be obtained from this service.
+pub struct Getter {
+    /// The kind of value that can be obtained from this channel.
     pub kind: ChannelKind,
 
-    /// If `Some(duration)`, this service can be polled, i.e. it
+    /// If `Some(duration)`, this channel can be polled, i.e. it
     /// will respond when the FoxBox requests the latest value.
     /// Parameter `duration` indicates the smallest interval
     /// between two updates.
     ///
-    /// Otherwise, the service cannot be polled and will push
+    /// Otherwise, the channel cannot be polled and will push
     /// data to the FoxBox when it is available.
     ///
     /// # Examples
@@ -173,14 +173,19 @@ pub struct Get {
     #[serde(default)]
     pub poll: Option<ValDuration>,
 
-    /// If `Some(duration)`, this service can send the data to
+    /// If `Some(duration)`, this channel can send the data to
     /// the FoxBox whenever it is updated. Parameter `duration`
     /// indicates the smallest interval between two updates.
     ///
-    /// Otherwise, the service cannot send data to the FoxBox
+    /// Otherwise, the channel cannot send data to the FoxBox
     /// and needs to be polled.
     #[serde(default)]
     pub trigger: Option<ValDuration>,
+
+    /// If `true`, this channel supports watching for specific
+    /// changes.
+    #[serde(default)]
+    pub watch: bool,
 
     /// Date at which the latest value was received, whether through
     /// polling or through a trigger.
@@ -190,21 +195,21 @@ pub struct Get {
     #[serde(default, skip_serializing)]
     private: (),
 }
-impl IOMechanism for Get {
+impl IOMechanism for Getter {
 }
 
-/// An output operation available on an service.
+/// An setter operation available on an channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Set {
-    /// The kind of value that can be sent to this service.
+pub struct Setter {
+    /// The kind of value that can be sent to this channel.
     pub kind: ChannelKind,
 
-    /// If `Some(duration)`, this service supports pushing,
+    /// If `Some(duration)`, this channel supports pushing,
     /// i.e. the FoxBox can send values.
     #[serde(default)]
     pub push: Option<ValDuration>,
 
-    /// Date at which the latest value was sent to the service.
+    /// Date at which the latest value was sent to the channel.
     #[serde(default)]
     pub updated: Option<TimeStamp>,
 
@@ -212,32 +217,32 @@ pub struct Set {
     #[serde(default, skip_serializing)]
     private: (),
 }
-impl IOMechanism for Set {
+impl IOMechanism for Setter {
 }
 
-/// An service represents a single place where data can enter or
-/// leave a device. Note that services support either a single kind
-/// of input or a single kind of output. Devices that support both
-/// inputs or outputs, or several kinds of inputs, or several kinds of
-/// outputs, are represented as nodes containing several services.
+/// An channel represents a single place where data can enter or
+/// leave a device. Note that channels support either a single kind
+/// of getter or a single kind of setter. Devices that support both
+/// getters or setters, or several kinds of getters, or several kinds of
+/// setters, are represented as nodes containing several channels.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel<IO> where IO: IOMechanism {
-    /// Tags describing the service.
+    /// Tags describing the channel.
     ///
     /// These tags can be set by the user, adapters or
-    /// applications. They are used to regroup services for rules.
+    /// applications. They are used to regroup channels for rules.
     ///
     /// For instance "entrance".
     #[serde(default)]
     pub tags: Vec<String>,
 
-    /// An id unique to this service.
+    /// An id unique to this channel.
     pub id: Id<IO>,
 
-    /// The node owning this service.
+    /// The node owning this channel.
     pub node: Id<NodeId>,
 
-    /// The update mechanism for this service.
+    /// The update mechanism for this channel.
     pub mechanism: IO,
 
     /// The last time the device was seen.
@@ -249,8 +254,7 @@ pub struct Channel<IO> where IO: IOMechanism {
     private: (),
 }
 
-/// A mechanism used for communicating between the application and the
-/// service.
+/// The communication mechanism used by the channel.
 pub trait IOMechanism: Deserialize + Serialize {
 }
 

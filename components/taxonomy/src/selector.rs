@@ -1,4 +1,4 @@
-use devices::{NodeId, ChannelKind, Channel, Get, Set};
+use devices::{NodeId, ChannelKind, Channel, Getter, Setter};
 use util::{Exactly, Id};
 use values;
 
@@ -25,7 +25,7 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 ///
 /// let selector = NodeSelector::new()
 ///   .with_tags(vec!["entrance".to_owned()])
-///   .with_inputs(vec![GetSelector::new() /* can be more restrictive */]);
+///   .with_getters(vec![GetterSelector::new() /* can be more restrictive */]);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct NodeSelector {
@@ -37,13 +37,13 @@ pub struct NodeSelector {
     #[serde(default)]
     pub tags: Vec<String>,
 
-    /// Restrict results to nodes that have all the inputs in `inputs`.
+    /// Restrict results to nodes that have all the getters in `getters`.
     #[serde(default)]
-    pub inputs: Vec<GetSelector>,
+    pub getters: Vec<GetterSelector>,
 
-    /// Restrict results to nodes that have all the outputs in `outputs`.
+    /// Restrict results to nodes that have all the setters in `setters`.
     #[serde(default)]
-    pub outputs: Vec<SetSelector>,
+    pub setters: Vec<SetterSelector>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
@@ -73,18 +73,18 @@ impl NodeSelector {
         }
     }
 
-    /// Restrict results to nodes that have all the inputs in `inputs`.
-    pub fn with_inputs(mut self, mut inputs: Vec<GetSelector>) -> Self {
+    /// Restrict results to nodes that have all the getters in `getters`.
+    pub fn with_getters(mut self, mut getters: Vec<GetterSelector>) -> Self {
         NodeSelector {
-            inputs: {self.inputs.append(&mut inputs); self.inputs},
+            getters: {self.getters.append(&mut getters); self.getters},
             .. self
         }
     }
 
-    /// Restrict results to nodes that have all the outputs in `outputs`.
-    pub fn with_outputs(mut self, mut outputs: Vec<SetSelector>) -> Self {
+    /// Restrict results to nodes that have all the setters in `setters`.
+    pub fn with_setters(mut self, mut setters: Vec<SetterSelector>) -> Self {
         NodeSelector {
-            outputs: {self.outputs.append(&mut outputs); self.outputs},
+            setters: {self.setters.append(&mut setters); self.setters},
             .. self
         }
     }
@@ -94,8 +94,8 @@ impl NodeSelector {
         NodeSelector {
             id: self.id.and(other.id),
             tags: merge(self.tags, other.tags),
-            inputs: {self.inputs.append(&mut other.inputs); self.inputs},
-            outputs: {self.outputs.append(&mut other.outputs); self.outputs},
+            getters: {self.getters.append(&mut other.getters); self.getters},
+            setters: {self.setters.append(&mut other.setters); self.setters},
             private: (),
         }
     }
@@ -103,7 +103,7 @@ impl NodeSelector {
 
 
 
-/// A selector for one or more input channels.
+/// A selector for one or more getter channels.
 ///
 ///
 /// # Example
@@ -113,15 +113,15 @@ impl NodeSelector {
 /// use foxbox_taxonomy::devices::*;
 /// use foxbox_taxonomy::util::Id;
 ///
-/// let selector = GetSelector::new()
+/// let selector = GetterSelector::new()
 ///   .with_parent(Id::new("foxbox".to_owned()))
 ///   .with_kind(ChannelKind::CurrentTimeOfDay);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct GetSelector {
+pub struct GetterSelector {
     /// If `Exactly(id)`, return only the channel with the corresponding id.
     #[serde(default)]
-    pub id: Exactly<Id<Get>>,
+    pub id: Exactly<Id<Getter>>,
 
     /// If `Eactly(id)`, return only channels that are children of
     /// node `id`.
@@ -151,15 +151,15 @@ pub struct GetSelector {
     #[serde(default, skip_serializing)]
     private: (),
 }
-impl GetSelector {
-    /// Create a new selector that accepts all input channels.
+impl GetterSelector {
+    /// Create a new selector that accepts all getter channels.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Restrict to a channel with a specific id.
-    pub fn with_id(self, id: Id<Get>) -> Self {
-        GetSelector {
+    pub fn with_id(self, id: Id<Getter>) -> Self {
+        GetterSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
         }
@@ -167,7 +167,7 @@ impl GetSelector {
 
     /// Restrict to a channel with a specific parent.
     pub fn with_parent(self, id: Id<NodeId>) -> Self {
-        GetSelector {
+        GetterSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
         }
@@ -175,7 +175,7 @@ impl GetSelector {
 
     /// Restrict to a channel with a specific kind.
     pub fn with_kind(self, kind: ChannelKind) -> Self {
-        GetSelector {
+        GetterSelector {
             kind: self.kind.and(Exactly::Exactly(kind)),
             .. self
         }
@@ -183,7 +183,7 @@ impl GetSelector {
 
     ///  Restrict to channels that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<String>) -> Self {
-        GetSelector {
+        GetterSelector {
             tags: merge(self.tags, tags),
             .. self
         }
@@ -192,7 +192,7 @@ impl GetSelector {
     /// Restrict to channels that support polling with the acceptable
     /// period
     pub fn with_poll(self, period: Period) -> Self {
-        GetSelector {
+        GetterSelector {
             poll: Period::and_option(self.poll, Some(period)),
             .. self
         }
@@ -201,7 +201,7 @@ impl GetSelector {
     /// Restrict to channels that support trigger with the acceptable
     /// period
     pub fn with_trigger(self, period: Period) -> Self {
-        GetSelector {
+        GetterSelector {
             trigger: Period::and_option(self.trigger, Some(period)),
             .. self
         }
@@ -209,7 +209,7 @@ impl GetSelector {
 
     /// Restrict to channels that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
-        GetSelector {
+        GetterSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
             tags: merge(self.tags, other.tags),
@@ -221,7 +221,7 @@ impl GetSelector {
     }
 
     /// Determine if a channel is matched by this selector.
-    pub fn matches(&self, channel: &Channel<Get>) -> bool {
+    pub fn matches(&self, channel: &Channel<Getter>) -> bool {
         if !self.id.matches(&channel.id) {
             return false;
         }
@@ -244,12 +244,12 @@ impl GetSelector {
     }
 }
 
-/// A selector for one or more output channels.
+/// A selector for one or more setter channels.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct SetSelector {
+pub struct SetterSelector {
     /// If `Exactly(id)`, return only the channel with the corresponding id.
     #[serde(default)]
-    pub id: Exactly<Id<Set>>,
+    pub id: Exactly<Id<Setter>>,
 
     /// If `Exactly(id)`, return only channels that are immediate children
     /// of node `id`.
@@ -275,15 +275,15 @@ pub struct SetSelector {
     private: (),
 }
 
-impl SetSelector {
-    /// Create a new selector that accepts all input channels.
+impl SetterSelector {
+    /// Create a new selector that accepts all getter channels.
     pub fn new() -> Self {
-        SetSelector::default()
+        SetterSelector::default()
     }
 
     /// Selector to a channel with a specific id.
-    pub fn with_id(self, id: Id<Set>) -> Self {
-        SetSelector {
+    pub fn with_id(self, id: Id<Setter>) -> Self {
+        SetterSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
         }
@@ -291,7 +291,7 @@ impl SetSelector {
 
     /// Selector to channels with a specific parent.
     pub fn with_parent(self, id: Id<NodeId>) -> Self {
-        SetSelector {
+        SetterSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
         }
@@ -299,7 +299,7 @@ impl SetSelector {
 
     /// Selector to channels with a specific kind.
     pub fn with_kind(self, kind: ChannelKind) -> Self {
-        SetSelector {
+        SetterSelector {
             kind: self.kind.and(Exactly::Exactly(kind)),
             .. self
         }
@@ -307,7 +307,7 @@ impl SetSelector {
 
     ///  Restrict to channels that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<String>) -> Self {
-        SetSelector {
+        SetterSelector {
             tags: merge(self.tags, tags),
             .. self
         }
@@ -316,7 +316,7 @@ impl SetSelector {
     /// Restrict to channels that support push with the acceptable
     /// period
     pub fn with_push(self, period: Period) -> Self {
-        SetSelector {
+        SetterSelector {
             push: Period::and_option(self.push, Some(period)),
             .. self
         }
@@ -324,7 +324,7 @@ impl SetSelector {
 
     /// Restrict results to channels that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
-        SetSelector {
+        SetterSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
             tags: merge(self.tags, other.tags),
@@ -335,7 +335,7 @@ impl SetSelector {
     }
 
     /// Determine if a channel is matched by this selector.
-    pub fn matches(&self, channel: &Channel<Set>) -> bool {
+    pub fn matches(&self, channel: &Channel<Setter>) -> bool {
         if !self.id.matches(&channel.id) {
             return false;
         }
