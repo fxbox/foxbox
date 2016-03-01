@@ -106,14 +106,18 @@ pub fn create<T: Controller>(controller: T) -> Chain {
 
 #[cfg(test)]
 describe! service_router {
+    before_each {
+        use iron::Headers;
+        use controller::FoxBox;
+        use iron_test::request;
+
+        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
+        let service_router = create(controller.clone());
+    }
+
     describe! services {
         before_each {
-            use iron::Headers;
-            use controller::FoxBox;
-            use iron_test::{ request, response };
-
-            let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
-            let service_router = create(controller.clone());
+            use iron_test::response;
         }
 
         it "should create list.json" {
@@ -149,33 +153,20 @@ describe! service_router {
 
     describe! cors {
         before_each {
-            use iron::Headers;
-            use controller::FoxBox;
-            use iron_test::request;
-
-            let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
-            let service_router = create(controller.clone());
+            use iron::headers;
+            use super::super::CORS;
         }
 
         it "should get the appropriate CORS headers" {
-            use iron::headers;
-            use super::super::CORS;
-
             for endpoint in CORS::ENDPOINTS {
                 let (_, path) = *endpoint;
                 let path = "http://localhost:3000/".to_owned() +
                            &(path.join("/").replace("*", "foo"));
-                match request::options(&path, Headers::new(), &service_router) {
-                    Ok(res) => {
-                        let headers = &res.headers;
-                        assert!(headers.has::<headers::AccessControlAllowOrigin>());
-                        assert!(headers.has::<headers::AccessControlAllowHeaders>());
-                        assert!(headers.has::<headers::AccessControlAllowMethods>());
-                    },
-                    _ => {
-                        assert!(false)
-                    }
-                }
+                let response = request::options(&path, Headers::new(), &service_router).unwrap();
+                let headers = &response.headers;
+                assert!(headers.has::<headers::AccessControlAllowOrigin>());
+                assert!(headers.has::<headers::AccessControlAllowHeaders>());
+                assert!(headers.has::<headers::AccessControlAllowMethods>());
             }
         }
     }
