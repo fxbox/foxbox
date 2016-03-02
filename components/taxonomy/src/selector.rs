@@ -21,7 +21,7 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 ///
 /// ```
 /// use foxbox_taxonomy::selector::*;
-/// use foxbox_taxonomy::devices::*;
+/// use foxbox_taxonomy::services::*;
 ///
 /// let selector = ServiceSelector::new()
 ///   .with_tags(vec!["entrance".to_owned()])
@@ -110,7 +110,7 @@ impl ServiceSelector {
 ///
 /// ```
 /// use foxbox_taxonomy::selector::*;
-/// use foxbox_taxonomy::devices::*;
+/// use foxbox_taxonomy::services::*;
 /// use foxbox_taxonomy::util::Id;
 ///
 /// let selector = GetterSelector::new()
