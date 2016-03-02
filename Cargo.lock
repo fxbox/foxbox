@@ -15,7 +15,7 @@ dependencies = [
  "log 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.0 (git+https://github.com/carllerche/mio.git)",
  "mount 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "multicast_dns 0.1.0 (git+https://github.com/fxbox/multicast-dns.git?rev=b87f76a)",
+ "multicast_dns 0.1.0 (git+https://github.com/fxbox/multicast-dns.git?rev=a6e4bcc)",
  "router 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.6.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -372,7 +372,7 @@ dependencies = [
 [[package]]
 name = "multicast_dns"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/multicast-dns.git?rev=b87f76a#b87f76af847ebabd0584ae57d7ac55c05f5ddc04"
+source = "git+https://github.com/fxbox/multicast-dns.git?rev=a6e4bcc#a6e4bcc5ecbab86d1b23552e8b925f534f739e39"
 dependencies = [
  "libc 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
