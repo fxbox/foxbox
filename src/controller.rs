@@ -32,8 +32,6 @@ pub struct FoxBox {
     websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
 }
 
-pub const DEFAULT_HTTP_PORT: u16 = 3000;
-const DEFAULT_WS_PORT: u16 = 4000;
 const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 const DEFAULT_DOMAIN: &'static str = ".local";
 
@@ -60,8 +58,8 @@ impl FoxBox {
 
     pub fn new(verbose: bool,
                hostname: Option<String>,
-               http_port: Option<u16>,
-               ws_port: Option<u16>) -> Self {
+               http_port: u16,
+               ws_port: u16) -> Self {
 
         FoxBox {
             services: Arc::new(Mutex::new(HashMap::new())),
@@ -70,8 +68,8 @@ impl FoxBox {
             hostname: hostname.map_or(DEFAULT_HOSTNAME.to_owned(), |name| {
                 format!("{}{}", name, DEFAULT_DOMAIN)
             }),
-            http_port: http_port.unwrap_or(DEFAULT_HTTP_PORT),
-            ws_port: ws_port.unwrap_or(DEFAULT_WS_PORT)
+            http_port: http_port,
+            ws_port: ws_port
         }
     }
 }
@@ -194,7 +192,7 @@ describe! controller {
         use stubs::service::ServiceStub;
 
         let service = ServiceStub;
-        let controller = FoxBox::new(false, Some("foxbox".to_owned()), None, None);
+        let controller = FoxBox::new(false, Some("foxbox".to_owned()), 1234, 5678);
     }
 
     describe! add_service {
@@ -217,13 +215,13 @@ describe! controller {
         it "should create http root" {
             controller.add_service(Box::new(service));
             assert_eq!(controller.get_http_root_for_service("1".to_string()),
-                       "http://foxbox.local:3000/services/1/");
+                       "http://foxbox.local:1234/services/1/");
         }
 
         it "should create ws root" {
             controller.add_service(Box::new(service));
             assert_eq!(controller.get_ws_root_for_service("1".to_string()),
-                       "ws://foxbox.local:4000/services/1/");
+                       "ws://foxbox.local:5678/services/1/");
         }
 
         it "should return a json" {

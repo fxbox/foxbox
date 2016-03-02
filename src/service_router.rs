@@ -142,7 +142,7 @@ describe! service_router {
         use iron_test::request;
         use mount::Mount;
 
-        let controller = FoxBox::new(false, Some("localhost".to_owned()), None, None);
+        let controller = FoxBox::new(false, Some("localhost".to_owned()), 1234, 5678);
         let service_router = create(controller.clone());
 
         let mut mount = Mount::new();
@@ -171,7 +171,7 @@ describe! service_router {
                 username: "username".to_owned(),
                 password: Some("password".to_owned())
             }));
-            let response = request::post("http://localhost:3000/users/login",
+            let response = request::post("http://localhost:1234/users/login",
                                          headers,
                                          "{}",
                                          &mount).unwrap();
@@ -190,7 +190,7 @@ describe! service_router {
         }
 
         it "should create list.json" {
-            let response = request::get("http://localhost:3000/list.json",
+            let response = request::get("http://localhost:1234/list.json",
                             auth_header,
                             &mount).unwrap();
 
@@ -202,7 +202,7 @@ describe! service_router {
             use controller::Controller;
             use stubs::service::ServiceStub;
             controller.add_service(Box::new(ServiceStub));
-            let response = request::get("http://localhost:3000/1/a-command",
+            let response = request::get("http://localhost:1234/1/a-command",
                             auth_header,
                             &mount).unwrap();
 
@@ -211,7 +211,7 @@ describe! service_router {
         }
 
         it "should return an error if no service was found" {
-            let response = request::get("http://localhost:3000/unknown-id/a-command",
+            let response = request::get("http://localhost:1234/unknown-id/a-command",
                             auth_header,
                             &mount).unwrap();
 
@@ -229,7 +229,7 @@ describe! service_router {
         it "should get the appropriate CORS headers" {
             for endpoint in CORS::ENDPOINTS {
                 let (_, path) = *endpoint;
-                let path = "http://localhost:3000/".to_owned() +
+                let path = "http://localhost:1234/".to_owned() +
                            &(path.replace(":", "foo"));
                 let response = request::options(&path, Headers::new(), &mount).unwrap();
                 let headers = &response.headers;

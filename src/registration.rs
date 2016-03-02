@@ -17,7 +17,6 @@ use std::io::Read;
 use std::time::Duration;
 use std::thread;
 
-const DEFAULT_ENDPOINT: &'static str = "http://localhost:4242/register";
 const REGISTRATION_INTERVAL: u32 = 1; // in minutes.
 
 pub struct Registrar;
@@ -27,13 +26,8 @@ impl Registrar {
         Registrar
     }
 
-    pub fn start(&self, endpoint: Option<String>, iface: Option<String>) {
-        let url = match endpoint {
-            Some(u) => u,
-            _ => DEFAULT_ENDPOINT.to_owned()
-        };
-
-        info!("Starting registration with {}", url);
+    pub fn start(&self, endpoint_url: String, iface: Option<String>) {
+        info!("Starting registration with {}", endpoint_url);
         let ip_addr = self.get_ip_addr(&iface);
         if ip_addr == None {
             // TODO: retry later, in case we're racing with the network
@@ -42,7 +36,7 @@ impl Registrar {
         }
 
         info!("Got ip address: {}", ip_addr.clone().unwrap());
-        let full_address = format!("{}?ip={}", url, ip_addr.unwrap());
+        let full_address = format!("{}?ip={}", endpoint_url, ip_addr.unwrap());
 
         // Spawn a thread to register every REGISTRATION_INTERVAL minutes.
         thread::Builder::new().name("Registrar".to_owned())

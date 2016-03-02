@@ -68,7 +68,7 @@ mod stubs {
     pub mod service;
 }
 
-use controller::{ Controller, FoxBox, DEFAULT_HTTP_PORT };
+use controller::{ Controller, FoxBox };
 use tunnel_controller:: { TunnelConfig, Tunnel };
 use multicast_dns::host::HostManager;
 
@@ -77,19 +77,19 @@ Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i
 
 Options:
     -v, --verbose            Toggle verbose output.
-    -n, --name <hostname>    Set local hostname.
-    -p, --port <port>        Set port to listen on for http connections.
-    -w, --wsport <wsport>    Set port to listen on for websocket.
-    -r, --register <url>     Change the url of the registration endpoint.
+    -n, --name <hostname>    Set local hostname. Linux only. Requires to be a member of the netdev group.
+    -p, --port <port>        Set port to listen on for http connections. [default: 3000]
+    -w, --wsport <wsport>    Set port to listen on for websocket. [default: 4000]
+    -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242/register]
     -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
     -h, --help               Print this help menu.
 ",
         flag_name: Option<String>,
-        flag_port: Option<u16>,
-        flag_wsport: Option<u16>,
+        flag_port: u16,
+        flag_wsport: u16,
+        flag_register: String,
         flag_iface: Option<String>,
-        flag_register: Option<String>,
         flag_tunnel: Option<String>);
 
 /// Updates local host name with the provided host name string. If requested host name
@@ -126,7 +126,7 @@ fn main() {
     // Start the tunnel.
     if let Some(host) = args.flag_tunnel {
         let mut tunnel =
-            Tunnel::new(TunnelConfig::new(args.flag_port.unwrap_or(DEFAULT_HTTP_PORT), host));
+            Tunnel::new(TunnelConfig::new(args.flag_port, host));
         tunnel.start().unwrap();
     }
 
@@ -137,37 +137,66 @@ fn main() {
     controller.run();
 }
 
-#[test]
-fn options_are_good() {
-    // short form options
-    {
-        let argv = || vec!["foxbox", "-p", "1234", "-n", "foobar",
-                           "-w", "4567", "-v"];
+#[cfg(test)]
+describe! main {
+    describe! args {
+        it "should have default values" {
+            let argv = || vec!["foxbox"];
+            let args: super::super::Args = super::super::Args::docopt().argv(argv().into_iter())
+                .decode().unwrap();
 
-        let args: Args = Args::docopt().argv(argv().into_iter())
-            .decode()
-            .unwrap_or_else(|e| e.exit());
+            assert_eq!(args.flag_verbose, false);
+            assert_eq!(args.flag_name, None);
+            assert_eq!(args.flag_port, 3000);
+            assert_eq!(args.flag_wsport, 4000);
+            assert_eq!(args.flag_register, "http://localhost:4242/register");
+            assert_eq!(args.flag_iface, None);
+            assert_eq!(args.flag_tunnel, None);
+            assert_eq!(args.flag_help, false);
+        }
 
-        assert_eq!(args.flag_verbose, true);
-        assert_eq!(args.flag_name, Some("foobar".to_string()));
-        assert_eq!(args.flag_port, Some(1234));
-        assert_eq!(args.flag_wsport, Some(4567));
-        assert_eq!(args.flag_help, false);
-    }
-    // long form options
-    {
-        let argv = || vec!["foxbox", "--port", "1234",
-                           "--name", "foobar", "--wsport", "4567",
-                           "--verbose"];
+        it "should support short form" {
+            let argv = || vec!["foxbox",
+                               "-v",
+                               "-p", "1234",
+                               "-n", "foobar",
+                               "-w", "4567",
+                               "-r", "http://foo.bar:6868/register",
+                               "-i", "eth99",
+                               "-t", "tunnel.host"];
 
-        let args: Args = Args::docopt().argv(argv().into_iter())
-            .decode()
-            .unwrap_or_else(|e| e.exit());
+           let args: super::super::Args = super::super::Args::docopt().argv(argv().into_iter())
+               .decode().unwrap();
 
-        assert_eq!(args.flag_verbose, true);
-        assert_eq!(args.flag_name, Some("foobar".to_string()));
-        assert_eq!(args.flag_port, Some(1234));
-        assert_eq!(args.flag_wsport, Some(4567));
-        assert_eq!(args.flag_help, false);
+            assert_eq!(args.flag_verbose, true);
+            assert_eq!(args.flag_name.unwrap(), "foobar");
+            assert_eq!(args.flag_port, 1234);
+            assert_eq!(args.flag_wsport, 4567);
+            assert_eq!(args.flag_register, "http://foo.bar:6868/register");
+            assert_eq!(args.flag_iface.unwrap(), "eth99");
+            assert_eq!(args.flag_tunnel.unwrap(), "tunnel.host");
+        }
+
+        it "should support long form" {
+            let argv = || vec!["foxbox",
+                               "--verbose",
+                               "--port", "1234",
+                               "--name", "foobar",
+                               "--wsport", "4567",
+                               "--register", "http://foo.bar:6868/register",
+                               "--iface", "eth99",
+                               "--tunnel", "tunnel.host"];
+
+            let args: super::super::Args = super::super::Args::docopt().argv(argv().into_iter())
+                .decode().unwrap();
+
+            assert_eq!(args.flag_verbose, true);
+            assert_eq!(args.flag_name.unwrap(), "foobar");
+            assert_eq!(args.flag_port, 1234);
+            assert_eq!(args.flag_wsport, 4567);
+            assert_eq!(args.flag_register, "http://foo.bar:6868/register");
+            assert_eq!(args.flag_iface.unwrap(), "eth99");
+            assert_eq!(args.flag_tunnel.unwrap(), "tunnel.host");
+        }
     }
 }
