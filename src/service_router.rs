@@ -23,7 +23,7 @@ impl CORS {
     // "/foo/:bar" for a URL like https://domain.com/foo/123 where 123 is
     // variable.
     pub const ENDPOINTS: &'static[Endpoint] = &[
-        (&[Method::Get], "list.json"),
+        (&[Method::Get], "list"),
         (&[Method::Get, Method::Post, Method::Put], ":service/:command")
     ];
 }
@@ -87,7 +87,7 @@ pub fn create<T: Controller>(controller: T) -> Chain {
     let mut router = Router::new();
 
     let c1 = controller.clone();
-    router.get("list.json", move |_: &mut Request| -> IronResult<Response> {
+    router.get("list", move |_: &mut Request| -> IronResult<Response> {
         // Build a json representation of the services.
         let serialized = itry!(c1.services_as_json());
 
@@ -115,7 +115,7 @@ pub fn create<T: Controller>(controller: T) -> Chain {
 
     let auth_endpoints = if cfg!(feature = "authentication") {
         vec![
-            AuthEndpoint(vec![Method::Get], "list.json".to_owned()),
+            AuthEndpoint(vec![Method::Get], "list".to_owned()),
             AuthEndpoint(vec![Method::Get, Method::Post, Method::Put],
                          ":service/:command".to_owned())
         ]
@@ -189,8 +189,8 @@ describe! service_router {
             }));
         }
 
-        it "should create list.json" {
-            let response = request::get("http://localhost:1234/list.json",
+        it "should create list" {
+            let response = request::get("http://localhost:1234/list",
                             auth_header,
                             &mount).unwrap();
 
