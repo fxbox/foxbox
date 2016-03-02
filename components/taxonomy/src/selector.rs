@@ -1,4 +1,4 @@
-use devices::{NodeId, ChannelKind, Channel, Getter, Setter};
+use services::{ServiceId, ChannelKind, Channel, Getter, Setter};
 use util::{Exactly, Id};
 use values;
 
@@ -14,7 +14,7 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
     a
 }
 
-/// A selector for one or more nodes.
+/// A selector for one or more services.
 ///
 ///
 /// # Example
@@ -23,25 +23,25 @@ fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
 /// use foxbox_taxonomy::selector::*;
 /// use foxbox_taxonomy::devices::*;
 ///
-/// let selector = NodeSelector::new()
+/// let selector = ServiceSelector::new()
 ///   .with_tags(vec!["entrance".to_owned()])
 ///   .with_getters(vec![GetterSelector::new() /* can be more restrictive */]);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct NodeSelector {
-    /// If `Exactly(id)`, return only the node with the corresponding id.
+pub struct ServiceSelector {
+    /// If `Exactly(id)`, return only the service with the corresponding id.
     #[serde(default)]
-    pub id: Exactly<Id<NodeId>>,
+    pub id: Exactly<Id<ServiceId>>,
 
-    ///  Restrict results to nodes that have all the tags in `tags`.
+    ///  Restrict results to services that have all the tags in `tags`.
     #[serde(default)]
     pub tags: Vec<String>,
 
-    /// Restrict results to nodes that have all the getters in `getters`.
+    /// Restrict results to services that have all the getters in `getters`.
     #[serde(default)]
     pub getters: Vec<GetterSelector>,
 
-    /// Restrict results to nodes that have all the setters in `setters`.
+    /// Restrict results to services that have all the setters in `setters`.
     #[serde(default)]
     pub setters: Vec<SetterSelector>,
 
@@ -51,47 +51,47 @@ pub struct NodeSelector {
 }
 
 
-impl NodeSelector {
-    /// Create a new selector that accepts all nodes.
+impl ServiceSelector {
+    /// Create a new selector that accepts all services.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Selector for a node with a specific id.
-    pub fn with_id(self, id: Id<NodeId>) -> Self {
-        NodeSelector {
+    /// Selector for a service with a specific id.
+    pub fn with_id(self, id: Id<ServiceId>) -> Self {
+        ServiceSelector {
             id: self.id.and(Exactly::Exactly(id)),
             .. self
         }
     }
 
-    ///  Restrict results to nodes that have all the tags in `tags`.
+    ///  Restrict results to services that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<String>) -> Self {
-        NodeSelector {
+        ServiceSelector {
             tags: merge(self.tags, tags),
             .. self
         }
     }
 
-    /// Restrict results to nodes that have all the getters in `getters`.
+    /// Restrict results to services that have all the getters in `getters`.
     pub fn with_getters(mut self, mut getters: Vec<GetterSelector>) -> Self {
-        NodeSelector {
+        ServiceSelector {
             getters: {self.getters.append(&mut getters); self.getters},
             .. self
         }
     }
 
-    /// Restrict results to nodes that have all the setters in `setters`.
+    /// Restrict results to services that have all the setters in `setters`.
     pub fn with_setters(mut self, mut setters: Vec<SetterSelector>) -> Self {
-        NodeSelector {
+        ServiceSelector {
             setters: {self.setters.append(&mut setters); self.setters},
             .. self
         }
     }
 
-    /// Restrict results to nodes that are accepted by two selector.
-    pub fn and(mut self, mut other: NodeSelector) -> Self {
-        NodeSelector {
+    /// Restrict results to services that are accepted by two selector.
+    pub fn and(mut self, mut other: ServiceSelector) -> Self {
+        ServiceSelector {
             id: self.id.and(other.id),
             tags: merge(self.tags, other.tags),
             getters: {self.getters.append(&mut other.getters); self.getters},
@@ -124,9 +124,9 @@ pub struct GetterSelector {
     pub id: Exactly<Id<Getter>>,
 
     /// If `Eactly(id)`, return only channels that are children of
-    /// node `id`.
+    /// service `id`.
     #[serde(default)]
-    pub parent: Exactly<Id<NodeId>>,
+    pub parent: Exactly<Id<ServiceId>>,
 
     ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
@@ -166,7 +166,7 @@ impl GetterSelector {
     }
 
     /// Restrict to a channel with a specific parent.
-    pub fn with_parent(self, id: Id<NodeId>) -> Self {
+    pub fn with_parent(self, id: Id<ServiceId>) -> Self {
         GetterSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
@@ -225,7 +225,7 @@ impl GetterSelector {
         if !self.id.matches(&channel.id) {
             return false;
         }
-        if !self.parent.matches(&channel.node) {
+        if !self.parent.matches(&channel.service) {
             return false;
         }
         if !self.kind.matches(&channel.mechanism.kind) {
@@ -252,9 +252,9 @@ pub struct SetterSelector {
     pub id: Exactly<Id<Setter>>,
 
     /// If `Exactly(id)`, return only channels that are immediate children
-    /// of node `id`.
+    /// of service `id`.
     #[serde(default)]
-    pub parent: Exactly<Id<NodeId>>,
+    pub parent: Exactly<Id<ServiceId>>,
 
     ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
@@ -290,7 +290,7 @@ impl SetterSelector {
     }
 
     /// Selector to channels with a specific parent.
-    pub fn with_parent(self, id: Id<NodeId>) -> Self {
+    pub fn with_parent(self, id: Id<ServiceId>) -> Self {
         SetterSelector {
             parent: self.parent.and(Exactly::Exactly(id)),
             .. self
@@ -339,7 +339,7 @@ impl SetterSelector {
         if !self.id.matches(&channel.id) {
             return false;
         }
-        if !self.parent.matches(&channel.node) {
+        if !self.parent.matches(&channel.service) {
             return false;
         }
         if !self.kind.matches(&channel.mechanism.kind) {

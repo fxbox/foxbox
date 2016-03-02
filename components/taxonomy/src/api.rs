@@ -13,7 +13,7 @@
 //!
 //!
 
-use devices::*;
+use services::*;
 use selector::*;
 use values::Value;
 use util::Id;
@@ -21,8 +21,8 @@ use util::Id;
 /// An error produced by one of the APIs in this module.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Error {
-    /// There is no such node connected to the Foxbox, even indirectly.
-    NoSuchNode(Id<NodeId>),
+    /// There is no such service connected to the Foxbox, even indirectly.
+    NoSuchService(Id<ServiceId>),
 
     /// There is no such getter channel connected to the Foxbox, even indirectly.
     NoSuchGetter(Id<Getter>),
@@ -59,20 +59,20 @@ pub enum WatchEvent {
 
 /// A handle to the public API.
 pub trait API: Send {
-    /// Get the metadata on nodes matching some conditions.
+    /// Get the metadata on services matching some conditions.
     ///
-    /// A call to `API::get_nodes(vec![req1, req2, ...])` will return
-    /// the metadata on all nodes matching _either_ `req1` or `req2`
+    /// A call to `API::get_services(vec![req1, req2, ...])` will return
+    /// the metadata on all services matching _either_ `req1` or `req2`
     /// or ...
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/nodes`
+    /// `GET /api/v1/services`
     ///
     /// ## Requests
     ///
-    /// Any JSON that can be deserialized to a `Vec<NodeSelector>`. See
-    /// the implementation of `NodeSelector` for details.
+    /// Any JSON that can be deserialized to a `Vec<ServiceSelector>`. See
+    /// the implementation of `ServiceSelector` for details.
     ///
     /// ### Example
     ///
@@ -102,20 +102,20 @@ pub trait API: Send {
     ///
     /// ## Success
     ///
-    /// A JSON representing an array of `Node`. See the implementation
-    /// of `Node` for details.
+    /// A JSON representing an array of `Service`. See the implementation
+    /// of `Service` for details.
     ///
     /// ### Example
     ///
     /// ```json
     /// [{
     ///   "tags": ["entrance", "door", "somevendor"],
-    ///   "id: "some-node-id",
+    ///   "id: "some-service-id",
     ///   "getters": [],
     ///   "setters": [
     ///     "tags": [...],
     ///     "id": "some-channel-id",
-    ///     "node": "some-node-id",
+    ///     "service": "some-service-id",
     ///     "last_seen": "some-date",
     ///     "mechanism": {
     ///       "Setter":  {
@@ -129,25 +129,25 @@ pub trait API: Send {
     ///   ]
     /// }]
     /// ```
-    fn get_nodes(&self, &Vec<NodeSelector>) -> Vec<Node>;
+    fn get_services(&self, &Vec<ServiceSelector>) -> Vec<Service>;
 
-    /// Label a set of nodes with a set of tags.
+    /// Label a set of services with a set of tags.
     ///
-    /// A call to `API::put_node_tag(vec![req1, req2, ...], vec![tag1,
-    /// ...])` will label all the nodes matching _either_ `req1` or
-    /// `req2` or ... with `tag1`, ... and return the number of nodes
+    /// A call to `API::put_service_tag(vec![req1, req2, ...], vec![tag1,
+    /// ...])` will label all the services matching _either_ `req1` or
+    /// `req2` or ... with `tag1`, ... and return the number of services
     /// matching any of the selectors.
     ///
-    /// Some of the nodes may already be labelled with `tag1`, or
+    /// Some of the services may already be labelled with `tag1`, or
     /// `tag2`, ... They will not change state. They are counted in
     /// the resulting `usize` nevertheless.
     ///
-    /// Note that this call is _not live_. In other words, if nodes
+    /// Note that this call is _not live_. In other words, if services
     /// are added after the call, they will not be affected.
     ///
     /// # REST API
     ///
-    /// `POST /api/v1/nodes/tag`
+    /// `POST /api/v1/services/tag`
     ///
     /// ## Getters
     ///
@@ -155,7 +155,7 @@ pub trait API: Send {
     ///
     /// ```ignore
     /// {
-    ///   set: Vec<NodeSelector>,
+    ///   set: Vec<ServiceSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
@@ -168,25 +168,25 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON string representing a number.
-    fn put_node_tag(&self, set: &Vec<NodeSelector>, tags: &Vec<String>) -> usize;
+    fn add_service_tag(&self, set: &Vec<ServiceSelector>, tags: &Vec<String>) -> usize;
 
-    /// Remove a set of tags from a set of nodes.
+    /// Remove a set of tags from a set of services.
     ///
-    /// A call to `API::delete_node_tag(vec![req1, req2, ...], vec![tag1,
-    /// ...])` will remove from all the nodes matching _either_ `req1` or
-    /// `req2` or ... all of the tags `tag1`, ... and return the number of nodes
+    /// A call to `API::delete_service_tag(vec![req1, req2, ...], vec![tag1,
+    /// ...])` will remove from all the services matching _either_ `req1` or
+    /// `req2` or ... all of the tags `tag1`, ... and return the number of services
     /// matching any of the selectors.
     ///
-    /// Some of the nodes may not be labelled with `tag1`, or `tag2`,
+    /// Some of the services may not be labelled with `tag1`, or `tag2`,
     /// ... They will not change state. They are counted in the
     /// resulting `usize` nevertheless.
     ///
-    /// Note that this call is _not live_. In other words, if nodes
+    /// Note that this call is _not live_. In other words, if services
     /// are added after the call, they will not be affected.
     ///
     /// # REST API
     ///
-    /// `DELETE /api/v1/nodes/tag`
+    /// `DELETE /api/v1/services/tag`
     ///
     /// ## Getters
     ///
@@ -194,7 +194,7 @@ pub trait API: Send {
     ///
     /// ```ignore
     /// {
-    ///   set: Vec<NodeSelector>,
+    ///   set: Vec<ServiceSelector>,
     ///   tags: Vec<String>,
     /// }
     /// ```
@@ -207,8 +207,8 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn delete_node_tag(&self, set: &Vec<NodeSelector>, tags: String) -> usize;
-    
+    fn remove_service_tag(&self, set: &Vec<ServiceSelector>, tags: String) -> usize;
+
     /// Get a list of getters matching some conditions
     ///
     /// # REST API
@@ -261,8 +261,8 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn put_getter_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
-    fn put_setter_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
+    fn add_getter_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
+    fn add_setter_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
 
     /// Remove a set of tags from a set of channels.
     ///
@@ -308,8 +308,8 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn delete_getter_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
-    fn delete_setter_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
+    fn remove_getter_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
+    fn remove_setter_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
 
     /// Read the latest value from a set of channels
     ///
@@ -323,7 +323,7 @@ pub trait API: Send {
     /// # REST API
     ///
     /// `POST /api/v1/channels/value`
-    fn put_channel_value(&self, &Vec<SetterSelector>, Value) -> Vec<(Id<Setter>, Result<(), Error>)>;
+    fn set_channel_value(&self, &Vec<SetterSelector>, Value) -> Vec<(Id<Setter>, Result<(), Error>)>;
 
     /// Watch for any change
     ///
@@ -346,7 +346,7 @@ pub struct WatchOptions {
     /// If `true`, watch as new values become available.
     pub should_watch_values: bool,
 
-    /// If `true`, watch as nodes are connected/disconnected.
+    /// If `true`, watch as services are connected/disconnected.
     pub should_watch_topology: bool,
 
     /// Make sure that we can't instantiate from another crate.

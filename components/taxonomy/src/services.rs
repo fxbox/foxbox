@@ -14,33 +14,33 @@ use serde::de::{Deserialize, Deserializer, Error};
 
 
 /// A marker for Id.
-/// Only useful for writing `Id<NodeId>`.
+/// Only useful for writing `Id<ServiceId>`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
-pub struct NodeId;
+pub struct ServiceId;
 
-/// Metadata on a node. A node is a device or collection of devices
-/// that may offer services. The FoxBox itself a node offering
+/// Metadata on a service. A service is a device or collection of devices
+/// that may offer services. The FoxBox itself a service offering
 /// services such as a clock, communication with the user through her
 /// smart devices, etc.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Node {
-    /// Tags describing the node.
+pub struct Service {
+    /// Tags describing the service.
     ///
     /// These tags can be set by the user, adapters or
-    /// applications. They are used by applications to find nodes and
+    /// applications. They are used by applications to find services and
     /// services.
     ///
-    /// For instance, a user may set tag "entrance" to all nodes
-    /// placed in the entrance of his house, or a tag "blue" to a node
+    /// For instance, a user may set tag "entrance" to all services
+    /// placed in the entrance of his house, or a tag "blue" to a service
     /// controlling blue lights. An adapter may set tags "plugged" or
     /// "battery" to devices that respectively depend on a plugged
     /// power source or on a battery.
     pub tags: Vec<String>,
 
-    /// An id unique to this node.
-    pub id: Id<NodeId>,
+    /// An id unique to this service.
+    pub id: Id<ServiceId>,
 
-    /// Channels connected directly to this node.
+    /// Channels connected directly to this service.
     pub getters: Vec<Channel<Getter>>,
     pub setters: Vec<Channel<Setter>>,
 
@@ -224,7 +224,7 @@ impl IOMechanism for Setter {
 /// leave a device. Note that channels support either a single kind
 /// of getter or a single kind of setter. Devices that support both
 /// getters or setters, or several kinds of getters, or several kinds of
-/// setters, are represented as nodes containing several channels.
+/// setters, are represented as services containing several channels.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel<IO> where IO: IOMechanism {
     /// Tags describing the channel.
@@ -239,8 +239,8 @@ pub struct Channel<IO> where IO: IOMechanism {
     /// An id unique to this channel.
     pub id: Id<IO>,
 
-    /// The node owning this channel.
-    pub node: Id<NodeId>,
+    /// The service owning this channel.
+    pub service: Id<ServiceId>,
 
     /// The update mechanism for this channel.
     pub mechanism: IO,

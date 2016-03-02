@@ -40,7 +40,7 @@ pub enum Type {
     TimeStamp,
 
     Temperature,
-    String, 
+    String,
     ///
     /// ...
     ///
