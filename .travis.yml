@@ -1,7 +1,7 @@
 sudo: required
 language: rust
 rust:
-    - nightly-2016-02-22
+    - nightly-2016-03-01
 cache:
     directories:
         - $HOME/.cargo
