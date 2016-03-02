@@ -46,6 +46,7 @@ extern crate unicase;
 extern crate uuid;
 extern crate ws;
 extern crate multicast_dns;
+extern crate xml;
 
 #[cfg(test)]
 extern crate regex;
@@ -61,6 +62,7 @@ mod http_server;
 mod managed_process;
 mod registration;
 mod service;
+mod upnp;
 mod service_router;
 mod stable_uuid;
 mod static_router;

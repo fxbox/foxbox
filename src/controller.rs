@@ -21,6 +21,7 @@ use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex };
 use std::sync::atomic::{ AtomicBool, Ordering };
+use upnp::UpnpManager;
 use ws_server::WsServer;
 use ws;
 
@@ -33,6 +34,7 @@ pub struct FoxBox {
     services: Arc<Mutex<HashMap<String, Box<Service>>>>,
     websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
     pub config: Arc<ConfigService>,
+    upnp: Arc<UpnpManager>,
 }
 
 const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
@@ -54,6 +56,8 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn add_websocket(&mut self, socket: ws::Sender);
     fn remove_websocket(&mut self, socket: ws::Sender);
     fn broadcast_to_websockets(&self, data: serde_json::value::Value);
+
+    fn get_upnp_manager(&self) -> Arc<UpnpManager>;
 }
 
 impl FoxBox {
@@ -73,6 +77,7 @@ impl FoxBox {
             http_port: http_port,
             ws_port: ws_port,
             config: Arc::new(ConfigService::new("foxbox.conf")),
+            upnp: Arc::new(UpnpManager::new()),
         }
     }
 }
@@ -84,10 +89,14 @@ impl Controller for FoxBox {
 
         let mut event_loop = mio::EventLoop::new().unwrap();
 
+        {
+            Arc::get_mut(&mut self.upnp).unwrap().start().unwrap();
+        }
         HttpServer::new(self.clone()).start();
         WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
         let mut adapter_manager = AdapterManager::new(self.clone());
         adapter_manager.start();
+        self.upnp.search(None).unwrap();
 
         event_loop.run(&mut FoxBoxEventLoop {
             controller: self.clone(),
@@ -187,6 +196,10 @@ impl Controller for FoxBox {
                 Err(err) => error!("Error sending to socket: {}", err)
             }
         }
+    }
+
+    fn get_upnp_manager(&self) -> Arc<UpnpManager> {
+        self.upnp.clone()
     }
 }
 
