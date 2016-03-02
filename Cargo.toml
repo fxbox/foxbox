@@ -23,6 +23,7 @@ log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
 mount = "0.0.10"
 router = "0.1.0"
+rust-crypto = "0.2.34"
 rustc-serialize = "0.3"
 serde = "0.6.13"
 serde_json = "0.6.0"

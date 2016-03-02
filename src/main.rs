@@ -58,6 +58,7 @@ mod managed_process;
 mod registration;
 mod service;
 mod service_router;
+mod stable_uuid;
 mod tunnel_controller;
 mod ws_server;
 

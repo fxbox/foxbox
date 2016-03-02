@@ -19,9 +19,8 @@ use router::Router;
 use service::{ Service, ServiceAdapter, ServiceProperties };
 use std::time::Duration;
 use std::thread;
-use uuid::Uuid;
 use std::io::Read;
-
+use stable_uuid as StableUuid;
 
 pub struct PhilipsHueAdapter<T> {
     name: String,
@@ -125,7 +124,7 @@ struct HueLightService<T> {
 impl<T: Controller> HueLightService<T> {
     fn new(controller: T, id: u32, light: HueLight) -> Self {
         debug!("Creating HueLightService {} for HueLight {:?}", id, light);
-        let service_id = Uuid::new_v4().to_simple_string();
+        let service_id = StableUuid::from_str(light.get_unique_id()).to_simple_string();
         HueLightService {
             controller: controller.clone(),
             properties: ServiceProperties {

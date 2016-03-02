@@ -17,6 +17,7 @@ dependencies = [
  "mount 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "multicast_dns 0.1.0 (git+https://github.com/fxbox/multicast-dns.git?rev=a6e4bcc)",
  "router 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rust-crypto 0.2.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.6.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",

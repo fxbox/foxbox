@@ -178,8 +178,12 @@ impl HueLight {
     }
 
     pub fn get_settings(&self) -> structs::HueHubSettingsLightEntry {
-        let api = HueHubApi::new(self.hub_id.clone(), self.hub_ip.clone());
-        api.get_light_status(&self.hue_id)
+        HueHubApi::new(self.hub_id.clone(), self.hub_ip.clone())
+            .get_light_status(&self.hue_id)
+    }
+
+    pub fn get_unique_id(&self) -> String {
+        self.get_settings().uniqueid
     }
 
     pub fn get_state(&self) -> LightState {
