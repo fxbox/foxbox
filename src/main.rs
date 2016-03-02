@@ -68,7 +68,7 @@ mod stubs {
     pub mod service;
 }
 
-use controller::{ Controller, FoxBox, DEFAULT_HTTP_PORT };
+use controller::{ Controller, FoxBox };
 use tunnel_controller:: { TunnelConfig, Tunnel };
 use multicast_dns::host::HostManager;
 
@@ -77,7 +77,7 @@ Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i
 
 Options:
     -v, --verbose            Toggle verbose output.
-    -n, --name <hostname>    Set local hostname. [default: foxbox]
+    -n, --name <hostname>    Set local hostname. Linux only. Requires to be a member of the netdev group.
     -p, --port <port>        Set port to listen on for http connections. [default: 3000]
     -w, --wsport <wsport>    Set port to listen on for websocket. [default: 4000]
     -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242/register]
@@ -86,10 +86,10 @@ Options:
     -h, --help               Print this help menu.
 ",
         flag_name: Option<String>,
-        flag_port: Option<u16>,
-        flag_wsport: Option<u16>,
+        flag_port: u16,
+        flag_wsport: u16,
+        flag_register: String,
         flag_iface: Option<String>,
-        flag_register: Option<String>,
         flag_tunnel: Option<String>);
 
 /// Updates local host name with the provided host name string. If requested host name
@@ -126,7 +126,7 @@ fn main() {
     // Start the tunnel.
     if let Some(host) = args.flag_tunnel {
         let mut tunnel =
-            Tunnel::new(TunnelConfig::new(args.flag_port.unwrap_or(DEFAULT_HTTP_PORT), host));
+            Tunnel::new(TunnelConfig::new(args.flag_port, host));
         tunnel.start().unwrap();
     }
 
@@ -146,10 +146,10 @@ describe! main {
                 .decode().unwrap();
 
             assert_eq!(args.flag_verbose, false);
-            assert_eq!(args.flag_name.unwrap(), "foxbox");
-            assert_eq!(args.flag_port.unwrap(), 3000);
-            assert_eq!(args.flag_wsport.unwrap(), 4000);
-            assert_eq!(args.flag_register.unwrap(), "http://localhost:4242/register");
+            assert_eq!(args.flag_name, None);
+            assert_eq!(args.flag_port, 3000);
+            assert_eq!(args.flag_wsport, 4000);
+            assert_eq!(args.flag_register, "http://localhost:4242/register");
             assert_eq!(args.flag_iface, None);
             assert_eq!(args.flag_tunnel, None);
             assert_eq!(args.flag_help, false);
@@ -170,9 +170,9 @@ describe! main {
 
             assert_eq!(args.flag_verbose, true);
             assert_eq!(args.flag_name.unwrap(), "foobar");
-            assert_eq!(args.flag_port.unwrap(), 1234);
-            assert_eq!(args.flag_wsport.unwrap(), 4567);
-            assert_eq!(args.flag_register.unwrap(), "http://foo.bar:6868/register");
+            assert_eq!(args.flag_port, 1234);
+            assert_eq!(args.flag_wsport, 4567);
+            assert_eq!(args.flag_register, "http://foo.bar:6868/register");
             assert_eq!(args.flag_iface.unwrap(), "eth99");
             assert_eq!(args.flag_tunnel.unwrap(), "tunnel.host");
         }
@@ -192,9 +192,9 @@ describe! main {
 
             assert_eq!(args.flag_verbose, true);
             assert_eq!(args.flag_name.unwrap(), "foobar");
-            assert_eq!(args.flag_port.unwrap(), 1234);
-            assert_eq!(args.flag_wsport.unwrap(), 4567);
-            assert_eq!(args.flag_register.unwrap(), "http://foo.bar:6868/register");
+            assert_eq!(args.flag_port, 1234);
+            assert_eq!(args.flag_wsport, 4567);
+            assert_eq!(args.flag_register, "http://foo.bar:6868/register");
             assert_eq!(args.flag_iface.unwrap(), "eth99");
             assert_eq!(args.flag_tunnel.unwrap(), "tunnel.host");
         }
