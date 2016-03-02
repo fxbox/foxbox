@@ -2,14 +2,23 @@
 //! Values manipulated by services
 //!
 use std::cmp::{PartialOrd, Ordering};
-use std::time::Duration;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use serde_json;
-use chrono;
+use chrono::{Duration, DateTime, UTC};
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error};
+
+/// Representation of a type error.
+#[derive(Debug)]
+pub struct TypeError {
+    /// The type we expected.
+    pub expected: Type,
+
+    /// The type we actually got.
+    pub got: Type,
+}
 
 ///
 /// The type of values manipulated by endpoints.
@@ -48,6 +57,19 @@ pub enum Type {
     Json,
     Binary,
     ExtNumeric,
+}
+
+impl Type {
+    /// Determine whether using `Range::Eq` for this type is
+    /// appropriate. Typically, using `Range::Eq` for a floating point
+    /// number is a bad idea.
+    pub fn supports_eq(&self) -> bool {
+        use self::Type::*;
+        match *self {
+            Duration | TimeStamp | Temperature | ExtNumeric | Color => false,
+            Unit | Bool | String | Json | Binary => true,
+        }
+    }
 }
 
 /// A temperature. Internal representation may be either Fahrenheit or
@@ -181,6 +203,20 @@ impl Value {
             Value::ExtNumeric(_) => Type::ExtNumeric,
         }
     }
+
+    pub fn as_timestamp(&self) -> Result<&TimeStamp, TypeError> {
+        match *self {
+            Value::TimeStamp(ref x) => Ok(x),
+            _ => Err(TypeError {expected: Type::TimeStamp, got: self.get_type()})
+        }
+    }
+
+    pub fn as_duration(&self) -> Result<&ValDuration, TypeError> {
+        match *self {
+            Value::Duration(ref x) => Ok(x),
+            _ => Err(TypeError {expected: Type::Duration, got: self.get_type()})
+        }
+    }
 }
 
 impl PartialOrd for Value {
@@ -231,33 +267,38 @@ impl ValDuration {
     pub fn new(duration: Duration) -> Self {
         ValDuration(duration)
     }
+    pub fn as_duration(&self) -> &Duration {
+        &self.0
+    }
 }
 impl Serialize for ValDuration {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {
-        let as_ms : u64 = self.0.as_secs() * 1000
-            + (self.0.subsec_nanos() as u64) / 1_000_000;
-        as_ms.serialize(serializer)
+        let as_sec = (self.0.num_milliseconds() as f64) / (1000 as f64);
+        as_sec.serialize(serializer)
     }
 }
 impl Deserialize for ValDuration {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer {
         let as_sec : f64 = try!(f64::deserialize(deserializer));
-        Ok(ValDuration(Duration::new(as_sec as u64, as_sec.fract() as u32)))
+        Ok(ValDuration(Duration::milliseconds((as_sec * 1000.) as i64)))
     }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
-pub struct TimeStamp(chrono::DateTime<chrono::UTC>);
+pub struct TimeStamp(DateTime<UTC>);
 impl TimeStamp {
-    pub fn from_datetime(datetime: chrono::DateTime<chrono::UTC>) -> Self {
+    pub fn from_datetime(datetime: DateTime<UTC>) -> Self {
         TimeStamp(datetime)
     }
+    pub fn as_datetime(&self) -> &DateTime<UTC> {
+        &self.0
+    }
     pub fn from_s(s: i64) -> Self {
-        use chrono::*;
+        use chrono;
         let naive = chrono::naive::datetime::NaiveDateTime::from_timestamp(s, 0);
-        let date = DateTime::<UTC>::from_utc(naive, chrono::UTC);
+        let date = DateTime::<UTC>::from_utc(naive, UTC);
         TimeStamp(date)
     }
 }
@@ -272,7 +313,7 @@ impl Deserialize for TimeStamp {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer {
         let str = try!(String::deserialize(deserializer));
-        match chrono::DateTime::<chrono::UTC>::from_str(&str) {
+        match DateTime::<UTC>::from_str(&str) {
             Ok(dt) => Ok(TimeStamp(dt)),
             Err(_) => Err(D::Error::syntax("Invalid date"))
         }
