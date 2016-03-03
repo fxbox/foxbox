@@ -20,6 +20,7 @@ multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e
 iron = "0.2.6"
 libc = "0.2.7"
 log = "0.3"
+logger ="0.0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
 mount = "0.0.10"
 router = "0.1.0"

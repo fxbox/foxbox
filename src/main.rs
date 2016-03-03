@@ -36,6 +36,7 @@ extern crate iron_test;
 extern crate libc;
 #[macro_use]
 extern crate log;
+extern crate logger;
 extern crate mio;
 extern crate mount;
 extern crate router;
