@@ -20,6 +20,7 @@
   "homepage": "https://github.com/fxbox/foxbox",
   "dependencies": {
     "http-proxy": "^1.13.2",
+    "mdns": "^2.3.1",
     "qr-image": "^3.1.0"
   },
   "devDependencies": {

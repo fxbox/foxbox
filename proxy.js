@@ -6,6 +6,7 @@ var fs = require('fs');
 var qr = require('qr-image');
 var exec = require('child_process').exec;
 var proxy = require('http-proxy').createProxyServer();
+var mdns = require('mdns');
 var ports = {
   backend: 3000,
   front: 4333
@@ -59,25 +60,58 @@ function build() {
         '-out certs/server/my-server.crt.pem ' +
         '-days 1000000');
   }).then(() => {
-    console.log(`fqdn ${fqdn}`);
+    console.log(`Generated certificate chain for ${fqdn} in ./certs.`);
     return fqdn;
   });
 }
 
-build().then(fqdn => {
+function mdnsServe(fqdn) {
+  // advertise a https server:
+  mdns.createAdvertisement(mdns.tcp('https'), ports.front, {
+    // seems that https://www.npmjs.com/package/cordova-plugin-zeroconf does not
+    // support custom name field, so using txtRecord instead:
+    txtRecord: {
+      name: fqdn
+    }
+  }).start();
+
+  // // For debugging purposes:
+  // var browser = mdns.createBrowser(mdns.tcp('https'));
+  // browser.on('serviceUp', function(service) {
+  //   console.log("service up: ", service);
+  // });
+  // browser.on('serviceDown', function(service) {
+  //   console.log("service down: ", service);
+  // });
+  // browser.start();
+}
+
+function qrGen(fqdn) {
   const qrCodeString = `https://${fqdn}:${ports.front}/`;
-  console.log(qrCodeString);
   const qr_svg = qr.image(qrCodeString, { type: 'svg' });
   qr_svg.pipe(fs.createWriteStream('qr.svg'));
+  console.log(`Wrote string ${qrCodeString} into ./qr.svg, please display and scan.`);
+}
+
+function proxyServe(fqdn) {
   // serve a web server on the local network:
   https.createServer({
     key: fs.readFileSync('certs/server/my-server.key.pem'),
     cert: fs.readFileSync('certs/server/my-server.crt.pem'),
     ca: fs.readFileSync('certs/ca/my-root-ca.crt.pem')
   }, (req, res) => {
-    proxy.web(req, res, { target: 'http://localhost:3000' });
+    proxy.web(req, res, { target: `http://localhost:${ports.backend}` });
   }).listen(ports.front);
-  console.log('Please display and scan qr.svg');
+  console.log(`Proxying https port ${ports.front} to http port ${ports.backend}, ` +
+      `ready for connections.`);
+}
+
+//...
+
+build().then(fqdn => {
+  mdnsServe(fqdn);
+  qrGen(fqdn);
+  proxyServe(fqdn);
 }).catch(err => {
   console.error(err);
 });
