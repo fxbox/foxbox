@@ -6,27 +6,11 @@
 
 'use strict';
 
-var SIGN_UP         = 0;
-var SIGN_UP_SUCCESS = 1;
 var SIGN_IN         = 2;
 var SIGNED_IN       = 3;
 
 
 var ELEMENTS = [{
-  screen: SIGN_UP,
-  selector: '#signup-pwd1'
-}, {
-  screen: SIGN_UP,
-  selector: '#signup-pwd2'
-}, {
-  screen: SIGN_UP,
-  selector: '#signup-button',
-  event: 'click',
-  listener: 'signup'
-}, {
-  screen: SIGN_UP_SUCCESS,
-  selector: '#location'
-}, {
   screen: SIGN_IN,
   selector: '#signin-pwd'
 }, {
@@ -60,17 +44,13 @@ var SessionUI = {
   init: function() {
     SessionUI.elements = {};
     SessionUI.screens = {
-      signup: document.querySelector('#signup'),
-      signupSuccess: document.querySelector('#signup-success'),
       signin: document.querySelector('#signin'),
       signedin: document.querySelector('#signedin')
     };
     if (SessionUI.session === null) {
-      SessionUI.show(SIGN_UP);
+      SessionUI.show(SIGN_IN);
     } else if (SessionUI.session.length) {
       SessionUI.show(SIGNED_IN);
-    } else {
-      SessionUI.show(SIGN_IN);
     }
   },
 
@@ -115,35 +95,9 @@ var SessionUI = {
       return;
     }
     this.currentScreen = screen;
-    this.screens.signup.hidden = (screen != SIGN_UP);
-    this.screens.signupSuccess.hidden = (screen != SIGN_UP_SUCCESS);
     this.screens.signin.hidden = (screen != SIGN_IN);
     this.screens.signedin.hidden = (screen != SIGNED_IN);
     this.loadElements(screen);
-  },
-
-  showLocation: function(location) {
-    SessionUI.elements.location.innerHTML = location;
-  },
-
-  signup: function() {
-    var pwd = SessionUI.elements.signupPwd1.value;
-    if (pwd != SessionUI.elements.signupPwd2.value) {
-      window.alert('Passwords don\'t match! Please try again.');
-      return;
-    }
-
-    if (pwd.length < 8) {
-      window.alert('Please use a password of at least 8 characters.');
-      return;
-    }
-
-    Session.create('admin', 'admin@foxbox.local', pwd).then(function() {
-      SessionUI.show(SIGN_UP_SUCCESS);
-      SessionUI.showLocation(window.location.href);
-    }).catch(function(error) {
-      window.alert('Signup error ' + error);
-    });
   },
 
   signin: function() {

@@ -5,13 +5,11 @@
 'use strict';
 
 (function(exports) {
-  var SIGN_UP = '/users/setup';
-  var SIGN_IN = '/users/login';
 
-  function sessionRequest(sessionInfo, endpoint) {
+  function sessionRequest(sessionInfo) {
     return new Promise(function(resolve, reject) {
       var xhr = new XMLHttpRequest();
-      xhr.open('POST', endpoint, true);
+      xhr.open('POST', '/users/login', true);
       xhr.onload = function() {
         var response;
         try {
@@ -31,36 +29,15 @@
       };
       // See https://github.com/fxbox/users/blob/master/doc/API.md#post-setup
       xhr.setRequestHeader('Content-Type', 'application/json');
-      if (endpoint === SIGN_UP) {
-        var body;
-        try {
-          body = JSON.stringify(sessionInfo);
-        } catch(e) {
-          return reject(e);
-        }
-        xhr.send(body);
-      } else {
-        var auth = btoa(sessionInfo.username + ':' + sessionInfo.password);
-        xhr.setRequestHeader ('Authorization', 'Basic ' + auth);
-        xhr.send();
-      }
+      var auth = btoa(sessionInfo.username + ':' + sessionInfo.password);
+      xhr.setRequestHeader ('Authorization', 'Basic ' + auth);
+      xhr.send();
     });
   }
 
   var Session = {
     get: function() {
       return localStorage.getItem('session');
-    },
-
-    create: function(username, email, pwd) {
-      if (!username || !email || !pwd) {
-        return Promise.reject();
-      }
-      return sessionRequest({
-        email: email,
-        username: username,
-        password: pwd
-      }, SIGN_UP);
     },
 
     start: function(username, pwd) {
@@ -70,11 +47,11 @@
       return sessionRequest({
         username: username,
         password: pwd
-      }, SIGN_IN);
+      });
     },
 
     clear: function() {
-      localStorage.setItem('session', '');
+      localStorage.clear('session');
     }
   };
 
