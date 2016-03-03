@@ -2,17 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use adapters::philips_hue::api::serde_json;
+use adapters::philips_hue::serde_json;
 
 use std::collections::BTreeMap;
 use serde::de::Deserialize;
 use core::fmt::Debug;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct HueHubSettings {
-    pub config: HueHubSettingsConfig,
+pub struct Settings {
+    pub config: SettingsConfig,
     pub scenes: BTreeMap<String, serde_json::Value>,
-    pub lights: BTreeMap<String, HueHubSettingsLightEntry>,
+    pub lights: BTreeMap<String, SettingsLightEntry>,
     pub sensors: BTreeMap<String, serde_json::Value>,
     pub rules: BTreeMap<String, serde_json::Value>,
     pub schedules: BTreeMap<String, serde_json::Value>,
@@ -20,8 +20,8 @@ pub struct HueHubSettings {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct HueHubSettingsConfig {
-    pub whitelist: BTreeMap<String, HueHubSettingsConfigWhitelistEntry>,
+pub struct SettingsConfig {
+    pub whitelist: BTreeMap<String, SettingsConfigWhitelistEntry>,
     pub portalconnection: String,
     pub modelid: String,
     pub proxyport: u32,
@@ -50,7 +50,7 @@ pub struct HueHubSettingsConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct HueHubSettingsConfigWhitelistEntry {
+pub struct SettingsConfigWhitelistEntry {
     pub name: String,
     #[serde(rename="create date")]
     pub create_date: String,
@@ -59,7 +59,7 @@ pub struct HueHubSettingsConfigWhitelistEntry {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct HueHubSettingsLightEntry {
+pub struct SettingsLightEntry {
     pub swversion: String,
     pub modelid: String,
     pub name: String,
@@ -68,11 +68,11 @@ pub struct HueHubSettingsLightEntry {
     pub lighttype: String,
     pub pointsymbol: BTreeMap<String, String>,
     pub manufacturername: String,
-    pub state: HueHubSettingsLightState,
+    pub state: SettingsLightState,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct HueHubSettingsLightState {
+pub struct SettingsLightState {
     pub on: bool,
     pub ct: u32,
     pub reachable: bool,
@@ -85,19 +85,20 @@ pub struct HueHubSettingsLightState {
     pub alert: String,
 }
 
-impl HueHubSettings {
-    pub fn new(json: &String) -> Option<HueHubSettings> {
+impl Settings {
+    pub fn new(json: &str) -> Option<Settings> {
         parse_json(json)
     }
 }
 
-impl HueHubSettingsLightEntry {
-    pub fn new(json: &String) -> Option<Self> {
+#[allow(dead_code)]
+impl SettingsLightEntry {
+    pub fn new(json: &str) -> Option<Self> {
         parse_json(json)
     }
 }
 
-pub fn parse_json<T: Deserialize + Debug> (json: &String) -> Option<T> {
+pub fn parse_json<T: Deserialize + Debug> (json: &str) -> Option<T> {
     let parsed: Option<T> = match serde_json::from_str(&json) {
         Ok(value) => Some(value),
         Err(error) => {

@@ -2,43 +2,38 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-extern crate serde_json;
-
 use adapters::philips_hue::http;
-use adapters::philips_hue::api::HueHubApi;
+use adapters::philips_hue::hub_api::HubApi;
+use adapters::philips_hue::serde_json;
 
 #[derive(Serialize, Deserialize, Debug)]
-struct HueNupnpEntry {
+struct NupnpEntry {
     id: String,
     internalipaddress: String
 }
 
-pub fn query() -> Vec<HueHubApi> {
+pub fn query(server_url: &str) -> Vec<HubApi> {
     // "[{\"id\":\"001788fffe243755\",\"internalipaddress\":\"192.168.5.129\"}]"
-    debug!("query meethue");
-    let empty = String::from("[]");
-    let url = "http://www.meethue.com/api/nupnp".to_owned();
-    let content = http::get(url)
-        .unwrap_or(empty);
-    debug!("content: {:?}", content);
-    let hub_list = parse_response(content);
-    debug!("parsed: {:?}", hub_list);
+    debug!("Querying NUPnP server at {}", server_url);
+    let empty_list = Vec::new();
+    let hub_list = http::get(server_url)
+        .map(parse_response)
+        .unwrap_or(empty_list);
+    debug!("Parsed NUPnP response: {:?}", hub_list);
     hub_list
 }
 
-fn parse_response(content: String) -> Vec<HueHubApi> {
-    let mut hub_list: Vec<HueHubApi> = Vec::new();
-    let hubs: Vec<HueNupnpEntry> = match serde_json::from_str(&content) {
+fn parse_response(content: String) -> Vec<HubApi> {
+    let mut hub_list: Vec<HubApi> = Vec::new();
+    let hubs: Vec<NupnpEntry> = match serde_json::from_str(&content) {
         Ok(value) => value,
         Err(error) => {
             warn!("Unable to parse NUPnP response: {}", error.to_string());
-            Vec::<HueNupnpEntry>::new()
+            Vec::<NupnpEntry>::new()
         }
     };
     for hub in hubs {
-        let id = hub.id;
-        let ip = hub.internalipaddress;
-        let new_hub = HueHubApi::new(id.to_owned(), ip.to_owned());
+        let new_hub = HubApi::new(&hub.id, &hub.internalipaddress);
         hub_list.push(new_hub);
     }
     hub_list
