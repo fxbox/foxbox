@@ -2,18 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#![allow(dead_code)]
-
 extern crate hyper;
 
 use std::io::Read;
 use std::error::Error;
 
-pub fn get(url: String) -> Result<String, Box<Error>> {
+pub fn get(url: &str) -> Result<String, Box<Error>> {
     // return Ok(.to_owned());
     let client = hyper::Client::new();
     let mut res = try!(
-        client.get(&url)
+        client.get(url)
             .header(hyper::header::Connection::close())
             .send());
     let mut content = String::new();
@@ -21,11 +19,11 @@ pub fn get(url: String) -> Result<String, Box<Error>> {
     Ok(content.to_owned())
 }
 
-pub fn post(url: String, data: String) -> Result<String, Box<Error>> {
+pub fn post(url: &str, data: &str) -> Result<String, Box<Error>> {
     let client = hyper::Client::new();
     let mut res = try!(
-        client.post(&url)
-            .body(&data)
+        client.post(url)
+            .body(data)
             .header(hyper::header::Connection::close())
             .send());
     let mut content = String::new();
@@ -33,11 +31,11 @@ pub fn post(url: String, data: String) -> Result<String, Box<Error>> {
     Ok(content.to_owned())
 }
 
-pub fn put(url: String, data: String) -> Result<String, Box<Error>> {
+pub fn put(url: &str, data: &str) -> Result<String, Box<Error>> {
     let client = hyper::Client::new();
     let mut res = try!(
-        client.put(&url)
-            .body(&data)
+        client.put(url)
+            .body(data)
             .header(hyper::header::Connection::close())
             .send());
     let mut content = String::new();

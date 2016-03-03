@@ -5,21 +5,22 @@
 extern crate serde_json;
 
 mod http;
+mod hub_api;
+mod light;
 mod nupnp;
-mod api;
 
-use adapters::philips_hue::api::structs::*;
-use adapters::philips_hue::api::HueLight;
 use controller::Controller;
 use iron::{ Request, Response, IronResult };
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
-use iron::status::Status;
 use iron::method::Method;
+use iron::status::Status;
 use router::Router;
+use self::hub_api::structs::*;
+use self::light::Light;
 use service::{ Service, ServiceAdapter, ServiceProperties };
-use std::time::Duration;
-use std::thread;
 use std::io::Read;
+use std::thread;
+use std::time::Duration;
 use stable_uuid as StableUuid;
 
 pub struct PhilipsHueAdapter<T> {
@@ -48,7 +49,7 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
         thread::spawn(move || {
             controller.adapter_started("Philips Hue Service Adapter".to_owned());
 
-            let nupnp_hubs = nupnp::query();
+            let nupnp_hubs = nupnp::query("http://www.meethue.com/api/nupnp");
             debug!("nUPnP reported Philips Hue bridges: {:?}", nupnp_hubs);
 
             for hub in nupnp_hubs {
@@ -90,7 +91,7 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
                     // We have a paired Hub, instanciate the lights services.
                     // Extract and log some info
                     let setting = hub.get_settings();
-                    let hs = HueHubSettings::new(&setting).unwrap(); // TODO: no unwrap
+                    let hs = Settings::new(&setting).unwrap(); // TODO: no unwrap
                     info!(
                         "Connected to Philips Hue bridge model {}, ID {}, software version {}, IP address {}",
                         hs.config.modelid, hs.config.bridgeid, hs.config.swversion,
@@ -114,16 +115,17 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
     }
 
 }
-
+ 
+#[allow(dead_code)]
 struct HueLightService<T> {
     controller: T,
     properties: ServiceProperties,
-    light: HueLight,
+    light: Light,
 }
 
 impl<T: Controller> HueLightService<T> {
-    fn new(controller: T, id: u32, light: HueLight) -> Self {
-        debug!("Creating HueLightService {} for HueLight {:?}", id, light);
+    fn new(controller: T, id: u32, light: Light) -> Self {
+        debug!("Creating HueLightService {} for Light {:?}", id, light);
         let service_id = StableUuid::from_str(light.get_unique_id()).to_simple_string();
         HueLightService {
             controller: controller.clone(),
