@@ -73,6 +73,7 @@ $ cd foxbox
 
 ```bash
 $ cargo run
+$ node proxy.js
 ```
 
 To run with custom local host name (eg. foxbox.local):

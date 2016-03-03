@@ -18,6 +18,10 @@
     "url": "https://github.com/fxbox/foxbox/issues"
   },
   "homepage": "https://github.com/fxbox/foxbox",
+  "dependencies": {
+    "http-proxy": "^1.13.2",
+    "qr-image": "^3.1.0"
+  },
   "devDependencies": {
     "jshint": "2.9.1",
     "mocha": "2.4.5",
