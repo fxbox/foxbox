@@ -6,8 +6,11 @@ use controller::Controller;
 use service_router;
 use foxbox_users::users_router::UsersRouter;
 use iron::Iron;
+use iron::prelude::Chain;
+use logger::Logger;
 use mount::Mount;
 use staticfile::Static;
+use std::env;
 use std::path::Path;
 use std::thread;
 
@@ -30,9 +33,19 @@ impl<T: Controller> HttpServer<T> {
 
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
 
+        let mut chain = Chain::new(mount);
+
+        if let Ok(level) = env::var("RUST_LOG") {
+            if level == "http" {
+                let (logger_before, logger_after) = Logger::new(None);
+                chain.link_before(logger_before);
+                chain.link_after(logger_after);
+            }
+        };
+
         thread::Builder::new().name("HttpServer".to_owned())
                               .spawn(move || {
-            Iron::new(mount).http(addrs[0]).unwrap();
+            Iron::new(chain).http(addrs[0]).unwrap();
         }).unwrap();
     }
 }

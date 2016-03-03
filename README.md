@@ -96,6 +96,15 @@ $ cargo build
 ```
 
 ## Build time options
+### Logs
+FoxBox makes use of [env_logger](http://doc.rust-lang.org/log/env_logger/) so you can configure logging options via the `RUST_LOG` environment variable.
+
+```bash
+$ RUST_LOG=foxbox=trace cargo run
+```
+
+Along with the usual log levels and module options defined by `env_logger` you can also use `RUST_LOG=http` to log HTTP requests.
+
 ### Disable authentication
 You may want to disable endpoints authentication to ease your development process. You can do that by removing `authentication` from the `default` feature in the `Cargo.toml` file.
 
