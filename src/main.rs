@@ -72,7 +72,10 @@ mod stubs {
 
 use controller::{ Controller, FoxBox };
 use tunnel_controller:: { TunnelConfig, Tunnel };
+use libc::SIGINT;
 use multicast_dns::host::HostManager;
+use std::mem;
+use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 
 docopt!(Args derive Debug, "
 Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>]
@@ -117,7 +120,19 @@ fn update_hostname(hostname: String) -> Option<String> {
     Some(host_manager.set_name(&hostname))
 }
 
+// Handle SIGINT (Ctrl-C) for manual shutdown.
+// Signal handlers must not do anything substantial. To trigger shutdown, we atomically
+// flip this flag; the event loop checks the flag and exits accordingly.
+static SHUTDOWN_FLAG: AtomicBool = ATOMIC_BOOL_INIT;
+unsafe fn handle_sigint(_:i32) {
+    SHUTDOWN_FLAG.store(true, Ordering::Release);
+}
+
 fn main() {
+    unsafe {
+        libc::signal(SIGINT, mem::transmute(handle_sigint));
+    }
+
     env_logger::init().unwrap();
 
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
@@ -126,17 +141,21 @@ fn main() {
     registrar.start(args.flag_register, args.flag_iface);
 
     // Start the tunnel.
+    let mut tunnel: Option<Tunnel> = None;
     if let Some(host) = args.flag_tunnel {
-        let mut tunnel =
-            Tunnel::new(TunnelConfig::new(args.flag_port, host));
-        tunnel.start().unwrap();
+        tunnel = Some(Tunnel::new(TunnelConfig::new(args.flag_port, host)));
+        tunnel.as_mut().unwrap().start().unwrap();
     }
 
     let mut controller = FoxBox::new(
         args.flag_verbose, args.flag_name.map_or(None, update_hostname), args.flag_port,
         args.flag_wsport);
 
-    controller.run();
+    controller.run(&SHUTDOWN_FLAG);
+
+    if let Some(mut tunnel) = tunnel {
+        tunnel.stop().unwrap();
+    }
 }
 
 #[cfg(test)]
