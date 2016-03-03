@@ -1,8 +1,10 @@
 #!/bin/bash
 
+# You must disable authenticaion before using this script.
+# See https://github.com/fxbox/foxbox#disable-authentication
+
 HOST="localhost:3000"
 VAL=0.2
-
 
 huecmd() {
 	id=$1
