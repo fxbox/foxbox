@@ -83,7 +83,11 @@ $ cd foxbox
 
 ```bash
 $ cargo run
+$ node proxy.js
 ```
+
+Note that the self-signed and LetsEncrypt-signed certs will all be stored under
+scripts/certs.
 
 To run with custom local host name (eg. foxbox.local):
 
