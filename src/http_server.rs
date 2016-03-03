@@ -4,11 +4,10 @@
 
 use controller::Controller;
 use service_router;
+use static_router;
 use foxbox_users::users_router::UsersRouter;
 use iron::Iron;
 use mount::Mount;
-use staticfile::Static;
-use std::path::Path;
 use std::thread;
 
 pub struct HttpServer<T: Controller> {
@@ -24,7 +23,7 @@ impl<T: Controller> HttpServer<T> {
         let router = service_router::create(self.controller.clone());
 
         let mut mount = Mount::new();
-        mount.mount("/", Static::new(Path::new("static")))
+        mount.mount("/", static_router::create())
              .mount("/services", router)
              .mount("/users", UsersRouter::init());
 
