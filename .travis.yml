@@ -15,7 +15,8 @@ env:
 before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y avahi-daemon libavahi-client-dev libavahi-common-dev libavahi-common3 libdbus-1-dev
-  - sudo usermod -a -G netdev $USER # "netdev" group membership allows to set custom host name via avahi-daemon. 
+  - sudo usermod -a -G netdev $USER # "netdev" group membership allows to set custom host name via avahi-daemon.
+  - sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev # kcov's dependencies
 
 before_script:
     - "sh -e /etc/init.d/xvfb start"
@@ -30,6 +31,6 @@ before_script:
 script:
     - rm -f *sqlite
     - cargo build # Linter is also executed here
-    - RUST_BACKTRACE=1 cargo test
+    - $TRAVIS_BUILD_DIR/tools/execute-unit-tests-with-coverage
     - jshint static/js/*.js test/selenium/*.js
     - (cargo run -- -n $BOX_HOST_NAME -p $BOX_PORT &> /dev/null &) ; npm test
