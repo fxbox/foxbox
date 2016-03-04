@@ -6,11 +6,13 @@ use serde::ser::Serializer;
 use serde::de::Deserializer;
 
 use std::cmp;
+use std::hash::Hash;
+use std::collections::HashSet;
 
-fn merge<T>(mut a: Vec<T>, mut b: Vec<T>) -> Vec<T> where T: Ord {
-    a.append(&mut b);
-    a.sort();
-    a.dedup();
+fn merge<T>(mut a: HashSet<T>, b: Vec<T>) -> HashSet<T> where T: Hash + Eq {
+    for x in b {
+        a.insert(x);
+    }
     a
 }
 
@@ -35,7 +37,7 @@ pub struct ServiceSelector {
 
     ///  Restrict results to services that have all the tags in `tags`.
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
 
     /// Restrict results to services that have all the getters in `getters`.
     #[serde(default)]
@@ -93,7 +95,7 @@ impl ServiceSelector {
     pub fn and(mut self, mut other: ServiceSelector) -> Self {
         ServiceSelector {
             id: self.id.and(other.id),
-            tags: merge(self.tags, other.tags),
+            tags: self.tags.union(&other.tags).cloned().collect(),
             getters: {self.getters.append(&mut other.getters); self.getters},
             setters: {self.setters.append(&mut other.setters); self.setters},
             private: (),
@@ -130,7 +132,7 @@ pub struct GetterSelector {
 
     ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
 
     /// If `Exatly(k)`, restrict results to channels that produce values
     /// of kind `k`.
@@ -212,7 +214,7 @@ impl GetterSelector {
         GetterSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
-            tags: merge(self.tags, other.tags),
+            tags: self.tags.union(&other.tags).cloned().collect(),
             kind: self.kind.and(other.kind),
             poll: Period::and_option(self.poll, other.poll),
             trigger: Period::and_option(self.trigger, other.trigger),
@@ -258,7 +260,7 @@ pub struct SetterSelector {
 
     ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
 
     /// If `Exactly(k)`, restrict results to channels that accept values
     /// of kind `k`.
@@ -327,7 +329,7 @@ impl SetterSelector {
         SetterSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
-            tags: merge(self.tags, other.tags),
+            tags: self.tags.union(&other.tags).cloned().collect(),
             kind: self.kind.and(other.kind),
             push: Period::and_option(self.push, other.push),
             private: (),
@@ -413,9 +415,9 @@ impl Period {
     }
 }
 
-fn has_selected_tags(actual: &Vec<String>, requested: &Vec<String>) -> bool {
+fn has_selected_tags(actual: &HashSet<String>, requested: &HashSet<String>) -> bool {
     for tag in &*actual {
-        if requested.iter().find(|x| *x == tag).is_none() {
+        if !requested.contains(tag) {
             return false;
         }
     }

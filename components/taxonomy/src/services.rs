@@ -12,6 +12,8 @@ use util::Id;
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error};
 
+use std::hash::{Hash, Hasher};
+use std::collections::HashSet;
 
 /// A marker for Id.
 /// Only useful for writing `Id<ServiceId>`.
@@ -35,14 +37,14 @@ pub struct Service {
     /// controlling blue lights. An adapter may set tags "plugged" or
     /// "battery" to devices that respectively depend on a plugged
     /// power source or on a battery.
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
 
     /// An id unique to this service.
     pub id: Id<ServiceId>,
 
     /// Channels connected directly to this service.
-    pub getters: Vec<Channel<Getter>>,
-    pub setters: Vec<Channel<Setter>>,
+    pub getters: HashSet<Channel<Getter>>,
+    pub setters: HashSet<Channel<Setter>>,
 }
 
 
@@ -223,7 +225,7 @@ pub struct Channel<IO> where IO: IOMechanism {
     ///
     /// For instance "entrance".
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: HashSet<String>,
 
     /// An id unique to this channel.
     pub id: Id<IO>,
@@ -238,10 +240,17 @@ pub struct Channel<IO> where IO: IOMechanism {
     #[serde(default)]
     pub last_seen: Option<TimeStamp>,
 }
+impl<IO> Eq for Channel<IO> where IO: IOMechanism {
+}
 impl<IO> PartialEq for Channel<IO> where IO: IOMechanism {
      fn eq(&self, other: &Self) -> bool {
          self.id.eq(&other.id)
      }
+}
+impl<IO> Hash for Channel<IO> where IO: IOMechanism {
+    fn hash<H>(&self, state: &mut H) where H: Hasher {
+        self.id.hash(state)
+    }
 }
 
 /// The communication mechanism used by the channel.
