@@ -5,20 +5,38 @@
 mod philips_hue;
 
 use controller::Controller;
+use self::philips_hue::PhilipsHueAdapter;
 use service::ServiceAdapter;
 
 pub struct AdapterManager<T> {
-    controller: T
+    controller: T,
+    adapters: Vec<Box<ServiceAdapter>>
 }
 
 impl<T: Controller> AdapterManager<T> {
     pub fn new(controller: T) -> Self {
         debug!("Creating Adapter Manager");
-        AdapterManager { controller: controller }
+        AdapterManager {
+            controller: controller,
+            adapters: Vec::new()
+        }
     }
 
-    pub fn start(&self) {
-        // Start all the adapters.
-        philips_hue::PhilipsHueAdapter::new(self.controller.clone()).start();
-	}
+    /// Start all the adapters.
+    pub fn start(&mut self) {
+        let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
+        self.start_adapter(Box::new(PhilipsHueAdapter::new(c)));
+    }
+
+    fn start_adapter(&mut self, adapter: Box<ServiceAdapter>) {
+        adapter.start();
+        self.adapters.push(adapter);
+    }
+
+    /// Stop all the adapters.
+    pub fn stop(&self) {
+        for adapter in &self.adapters {
+            adapter.stop();
+        }
+    }
 }

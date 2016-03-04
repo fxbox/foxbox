@@ -20,6 +20,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex, RwLock };
+use std::sync::atomic::{ AtomicBool, Ordering };
 use ws_server::WsServer;
 use ws;
 
@@ -38,7 +39,7 @@ const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
 const DEFAULT_DOMAIN: &'static str = ".local";
 
 pub trait Controller : Send + Sync + Clone + Reflect + 'static {
-    fn run(&mut self);
+    fn run(&mut self, shutdown_flag: &AtomicBool);
     fn dispatch_service_request(&self, id: String, request: &mut Request) -> IronResult<Response>;
     fn adapter_started(&self, adapter: String);
     fn adapter_notification(&self, notification: serde_json::value::Value);
@@ -82,15 +83,27 @@ impl FoxBox {
 
 impl Controller for FoxBox {
 
-    fn run(&mut self) {
+    fn run(&mut self, shutdown_flag: &AtomicBool) {
         debug!("Starting controller");
 
         let mut event_loop = mio::EventLoop::new().unwrap();
 
         HttpServer::new(self.clone()).start();
         WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
-        AdapterManager::new(self.clone()).start();
-        event_loop.run(&mut FoxBoxEventLoop { controller: self.clone() }).unwrap();
+        let mut adapter_manager = AdapterManager::new(self.clone());
+        adapter_manager.start();
+
+        event_loop.run(&mut FoxBoxEventLoop {
+            controller: self.clone(),
+            shutdown_flag: &shutdown_flag
+        }).unwrap();
+
+        debug!("Stopping controller");
+        adapter_manager.stop();
+
+        for service in self.services.lock().unwrap().values() {
+            service.stop();
+        }
     }
 
     fn dispatch_service_request(&self, id: String, request: &mut Request) -> IronResult<Response> {
@@ -197,13 +210,20 @@ impl Controller for FoxBox {
     }
 }
 
-struct FoxBoxEventLoop {
-    controller: FoxBox
+struct FoxBoxEventLoop<'a> {
+    controller: FoxBox,
+    shutdown_flag: &'a AtomicBool
 }
 
-impl mio::Handler for FoxBoxEventLoop {
+impl<'a> mio::Handler for FoxBoxEventLoop<'a> {
     type Timeout = ();
     type Message = ();
+
+    fn tick(&mut self, event_loop: &mut mio::EventLoop<Self>) {
+        if self.shutdown_flag.load(Ordering::Acquire) {
+            event_loop.shutdown();
+        }
+    }
 }
 
 
