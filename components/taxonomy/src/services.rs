@@ -19,8 +19,8 @@ use serde::de::{Deserialize, Deserializer, Error};
 pub struct ServiceId;
 
 /// Metadata on a service. A service is a device or collection of devices
-/// that may offer services. The FoxBox itself a service offering
-/// services such as a clock, communication with the user through her
+/// that may offer services. The FoxBox itself is a service offering
+/// services such as a clock, communicating with the user through her
 /// smart devices, etc.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Service {
@@ -134,13 +134,14 @@ impl ChannelKind {
     /// Get the type of values used to communicate with this service.
     pub fn get_type(&self) -> Type {
         use self::ChannelKind::*;
-        use values::Type::*;
+        use values::Type;
         match *self {
-            Ready => Unit,
-            OnOff | OpenClosed => Bool,
-            CurrentTime => TimeStamp,
-            CurrentTimeOfDay | RemainingTime => Duration,
-            Thermostat | ActualTemperature => Temperature,
+            Ready => Type::Unit,
+            OnOff => Type::OnOff,
+            OpenClosed => Type::OpenClosed,
+            CurrentTime => Type::TimeStamp,
+            CurrentTimeOfDay | RemainingTime => Type::Duration,
+            Thermostat | ActualTemperature => Type::Temperature,
             Extension { ref typ, ..} => typ.clone(),
         }
     }
