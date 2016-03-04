@@ -31,9 +31,10 @@ pub struct PhilipsHueAdapter<T> {
 impl<T: Controller> PhilipsHueAdapter<T> {
     pub fn new(controller: T) -> Self {
         debug!("Creating Philips Hue adapter");
-        PhilipsHueAdapter { name: "PhilipsHueAdapter".to_owned(),
-                       controller: controller,
-                     }
+        PhilipsHueAdapter {
+            name: "PhilipsHueAdapter".to_owned(),
+            controller: controller,
+        }
     }
 }
 
@@ -49,7 +50,9 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
         thread::spawn(move || {
             controller.adapter_started("Philips Hue Service Adapter".to_owned());
 
-            let nupnp_hubs = nupnp::query("http://www.meethue.com/api/nupnp");
+            let nupnp_url = controller.get_config().get_or_set_default(
+                    "philips_hue", "nupnp_url", "http://www.meethue.com/api/nupnp");
+            let nupnp_hubs = nupnp::query(&nupnp_url);
             debug!("nUPnP reported Philips Hue bridges: {:?}", nupnp_hubs);
 
             for hub in nupnp_hubs {
@@ -68,7 +71,8 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
                         // Try pairing for 120 seconds.
                         for _ in 0..120 {
                             controller.adapter_notification(
-                                json_value!({ adapter: "philips_hue", message: "NeedsPairing", hub: hub.id }));
+                                json_value!({ adapter: "philips_hue",
+                                    message: "NeedsPairing", hub: hub.id }));
                             if hub.try_pairing() {
                                 break;
                             }
@@ -115,7 +119,7 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
     }
 
 }
- 
+
 #[allow(dead_code)]
 struct HueLightService<T> {
     controller: T,

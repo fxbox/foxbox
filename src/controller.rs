@@ -57,6 +57,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn remove_websocket(&mut self, socket: ws::Sender);
     fn broadcast_to_websockets(&self, data: serde_json::value::Value);
 
+    fn get_config(&self) -> &ConfigService;
     fn get_upnp_manager(&self) -> Arc<UpnpManager>;
 }
 
@@ -77,7 +78,7 @@ impl FoxBox {
             http_port: http_port,
             ws_port: ws_port,
             config: Arc::new(ConfigService::new("foxbox.conf")),
-            upnp: Arc::new(UpnpManager::new()),
+            upnp: Arc::new(UpnpManager::new())
         }
     }
 }
@@ -198,11 +199,16 @@ impl Controller for FoxBox {
         }
     }
 
+    fn get_config(&self) -> &ConfigService {
+        &self.config
+    }
+
     fn get_upnp_manager(&self) -> Arc<UpnpManager> {
         self.upnp.clone()
     }
 }
 
+#[allow(dead_code)]
 struct FoxBoxEventLoop<'a> {
     controller: FoxBox,
     shutdown_flag: &'a AtomicBool
