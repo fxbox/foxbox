@@ -13,7 +13,7 @@ use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error};
 
 use std::hash::{Hash, Hasher};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 /// A marker for Id.
 /// Only useful for writing `Id<ServiceId>`.
@@ -43,8 +43,8 @@ pub struct Service {
     pub id: Id<ServiceId>,
 
     /// Channels connected directly to this service.
-    pub getters: HashSet<Channel<Getter>>,
-    pub setters: HashSet<Channel<Setter>>,
+    pub getters: HashMap<Id<Getter>, Channel<Getter>>,
+    pub setters: HashMap<Id<Setter>, Channel<Setter>>,
 }
 
 
