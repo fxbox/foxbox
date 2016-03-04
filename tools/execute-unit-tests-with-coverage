@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Warning: kcov is a Linux only tool
+
+set -ex
+
+KCOV_VERSION="30"
+
+CURRENT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_HOME="$CURRENT_PATH/.."
+KCOV_TEMP="$PROJECT_HOME/target/kcov"
+KCOV_HOME="$KCOV_TEMP/kcov-$KCOV_VERSION"
+KCOV_BINARY="$KCOV_HOME/src/kcov"
+
+
+get_and_compile_kcov_locally() {
+  mkdir -p "$KCOV_TEMP"
+  curl --location --output "$KCOV_TEMP/kcov.tar.gz" \
+    "https://github.com/SimonKagstrom/kcov/archive/v$KCOV_VERSION.tar.gz"
+  tar xvf "$KCOV_TEMP/kcov.tar.gz" --directory="$KCOV_TEMP"
+  cd "$KCOV_HOME"
+  cmake .
+  make
+  cd -
+}
+
+compile_foxbox_with_dead_code() {
+  # TODO: Clean up this workaround once this PR lands:
+  # https://github.com/rust-lang/cargo/pull/2241
+  RUSTC_COMMAND=$(cargo test --no-run --verbose | sed --quiet 's/.*`\(rustc .* --test .*\)`.*/\1/p')
+  eval $RUSTC_COMMAND -C link-dead-code
+}
+
+run_tests_and_coverage() {
+  FOXBOX_UNIT_TEST_BINARY=$(find "$PROJECT_HOME/target/debug" -maxdepth 1 -executable -name foxbox-\*)
+
+  RUST_BACKTRACE=1 "$KCOV_BINARY" \
+    --exclude-path="${CARGO_HOME:=~/.cargo},\
+                    $PROJECT_HOME/src/stubs,\
+                    $PROJECT_HOME/target" \
+    --coveralls-id="${TRAVIS_JOB_ID:=no-job-id}" \
+    "$PROJECT_HOME/target/coverage-report/" \
+    "$FOXBOX_UNIT_TEST_BINARY"
+}
+
+
+if ! [ -f "$KCOV_BINARY" ] ; then
+  get_and_compile_kcov_locally
+fi
+
+compile_foxbox_with_dead_code
+run_tests_and_coverage
