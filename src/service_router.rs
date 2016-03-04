@@ -137,6 +137,7 @@ pub fn create<T: Controller>(controller: T) -> Chain {
 describe! service_router {
     before_each {
         use controller::FoxBox;
+        use foxbox_users::users_db::{ UserBuilder, UsersDb };
         use foxbox_users::users_router::UsersRouter;
         use iron::Headers;
         use iron_test::request;
@@ -148,24 +149,24 @@ describe! service_router {
         let mut mount = Mount::new();
         mount.mount("", service_router)
              .mount("/users", UsersRouter::init());
+
+        let db = UsersDb::new();
+        db.clear().ok();
+        let user = UserBuilder::new()
+            .id(1).name(String::from("username"))
+            .password(String::from("password"))
+            .email(String::from("username@example.com"))
+            .finalize().unwrap();
+        db.create(&user).ok();
     }
 
     describe! services {
         before_each {
             extern crate serde_json;
 
-            use foxbox_users::users_db::{ UserBuilder, UsersDb };
             use iron::headers::{ Authorization, Basic, Bearer };
             use iron_test::response;
 
-            let db = UsersDb::new();
-            db.clear().ok();
-            let user = UserBuilder::new()
-                .id(1).name(String::from("username"))
-                .password(String::from("password"))
-                .email(String::from("username@example.com"))
-                .finalize().unwrap();
-            db.create(&user).ok();
             let mut headers = Headers::new();
             headers.set(Authorization(Basic {
                 username: "username".to_owned(),
