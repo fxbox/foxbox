@@ -33,9 +33,16 @@ pub enum Type {
     /// has reached 0 or that a device is ready.
     Unit,
 
-    /// A boolean. Used for instance for on-off switches, presence
-    /// detectors, etc.
-    Bool,
+    ///
+    /// # Boolean values
+    ///
+
+    /// A boolean on/off state. Used for various two-states switches.
+    OnOff,
+
+    /// A boolean open/closed state. Used for instance for doors,
+    /// windows, etc.
+    OpenClosed,
 
     ///
     /// # Time
@@ -56,6 +63,8 @@ pub enum Type {
     Color,
     Json,
     Binary,
+
+    ExtBool,
     ExtNumeric,
 }
 
@@ -67,8 +76,65 @@ impl Type {
         use self::Type::*;
         match *self {
             Duration | TimeStamp | Temperature | ExtNumeric | Color => false,
-            Unit | Bool | String | Json | Binary => true,
+            Unit | String | Json | Binary | OnOff | OpenClosed | ExtBool => true,
         }
+    }
+}
+
+/// An on/off state. Internal representation may be either On or Off.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum OnOff {
+    On,
+    Off,
+}
+
+impl OnOff {
+    fn as_bool(&self) -> bool {
+        match *self {
+            OnOff::On => true,
+            OnOff::Off => false,
+        }
+    }
+}
+
+impl PartialOrd for OnOff {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OnOff {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_bool().cmp(&other.as_bool())
+    }
+}
+
+/// An open/closed state. Internal representation may be either
+/// Open or Closed.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum OpenClosed {
+    Open,
+    Closed,
+}
+
+impl OpenClosed {
+    fn as_bool(&self) -> bool {
+        match *self {
+            OpenClosed::Open => true,
+            OpenClosed::Closed => false,
+        }
+    }
+}
+
+impl PartialOrd for OpenClosed {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OpenClosed {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_bool().cmp(&other.as_bool())
     }
 }
 
@@ -123,6 +189,40 @@ impl PartialOrd for Json {
     }
 }
 
+/// A data structure holding a boolean value of a type that has not
+/// been standardized yet.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ExtBool {
+    pub value: bool,
+
+    /// The vendor. Used for namespacing purposes, to avoid
+    /// confusing two incompatible extensions with similar
+    /// names. For instance, "foxlink@mozilla.com".
+    pub vendor: String,
+
+    /// Identification of the adapter introducing this value.
+    /// Designed to aid with tracing and debugging.
+    pub adapter: String,
+
+    /// A string describing the nature of the value, designed to
+    /// aid with type-checking.
+    ///
+    /// Examples: `"PresenceDetected"`.
+    pub kind: String,
+}
+
+impl PartialOrd for ExtBool {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.vendor != other.vendor {
+            return None;
+        } else if self.kind != other.kind {
+            return None;
+        }
+
+        self.value.partial_cmp(&other.value)
+    }
+}
+
 /// A data structure holding a numeric value of a type that has not
 /// been standardized yet.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -162,7 +262,8 @@ impl PartialOrd for ExtNumeric {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Unit,
-    Bool(bool),
+    OnOff(OnOff),
+    OpenClosed(OpenClosed),
     Duration(ValDuration),
     TimeStamp(TimeStamp),
     Temperature(Temperature),
@@ -171,18 +272,22 @@ pub enum Value {
 
     // FIXME: Add more as we identify needs
 
+    /// A boolean value representing a unit that has not been
+    /// standardized yet into the API.
+    ExtBool(ExtBool),
+
     /// A numeric value representing a unit that has not been
     /// standardized yet into the API.
     ExtNumeric(ExtNumeric),
 
     /// A Json value. We put it behind an `Arc` to make sure that
-    /// cloning remains unexpensive.
+    /// cloning remains inexpensive.
     Json(Arc<Json>),
 
     /// Binary data.
     Binary {
         /// The actual data. We put it behind an `Arc` to make sure
-        /// that cloning remains unexpensive.
+        /// that cloning remains inexpensive.
         data: Arc<Vec<u8>>,
         mimetype: String
     }
@@ -192,7 +297,8 @@ impl Value {
     pub fn get_type(&self) -> Type {
         match *self {
             Value::Unit => Type::Unit,
-            Value::Bool(_) => Type::Bool,
+            Value::OnOff => Type::OnOff,
+            Value::OpenClosed => Type::OpenClosed,
             Value::String(_) => Type::String,
             Value::Duration(_) => Type::Duration,
             Value::TimeStamp(_) => Type::TimeStamp,
@@ -200,6 +306,7 @@ impl Value {
             Value::Color(_) => Type::Color,
             Value::Json(_) => Type::Json,
             Value::Binary{..} => Type::Binary,
+            Value::ExtBool(_) => Type::ExtBool,
             Value::ExtNumeric(_) => Type::ExtNumeric,
         }
     }
@@ -230,8 +337,11 @@ impl PartialOrd for Value {
             (&Unit, &Unit) => Some(Equal),
             (&Unit, _) => None,
 
-            (&Bool(a), &Bool(b)) => a.partial_cmp(&b),
-            (&Bool(_), _) => None,
+            (&OnOff(ref a), &OnOff(ref b)) => a.partial_cmp(b),
+            (&OnOff(_), _) => None,
+
+            (&OpenClosed(ref a), &OpenClosed(ref b)) => a.partial_cmp(b),
+            (&OpenClosed(_), _) => None,
 
             (&Duration(ref a), &Duration(ref b)) => a.partial_cmp(b),
             (&Duration(_), _) => None,
@@ -244,6 +354,9 @@ impl PartialOrd for Value {
 
             (&Color(ref a), &Color(ref b)) => a.partial_cmp(b),
             (&Color(_), _) => None,
+
+            (&ExtBool(ref a), &ExtBool(ref b)) => a.partial_cmp(b),
+            (&ExtBool(_), _) => None,
 
             (&ExtNumeric(ref a), &ExtNumeric(ref b)) => a.partial_cmp(b),
             (&ExtNumeric(_), _) => None,
