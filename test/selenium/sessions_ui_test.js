@@ -20,6 +20,10 @@ describe('sessions ui', function() {
 
   const PASS = '12345678';
 
+  var SetUpWebapp = require('./lib/setup_webapp.js');
+  var setUpWebapp;
+  var signedInPage;
+
   before(function() {
     driver = new webdriver.Builder().
       forBrowser('firefox').
@@ -109,6 +113,21 @@ describe('sessions ui', function() {
         }).then(function() {
           return elements.set.click();
         }).then(function() {
+          return driver.wait(webdriver.until.alertIsPresent(), 5000);
+        }).then(function() {
+          return driver.switchTo().alert();
+        }).then(function(alert) {
+          return alert.getText().then(function(text) {
+            assert.equal(text,
+                         'Please use a password of at least 8 characters.');
+          }).then(function() {
+            alert.dismiss();
+          });
+        });
+      });
+
+      it('should fail if password is not set', function() {
+        return  elements.set.click().then(function() {
           return driver.wait(webdriver.until.alertIsPresent(), 5000);
         }).then(function() {
           return driver.switchTo().alert();
@@ -242,6 +261,21 @@ describe('sessions ui', function() {
       });
     });
 
+    it('should fail if password is not typed', function() {
+      return  elements.signinButton.click().then(function() {
+          return driver.wait(webdriver.until.alertIsPresent(), 5000);
+        }).then(function() {
+          return driver.switchTo().alert();
+        }).then(function(alert) {
+          return alert.getText().then(function(text) {
+            assert.equal(text,
+                         'Invalid password');
+          }).then(function() {
+            alert.dismiss();
+          });
+        });
+    });
+
     it('should accept matching, long-enough passwords', function () {
       return elements.signinPwd.sendKeys(PASS).then(function() {
         return elements.signinButton.click();
@@ -249,6 +283,27 @@ describe('sessions ui', function() {
         return driver.wait(webdriver.until.elementIsVisible(screens.signedin),
                            5000);
       });
+    });
+
+    describe('tests changing views', function(){
+
+        before(function() {
+          driver.navigate().refresh();
+          setUpWebapp = new SetUpWebapp(driver);
+
+        });
+        beforeEach(function(){
+          return driver.wait(webdriver.until.titleIs('FoxBox'), 5000).then(
+            function() {
+          return setUpWebapp.getSignInPage();
+          }).then(function(signedInPageView) {
+             signedInPage = signedInPageView;
+          });
+        });
+
+        it('should go to sign out page' , function() {
+          return signedInPage.signOut();
+        });
     });
   });
 
