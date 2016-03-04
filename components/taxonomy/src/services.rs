@@ -238,6 +238,11 @@ pub struct Channel<IO> where IO: IOMechanism {
     #[serde(default)]
     pub last_seen: Option<TimeStamp>,
 }
+impl<IO> PartialEq for Channel<IO> where IO: IOMechanism {
+     fn eq(&self, other: &Self) -> bool {
+         self.id.eq(&other.id)
+     }
+}
 
 /// The communication mechanism used by the channel.
 pub trait IOMechanism: Deserialize + Serialize {
