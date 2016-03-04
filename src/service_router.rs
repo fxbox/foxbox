@@ -136,11 +136,14 @@ pub fn create<T: Controller>(controller: T) -> Chain {
 #[cfg(test)]
 describe! service_router {
     before_each {
+        extern crate serde_json;
+
         use controller::FoxBox;
         use foxbox_users::users_db::{ UserBuilder, UsersDb };
         use foxbox_users::users_router::UsersRouter;
+        use iron::headers::{ Authorization, Basic, Bearer };
         use iron::Headers;
-        use iron_test::request;
+        use iron_test::{ request, response };
         use mount::Mount;
 
         let controller = FoxBox::new(false, Some("localhost".to_owned()), 1234, 5678);
@@ -158,38 +161,31 @@ describe! service_router {
             .email(String::from("username@example.com"))
             .finalize().unwrap();
         db.create(&user).ok();
+
+        let mut headers = Headers::new();
+        headers.set(Authorization(Basic {
+            username: "username".to_owned(),
+            password: Some("password".to_owned())
+        }));
+        let response = request::post("http://localhost:1234/users/login",
+                                     headers,
+                                     "{}",
+                                     &mount).unwrap();
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct Token {
+            session_token: String
+        };
+
+        let result: Token = serde_json::from_str(
+            &response::extract_body_to_string(response)
+        ).unwrap();
+        let mut auth_header = Headers::new();
+        auth_header.set(Authorization(Bearer {
+            token: result.session_token
+        }));
     }
 
     describe! services {
-        before_each {
-            extern crate serde_json;
-
-            use iron::headers::{ Authorization, Basic, Bearer };
-            use iron_test::response;
-
-            let mut headers = Headers::new();
-            headers.set(Authorization(Basic {
-                username: "username".to_owned(),
-                password: Some("password".to_owned())
-            }));
-            let response = request::post("http://localhost:1234/users/login",
-                                         headers,
-                                         "{}",
-                                         &mount).unwrap();
-            #[derive(Debug, PartialEq, Serialize, Deserialize)]
-            struct Token {
-                session_token: String
-            };
-
-            let result: Token = serde_json::from_str(
-                &response::extract_body_to_string(response)
-            ).unwrap();
-            let mut auth_header = Headers::new();
-            auth_header.set(Authorization(Bearer {
-                token: result.session_token
-            }));
-        }
-
         it "should create list.json" {
             let response = request::get("http://localhost:1234/list.json",
                             auth_header,
