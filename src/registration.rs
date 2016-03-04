@@ -246,6 +246,12 @@ describe! registrar {
             ];
         }
 
+        it "should return default IPv4" {
+            let ip_addr = registrar.get_ip_addr_from_ifaces(&interfaces, &None)
+                .unwrap();
+            assert_eq!(ip_addr, "192.168.0.4");
+        }
+
         it "should return IPv6" {
             let ip_addr = registrar.get_ip_addr_from_ifaces(&interfaces, &Some("eth1".to_owned()))
                 .unwrap();
