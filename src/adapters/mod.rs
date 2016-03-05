@@ -3,16 +3,24 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 mod ip_camera_adapter;
+
+/// An adapter dedicated to the Philips Hue
 mod philips_hue;
+
+/// An adapter providing time services.
+mod clock;
 
 use controller::Controller;
 use self::ip_camera_adapter::IpCameraAdapter;
 use self::philips_hue::PhilipsHueAdapter;
 use service::ServiceAdapter;
+use adapt::*;
+
 
 pub struct AdapterManager<T> {
     controller: T,
-    adapters: Vec<Box<ServiceAdapter>>
+    adapters: Vec<Box<ServiceAdapter>>,
+    control: AdapterControl,
 }
 
 impl<T: Controller> AdapterManager<T> {
@@ -20,7 +28,8 @@ impl<T: Controller> AdapterManager<T> {
         debug!("Creating Adapter Manager");
         AdapterManager {
             controller: controller,
-            adapters: Vec::new()
+            adapters: Vec::new(),
+            control: AdapterControl::new(),
         }
     }
 
@@ -29,6 +38,7 @@ impl<T: Controller> AdapterManager<T> {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
         self.start_adapter(Box::new(PhilipsHueAdapter::new(c.clone())));
         self.start_adapter(Box::new(IpCameraAdapter::new(c)));
+        clock::Clock::init(&self.control, Box::new(|_result| {})); // FIXME: We should have a way to report errors
     }
 
     fn start_adapter(&mut self, adapter: Box<ServiceAdapter>) {
