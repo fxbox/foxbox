@@ -53,7 +53,7 @@ extern crate regex;
 // Need to be declared first so to let the macros be visible from other modules.
 #[macro_use]
 mod utils;
-
+mod transact;
 mod adapters;
 mod config_store;
 mod controller;
