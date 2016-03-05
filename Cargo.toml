@@ -22,6 +22,7 @@ libc = "0.2.7"
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
 mount = "0.0.10"
+nix = { git = "https://github.com/nix-rust/nix.git", rev = "138080" } # Until 0.5.1 is released
 router = "0.1.0"
 rust-crypto = "0.2.34"
 rustc-serialize = "0.3"
