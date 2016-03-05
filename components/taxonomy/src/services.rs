@@ -46,7 +46,17 @@ pub struct Service {
     pub getters: HashMap<Id<Getter>, Channel<Getter>>,
     pub setters: HashMap<Id<Setter>, Channel<Setter>>,
 }
-
+impl Service {
+    /// Create an empty service.
+    pub fn empty(id: Id<ServiceId>) -> Self {
+        Service {
+            tags: HashSet::new(),
+            getters: HashMap::new(),
+            setters: HashMap::new(),
+            id: id,
+        }
+    }
+}
 
 /// The kind of the service, i.e. a strongly-typed description of
 /// _what_ the service can do. Used both for locating services
