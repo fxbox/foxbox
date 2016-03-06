@@ -342,8 +342,53 @@ impl PartialOrd for ExtNumeric {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Binary {
+   /// The actual data. We put it behind an `Arc` to make sure
+   /// that cloning remains inexpensive.
+   data: Arc<Vec<u8>>,
+
+   /// The mime type. Should probably be an Id<MimeTypeId>.
+   mimetype: String,
+}
+
 /// Representation of an actual value that can be sent to/received
 /// from a service.
+///
+/// # (De)serialization
+///
+/// Values of this state are represented by an object `{ key: value }`, where key is one of
+/// `Unit`, `OnOff`, `OpenClosed`, ... Note that the `value` for `Unit` is `[]`.
+///
+/// ```
+/// extern crate serde;
+/// extern crate serde_json;
+/// extern crate foxbox_taxonomy;
+///
+/// # fn main() {
+/// use foxbox_taxonomy::values::Value::*;
+/// use foxbox_taxonomy::values::OnOff::*;
+/// use foxbox_taxonomy::values::OpenClosed::*;
+///
+/// let unit = serde_json::to_string(&Unit).unwrap();
+/// assert_eq!(unit, "{\"Unit\":[]}");
+///
+/// let unit : foxbox_taxonomy::values::Value = serde_json::from_str("{\"Unit\":[]}").unwrap();
+/// assert_eq!(unit, Unit);
+///
+/// let on = serde_json::to_string(&OnOff(On)).unwrap();
+/// assert_eq!(on, "{\"OnOff\":\"On\"}");
+///
+/// let on : foxbox_taxonomy::values::Value = serde_json::from_str("{\"OnOff\":\"On\"}").unwrap();
+/// assert_eq!(on, OnOff(On));
+///
+/// let open = serde_json::to_string(&OpenClosed(Open)).unwrap();
+/// assert_eq!(open, "{\"OpenClosed\":\"Open\"}");
+///
+/// let open : foxbox_taxonomy::values::Value = serde_json::from_str("{\"OpenClosed\":\"Open\"}").unwrap();
+/// assert_eq!(open, OpenClosed(Open));
+/// # }
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Unit,
@@ -370,27 +415,22 @@ pub enum Value {
     Json(Arc<Json>),
 
     /// Binary data.
-    Binary {
-        /// The actual data. We put it behind an `Arc` to make sure
-        /// that cloning remains inexpensive.
-        data: Arc<Vec<u8>>,
-        mimetype: String
-    }
+    Binary(Binary),
 }
 
 impl Value {
     pub fn get_type(&self) -> Type {
         match *self {
             Value::Unit => Type::Unit,
-            Value::OnOff => Type::OnOff,
-            Value::OpenClosed => Type::OpenClosed,
+            Value::OnOff(_) => Type::OnOff,
+            Value::OpenClosed(_) => Type::OpenClosed,
             Value::String(_) => Type::String,
             Value::Duration(_) => Type::Duration,
             Value::TimeStamp(_) => Type::TimeStamp,
             Value::Temperature(_) => Type::Temperature,
             Value::Color(_) => Type::Color,
             Value::Json(_) => Type::Json,
-            Value::Binary{..} => Type::Binary,
+            Value::Binary(_) => Type::Binary,
             Value::ExtBool(_) => Type::ExtBool,
             Value::ExtNumeric(_) => Type::ExtNumeric,
         }
@@ -452,9 +492,9 @@ impl PartialOrd for Value {
             (&Json(ref a), &Json(ref b)) => a.partial_cmp(b),
             (&Json(_), _) => None,
 
-            (&Binary{mimetype: ref a_mimetype, data: ref a_data},
-             &Binary{mimetype: ref b_mimetype, data: ref b_data}) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
-            (&Binary{..}, _) => None,
+            (&Binary(self::Binary {mimetype: ref a_mimetype, data: ref a_data}),
+             &Binary(self::Binary {mimetype: ref b_mimetype, data: ref b_data})) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
+            (&Binary(_), _) => None,
         }
     }
 }
