@@ -3,14 +3,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use controller::Controller;
-use events::*;
 use iron::{ Request, Response, IronResult };
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
 use router::Router;
 use service::{ Service, ServiceAdapter, ServiceProperties };
+use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
+use upnp::{ UpnpListener, UpnpService };
 use uuid::Uuid;
 
 struct DummyService<T> {
@@ -84,6 +85,24 @@ pub struct DummyAdapter<T> {
     controller: T
 }
 
+struct DummyListener;
+
+impl DummyListener {
+    pub fn new() -> Arc<Self> {
+        Arc::new(DummyListener)
+    }
+}
+
+impl UpnpListener for DummyListener {
+    fn upnp_discover(&self, service: &UpnpService) -> bool {
+        let owns = service.msearch.device_id == "uuid:2f402f80-da50-11e1-9b23-c86000788a05";
+        if owns {
+            debug!("Found Phillips Hue simulator upnp service: {:?}", service);
+        }
+        owns
+    }
+}
+
 impl<T: Controller> DummyAdapter<T> {
     pub fn new(controller: T) -> Self {
         debug!("Creating dummy adapter");
@@ -100,14 +119,16 @@ impl<T: Controller> ServiceAdapter for DummyAdapter<T> {
     fn start(&self) {
         let mut id = 0;
         let controller = self.controller.clone();
+        {
+            let listener = DummyListener::new();
+            controller.get_upnp_manager().add_listener("dummy".to_owned(), listener);
+        }
         thread::spawn(move || {
-            controller.send_event(
-                EventData::AdapterStart { name: "Dummy Service Adapter".to_owned() }).unwrap();
+            controller.adapter_started("Dummy Service Adapter".to_owned());
             loop {
                 thread::sleep(Duration::from_millis(2000));
                 id += 1;
                 let service = DummyService::new(controller.clone(), id);
-                let service_id = service.get_properties().id;
                 service.start();
                 controller.add_service(Box::new(service));
 
@@ -123,3 +144,4 @@ impl<T: Controller> ServiceAdapter for DummyAdapter<T> {
         debug!("Stopping dummy adapter");
     }
 }
+
