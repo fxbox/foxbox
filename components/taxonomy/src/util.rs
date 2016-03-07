@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use serde::ser::{Serialize, Serializer};
-use serde::de::{Deserialize, Deserializer};
+use serde::de::{Deserialize, Deserializer, Error as DeserializationError, Type as DeserializationType};
 
 use std::cmp::PartialEq;
 use std::hash::{Hash, Hasher};
@@ -76,7 +76,7 @@ impl<T> Phantom<T> {
 impl<T> Serialize for Phantom<T> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {
-        serializer.visit_unit()
+            ().serialize(serializer)
     }
 }
 impl<T> Deserialize for Phantom<T> {
@@ -123,7 +123,7 @@ impl<T> Hash for Id<T> {
 impl<T> Serialize for Id<T> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {
-        serializer.visit_str(&self.id)
+        self.id.serialize(serializer)
     }
 }
 impl<T> Deserialize for Id<T> {
@@ -133,5 +133,94 @@ impl<T> Deserialize for Id<T> {
             id: try!(String::deserialize(deserializer)),
             phantom: Phantom::new()
         })
+    }
+}
+
+
+
+/// By default, the (de)serialization of trivial enums by Serde is surprising, e.g.
+/// in JSON,  `enum Foo {A, B, C}` will produce `{"\"A\": []"}` for `A`, where `"\"A\""`
+/// would be expected.
+///
+/// Implementing serialization is very simple, but deserialization is much more annoying.
+/// This struct lets us implement simply the deserialization to a predictable and well-specified
+/// list of strings.
+///
+/// # Example
+///
+/// ```
+/// extern crate serde;
+/// use serde::de::{Deserialize, Deserializer};
+///
+/// extern crate foxbox_taxonomy;
+/// use foxbox_taxonomy::util::TrivialEnumVisitor;
+///
+/// enum Foo { A, B, C }
+///
+/// impl Deserialize for Foo {
+///   fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error> where D: Deserializer {
+///     deserializer.visit_string(TrivialEnumVisitor::new(|source| {
+///       match source {
+///         "A" => Ok(Foo::A),
+///         "B" => Ok(Foo::B),
+///         "C" => Ok(Foo::C),
+///          _ => Err(())
+///       }
+///    }))
+///   }
+/// }
+///
+/// # fn main() {}
+/// ```
+pub struct TrivialEnumVisitor<T> where T: Deserialize {
+    parser: Box<Fn(&str) -> Result<T, ()>>
+}
+impl<T> TrivialEnumVisitor<T> where T: Deserialize {
+    pub fn new<F>(parser: F) -> Self
+        where F: Fn(&str) -> Result<T, ()> + 'static {
+            TrivialEnumVisitor {
+                parser: Box::new(parser)
+            }
+        }
+    fn parse<E>(&self, source: &str) -> Result<T, E>
+        where E: DeserializationError
+    {
+        (self.parser)(source)
+            .map_err(|()| E::unknown_field(&source.to_owned()))
+    }
+}
+
+use serde::de::Visitor;
+impl<T> Visitor for TrivialEnumVisitor<T> where T: Deserialize {
+    type Value = T;
+    fn visit_str<E>(&mut self, v: &str) -> Result<T, E>
+        where E: DeserializationError,
+    {
+        self.parse(v)
+    }
+
+    fn visit_string<E>(&mut self, v: String) -> Result<T, E>
+        where E: DeserializationError,
+    {
+        self.parse(&v)
+    }
+
+    fn visit_bytes<E>(&mut self, v: &[u8]) -> Result<T, E>
+        where E: DeserializationError,
+    {
+        use std::str;
+        match str::from_utf8(v) {
+            Ok(s) => self.parse(s),
+            Err(_) => Err(E::type_mismatch(DeserializationType::String)),
+        }
+    }
+
+    fn visit_byte_buf<E>(&mut self, v: Vec<u8>) -> Result<T, E>
+        where E: DeserializationError,
+    {
+        match String::from_utf8(v) {
+            Ok(s) => self.parse(&s),
+            Err(_) => Err(DeserializationError::type_mismatch(DeserializationType::String)),
+        }
     }
 }

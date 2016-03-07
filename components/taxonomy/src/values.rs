@@ -1,6 +1,8 @@
 //!
 //! Values manipulated by services
 //!
+use util::*;
+
 use std::cmp::{PartialOrd, Ordering};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -81,8 +83,30 @@ impl Type {
     }
 }
 
-/// An on/off state. Internal representation may be either On or Off.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+/// An on/off state.
+///
+/// # (De)serialization
+///
+/// Values of this state are represented by strings "On"|"Off".
+///
+/// ```
+/// extern crate serde;
+/// extern crate serde_json;
+/// extern crate foxbox_taxonomy;
+///
+/// let on = serde_json::to_string(&foxbox_taxonomy::values::OnOff::On).unwrap();
+/// assert_eq!(on, "\"On\"");
+///
+/// let on : foxbox_taxonomy::values::OnOff = serde_json::from_str("\"On\"").unwrap();
+/// assert_eq!(on, foxbox_taxonomy::values::OnOff::On);
+///
+/// let off = serde_json::to_string(&foxbox_taxonomy::values::OnOff::Off).unwrap();
+/// assert_eq!(off, "\"Off\"");
+///
+/// let off : foxbox_taxonomy::values::OnOff = serde_json::from_str("\"Off\"").unwrap();
+/// assert_eq!(off, foxbox_taxonomy::values::OnOff::Off);
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OnOff {
     On,
     Off,
@@ -109,9 +133,50 @@ impl Ord for OnOff {
     }
 }
 
-/// An open/closed state. Internal representation may be either
-/// Open or Closed.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+impl Serialize for OnOff {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error> where S: Serializer {
+        match *self {
+            OnOff::On => "On".serialize(serializer),
+            OnOff::Off => "Off".serialize(serializer)
+        }
+    }
+}
+impl Deserialize for OnOff {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error> where D: Deserializer {
+        deserializer.visit_string(TrivialEnumVisitor::new(|source| {
+            match source {
+                "On" => Ok(OnOff::On),
+                "Off" => Ok(OnOff::Off),
+                _ => Err(())
+            }
+        }))
+    }
+}
+
+/// An open/closed state.
+///
+/// # (De)serialization
+///
+/// Values of this state are represented by strings "Open"|"Closed".
+///
+/// ```
+/// extern crate serde;
+/// extern crate serde_json;
+/// extern crate foxbox_taxonomy;
+///
+/// let open = serde_json::to_string(&foxbox_taxonomy::values::OpenClosed::Open).unwrap();
+/// assert_eq!(open, "\"Open\"");
+///
+/// let open : foxbox_taxonomy::values::OpenClosed = serde_json::from_str("\"Open\"").unwrap();
+/// assert_eq!(open, foxbox_taxonomy::values::OpenClosed::Open);
+///
+/// let closed = serde_json::to_string(&foxbox_taxonomy::values::OpenClosed::Closed).unwrap();
+/// assert_eq!(closed, "\"Closed\"");
+///
+/// let closed : foxbox_taxonomy::values::OpenClosed = serde_json::from_str("\"Closed\"").unwrap();
+/// assert_eq!(closed, foxbox_taxonomy::values::OpenClosed::Closed);
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OpenClosed {
     Open,
     Closed,
@@ -135,6 +200,26 @@ impl PartialOrd for OpenClosed {
 impl Ord for OpenClosed {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_bool().cmp(&other.as_bool())
+    }
+}
+
+impl Serialize for OpenClosed {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error> where S: Serializer {
+        match *self {
+            OpenClosed::Open => "Open".serialize(serializer),
+            OpenClosed::Closed => "Closed".serialize(serializer)
+        }
+    }
+}
+impl Deserialize for OpenClosed {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error> where D: Deserializer {
+        deserializer.visit_string(TrivialEnumVisitor::new(|source| {
+            match source {
+                "Open" | "open" => Ok(OpenClosed::Open),
+                "Closed" | "closed" => Ok(OpenClosed::Closed),
+                _ => Err(())
+            }
+        }))
     }
 }
 
@@ -257,8 +342,53 @@ impl PartialOrd for ExtNumeric {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Binary {
+   /// The actual data. We put it behind an `Arc` to make sure
+   /// that cloning remains inexpensive.
+   data: Arc<Vec<u8>>,
+
+   /// The mime type. Should probably be an Id<MimeTypeId>.
+   mimetype: String,
+}
+
 /// Representation of an actual value that can be sent to/received
 /// from a service.
+///
+/// # (De)serialization
+///
+/// Values of this state are represented by an object `{ key: value }`, where key is one of
+/// `Unit`, `OnOff`, `OpenClosed`, ... Note that the `value` for `Unit` is `[]`.
+///
+/// ```
+/// extern crate serde;
+/// extern crate serde_json;
+/// extern crate foxbox_taxonomy;
+///
+/// # fn main() {
+/// use foxbox_taxonomy::values::Value::*;
+/// use foxbox_taxonomy::values::OnOff::*;
+/// use foxbox_taxonomy::values::OpenClosed::*;
+///
+/// let unit = serde_json::to_string(&Unit).unwrap();
+/// assert_eq!(unit, "{\"Unit\":[]}");
+///
+/// let unit : foxbox_taxonomy::values::Value = serde_json::from_str("{\"Unit\":[]}").unwrap();
+/// assert_eq!(unit, Unit);
+///
+/// let on = serde_json::to_string(&OnOff(On)).unwrap();
+/// assert_eq!(on, "{\"OnOff\":\"On\"}");
+///
+/// let on : foxbox_taxonomy::values::Value = serde_json::from_str("{\"OnOff\":\"On\"}").unwrap();
+/// assert_eq!(on, OnOff(On));
+///
+/// let open = serde_json::to_string(&OpenClosed(Open)).unwrap();
+/// assert_eq!(open, "{\"OpenClosed\":\"Open\"}");
+///
+/// let open : foxbox_taxonomy::values::Value = serde_json::from_str("{\"OpenClosed\":\"Open\"}").unwrap();
+/// assert_eq!(open, OpenClosed(Open));
+/// # }
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Unit,
@@ -285,27 +415,22 @@ pub enum Value {
     Json(Arc<Json>),
 
     /// Binary data.
-    Binary {
-        /// The actual data. We put it behind an `Arc` to make sure
-        /// that cloning remains inexpensive.
-        data: Arc<Vec<u8>>,
-        mimetype: String
-    }
+    Binary(Binary),
 }
 
 impl Value {
     pub fn get_type(&self) -> Type {
         match *self {
             Value::Unit => Type::Unit,
-            Value::OnOff => Type::OnOff,
-            Value::OpenClosed => Type::OpenClosed,
+            Value::OnOff(_) => Type::OnOff,
+            Value::OpenClosed(_) => Type::OpenClosed,
             Value::String(_) => Type::String,
             Value::Duration(_) => Type::Duration,
             Value::TimeStamp(_) => Type::TimeStamp,
             Value::Temperature(_) => Type::Temperature,
             Value::Color(_) => Type::Color,
             Value::Json(_) => Type::Json,
-            Value::Binary{..} => Type::Binary,
+            Value::Binary(_) => Type::Binary,
             Value::ExtBool(_) => Type::ExtBool,
             Value::ExtNumeric(_) => Type::ExtNumeric,
         }
@@ -367,9 +492,9 @@ impl PartialOrd for Value {
             (&Json(ref a), &Json(ref b)) => a.partial_cmp(b),
             (&Json(_), _) => None,
 
-            (&Binary{mimetype: ref a_mimetype, data: ref a_data},
-             &Binary{mimetype: ref b_mimetype, data: ref b_data}) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
-            (&Binary{..}, _) => None,
+            (&Binary(self::Binary {mimetype: ref a_mimetype, data: ref a_data}),
+             &Binary(self::Binary {mimetype: ref b_mimetype, data: ref b_data})) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
+            (&Binary(_), _) => None,
         }
     }
 }
