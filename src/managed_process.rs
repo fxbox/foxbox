@@ -20,7 +20,7 @@ const RESTART_TIME_THRESHOLD: f64 = 5.0; // seconds
 
 fn seconds_since_epoch() -> f64 {
     let now = SystemTime::now();
-    now.duration_from_earlier(UNIX_EPOCH).unwrap().as_secs() as f64
+    now.duration_since(UNIX_EPOCH).unwrap().as_secs() as f64
 }
 
 pub struct ManagedProcess {
