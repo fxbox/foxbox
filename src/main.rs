@@ -11,9 +11,6 @@
 // Needed for IntoIter in controller.rs
 #![feature(collections)]
 
-// Needed for time functions
-#![feature(time2)]
-
 // Make linter fail for every warning
 #![plugin(clippy)]
 #![deny(clippy)]
