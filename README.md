@@ -17,18 +17,18 @@ To determine which version of rust is being used, check the
 Look for these 2 lines near the top of the file:
 ```yaml
 rust:
-    - nightly-2016-02-22
+    - nightly-2016-03-07
 ```
 You should then be able to then use:
 ```
-multirust override nightly-2016-02-22
+multirust override nightly-2016-03-07
 ```
 to get the same version of toolchain that's being used for the travis tests.
 
-Incidently, nightly-2016-02-22 corresponds to:
+Incidently, nightly-2016-03-07 corresponds to:
 ```bash
 $ rustc -V
-rustc 1.8.0-nightly (c92e910c1 2016-02-21)
+rustc 1.9.0-nightly (998a6720b 2016-03-07)
 ```
 
 It's recommended that you use [`multirust`](https://github.com/brson/multirust)
