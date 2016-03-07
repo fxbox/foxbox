@@ -7,7 +7,7 @@ extern crate collections;
 extern crate mio;
 
 use adapters::AdapterManager;
-use config_store::ConfigStore;
+use config_store::ConfigService;
 use core::marker::Reflect;
 use http_server::HttpServer;
 use iron::{Request, Response, IronResult};
@@ -19,7 +19,7 @@ use std::collections::hash_map::HashMap;
 use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
-use std::sync::{ Arc, Mutex, RwLock };
+use std::sync::{ Arc, Mutex };
 use std::sync::atomic::{ AtomicBool, Ordering };
 use ws_server::WsServer;
 use ws;
@@ -32,7 +32,7 @@ pub struct FoxBox {
     ws_port: u16,
     services: Arc<Mutex<HashMap<String, Box<Service>>>>,
     websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
-    pub config: Arc<RwLock<ConfigStore>>,
+    pub config: Arc<ConfigService>,
 }
 
 const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
@@ -50,11 +50,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn services_as_json(&self) -> Result<String, serde_json::error::Error>;
     fn get_http_root_for_service(&self, service_id: String) -> String;
     fn get_ws_root_for_service(&self, service_id: String) -> String;
-    fn get_config(&self, namespace: &str, property: &str) -> Option<String>;
-    fn get_config_or_set_default(&mut self, namespace: &str, property: &str, default: &str) -> String;
-    fn set_config(&mut self, namespace: &str, property: &str, value: &str);
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error>;
-
     fn add_websocket(&mut self, socket: ws::Sender);
     fn remove_websocket(&mut self, socket: ws::Sender);
     fn broadcast_to_websockets(&self, data: serde_json::value::Value);
@@ -76,7 +72,7 @@ impl FoxBox {
             }),
             http_port: http_port,
             ws_port: ws_port,
-            config: Arc::new(RwLock::new(ConfigStore::new("foxbox.conf"))),
+            config: Arc::new(ConfigService::new("foxbox.conf")),
         }
     }
 }
@@ -168,22 +164,6 @@ impl Controller for FoxBox {
 
     fn get_ws_root_for_service(&self, service_id: String) -> String {
         format!("ws://{}:{}/services/{}/", self.hostname, self.ws_port, service_id)
-    }
-
-    fn get_config(&self, namespace: &str, property: &str) -> Option<String> {
-        self.config.read().unwrap().get(namespace, property)
-            .map(|value| { value.to_owned() })
-    }
-
-    fn get_config_or_set_default(&mut self, namespace: &str, property: &str, default: &str) -> String {
-        self.get_config(namespace, property).unwrap_or_else(|| {
-            self.set_config(namespace, property, default);
-            default.to_owned()
-        })
-    }
-
-    fn set_config(&mut self, namespace: &str, property: &str, value: &str) {
-        self.config.write().unwrap().set(namespace, property, value);
     }
 
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
