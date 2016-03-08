@@ -22,3 +22,6 @@ node_modules
 # Folders created by various IDEs
 .vscode
 .idea
+
+# Shared copied assets
+/static/**/shared

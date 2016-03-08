@@ -24,8 +24,7 @@
         if (!token) {
           return reject('Missing token');
         }
-        localStorage.setItem('session', token);
-        resolve();
+        resolve(token);
       };
       // See https://github.com/fxbox/users/blob/master/doc/API.md#post-setup
       xhr.setRequestHeader('Content-Type', 'application/json');
@@ -40,13 +39,18 @@
       return localStorage.getItem('session');
     },
 
-    start: function(username, pwd) {
+    start: function(username, pwd, store) {
       if (!username || !pwd) {
         return Promise.reject();
       }
       return sessionRequest({
         username: username,
         password: pwd
+      }).then(function(token) {
+        if (store) {
+          localStorage.setItem('session', token);
+        }
+        return token;
       });
     },
 
