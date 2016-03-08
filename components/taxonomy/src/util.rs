@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use string_cache::Atom;
+
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error as DeserializationError, Type as DeserializationType};
 
@@ -90,21 +92,43 @@ impl<T> Deserialize for Phantom<T> {
 }
 
 /// A unique id for values of a given kind.
+///
+/// # (De)serialization
+///
+/// Serialized values of this type are represented by plain strings.
+///
+/// ```
+/// extern crate serde;
+/// extern crate serde_json;
+/// extern crate foxbox_taxonomy;
+///
+/// #[derive(Debug)]
+/// struct UniqueId;
+///
+/// let my_id = foxbox_taxonomy::util::Id::<UniqueId>::new("Unique Identifier".to_owned());
+///
+/// let my_serialized_id = serde_json::to_string(&my_id).unwrap();
+/// assert_eq!(my_serialized_id, "\"Unique Identifier\"");
+///
+/// let my_deserialized_id: foxbox_taxonomy::util::Id<UniqueId> =
+///     serde_json::from_str("\"Unique Identifier\"").unwrap();
+/// assert_eq!(my_deserialized_id, my_id);
+/// ```
 #[derive(Debug, Clone)]
 pub struct Id<T> {
-    id: String,
+    id: Atom,
 
-    phantom: Phantom<T>
+    phantom: Phantom<T>,
 }
 impl<T> Id<T> {
     pub fn new(id: String) -> Self {
         Id {
-            id: id,
-            phantom: Phantom::new()
+            id: Atom::from(id),
+            phantom: Phantom::new(),
         }
     }
 
-    pub fn as_string(&self) -> &String {
+    pub fn as_atom(&self) -> &Atom {
         &self.id
     }
 }
@@ -123,15 +147,17 @@ impl<T> Hash for Id<T> {
 impl<T> Serialize for Id<T> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {
-        self.id.serialize(serializer)
+        self.id.as_ref().serialize(serializer)
     }
 }
 impl<T> Deserialize for Id<T> {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer {
+        let deserialized_string = try!(String::deserialize(deserializer));
+
         Ok(Id {
-            id: try!(String::deserialize(deserializer)),
-            phantom: Phantom::new()
+            id: Atom::from(deserialized_string),
+            phantom: Phantom::new(),
         })
     }
 }
