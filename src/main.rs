@@ -35,10 +35,12 @@ extern crate libc;
 extern crate log;
 extern crate mio;
 extern crate mount;
+extern crate nix;
 extern crate router;
 extern crate rustc_serialize;
 extern crate serde;
 extern crate staticfile;
+extern crate time;
 extern crate unicase;
 extern crate uuid;
 extern crate ws;
@@ -74,9 +76,13 @@ mod stubs {
 }
 
 use controller::{ Controller, FoxBox };
+use env_logger::LogBuilder;
 use tunnel_controller:: { TunnelConfig, Tunnel };
 use libc::SIGINT;
+use log::{ LogRecord, LogLevelFilter };
+
 use multicast_dns::host::HostManager;
+use std::env;
 use std::mem;
 use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 
@@ -131,12 +137,41 @@ unsafe fn handle_sigint(_:i32) {
     SHUTDOWN_FLAG.store(true, Ordering::Release);
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[inline]
+fn tid_str() -> String {
+    // gettid only exists for the linux and android variants of nix
+    format!("({}) ", nix::unistd::gettid())
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+#[inline]
+fn tid_str() -> &'static str {
+    ""
+}
+
 fn main() {
     unsafe {
         libc::signal(SIGINT, mem::transmute(handle_sigint));
     }
 
-    env_logger::init().unwrap();
+    let format = |record: &LogRecord| {
+        let t = time::now();
+        format!("{}.{:03}: {}{:5} {}",
+            time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
+            t.tm_nsec / 1000_000,
+            tid_str(),
+            record.level(),
+            record.args()
+        )
+    };
+    let mut builder = LogBuilder::new();
+    builder.format(format).filter(None, LogLevelFilter::Info);
+
+    if env::var("RUST_LOG").is_ok() {
+       builder.parse(&env::var("RUST_LOG").unwrap());
+    }
+    builder.init().unwrap();
 
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
