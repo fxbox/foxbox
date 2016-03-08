@@ -32,7 +32,7 @@ compile_foxbox_with_dead_code() {
 }
 
 run_tests_and_coverage() {
-  FOXBOX_UNIT_TEST_BINARY=$(find "$PROJECT_HOME/target/debug" -maxdepth 1 -executable -name foxbox-\*)
+  FOXBOX_UNIT_TEST_BINARY=$PROJECT_HOME/target/debug/foxbox
 
   RUST_BACKTRACE=1 "$KCOV_BINARY" \
     --exclude-path="${CARGO_HOME:=~/.cargo},\
