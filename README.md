@@ -34,6 +34,15 @@ rustc 1.9.0-nightly (998a6720b 2016-03-07)
 It's recommended that you use [`multirust`](https://github.com/brson/multirust)
 to install and switch between versions of Rust.
 
+#### Build requirements
+
+| Dependency   | Debian/Raspian        | Fedora          | Arch             | OS X |
+| ------------ | --------------------- | --------------- | ---------------- | ---- |
+| `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `libupnp`        | `?`  |
+| `libssl`     | `libssl-dev`          | `?`             | via `base-devel` | `?`  |
+| `libavahi`   | `libavahi-client-dev` | `?`             | `avahi`          | `?`  |
+| `libsqlite3` | `libsqlite3-dev`      | `?`             | `sqlite`         | `?`  |
+
 ### Node
 
 We're using Node to run Selenium tests. Currently v4.x LTS. We plan to stay on
