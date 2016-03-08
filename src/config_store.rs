@@ -126,7 +126,7 @@ impl ConfigService {
 }
 
 #[cfg(test)]
-describe! config_store {
+describe! config {
 
     before_each {
         use uuid::Uuid;
@@ -134,143 +134,89 @@ describe! config_store {
         let config_file_name = format!("conftest-{}.tmp", Uuid::new_v4().to_simple_string());
     }
 
-    it "should remember properties" {
-        // Block to make `config` go out of scope
-        {
-            let mut config = ConfigStore::new(&config_file_name);
-            config.set("foo", "bar", "baz");
-            assert_eq!(
-                config.get("foo", "bar"),
-                Some(&"baz".to_string())
-            );
-        }
-        // Would use after_each, but after_each is never called:
+    after_each {
         fs::remove_file(config_file_name).unwrap_or(());
     }
 
-    it "should return None on non-existent namespaces" {
-        // Block to make `config` go out of scope
-        {
+    describe! config_store {
+        before_each {
             let mut config = ConfigStore::new(&config_file_name);
+        }
+
+        it "should remember properties" {
             config.set("foo", "bar", "baz");
-            assert_eq!(
-                config.get("foofoo", "bar"),
-                None
-            );
+            let foo_bar = config.get("foo", "bar").unwrap();
+            assert_eq!(foo_bar, "baz");
         }
-        fs::remove_file(config_file_name).unwrap_or(());
-    }
 
-    it "should return None on non-existent properties" {
-        // Block to make `config` go out of scope
-        {
-            let mut config = ConfigStore::new(&config_file_name);
+        it "should return None on non-existent namespaces" {
             config.set("foo", "bar", "baz");
-            assert_eq!(
-                config.get("foo", "barbar"),
-                None
-            );
+            assert_eq!(config.get("foofoo", "bar"), None);
         }
-        fs::remove_file(config_file_name).unwrap_or(());
-    }
 
-    it "should remember things over restarts" {
-        // Block to make `config` go out of scope
-        {
-            let mut config = ConfigStore::new(&config_file_name);
+        it "should return None on non-existent properties" {
             config.set("foo", "bar", "baz");
+            assert_eq!(config.get("foo", "barbar"), None);
         }
-        // `config` should now be out of scope and dropped
-        {
-            let config = ConfigStore::new(&config_file_name);
-            assert_eq!(
-                config.get("foo", "bar"),
-                Some(&"baz".to_string())
-            );
-        }
-        fs::remove_file(config_file_name).unwrap_or(());
-    }
-}
-
-#[cfg(test)]
-describe! config_service {
-
-    before_each {
-        use uuid::Uuid;
-        use std::fs;
-        let config_file_name = format!("conftest-{}.tmp", Uuid::new_v4().to_simple_string());
     }
 
-    it "should remember properties" {
-        // Block to make `config` go out of scope
-        {
+    describe! config_service {
+        before_each {
             let mut config = ConfigService::new(&config_file_name);
-            config.set("foo", "bar", "baz");
-            assert_eq!(
-                config.get("foo", "bar"),
-                Some("baz".to_string())
-            );
         }
-        // Would use after_each, but after_each is never called:
-        fs::remove_file(config_file_name).unwrap_or(());
-    }
 
-    it "should return the default value when needed" {
-        // Block to make `config` go out of scope
-        {
-            let mut config = ConfigService::new(&config_file_name);
+        it "should remember properties" {
+            config.set("foo", "bar", "baz");
+            let foo_bar = config.get("foo", "bar").unwrap();
+            assert_eq!(foo_bar, "baz");
+        }
+
+        it "should return the default value when needed" {
             let res = config.get_or_set_default("foo", "bar", "default");
             assert_eq!(res, "default");
 
-            // It is now set.
-            assert_eq!(
-                config.get("foo", "bar"),
-                Some("default".to_string())
-            );
+            let foo_bar = config.get("foo", "bar").unwrap();
+            assert_eq!(foo_bar, "default");
         }
-        fs::remove_file(config_file_name).unwrap_or(());
+
+        it "should return None on non-existent namespaces" {
+            config.set("foo", "bar", "baz");
+            assert_eq!(config.get("foofoo", "bar"), None);
+        }
+
+        it "should return None on non-existent properties" {
+            config.set("foo", "bar", "baz");
+            assert_eq!(config.get("foo", "barbar"), None);
+        }
     }
 
-    it "should return None on non-existent namespaces" {
-        // Block to make `config` go out of scope
-        {
-            let mut config = ConfigService::new(&config_file_name);
-            config.set("foo", "bar", "baz");
-            assert_eq!(
-                config.get("foofoo", "bar"),
-                None
-            );
+    describe! restarts {
+        it "ConfigStore should remember things over restarts" {
+            // Block to make `config` go out of scope
+            {
+                let mut config = ConfigStore::new(&config_file_name);
+                config.set("foo", "bar", "baz");
+            }
+            // `config` should now be out of scope and dropped
+            {
+                let config = ConfigStore::new(&config_file_name);
+                let foo_bar = config.get("foo", "bar").unwrap();
+                assert_eq!(foo_bar, "baz");
+            };
         }
-        fs::remove_file(config_file_name).unwrap_or(());
-    }
 
-    it "should return None on non-existent properties" {
-        // Block to make `config` go out of scope
-        {
-            let mut config = ConfigService::new(&config_file_name);
-            config.set("foo", "bar", "baz");
-            assert_eq!(
-                config.get("foo", "barbar"),
-                None
-            );
+        it "ConfigService should remember things over restarts" {
+            // Block to make `config` go out of scope
+            {
+                let mut config = ConfigService::new(&config_file_name);
+                config.set("foo", "bar", "baz");
+            }
+            // `config` should now be out of scope and dropped
+            {
+                let config = ConfigService::new(&config_file_name);
+                let foo_bar = config.get("foo", "bar").unwrap();
+                assert_eq!(foo_bar, "baz");
+            };
         }
-        fs::remove_file(config_file_name).unwrap_or(());
-    }
-
-    it "should remember things over restarts" {
-        // Block to make `config` go out of scope
-        {
-            let mut config = ConfigService::new(&config_file_name);
-            config.set("foo", "bar", "baz");
-        }
-        // `config` should now be out of scope and dropped
-        {
-            let config = ConfigService::new(&config_file_name);
-            assert_eq!(
-                config.get("foo", "bar"),
-                Some("baz".to_string())
-            );
-        }
-        fs::remove_file(config_file_name).unwrap_or(());
     }
 }
