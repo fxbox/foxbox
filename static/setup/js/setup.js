@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* global URLSearchParams */
+
 'use strict';
 
 var SetupUI = {
@@ -16,6 +18,14 @@ var SetupUI = {
       signup: document.querySelector('#signup'),
       signupSuccess: document.querySelector('#signup-success')
     };
+
+    var searchParams =
+      new URLSearchParams(window.location.search.substring(1));
+
+    if (searchParams.has('redirect_url')) {
+      SetupUI.redirect = searchParams.get('redirect_url');
+    }
+
     SetupUI.elements.signupButton.addEventListener('click', SetupUI.signup);
   },
 
@@ -50,10 +60,14 @@ var SetupUI = {
         window.alert('Missing token');
         return;
       }
-      localStorage.setItem('session', token);
-      SetupUI.elements.location.innerHTML = window.location.href;
-      SetupUI.screens.signupSuccess.hidden = false;
-      SetupUI.screens.signup.hidden = true;
+      if (SetupUI.redirect) {
+        window.location.replace(SetupUI.redirect + '?session_token=' + token);
+      } else {
+        localStorage.setItem('session', token);
+        SetupUI.elements.location.innerHTML = window.location.href;
+        SetupUI.screens.signupSuccess.hidden = false;
+        SetupUI.screens.signup.hidden = true;
+      }
     };
     // See https://github.com/fxbox/users/blob/master/doc/API.md#post-setup
     xhr.setRequestHeader('Content-Type', 'application/json');

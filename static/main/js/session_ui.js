@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* global Session */
+/* global URLSearchParams */
 
 'use strict';
 
@@ -47,6 +48,14 @@ var SessionUI = {
       signin: document.querySelector('#signin'),
       signedin: document.querySelector('#signedin')
     };
+
+    var searchParams =
+      new URLSearchParams(window.location.search.substring(1));
+
+    if (searchParams.has('redirect_url')) {
+      SessionUI.redirect = searchParams.get('redirect_url');
+    }
+
     if (SessionUI.session === null) {
       SessionUI.show(SIGN_IN);
     } else if (SessionUI.session.length) {
@@ -107,8 +116,13 @@ var SessionUI = {
       return;
     }
 
-    Session.start('admin', pwd).then(function() {
-      SessionUI.show(SIGNED_IN);
+    Session.start('admin', pwd, SessionUI.redirect === undefined).then(
+      function(token) {
+      if (SessionUI.redirect) {
+        window.location.replace(SessionUI.redirect + '?session_token=' + token);
+      } else {
+        SessionUI.show(SIGNED_IN);
+      }
     }).catch(function(error) {
       window.alert('Signin error ' + error);
     });
