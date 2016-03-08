@@ -69,6 +69,14 @@ $ git clone git@github.com:<username>/foxbox.git
 $ cd foxbox
 ```
 
+## Generating/updating certs and DNS records
+
+```bash
+$ cd scripts
+$ ./update.sh my-link-box 192.168.0.42 52.36.71.23
+$ cd ..
+```
+
 ## Running the daemon
 
 ```bash
