@@ -38,6 +38,7 @@
 extern crate chrono;
 extern crate serde;
 extern crate serde_json;
+extern crate string_cache;
 
 /// Metadata on devices
 pub mod services;
