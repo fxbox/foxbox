@@ -58,6 +58,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn broadcast_to_websockets(&self, data: serde_json::value::Value);
 
     fn get_upnp_manager(&self) -> Arc<UpnpManager>;
+    fn get_config(&self) -> Arc<ConfigService>;
 }
 
 impl FoxBox {
@@ -200,6 +201,10 @@ impl Controller for FoxBox {
 
     fn get_upnp_manager(&self) -> Arc<UpnpManager> {
         self.upnp.clone()
+    }
+
+    fn get_config(&self) -> Arc<ConfigService> {
+        self.config.clone()
     }
 }
 
