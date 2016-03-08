@@ -31,6 +31,6 @@ before_script:
 script:
     - rm -f *sqlite
     - cargo build # Linter is also executed here
-    - $TRAVIS_BUILD_DIR/tools/execute-unit-tests-with-coverage
+    - RUST_BACKTRACE=1 cargo test
     - jshint static/main/js/*.js static/setup/js/*.js test/selenium/*.js
     - (cargo run -- -n $BOX_HOST_NAME -p $BOX_PORT &> /dev/null &) ; npm test
