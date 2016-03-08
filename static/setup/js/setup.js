@@ -48,7 +48,7 @@ var SetupUI = {
       var token = response.session_token;
       if (!token) {
         window.alert('Missing token');
-        return
+        return;
       }
       localStorage.setItem('session', token);
       SetupUI.elements.location.innerHTML = window.location.href;
@@ -65,7 +65,7 @@ var SetupUI = {
         password: pwd
       });
     } catch(e) {
-      return reject(e);
+      return;
     }
     xhr.send(body);
   }
