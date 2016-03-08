@@ -171,7 +171,7 @@ Cross compiling on Mac hasn't been documented. A PR is welcomed. :wink:
 You'll need some dependencies installed to build.
 
 ``` bash
-$ brew install openssl
+$ brew install openssl libupnp
 ```
 
 This is required to build the openssl crate using homebrew's openssl:
