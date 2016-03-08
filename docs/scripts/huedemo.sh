@@ -19,7 +19,7 @@ cmd=$1
 case $cmd in
 	status)
 		echo "Talking to FoxBox at http://$HOST/services"
-		curl -s -X GET http://localhost:3000/services/list.json \
+		curl -s -X GET http://localhost:3000/services/list \
 			| tr '{' \\012 \
 			| cut -d, -f1 \
 			| tr -d \" \
