@@ -15,10 +15,34 @@
 
 use services::*;
 use selector::*;
-use values::Value;
-use util::{ Id, ResultSet };
+use values::{Value, Range, TypeError};
+use util::{Exactly, Id};
 
 use std::boxed::FnBox;
+
+/// An error that took place while communicating with either an adapter or the mechanism that
+/// handles registeration of adapters.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum AdapterError {
+    DuplicateGetter(Id<Getter>),
+    NoSuchGetter(Id<Getter>),
+    GetterDoesNotSupportPolling(Id<Getter>),
+    GetterDoesNotSupportWatching(Id<Getter>),
+    GetterRequiresThresholdForWatching(Id<Getter>),
+
+    DuplicateSetter(Id<Setter>),
+    NoSuchSetter(Id<Setter>),
+
+    DuplicateService(Id<ServiceId>),
+    NoSuchService(Id<ServiceId>),
+    TypeError(TypeError),
+
+    DuplicateAdapter(Id<AdapterId>),
+    ConflictingAdapter(Id<AdapterId>, Id<AdapterId>),
+    NoSuchAdapter(Id<AdapterId>),
+    InvalidValue
+}
+
 
 /// An error produced by one of the APIs in this module.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -32,8 +56,11 @@ pub enum Error {
     /// There is no such setter channel connected to the Foxbox, even indirectly.
     NoSuchSetter(Id<Setter>),
 
-    /// Attempting to set a value with the wrong type
+    /// Attempting to set a value with the wrong type.{}
     TypeError,
+
+    /// An error arose when talking to the adapter.
+    AdapterError(AdapterError),
 }
 
 /// An event during watching.
@@ -59,8 +86,13 @@ pub enum WatchEvent {
     GetterAdded(Id<Getter>),
 }
 
+pub type Callback<T, E> = Box<FnBox(Result<T, E>) + Send>;
+pub type Infallible<T> = Box<FnBox(T) + Send>;
+pub type ResultMap<K, T, E> = Vec<(K, Result<T, E>)>;
+pub type FnResultMap<K, T, E> = Box<FnBox(ResultMap<K, T, E>) + Send>;
+
 /// A handle to the public API.
-pub trait API: Send {
+pub trait APIHandle: Send {
     /// Get the metadata on services matching some conditions.
     ///
     /// A call to `API::get_services(vec![req1, req2, ...])` will return
@@ -131,7 +163,7 @@ pub trait API: Send {
     ///   ]
     /// }]
     /// ```
-    fn get_services(&self, &[ServiceSelector], Box<FnBox(Vec<Service>)>);
+    fn get_services(&self, Vec<ServiceSelector>, Infallible<Vec<Service>>);
 
     /// Label a set of services with a set of tags.
     ///
@@ -170,7 +202,7 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON string representing a number.
-    fn add_service_tag(&self, set: &[ServiceSelector], tags: &[String], Box<FnBox(usize)>);
+    fn add_service_tag(&self, set: Vec<ServiceSelector>, tags: Vec<String>, Infallible<usize>);
 
     /// Remove a set of tags from a set of services.
     ///
@@ -209,15 +241,15 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_service_tag(&self, set: &[ServiceSelector], tags: &[String], Box<FnBox(usize)>);
+    fn remove_service_tag(&self, set: Vec<ServiceSelector>, tags: Vec<String>, Infallible<usize>);
 
     /// Get a list of getters matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels`
-    fn get_getter_channels(&self, &[GetterSelector], Box<FnBox(Vec<Channel<Getter>>)>);
-    fn get_setter_channels(&self, &[SetterSelector], Box<FnBox(Vec<Channel<Setter>>)>);
+    fn get_getter_channels(&self, Vec<GetterSelector>, Infallible<Vec<Channel<Getter>>>);
+    fn get_setter_channels(&self, Vec<SetterSelector>, Infallible<Vec<Channel<Setter>>>);
 
     /// Label a set of channels with a set of tags.
     ///
@@ -263,8 +295,8 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn add_getter_tag(&self, &[GetterSelector], &[String], Box<FnBox(usize)>);
-    fn add_setter_tag(&self, &[SetterSelector], &[String], Box<FnBox(usize)>);
+    fn add_getter_tag(&self, Vec<GetterSelector>, Vec<String>, Infallible<usize>);
+    fn add_setter_tag(&self, Vec<SetterSelector>, Vec<String>, Infallible<usize>);
 
     /// Remove a set of tags from a set of channels.
     ///
@@ -310,86 +342,31 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_getter_tag(&self, &[GetterSelector], &[String], Box<FnBox(usize)>);
-    fn remove_setter_tag(&self, &[SetterSelector], &[String], Box<FnBox(usize)>);
+    fn remove_getter_tag(&self, Vec<GetterSelector>, Vec<String>, Infallible<usize>);
+    fn remove_setter_tag(&self, Vec<SetterSelector>, Vec<String>, Infallible<usize>);
 
     /// Read the latest value from a set of channels
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels/value`
-    fn get_channel_value(&self, &[GetterSelector], Box<FnBox(ResultSet<Id<Getter>, Value, Error>)>);
+    fn fetch_channel_values(&self, Vec<GetterSelector>, FnResultMap<Id<Getter>, Option<Value>, Error>);
 
-    /// Send one value to a set of channels
+    /// Send a bunch of values to a set of channels
     ///
     /// # REST API
     ///
     /// `POST /api/v1/channels/value`
-    fn set_channel_value(&self, &[Vec<SetterSelector>], Vec<Value>, Box<FnBox(ResultSet<Id<Setter>, (), Error>)>);
+    fn send_channel_values(&self, Vec<(Vec<SetterSelector>, Value)>, FnResultMap<Id<Setter>, (), Error>);
 
     /// Watch for any change
     ///
     /// # WebSocket API
     ///
     /// `/api/v1/channels/watch`
-    fn register_channel_watch(&self, Vec<WatchOptions>, cb: Box<Fn(WatchEvent) + Send + 'static>) -> Self::WatchGuard;
+    fn register_channel_watch(&self, Vec<GetterSelector>, range: Exactly<Range>, cb: Box<Fn(WatchEvent) + Send + 'static>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
 }
 
-/// Options for watching changes in one or more channels.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct WatchOptions {
-    /// The set of getters to watch. Note that the actual getters in the
-    /// set may change over time.
-    pub source: GetterSelector,
-
-    /// If `true`, watch as new values become available.
-    pub should_watch_values: bool,
-
-    /// If `true`, watch as services are connected/disconnected.
-    pub should_watch_topology: bool,
-
-    /// Make sure that we can't instantiate from another crate.
-    #[serde(default, skip_serializing)]
-    private: (),
-}
-
-impl WatchOptions {
-    pub fn new() -> Self {
-        WatchOptions {
-            source: GetterSelector::new(),
-            should_watch_values: false,
-            should_watch_topology: false,
-            private: (),
-        }
-    }
-
-    /// Restrict to getter channels in a given set.
-    ///
-    /// Also note that the actual getter channels that are part of the
-    /// set may change with time, for instance if devices are added
-    /// ore removed.  The selector _is live_, i.e. the channel watch
-    /// will continue watching any getter channels that match `req`.
-    pub fn with_getters(self, req: GetterSelector) -> Self {
-        WatchOptions {
-            source: self.source.and(req),
-            ..self
-        }
-    }
-
-    pub fn with_watch_values(self, should: bool) -> Self {
-        WatchOptions {
-            should_watch_values: should,
-            ..self
-        }
-    }
-
-    pub fn with_watch_topology(self, should: bool) -> Self {
-        WatchOptions {
-            should_watch_topology: should,
-            ..self
-        }
-    }
-}

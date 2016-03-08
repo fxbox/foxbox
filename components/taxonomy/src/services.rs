@@ -255,6 +255,9 @@ pub struct Channel<IO> where IO: IOMechanism {
     /// The update mechanism for this channel.
     pub mechanism: IO,
 
+    /// Identifier of the adapter for this channel.
+    pub adapter: Id<AdapterId>,
+
     /// The last time the device was seen.
     #[serde(default)]
     pub last_seen: Option<TimeStamp>,

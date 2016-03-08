@@ -1,4 +1,4 @@
-use services::{ServiceId, ChannelKind, Channel, Getter, Setter};
+use services::{Service, ServiceId, ChannelKind, Channel, Getter, Setter};
 use util::{Exactly, Id};
 use values;
 
@@ -14,6 +14,10 @@ fn merge<T>(mut a: HashSet<T>, b: Vec<T>) -> HashSet<T> where T: Hash + Eq {
         a.insert(x);
     }
     a
+}
+
+pub trait SelectedBy<T> {
+    fn matches(&self, &T) -> bool;
 }
 
 /// A selector for one or more services.
@@ -51,7 +55,6 @@ pub struct ServiceSelector {
     #[serde(default, skip_serializing)]
     private: (),
 }
-
 
 impl ServiceSelector {
     /// Create a new selector that accepts all services.
@@ -101,8 +104,43 @@ impl ServiceSelector {
             private: (),
         }
     }
+
+    pub fn matches(&self, service: &Service) -> bool {
+        if !self.id.matches(&service.id) {
+            return false;
+        }
+        if !has_selected_tags(&self.tags, &service.tags) {
+            return false;
+        }
+        // If any of the getter selectors doesn't find a getter,
+        // we don't match.
+        let getters_fail = self.getters.iter().find(|selector| {
+            service.getters.values().find(|getter| {
+                selector.matches(getter)
+            }).is_none()
+        }).is_some();
+        if getters_fail {
+            return false;
+        }
+        // If any of the setter selectors doesn't find a setter,
+        // we don't match.
+        let setters_fail = self.setters.iter().find(|selector| {
+            service.setters.values().find(|setter| {
+                selector.matches(setter)
+            }).is_none()
+        }).is_some();
+        if setters_fail {
+            return false;
+        }
+        true
+    }
 }
 
+impl SelectedBy<ServiceSelector> for Service {
+    fn matches(&self, selector: &ServiceSelector) -> bool {
+        selector.matches(self)
+    }
+}
 
 
 /// A selector for one or more getter channels.
@@ -246,6 +284,12 @@ impl GetterSelector {
     }
 }
 
+impl SelectedBy<GetterSelector> for Channel<Getter> {
+    fn matches(&self, selector: &GetterSelector) -> bool {
+        selector.matches(self)
+    }
+}
+
 /// A selector for one or more setter channels.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct SetterSelector {
@@ -357,6 +401,13 @@ impl SetterSelector {
     }
 }
 
+impl SelectedBy<SetterSelector> for Channel<Setter> {
+    fn matches(&self, selector: &SetterSelector) -> bool {
+        selector.matches(self)
+    }
+}
+
+
 /// An acceptable interval of time.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Period {
@@ -414,6 +465,7 @@ impl Period {
         }
     }
 }
+
 
 fn has_selected_tags(actual: &HashSet<String>, requested: &HashSet<String>) -> bool {
     for tag in &*actual {

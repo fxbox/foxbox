@@ -12,13 +12,14 @@ use std::hash::{Hash, Hasher};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Exactly<T> {
     /// No constraint.
-    Empty,
+    Always,
 
     /// Expect a specific value.
     Exactly(T),
 
-    /// Two conflicting constraints (or more) have been put on the value.
-    Conflict,
+    /// Never accept a constraint. This can happen, for instance, we have have
+    /// attempted to `and` two conflicting `Exactly`
+    Never,
 }
 
 impl<T> Exactly<T> where T: PartialEq {
@@ -26,28 +27,28 @@ impl<T> Exactly<T> where T: PartialEq {
     pub fn and(self, other: Self) -> Self {
         use self::Exactly::*;
         match (self, other) {
-            (Conflict, _) | (_, Conflict) => Conflict,
-            (Empty, x) | (x, Empty) => x,
+            (Never, _) | (_, Never) => Never,
+            (Always, x) | (x, Always) => x,
             (Exactly(x), Exactly(y)) =>
                 if x == y {
                     Exactly(y)
                 } else {
-                    Conflict
+                    Never
                 }
         }
     }
 
     pub fn is_empty(&self) -> bool {
         match *self {
-            Exactly::Empty => true,
+            Exactly::Always => true,
             _ => false,
         }
     }
 
     pub fn matches(&self, value: &T) -> bool {
         match *self {
+            Exactly::Always => true,
             Exactly::Exactly(ref id) => id == value,
-            Exactly::Empty => true,
             _ => false
         }
     }
@@ -55,14 +56,14 @@ impl<T> Exactly<T> where T: PartialEq {
 
 impl<T> Default for Exactly<T> {
     fn default() -> Self {
-        Exactly::Empty
+        Exactly::Always
     }
 }
 
 
 
 /// A variant of `PhantomData` that supports [De]serialization
-#[derive(Clone, Debug, Default, PartialEq, Hash, Eq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub struct Phantom<T> {
     phantom: PhantomData<T>
 }
@@ -74,7 +75,13 @@ impl<T> Phantom<T> {
         }
     }
 }
-
+impl<T> Default for Phantom<T> {
+    fn default() -> Self {
+        Phantom {
+            phantom: PhantomData
+        }
+    }
+}
 impl<T> Serialize for Phantom<T> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {

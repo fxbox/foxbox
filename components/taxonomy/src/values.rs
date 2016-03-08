@@ -13,7 +13,7 @@ use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer, Error};
 
 /// Representation of a type error.
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TypeError {
     /// The type we expected.
     pub expected: Type,
@@ -557,7 +557,7 @@ impl Deserialize for TimeStamp {
 }
 
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 /// A comparison between two values.
 pub enum Range {
     /// Leq(x) accepts any value v such that v <= x.
@@ -568,11 +568,11 @@ pub enum Range {
 
     /// BetweenEq {min, max} accepts any value v such that `min <= v`
     /// and `v <= max`. If `max < min`, it never accepts anything.
-    BetweenEq {min:Value, max:Value},
+    BetweenEq { min:Value, max:Value },
 
     /// OutOfStrict {min, max} accepts any value v such that `v < min`
     /// or `max < v`
-    OutOfStrict {min:Value, max:Value},
+    OutOfStrict { min:Value, max:Value },
 
 
     /// Eq(x) accespts any value v such that v == x
@@ -586,8 +586,8 @@ impl Range {
         match *self {
             Leq(ref max) => value <= max,
             Geq(ref min) => value >= min,
-            BetweenEq {ref min, ref max} => min <= value && value <= max,
-            OutOfStrict {ref min, ref max} => value < min || max < value,
+            BetweenEq { ref min, ref max } => min <= value && value <= max,
+            OutOfStrict { ref min, ref max } => value < min || max < value,
             Eq(ref val) => value == val,
         }
     }
@@ -600,7 +600,7 @@ impl Range {
         use self::Range::*;
         match *self {
             Leq(ref v) | Geq(ref v) | Eq(ref v) => Ok(v.get_type()),
-            BetweenEq{ref min, ref max} | OutOfStrict{ref min, ref max} => {
+            BetweenEq {ref min, ref max} | OutOfStrict {ref min, ref max} => {
                 let min_typ = min.get_type();
                 let max_typ = max.get_type();
                 if min_typ == max_typ {
