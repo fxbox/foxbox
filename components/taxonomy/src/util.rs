@@ -27,7 +27,7 @@ impl<T> Exactly<T> where T: PartialEq {
         use self::Exactly::*;
         match (self, other) {
             (Conflict, _) | (_, Conflict) => Conflict,
-            (Empty, x@_) | (x@_, Empty) => x,
+            (Empty, x) | (x, Empty) => x,
             (Exactly(x), Exactly(y)) =>
                 if x == y {
                     Exactly(y)
@@ -162,6 +162,8 @@ impl<T> Deserialize for Id<T> {
     }
 }
 
+/// A bunch of results grouped in an array of (key, result).
+pub type ResultSet<I, T, E> = Vec<(I, Result<T, E>)>;
 
 
 /// By default, the (de)serialization of trivial enums by Serde is surprising, e.g.

@@ -20,6 +20,11 @@ use std::collections::{HashSet, HashMap};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct ServiceId;
 
+/// A marker for Id.
+/// Only useful for writing `Id<AdapterId>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
+pub struct AdapterId;
+
 /// Metadata on a service. A service is a device or collection of devices
 /// that may offer services. The FoxBox itself is a service offering
 /// services such as a clock, communicating with the user through her
@@ -45,15 +50,19 @@ pub struct Service {
     /// Channels connected directly to this service.
     pub getters: HashMap<Id<Getter>, Channel<Getter>>,
     pub setters: HashMap<Id<Setter>, Channel<Setter>>,
+
+    /// Identifier of the adapter for this service.
+    pub adapter: Id<AdapterId>,
 }
 impl Service {
     /// Create an empty service.
-    pub fn empty(id: Id<ServiceId>) -> Self {
+    pub fn empty(id: Id<ServiceId>, adapter: Id<AdapterId>) -> Self {
         Service {
             tags: HashSet::new(),
             getters: HashMap::new(),
             setters: HashMap::new(),
             id: id,
+            adapter: adapter,
         }
     }
 }

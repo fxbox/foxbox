@@ -298,13 +298,12 @@ pub struct ExtBool {
 
 impl PartialOrd for ExtBool {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.vendor != other.vendor {
-            return None;
-        } else if self.kind != other.kind {
-            return None;
+        if self.vendor != other.vendor
+        || self.kind != other.kind {
+            None
+        } else {
+            self.value.partial_cmp(&other.value)
         }
-
-        self.value.partial_cmp(&other.value)
     }
 }
 
@@ -332,10 +331,9 @@ pub struct ExtNumeric {
 
 impl PartialOrd for ExtNumeric {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.vendor != other.vendor {
-            return None;
-        } else if self.kind != other.kind {
-            return None;
+        if self.vendor != other.vendor
+        || self.kind != other.kind {
+            None
         } else {
             self.value.partial_cmp(&other.value)
         }

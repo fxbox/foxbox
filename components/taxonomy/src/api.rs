@@ -16,7 +16,9 @@
 use services::*;
 use selector::*;
 use values::Value;
-use util::Id;
+use util::{ Id, ResultSet };
+
+use std::boxed::FnBox;
 
 /// An error produced by one of the APIs in this module.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -129,7 +131,7 @@ pub trait API: Send {
     ///   ]
     /// }]
     /// ```
-    fn get_services(&self, &Vec<ServiceSelector>) -> Vec<Service>;
+    fn get_services(&self, &[ServiceSelector], Box<FnBox(Vec<Service>)>);
 
     /// Label a set of services with a set of tags.
     ///
@@ -168,7 +170,7 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON string representing a number.
-    fn add_service_tag(&self, set: &Vec<ServiceSelector>, tags: &Vec<String>) -> usize;
+    fn add_service_tag(&self, set: &[ServiceSelector], tags: &[String], Box<FnBox(usize)>);
 
     /// Remove a set of tags from a set of services.
     ///
@@ -207,15 +209,15 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_service_tag(&self, set: &Vec<ServiceSelector>, tags: String) -> usize;
+    fn remove_service_tag(&self, set: &[ServiceSelector], tags: &[String], Box<FnBox(usize)>);
 
     /// Get a list of getters matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels`
-    fn get_getter_channels(&self, &Vec<GetterSelector>) -> Vec<Channel<Getter>>;
-    fn get_setter_channels(&self, &Vec<SetterSelector>) -> Vec<Channel<Setter>>;
+    fn get_getter_channels(&self, &[GetterSelector], Box<FnBox(Vec<Channel<Getter>>)>);
+    fn get_setter_channels(&self, &[SetterSelector], Box<FnBox(Vec<Channel<Setter>>)>);
 
     /// Label a set of channels with a set of tags.
     ///
@@ -261,8 +263,8 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn add_getter_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
-    fn add_setter_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
+    fn add_getter_tag(&self, &[GetterSelector], &[String], Box<FnBox(usize)>);
+    fn add_setter_tag(&self, &[SetterSelector], &[String], Box<FnBox(usize)>);
 
     /// Remove a set of tags from a set of channels.
     ///
@@ -308,22 +310,22 @@ pub trait API: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_getter_tag(&self, &Vec<GetterSelector>, &Vec<String>) -> usize;
-    fn remove_setter_tag(&self, &Vec<SetterSelector>, &Vec<String>) -> usize;
+    fn remove_getter_tag(&self, &[GetterSelector], &[String], Box<FnBox(usize)>);
+    fn remove_setter_tag(&self, &[SetterSelector], &[String], Box<FnBox(usize)>);
 
     /// Read the latest value from a set of channels
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels/value`
-    fn get_channel_value(&self, &Vec<GetterSelector>) -> Vec<(Id<Getter>, Result<Value, Error>)>;
+    fn get_channel_value(&self, &[GetterSelector], Box<FnBox(ResultSet<Id<Getter>, Value, Error>)>);
 
     /// Send one value to a set of channels
     ///
     /// # REST API
     ///
     /// `POST /api/v1/channels/value`
-    fn set_channel_value(&self, &Vec<SetterSelector>, Value) -> Vec<(Id<Setter>, Result<(), Error>)>;
+    fn set_channel_value(&self, &[Vec<SetterSelector>], Vec<Value>, Box<FnBox(ResultSet<Id<Setter>, (), Error>)>);
 
     /// Watch for any change
     ///

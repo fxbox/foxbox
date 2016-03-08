@@ -242,7 +242,7 @@ impl GetterSelector {
         if !has_selected_tags(&self.tags, &channel.tags) {
             return false;
         }
-        return true;
+        true
     }
 }
 
@@ -353,7 +353,7 @@ impl SetterSelector {
         if !has_selected_tags(&self.tags, &channel.tags) {
             return false;
         }
-        return true;
+        true
     }
 }
 
@@ -368,13 +368,13 @@ pub struct Period {
 impl Period {
     pub fn and(self, other: Self) -> Self {
         let min = match (self.min, other.min) {
-            (None, x@_) => x,
-            (x@_, None) => x,
+            (None, x) |
+            (x, None) => x,
             (Some(min1), Some(min2)) => Some(cmp::max(min1, min2))
         };
         let max = match (self.max, other.max) {
-            (None, x@_) => x,
-            (x@_, None) => x,
+            (None, x) |
+            (x, None) => x,
             (Some(max1), Some(max2)) => Some(cmp::min(max1, max2))
         };
         Period {
@@ -385,8 +385,8 @@ impl Period {
 
     pub fn and_option(a: Option<Self>, b: Option<Self>) -> Option<Self> {
         match (a, b) {
-            (None, x@_) => x,
-            (x@_, None) => x,
+            (None, x) |
+            (x, None) => x,
             (Some(a), Some(b)) => Some(a.and(b))
         }
     }
@@ -402,7 +402,7 @@ impl Period {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     pub fn matches_option(period: &Option<Self>, duration: &Option<values::ValDuration>) -> bool {
@@ -421,5 +421,5 @@ fn has_selected_tags(actual: &HashSet<String>, requested: &HashSet<String>) -> b
             return false;
         }
     }
-    return true;
+    true
 }

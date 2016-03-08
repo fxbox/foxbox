@@ -4,8 +4,9 @@ version = "0.1.2"
 authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
+chrono = "0.2.19"
+clippy = "*"
 serde = "^0.6"
 serde_json = "^0.6"
 serde_macros = "^0.6"
-chrono = "0.2.19"
 string_cache = "^0.2"
