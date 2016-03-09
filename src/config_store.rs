@@ -19,7 +19,8 @@ type ConfigTree = BTreeMap<String, ConfigNameSpace>;
 pub struct ConfigStore {
     file_name: String,
     save_lock: Mutex<()>,
-    config: ConfigTree
+    config: ConfigTree,
+    overrides: ConfigTree
 }
 
 impl ConfigStore {
@@ -27,7 +28,8 @@ impl ConfigStore {
         ConfigStore {
             file_name: file_name.to_owned(),
             save_lock: Mutex::new(()),
-            config: ConfigStore::load(file_name)
+            config: ConfigStore::load(file_name),
+            overrides: ConfigTree::new()
         }
     }
 
@@ -42,12 +44,37 @@ impl ConfigStore {
     }
 
     pub fn get(&self, namespace: &str, property: &str) -> Option<&String> {
+        match self.get_override(namespace, property) {
+            Some(value) => Some(value),
+            None => self.get_no_override(namespace, property)
+        }
+    }
+
+    fn get_no_override(&self, namespace: &str, property: &str) -> Option<&String> {
         if self.config.contains_key(namespace) {
             let res = self.config.get(namespace).unwrap().get(property);
             debug!("Config result for {}::{} is {:?}", namespace, property, res);
             res
         } else {
             debug!("No config result for {}::{}", namespace, property);
+            None
+        }
+    }
+
+    pub fn set_override(&mut self, namespace: &str, property: &str, value: &str) {
+        debug!("Setting config override for {}::{} to {}", namespace, property, value);
+        if !self.overrides.contains_key(namespace) {
+            self.overrides.insert(namespace.to_owned(), ConfigNameSpace::new());
+        }
+        self.overrides.get_mut(namespace).unwrap().insert(property.to_owned(), value.to_owned());
+    }
+
+    fn get_override(&self, namespace: &str, property: &str) -> Option<&String> {
+        if self.overrides.contains_key(namespace) {
+            let res = self.overrides.get(namespace).unwrap().get(property);
+            debug!("Config override for {}::{} is {:?}", namespace, property, res);
+            res
+        } else {
             None
         }
     }
@@ -59,7 +86,7 @@ impl ConfigStore {
                 file
             },
             Err(error) => {
-                error!("Unable to open configuration file {}: {}",
+                debug!("Unable to open configuration file {}: {}",
                     file_name, error.to_string());
                 return empty_config;
             }
@@ -113,15 +140,19 @@ impl ConfigService {
             .map(|value| { value.to_owned() })
     }
 
-    pub fn get_or_set_default(&mut self, namespace: &str, property: &str, default: &str) -> String {
+    pub fn get_or_set_default(&self, namespace: &str, property: &str, default: &str) -> String {
         self.get(namespace, property).unwrap_or_else(|| {
             self.set(namespace, property, default);
             default.to_owned()
         })
     }
 
-    pub fn set(&mut self, namespace: &str, property: &str, value: &str) {
+    pub fn set(&self, namespace: &str, property: &str, value: &str) {
         self.store.write().unwrap().set(namespace, property, value);
+    }
+
+    pub fn set_override(&self, namespace: &str, property: &str, value: &str) {
+        self.store.write().unwrap().set_override(namespace, property, value);
     }
 }
 
@@ -188,6 +219,15 @@ describe! config {
             config.set("foo", "bar", "baz");
             assert_eq!(config.get("foo", "barbar"), None);
         }
+
+        it "should accept overrides" {
+            config.set("foo", "bar", "baz");
+            let foo_bar = config.get("foo", "bar").unwrap();
+            assert_eq!(foo_bar, "baz");
+            config.set_override("foo", "bar", "bazbaz");
+            let foo_baz = config.get("foo", "bar").unwrap();
+            assert_eq!(foo_baz, "bazbaz");
+        }
     }
 
     describe! restarts {
@@ -198,6 +238,19 @@ describe! config {
                 config.set("foo", "bar", "baz");
             }
             // `config` should now be out of scope and dropped
+            {
+                let config = ConfigStore::new(&config_file_name);
+                let foo_bar = config.get("foo", "bar").unwrap();
+                assert_eq!(foo_bar, "baz");
+            };
+        }
+
+        it "ConfigStore should forget overrides over restarts" {
+            {
+                let mut config = ConfigStore::new(&config_file_name);
+                config.set("foo", "bar", "baz");
+                config.set_override("foo", "bar", "bazbaz");
+            }
             {
                 let config = ConfigStore::new(&config_file_name);
                 let foo_bar = config.get("foo", "bar").unwrap();

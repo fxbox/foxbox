@@ -160,3 +160,68 @@ pub fn parse_simple_xml<R: Read>(data: R) -> Result<HashMap<String, String>, Str
     }
     Ok(values)
 }
+
+#[allow(dead_code)]
+pub fn escape(unescaped_string: &str, to_escape: Vec<char>) -> String {
+    let mut escaped_string = String::new();
+    for chr in unescaped_string.to_owned().chars() {
+        if chr == '\\' || to_escape.contains(&chr) {
+            escaped_string.push('\\');
+        }
+        escaped_string.push(chr);
+    }
+    escaped_string
+}
+
+#[allow(dead_code)]
+pub fn unescape(escaped_string: &str) -> String {
+    let mut unescaped_string = String::new();
+    let mut escape_flag = false;
+    for chr in escaped_string.to_owned().chars() {
+        if escape_flag {
+            escape_flag = false;
+            unescaped_string.push(chr);
+        } else if chr == '\\' {
+            escape_flag = true;
+        } else {
+            unescaped_string.push(chr);
+        }
+    }
+    unescaped_string
+}
+
+pub fn split_escaped(string: &str, separator: char) -> Vec<String> {
+    let mut split = Vec::new();
+    let mut section = String::new();
+    let mut escape_flag = false;
+    for chr in string.to_owned().chars() {
+        if escape_flag {
+            escape_flag = false;
+            section.push(chr);
+        } else if chr == '\\' {
+            escape_flag = true;
+        } else if chr == separator {
+            split.push(section);
+            section = String::new();
+        } else {
+            section.push(chr);
+        }
+    }
+    split.push(section);
+    split
+}
+
+#[cfg(test)]
+describe! string_escaping {
+    it "should escape strings" {
+        assert_eq!(escape(r#"foo;bar\baz"#, vec![';']), r#"foo\;bar\\baz"#.to_owned())
+    }
+
+    it "should unescape strings" {
+        assert_eq!(unescape(r#"foo\;bar\\b\az"#), r#"foo;bar\baz"#.to_owned())
+    }
+
+    it "should split escaped strings" {
+        assert_eq!(split_escaped(r#"foo\;foo;bar;"#, ';'), vec!["foo;foo", "bar", ""]);
+    }
+}

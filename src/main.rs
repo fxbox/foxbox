@@ -87,7 +87,7 @@ use std::mem;
 use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>]
+Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-c <namespace;key;value>]...
 
 Options:
     -v, --verbose            Toggle verbose output.
@@ -97,6 +97,7 @@ Options:
     -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242/register]
     -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
+    -c, --config <namespace;key;value>  Set configuration override
     -h, --help               Print this help menu.
 ",
         flag_name: Option<String>,
@@ -104,7 +105,8 @@ Options:
         flag_wsport: u16,
         flag_register: String,
         flag_iface: Option<String>,
-        flag_tunnel: Option<String>);
+        flag_tunnel: Option<String>,
+        flag_config: Option<Vec<String>>);
 
 /// Updates local host name with the provided host name string. If requested host name
 /// is not available (used by anyone else on the same network) then collision
@@ -189,6 +191,24 @@ fn main() {
         args.flag_verbose, args.flag_name.map_or(None, update_hostname), args.flag_port,
         args.flag_wsport);
 
+    // Override config values
+    {
+        if let Some(flags) = args.flag_config {
+            for flag in flags {
+                let items: Vec<String> = utils::split_escaped(&flag, ';');
+                if items.len() >= 3 {
+                    let namespace = items[0].clone();
+                    let key = items[1].clone();
+                    let value = items[2..].join(";");
+                    warn!("Setting config override: {}::{}->{}", namespace, key, value);
+                    controller.config.set_override(&namespace, &key, &value);
+                } else {
+                    error!("Config override requires three fields: {}", flag)
+                }
+            }
+        }
+    }
+
     controller.run(&SHUTDOWN_FLAG);
 
     if let Some(mut tunnel) = tunnel {
@@ -211,6 +231,7 @@ describe! main {
             assert_eq!(args.flag_register, "http://localhost:4242/register");
             assert_eq!(args.flag_iface, None);
             assert_eq!(args.flag_tunnel, None);
+            assert_eq!(args.flag_config, None);
             assert_eq!(args.flag_help, false);
         }
 
@@ -222,7 +243,8 @@ describe! main {
                                "-w", "4567",
                                "-r", "http://foo.bar:6868/register",
                                "-i", "eth99",
-                               "-t", "tunnel.host"];
+                               "-t", "tunnel.host",
+                               "-c", "ns;key;value"];
 
            let args: super::super::Args = super::super::Args::docopt().argv(argv().into_iter())
                .decode().unwrap();
@@ -234,6 +256,7 @@ describe! main {
             assert_eq!(args.flag_register, "http://foo.bar:6868/register");
             assert_eq!(args.flag_iface.unwrap(), "eth99");
             assert_eq!(args.flag_tunnel.unwrap(), "tunnel.host");
+            assert_eq!(args.flag_config.unwrap(), vec!["ns;key;value"]);
         }
 
         it "should support long form" {
@@ -244,7 +267,8 @@ describe! main {
                                "--wsport", "4567",
                                "--register", "http://foo.bar:6868/register",
                                "--iface", "eth99",
-                               "--tunnel", "tunnel.host"];
+                               "--tunnel", "tunnel.host",
+                               "--config", "ns;key;value"];
 
             let args: super::super::Args = super::super::Args::docopt().argv(argv().into_iter())
                 .decode().unwrap();
@@ -256,6 +280,7 @@ describe! main {
             assert_eq!(args.flag_register, "http://foo.bar:6868/register");
             assert_eq!(args.flag_iface.unwrap(), "eth99");
             assert_eq!(args.flag_tunnel.unwrap(), "tunnel.host");
+            assert_eq!(args.flag_config.unwrap(), vec!["ns;key;value"]);
         }
     }
 }
