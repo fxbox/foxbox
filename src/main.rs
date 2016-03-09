@@ -22,10 +22,14 @@
 
 #![feature(associated_consts)]
 
+#![feature(fnbox)] // Let us use FnBox<>, since Box<FnOnce> doesn't work.
+
+extern crate chrono;
 extern crate core;
 extern crate docopt;
 extern crate env_logger;
 extern crate foxbox_users;
+extern crate foxbox_taxonomy;
 #[macro_use]
 extern crate iron;
 #[cfg(test)]
@@ -41,6 +45,7 @@ extern crate rustc_serialize;
 extern crate serde;
 extern crate staticfile;
 extern crate time;
+extern crate timer;
 extern crate unicase;
 extern crate uuid;
 extern crate ws;
@@ -53,7 +58,8 @@ extern crate regex;
 // Need to be declared first so to let the macros be visible from other modules.
 #[macro_use]
 mod utils;
-
+mod transact;
+mod adapt;
 mod adapters;
 mod config_store;
 mod controller;
