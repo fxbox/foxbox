@@ -87,6 +87,17 @@ on localhost
 * switch app to use that
 * note that all of this is still without the tunnel service (apart from setting the DNS A record)
 
+also todo:
+* generate shorter serial-no
+* add registration-server + serial-no flow in reg-server + in app
+* add QR-code flow in app
+* add build-time options:
+  * dns-server
+    * registration-server or not (already exists in cargo, but add it to proxy)
+    * tunnel server public IP address (no QR code for this)
+  * error when registration-server is specified but dns-server is not
+* mirrors list
+
 ## Running the daemon
 
 ```bash
