@@ -364,7 +364,7 @@ pub trait APIHandle: Send {
     /// # WebSocket API
     ///
     /// `/api/v1/channels/watch`
-    fn register_channel_watch(&self, Vec<GetterSelector>, range: Exactly<Range>, cb: Box<Fn(WatchEvent) + Send + 'static>) -> Self::WatchGuard;
+    fn register_channel_watch(&self, selectors: Vec<GetterSelector>, range: Exactly<Range>, on_event: Box<Fn(WatchEvent) + Send + 'static>, cb: Infallible<Self::WatchGuard>);
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
