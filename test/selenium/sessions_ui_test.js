@@ -22,7 +22,15 @@ describe('sessions ui', function() {
 
   var SetUpWebapp = require('./lib/setup_webapp.js');
   var setUpWebapp;
+  var setUpPage;
   var signedInPage;
+  var elements;
+
+  var shortPasswordErrorMessage 
+    = 'Please use a password of at least 8 characters.';
+  var errorPasswordDoNotMatch = 'Passwords don\'t match! Please try again.';
+  var successMessage = 'Thank you!';
+
 
   before(function() {
     driver = new webdriver.Builder().
@@ -47,36 +55,23 @@ describe('sessions ui', function() {
     });
 
     describe('signup', function() {
-      var elements;
-      var screens;
 
-      beforeEach(function() {
-        screens = {
-          signup: driver.findElement(webdriver.By.id('signup')),
-          signupSuccess: driver.findElement(webdriver.By.id('signup-success'))
-        };
-
-        elements = {
-          pwd1: driver.findElement(webdriver.By.id('signup-pwd1')),
-          pwd2: driver.findElement(webdriver.By.id('signup-pwd2')),
-          set: driver.findElement(webdriver.By.id('signup-button'))
-        };
-      });
-
-      it('should show the signup screen', function() {
-        return driver.wait(webdriver.until.elementIsVisible(screens.signup),
-                           3000);
-      });
-
-      it('should not show the signupSuccess screen', function(done) {
-        screens.signupSuccess.isDisplayed().then(function(visible) {
-          assert.equal(visible, false);
-          done();
+        beforeEach(function() {
+          elements = {
+            pwd1: driver.findElement(webdriver.By.id('signup-pwd1')),
+            pwd2: driver.findElement(webdriver.By.id('signup-pwd2')),
+            set: driver.findElement(webdriver.By.id('signup-button'))
+          };
+          setUpWebapp = new SetUpWebapp(driver);
+          setUpPage = setUpWebapp.getSetUpView();
         });
-      });
 
-      it('should have the right fields', function () {
-        var types = {
+      it('should show the signup screen by default', function() {
+          return setUpPage.isSetUpView();
+        });
+
+      it('should have the rights fields', function() {
+          var types = {
           pwd1: 'password',
           pwd2: 'password',
           set: 'submit'
@@ -89,73 +84,55 @@ describe('sessions ui', function() {
         return Promise.all(promises);
       });
 
-      it('should reject non-matching passwords', function () {
-        return elements.pwd1.sendKeys('asdfasdf').then(function() {
-          return elements.pwd2.sendKeys('qwerqwer');
-        }).then(function() {
-          return elements.set.click();
-        }).then(function() {
-          return driver.wait(webdriver.until.alertIsPresent(), 5000);
-        }).then(function() {
-          return driver.switchTo().alert();
-        }).then(function(alert) {
-          return alert.getText().then(function(text) {
-            assert.equal(text, 'Passwords don\'t match! Please try again.');
-          }).then(function() {
-            alert.dismiss();
+      it('should reject non-matching passwords', function() {
+          
+          return setUpPage.typePassword('12345678').then(function(){
+              return setUpPage.confirmTypePassword('123456');
+          }).then(function(){
+              return setUpPage.tapSubmitButton();
+          }).then(function(){
+              return setUpPage.alertMessage();
+          }).then(function(text){
+              assert.equal(text, errorPasswordDoNotMatch);
+          }).then(function(){
+              return setUpPage.dismissAlert();
           });
-        });
       });
 
       it('should reject short passwords', function () {
-        return elements.pwd1.sendKeys('asdf').then(function() {
-          return elements.pwd2.sendKeys('asdf');
-        }).then(function() {
-          return elements.set.click();
-        }).then(function() {
-          return driver.wait(webdriver.until.alertIsPresent(), 5000);
-        }).then(function() {
-          return driver.switchTo().alert();
-        }).then(function(alert) {
-          return alert.getText().then(function(text) {
-            assert.equal(text,
-                         'Please use a password of at least 8 characters.');
+          return setUpPage.typePassword('asdf').then(function() {
+            return setUpPage.confirmTypePassword('asdf');
           }).then(function() {
-            alert.dismiss();
+            return setUpPage.tapSubmitButton();
+          }).then(function() {
+            return setUpPage.alertMessage();
+          }).then(function(text){
+              assert.equal(text, shortPasswordErrorMessage);
+          }).then(function() {
+              return setUpPage.dismissAlert();
           });
         });
-      });
 
       it('should fail if password is not set', function() {
-        return  elements.set.click().then(function() {
-          return driver.wait(webdriver.until.alertIsPresent(), 5000);
-        }).then(function() {
-          return driver.switchTo().alert();
-        }).then(function(alert) {
-          return alert.getText().then(function(text) {
-            assert.equal(text,
-                         'Please use a password of at least 8 characters.');
-          }).then(function() {
-            alert.dismiss();
+          return setUpPage.tapSubmitButton().then(function(){
+              return setUpPage.alertMessage();
+          }).then(function(text){
+              assert.equal(text, shortPasswordErrorMessage);
+          }).then(function(){
+              return setUpPage.dismissAlert();
           });
         });
-      });
 
-      it('should accept matching, long-enough passwords', function () {
-        return elements.pwd1.sendKeys(PASS).then(function() {
-          return elements.pwd2.sendKeys(PASS);
-        }).then(function() {
-          return elements.set.click();
-        }).then(function() {
-          return driver.findElement(webdriver.By.id('thank-you'));
-        }).then(function(elt) {
-          return driver.wait(webdriver.until.elementIsVisible(elt), 5000)
-            .then(function() {
-              return elt.getAttribute('innerHTML');
-            }).then(function(value) {
-              assert.equal(value, 'Thank you!');
-            });
-        });
+      it('should accept matching, long-enough passwords', function() {
+          return setUpPage.typePassword('12345678').then(function() {
+              return setUpPage.confirmTypePassword('12345678');
+          }).then(function(){
+              return setUpPage.tapSubmitButtonSignUp();
+          }).then(function(successfulPageView) {
+              return successfulPageView.successLogin();
+          }).then(function(text) {
+              assert.equal(text, successMessage);
+          });
       });
     });
   });
