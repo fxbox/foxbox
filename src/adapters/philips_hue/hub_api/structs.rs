@@ -17,6 +17,7 @@ pub struct Settings {
     pub rules: BTreeMap<String, serde_json::Value>,
     pub schedules: BTreeMap<String, serde_json::Value>,
     pub groups: BTreeMap<String, serde_json::Value>,
+    pub resourcelinks: Option<BTreeMap<String, serde_json::Value>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
