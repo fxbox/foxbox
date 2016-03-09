@@ -4,6 +4,8 @@
 
 extern crate serde;
 
+use std::collections::BTreeMap;
+
 use iron::{Request, Response, IronResult};
 use self::serde::ser::{ Serialize, Serializer };
 
@@ -15,7 +17,9 @@ pub struct ServiceProperties {
     pub name: String,
     pub description: String,
     pub http_url: String,
-    pub ws_url: String
+    pub ws_url: String,
+    #[serde(rename="properties")]
+    pub custom_properties: BTreeMap<String, String>,
 }
 
 pub trait Service : Send + Sync {
@@ -62,6 +66,6 @@ describe! service {
         // [1] https://serde-rs.github.io/serde/serde/serde/ser/trait.Serializer.html
         let serialized_json = serde_json::to_string(&service).unwrap();
         assert_eq!(serialized_json, "{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"\
-        really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}");
+        really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\",\"properties\":{}}");
     }
 }

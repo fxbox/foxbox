@@ -278,7 +278,7 @@ describe! controller {
             controller.add_service(Box::new(service));
 
             match controller.services_as_json() {
-                Ok(txt) => assert_eq!(txt, "[{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\"}]"),
+                Ok(txt) => assert_eq!(txt, "[{\"id\":\"1\",\"name\":\"dummy service\",\"description\":\"really nothing to see\",\"http_url\":\"2\",\"ws_url\":\"3\",\"properties\":{}}]"),
                 Err(err) => assert!(false, err)
             }
         }
