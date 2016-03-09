@@ -14,7 +14,7 @@ clippy = "0.0.48"
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
-foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "80bf99f" }
+foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "a9b86cd" }
 foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "2dcf729" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
