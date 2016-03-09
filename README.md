@@ -69,13 +69,23 @@ $ git clone git@github.com:<username>/foxbox.git
 $ cd foxbox
 ```
 
-## Generating/updating certs and DNS records
-
-```bash
-$ cd scripts
-$ ./update.sh my-link-box 192.168.0.42 52.36.71.23
-$ cd ..
-```
+## TODO:
+* determine local IP address and make proxy do:
+    ```bash
+    $ cd scripts
+    $ ./update.sh my-link-box 192.168.0.42 52.36.71.23
+    $ cd ..
+    ```
+* add a script to generate a root cert and start dns-server + registration_server
+on localhost
+* sign the signing cert, with the root cert in proxy
+* do API calls with signed signing cert
+* check for this in dns-server
+* check for this in registration-server
+* generate additional qr.svg for public-local (not just for mdns)
+* send public-local URL (additional to local IP address) in registration-server
+* switch app to use that
+* note that all of this is still without the tunnel service (apart from setting the DNS A record)
 
 ## Running the daemon
 
