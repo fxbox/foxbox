@@ -75,14 +75,14 @@ pub struct SettingsLightEntry {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SettingsLightState {
     pub on: bool,
-    pub ct: u32,
+    pub ct: Option<u32>,
     pub reachable: bool,
-    pub effect: String,
-    pub sat: u32,
+    pub effect: Option<String>,
+    pub sat: Option<u32>,
     pub bri: u32,
-    pub colormode: String,
-    pub hue: u32,
-    pub xy: Vec<f32>,
+    pub colormode: Option<String>,
+    pub hue: Option<u32>,
+    pub xy: Option<Vec<f32>>,
     pub alert: String,
 }
 
