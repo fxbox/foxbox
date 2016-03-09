@@ -49,8 +49,8 @@ impl Light {
         // Created issues in muti-treading.
         let api = HubApi::new(&self.hub_id, &self.hub_ip);
         let ls = api.get_light_status(&self.hue_id);
-        let hue: f32 = ls.state.hue as f32 / 65535f32 * 360f32;
-        let sat: f32 = ls.state.sat as f32 / 254f32;
+        let hue: f32 = ls.state.hue.unwrap_or(0) as f32 / 65535f32 * 360f32;
+        let sat: f32 = ls.state.sat.unwrap_or(0) as f32 / 254f32;
         let val: f32 = ls.state.bri as f32 / 254f32;
         let on = ls.state.on;
 

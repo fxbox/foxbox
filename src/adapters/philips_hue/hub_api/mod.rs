@@ -121,11 +121,14 @@ impl HubApi {
         let mut lights: Vec<Light> = Vec::new();
         let url = "lights";
         let res = self.get(url).unwrap(); // TODO: remove unwrap
-        let json: BTreeMap<String, structs::SettingsLightEntry> = structs::parse_json(&res).unwrap(); // TODO: no unwrap
+        let json: BTreeMap<String, structs::SettingsLightEntry> =
+            structs::parse_json(&res).unwrap(); // TODO: no unwrap
 
-        for (key,_) in json {
-            let light = Light::new(&self.id, &self.ip, &key);
-            lights.push(light);
+        for (key, value) in json {
+            if value.lighttype == "Extended color light" {
+                let light = Light::new(&self.id, &self.ip, &key);
+                lights.push(light);
+            }
         }
 
         lights
