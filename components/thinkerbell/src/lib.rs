@@ -17,6 +17,7 @@ extern crate foxbox_taxonomy;
 extern crate transformable_channels;
 
 extern crate chrono;
+extern crate rusqlite;
 extern crate serde;
 extern crate serde_json;
 
@@ -39,3 +40,6 @@ pub mod util;
 /// An implementation of Thinkerbell's Execution Environment on top of fake devices.
 /// Useful mainly for writing tests.
 pub mod fake_env;
+
+/// ScriptManager manages storing and executing scripts.
+pub mod manager;
