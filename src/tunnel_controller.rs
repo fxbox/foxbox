@@ -4,7 +4,6 @@
 
 // Assumes Unix
 use std::io::prelude::*;
-use std::fs::File;
 use std::process::{ Child, Command };
 use std::io::Result;
 use managed_process::ManagedProcess;
@@ -18,43 +17,55 @@ pub struct Tunnel {
 
 #[derive(Clone, Debug)]
 pub struct TunnelConfig {
-    local_port: u16,
-    remote_host: String,
+    tunnel_url: String,
+    tunnel_secret: String,
+    local_http_port: u16,
+    local_ws_port: u16,
+    remote_name: String
 }
 
 impl TunnelConfig {
-    pub fn new(port: u16, remote_host: String) -> Self {
+    pub fn new(tunnel_url: String,
+               tunnel_secret: String,
+               local_http_port: u16,
+               local_ws_port: u16,
+               remote_name: String) -> Self {
         TunnelConfig {
-            local_port: port,
-            remote_host: remote_host
+            tunnel_url: tunnel_url,
+            tunnel_secret: tunnel_secret,
+            local_http_port: local_http_port,
+            local_ws_port: local_ws_port,
+            remote_name: remote_name
         }
     }
 
-    /// Describes how to spawn the ngrok process
+    /// Describes how to spawn the pagekite process.
+    /// pagekite requires a user (remote_name) and a shared secret to be able
+    /// to connect us with the bridge. For the first prototype we will have a
+    /// secret common to all boxes, but in the end we will need a secret per
+    /// box. Unfortunately pagekite does not provide a way to add a new
+    /// domain/secret pair while the bridge is running, but it provides the
+    /// possibility to delegate the authentication to a dynamic DNS server.
+    /// XXX We will move to DNS authentication after the first prototype if
+    /// we keep using pagekite.
+    /// https://github.com/fxbox/foxbox/issues/177#issuecomment-194778308
     pub fn spawn(&self) -> Result<Child> {
-        self.write_config_file();
-        Command::new("ngrok")
-                // Important! By default ngrok has a curses like view
-                // which takes over terminal, setting log overrides that
-                .arg("-log=stdout")
-                .arg("-config")
-                .arg("ngrok_config.yaml")
-                .arg(self.local_port.to_string())
+        Command::new("pagekite.py")
+                .arg(format!("--frontend={}", self.tunnel_url))
+                // XXX remove http service once we support https
+                .arg(format!("--service_on=http,https:{}:localhost:{}:{}",
+                             self.remote_name,
+                             self.local_http_port,
+                             self.tunnel_secret))
+                .arg(format!("--service_on=websocket:{}:localhost:{}:{}",
+                             self.remote_name,
+                             self.local_ws_port,
+                             self.tunnel_secret))
                 .spawn()
-    }
-
-    /// Write out the config file that ngrok relies on - this means that this file will always be
-    /// around in the right place, it doesn't clean up after itself
-    fn write_config_file(&self) -> () {
-        let mut file = File::create("ngrok_config.yaml").unwrap();
-        let remote_host = self.remote_host.to_owned();
-
-        file.write_fmt(format_args!("server_addr: {}\ntrust_host_root_certs: false", remote_host)).unwrap();
     }
 }
 
 impl Tunnel {
-
     /// Create a new Tunnel object containing the necessary
     /// configuration
     pub fn new(config: TunnelConfig) -> Tunnel {
