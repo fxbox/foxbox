@@ -74,6 +74,7 @@ impl<T> Default for Phantom<T> {
     }
 }
 
+#[allow(new_without_default)]
 impl<T> Phantom<T> {
     pub fn new() -> Self {
         Phantom {

@@ -18,7 +18,7 @@ use selector::*;
 use values::{Value, Range, TypeError};
 use util::{Exactly, Id};
 
-use std::boxed::FnBox;
+use std::sync::mpsc::Sender;
 
 /// An error that took place while communicating with either an adapter or the mechanism that
 /// handles registeration of adapters.
@@ -94,13 +94,10 @@ pub enum WatchEvent {
     },
 }
 
-pub type Callback<T, E> = Box<FnBox(Result<T, E>) + Send>;
-pub type Infallible<T> = Box<FnBox(T) + Send>;
 pub type ResultMap<K, T, E> = Vec<(K, Result<T, E>)>;
-pub type FnResultMap<K, T, E> = Box<FnBox(ResultMap<K, T, E>) + Send>;
 
 /// A handle to the public API.
-pub trait APIHandle: Send {
+pub trait API {
     /// Get the metadata on services matching some conditions.
     ///
     /// A call to `API::get_services(vec![req1, req2, ...])` will return
@@ -171,7 +168,7 @@ pub trait APIHandle: Send {
     ///   ]
     /// }]
     /// ```
-    fn get_services(&self, Vec<ServiceSelector>, Infallible<Vec<Service>>);
+    fn get_services(&self, &[ServiceSelector]) -> Vec<Service>;
 
     /// Label a set of services with a set of tags.
     ///
@@ -210,7 +207,7 @@ pub trait APIHandle: Send {
     /// ## Success
     ///
     /// A JSON string representing a number.
-    fn add_service_tag(&self, set: Vec<ServiceSelector>, tags: Vec<String>, Infallible<usize>);
+    fn add_service_tags(&self, selectors: &[ServiceSelector], tags: &[String]) -> usize;
 
     /// Remove a set of tags from a set of services.
     ///
@@ -249,15 +246,15 @@ pub trait APIHandle: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_service_tag(&self, set: Vec<ServiceSelector>, tags: Vec<String>, Infallible<usize>);
+    fn remove_service_tags(&self, selectors: &[ServiceSelector], tags: &[String]) -> usize;
 
     /// Get a list of getters matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels`
-    fn get_getter_channels(&self, Vec<GetterSelector>, Infallible<Vec<Channel<Getter>>>);
-    fn get_setter_channels(&self, Vec<SetterSelector>, Infallible<Vec<Channel<Setter>>>);
+    fn get_getter_channels(&self, selectors: &[GetterSelector]) -> Vec<Channel<Getter>>;
+    fn get_setter_channels(&self, selectors: &[SetterSelector]) -> Vec<Channel<Setter>>;
 
     /// Label a set of channels with a set of tags.
     ///
@@ -303,8 +300,8 @@ pub trait APIHandle: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn add_getter_tag(&self, Vec<GetterSelector>, Vec<String>, Infallible<usize>);
-    fn add_setter_tag(&self, Vec<SetterSelector>, Vec<String>, Infallible<usize>);
+    fn add_getter_tags(&self, selectors: &[GetterSelector], tags: &[String]) -> usize;
+    fn add_setter_tags(&self, selectors: &[SetterSelector], tags: &[String]) -> usize;
 
     /// Remove a set of tags from a set of channels.
     ///
@@ -350,29 +347,29 @@ pub trait APIHandle: Send {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_getter_tag(&self, Vec<GetterSelector>, Vec<String>, Infallible<usize>);
-    fn remove_setter_tag(&self, Vec<SetterSelector>, Vec<String>, Infallible<usize>);
+    fn remove_getter_tags(&self, selectors: &[GetterSelector], tags: &[String]) -> usize;
+    fn remove_setter_tags(&self, selectors: &[SetterSelector], tags: &[String]) -> usize;
 
     /// Read the latest value from a set of channels
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels/value`
-    fn fetch_channel_values(&self, Vec<GetterSelector>, FnResultMap<Id<Getter>, Option<Value>, Error>);
+    fn fetch_values(&self, &[GetterSelector]) -> ResultMap<Id<Getter>, Option<Value>, Error>;
 
     /// Send a bunch of values to a set of channels
     ///
     /// # REST API
     ///
     /// `POST /api/v1/channels/value`
-    fn send_channel_values(&self, Vec<(Vec<SetterSelector>, Value)>, FnResultMap<Id<Setter>, (), Error>);
+    fn send_values(&self, Vec<(Vec<SetterSelector>, Value)>) -> ResultMap<Id<Setter>, (), Error>;
 
     /// Watch for any change
     ///
     /// # WebSocket API
     ///
     /// `/api/v1/channels/watch`
-    fn register_channel_watch(&self, selectors: Vec<GetterSelector>, range: Exactly<Range>, on_event: Box<Fn(WatchEvent) + Send + 'static>, cb: Infallible<Self::WatchGuard>);
+    fn register_channel_watch(&self, selectors: Vec<GetterSelector>, range: Exactly<Range>, on_event: Sender<WatchEvent>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
