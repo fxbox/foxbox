@@ -4,7 +4,8 @@
 
 use controller::Controller;
 use foxbox_users::auth_middleware::{ AuthEndpoint, AuthMiddleware };
-use iron::{ AfterMiddleware, headers, IronResult, Request, Response };
+use iron::{ AfterMiddleware, headers, IronError, IronResult, Request,
+            Response };
 use iron::headers::ContentType;
 use iron::method::Method;
 use iron::method::Method::*;
@@ -26,12 +27,8 @@ impl CORS {
         (&[Method::Get], "list"),
         (&[Method::Get, Method::Post, Method::Put], ":service/:command")
     ];
-}
 
-impl AfterMiddleware for CORS {
-    fn after(&self, req: &mut Request, mut res: Response)
-        -> IronResult<Response> {
-
+    pub fn is_allowed(req: &mut Request) -> bool {
         let mut is_cors_endpoint = false;
         for endpoint in CORS::ENDPOINTS {
             let (ref methods, path) = *endpoint;
@@ -62,11 +59,10 @@ impl AfterMiddleware for CORS {
                 break;
             }
         }
+        is_cors_endpoint
+    }
 
-        if !is_cors_endpoint {
-            return Ok(res);
-        }
-
+    pub fn add_headers(res: &mut Response) {
         res.headers.set(headers::AccessControlAllowOrigin::Any);
         res.headers.set(headers::AccessControlAllowHeaders(
             vec![
@@ -78,8 +74,24 @@ impl AfterMiddleware for CORS {
         res.headers.set(headers::AccessControlAllowMethods(
             vec![Get, Post, Put]
         ));
-        res.status = Some(Status::Ok);
+    }
+}
+
+impl AfterMiddleware for CORS {
+    fn after(&self, req: &mut Request, mut res: Response)
+        -> IronResult<Response> {
+        if CORS::is_allowed(req) {
+            CORS::add_headers(&mut res);
+        }
         Ok(res)
+    }
+
+    fn catch(&self, req: &mut Request, mut err: IronError)
+        -> IronResult<Response> {
+        if CORS::is_allowed(req) {
+            CORS::add_headers(&mut err.response);
+        }
+        Err(err)
     }
 }
 
