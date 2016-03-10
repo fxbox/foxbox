@@ -18,8 +18,6 @@ use selector::*;
 use values::{Value, Range, TypeError};
 use util::{Exactly, Id};
 
-use std::sync::mpsc::Sender;
-
 /// An error that took place while communicating with either an adapter or the mechanism that
 /// handles registeration of adapters.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -369,7 +367,7 @@ pub trait API {
     /// # WebSocket API
     ///
     /// `/api/v1/channels/watch`
-    fn register_channel_watch(&self, selectors: Vec<GetterSelector>, range: Exactly<Range>, on_event: Sender<WatchEvent>) -> Self::WatchGuard;
+    fn register_channel_watch(&self, selectors: Vec<GetterSelector>, range: Exactly<Range>, on_event: Box<Fn(WatchEvent)>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
