@@ -14,13 +14,18 @@ use controller::Controller;
 use self::ip_camera_adapter::IpCameraAdapter;
 use self::philips_hue::PhilipsHueAdapter;
 use service::ServiceAdapter;
-use adapt::*;
 
+/// Work in progress replacing the AdapterManager by that of foxbox_adapters.
+use foxbox_adapters::manager::AdapterManager as AdapterManager2;
+
+use std::sync::Arc;
 
 pub struct AdapterManager<T> {
     controller: T,
     adapters: Vec<Box<ServiceAdapter>>,
-    control: AdapterControl,
+
+    // FIXME: This field isn't used for the time being.
+    manager2: Arc<AdapterManager2>,
 }
 
 impl<T: Controller> AdapterManager<T> {
@@ -29,7 +34,7 @@ impl<T: Controller> AdapterManager<T> {
         AdapterManager {
             controller: controller,
             adapters: Vec::new(),
-            control: AdapterControl::new(),
+            manager2: Arc::new(AdapterManager2::new()),
         }
     }
 
@@ -38,7 +43,7 @@ impl<T: Controller> AdapterManager<T> {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
         self.start_adapter(Box::new(PhilipsHueAdapter::new(c.clone())));
         self.start_adapter(Box::new(IpCameraAdapter::new(c)));
-        clock::Clock::init(&self.control, Box::new(|_result| {})); // FIXME: We should have a way to report errors
+        clock::Clock::init(&self.manager2).unwrap(); // FIXME: We should have a way to report errors
     }
 
     fn start_adapter(&mut self, adapter: Box<ServiceAdapter>) {
