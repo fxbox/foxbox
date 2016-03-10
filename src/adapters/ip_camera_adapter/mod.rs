@@ -8,6 +8,8 @@ extern crate serde_json;
 extern crate time;
 extern crate url;
 
+mod mjpeg_proxy;
+
 use controller::Controller;
 use iron::{ Request, Response, IronResult };
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
@@ -222,6 +224,16 @@ impl<T: Controller> IpCameraService<T> {
         }
         success_response!(format!("{}.jpg", filename), "Took a snapshot from {}: {}", self.name, full_filename)
     }
+
+    fn cmd_view(&self) -> IronResult<Response> {
+        let response = mjpeg_proxy::MJPEGProxy::create_response(
+            format!("http://{}/video/mjpg.cgi", self.ip),
+            CAMERA_USERNAME.to_owned(),
+            Some(CAMERA_PASSWORD.to_owned())
+        );
+
+        Ok(response)
+    }
 }
 
 impl<T: Controller> Service for IpCameraService<T> {
@@ -260,6 +272,7 @@ impl<T: Controller> Service for IpCameraService<T> {
         match cmd {
             "snapshot" => self.cmd_snapshot(),
             "list" => self.cmd_list(),
+            "view" => self.cmd_view(),
             "get" => {
                 if let Some(filename) = req.url.query.clone() {
                     // For now we assume that the query is the filename
