@@ -84,6 +84,14 @@ pub enum WatchEvent {
     /// because a tag was edited or because a device was
     /// added. Payload is the id of the device that was added.
     GetterAdded(Id<Getter>),
+
+    /// One of the channels encountered an error during initialization.
+    /// This channel will not be watched, but other channels will remain
+    /// watched.
+    InitializationError {
+        channel: Id<Getter>,
+        error: AdapterError
+    },
 }
 
 pub type Callback<T, E> = Box<FnBox(Result<T, E>) + Send>;

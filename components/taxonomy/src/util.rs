@@ -68,15 +68,14 @@ pub struct Phantom<T> {
     phantom: PhantomData<T>
 }
 
-impl<T> Phantom<T> {
-    pub fn new() -> Self {
-        Phantom {
-            phantom: PhantomData
-        }
-    }
-}
 impl<T> Default for Phantom<T> {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> Phantom<T> {
+    pub fn new() -> Self {
         Phantom {
             phantom: PhantomData
         }
