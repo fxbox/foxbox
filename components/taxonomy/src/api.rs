@@ -92,7 +92,11 @@ pub enum WatchEvent {
     },
 }
 
+/// A bunch of results coming from different sources.
 pub type ResultMap<K, T, E> = Vec<(K, Result<T, E>)>;
+
+/// A bunch of instructions, going to different targets.
+pub type TargetMap<K, T> = Vec<(Vec<K>, T)>;
 
 /// A handle to the public API.
 pub trait API {
@@ -360,16 +364,33 @@ pub trait API {
     /// # REST API
     ///
     /// `POST /api/v1/channels/value`
-    fn send_values(&self, Vec<(Vec<SetterSelector>, Value)>) -> ResultMap<Id<Setter>, (), Error>;
+    fn send_values(&self, TargetMap<SetterSelector, Value>) -> ResultMap<Id<Setter>, (), Error>;
 
-    /// Watch for any change
+    /// Watch for changes from channels.
+    ///
+    /// This method registers a closure to watch over events on a set of channels. Argument `watch`
+    /// specifies which channels to watch and which events are of interest.
+    ///
+    /// - If argument `Exactly<Range>` is `Exactly::Exactly(range)`, the watch is interested in
+    /// values coming from these channels, if they fall within `range`. This is the most common
+    /// case. In this case, `on_event` receives `WatcherEvent::GetterAdded`,
+    /// `WatcherEvent::GetterRemoved` and `WatcherEvent::Value`, whenever a new value is available
+    /// in the range.
+    ///
+    /// - If argument `Exactly<Range>` is `Exactly::Never`, the watch is not interested in the
+    /// values coming from these channels, only in connection/disconnection events. Argument
+    /// `on_event` receives `WatchEvent::GetterAdded` and `WatchEvent::GetterRemoved`.
+    ///
+    /// - If the `Exactly<Range>` argument is `Exactly::Always`, the watch is interested in
+    /// receiving *every single value coming from the channels*. This is very rarely a good idea.
+    /// Many devices may reject such requests.
     ///
     /// # WebSocket API
     ///
     /// `/api/v1/channels/watch`
-    fn register_channel_watch(&self, selectors: Vec<GetterSelector>, range: Exactly<Range>, on_event: Box<Fn(WatchEvent) + Send>) -> Self::WatchGuard;
+    fn register_channel_watch(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
+            on_event: Box<Fn(WatchEvent) + Send>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
 }
-
