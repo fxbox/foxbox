@@ -23,7 +23,11 @@ var SetupUI = {
       new URLSearchParams(window.location.search.substring(1));
 
     if (searchParams.has('redirect_url')) {
-      SetupUI.redirect = searchParams.get('redirect_url');
+      try {
+        SetupUI.redirect = new URL(searchParams.get('redirect_url'));
+      } catch(e) {
+        console.error(e);
+      }
     }
 
     SetupUI.elements.signupButton.addEventListener('click', SetupUI.signup);
@@ -61,7 +65,11 @@ var SetupUI = {
         return;
       }
       if (SetupUI.redirect) {
-        window.location.replace(SetupUI.redirect + '?session_token=' + token);
+        var url = SetupUI.redirect;
+        url.search +=
+         (url.search.split('?')[1] ? '&':'?') + 'session_token=' + token;
+        url.hash = window.location.hash;
+        window.location.replace(url.toString());
       } else {
         localStorage.setItem('session', token);
         SetupUI.elements.location.innerHTML = window.location.href;
