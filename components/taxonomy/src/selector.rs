@@ -1,4 +1,4 @@
-use services::{Service, ServiceId, ChannelKind, Channel, Getter, Setter};
+use services::{Service, ServiceId, ChannelKind, Channel, Getter, Setter, TagId};
 use util::{Exactly, Id};
 use values;
 
@@ -28,9 +28,10 @@ pub trait SelectedBy<T> {
 /// ```
 /// use foxbox_taxonomy::selector::*;
 /// use foxbox_taxonomy::services::*;
+/// use foxbox_taxonomy::util::Id;
 ///
 /// let selector = ServiceSelector::new()
-///   .with_tags(vec!["entrance".to_owned()])
+///   .with_tags(vec![Id::<TagId>::new("entrance".to_owned())])
 ///   .with_getters(vec![GetterSelector::new() /* can be more restrictive */]);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -41,7 +42,7 @@ pub struct ServiceSelector {
 
     ///  Restrict results to services that have all the tags in `tags`.
     #[serde(default)]
-    pub tags: HashSet<String>,
+    pub tags: HashSet<Id<TagId>>,
 
     /// Restrict results to services that have all the getters in `getters`.
     #[serde(default)]
@@ -71,7 +72,7 @@ impl ServiceSelector {
     }
 
     ///  Restrict results to services that have all the tags in `tags`.
-    pub fn with_tags(self, tags: Vec<String>) -> Self {
+    pub fn with_tags(self, tags: Vec<Id<TagId>>) -> Self {
         ServiceSelector {
             tags: merge(self.tags, tags),
             .. self
@@ -170,7 +171,7 @@ pub struct GetterSelector {
 
     ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
-    pub tags: HashSet<String>,
+    pub tags: HashSet<Id<TagId>>,
 
     /// If `Exatly(k)`, restrict results to channels that produce values
     /// of kind `k`.
@@ -222,7 +223,7 @@ impl GetterSelector {
     }
 
     ///  Restrict to channels that have all the tags in `tags`.
-    pub fn with_tags(self, tags: Vec<String>) -> Self {
+    pub fn with_tags(self, tags: Vec<Id<TagId>>) -> Self {
         GetterSelector {
             tags: merge(self.tags, tags),
             .. self
@@ -304,7 +305,7 @@ pub struct SetterSelector {
 
     ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
-    pub tags: HashSet<String>,
+    pub tags: HashSet<Id<TagId>>,
 
     /// If `Exactly(k)`, restrict results to channels that accept values
     /// of kind `k`.
@@ -352,7 +353,7 @@ impl SetterSelector {
     }
 
     ///  Restrict to channels that have all the tags in `tags`.
-    pub fn with_tags(self, tags: Vec<String>) -> Self {
+    pub fn with_tags(self, tags: Vec<Id<TagId>>) -> Self {
         SetterSelector {
             tags: merge(self.tags, tags),
             .. self
@@ -467,7 +468,7 @@ impl Period {
 }
 
 
-fn has_selected_tags(actual: &HashSet<String>, requested: &HashSet<String>) -> bool {
+fn has_selected_tags(actual: &HashSet<Id<TagId>>, requested: &HashSet<Id<TagId>>) -> bool {
     for tag in &*actual {
         if !requested.contains(tag) {
             return false;
