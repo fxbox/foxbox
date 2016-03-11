@@ -10,7 +10,7 @@ cache:
 
 # $BOX_HOST_NAME and $BOX_PORT are also used by Selenium tests.
 env:
-  - BOX_HOST_NAME=foxbox BOX_PORT=3000
+  - BOX_LOCAL_NAME=foxbox BOX_PORT=3000
 
 before_install:
   - sudo apt-get -qq update
@@ -33,4 +33,4 @@ script:
     - cargo build # Linter is also executed here
     - $TRAVIS_BUILD_DIR/tools/execute-unit-tests-with-coverage
     - jshint static/main/js/*.js static/setup/js/*.js test/selenium/*.js
-    - (cargo run -- -n $BOX_HOST_NAME -p $BOX_PORT &> /dev/null &) ; npm test
+    - (cargo run -- -l $BOX_LOCAL_NAME -p $BOX_PORT &> /dev/null &) ; npm test

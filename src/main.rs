@@ -91,11 +91,11 @@ use std::mem;
 use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-n <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-c <namespace;key;value>]...
+Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-c <namespace;key;value>]...
 
 Options:
     -v, --verbose            Toggle verbose output.
-    -n, --name <hostname>    Set local hostname. Linux only. Requires to be a member of the netdev group.
+    -l, --local-name <hostname>    Set local hostname. Linux only. Requires to be a member of the netdev group.
     -p, --port <port>        Set port to listen on for http connections. [default: 3000]
     -w, --wsport <wsport>    Set port to listen on for websocket. [default: 4000]
     -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242/register]
@@ -104,7 +104,7 @@ Options:
     -c, --config <namespace;key;value>  Set configuration override
     -h, --help               Print this help menu.
 ",
-        flag_name: Option<String>,
+        flag_local_name: Option<String>,
         flag_port: u16,
         flag_wsport: u16,
         flag_register: String,
@@ -192,7 +192,7 @@ fn main() {
     }
 
     let mut controller = FoxBox::new(
-        args.flag_verbose, args.flag_name.map_or(None, update_hostname), args.flag_port,
+        args.flag_verbose, args.flag_local_name.map_or(None, update_hostname), args.flag_port,
         args.flag_wsport);
 
     // Override config values
@@ -229,7 +229,7 @@ describe! main {
                 .decode().unwrap();
 
             assert_eq!(args.flag_verbose, false);
-            assert_eq!(args.flag_name, None);
+            assert_eq!(args.flag_local_name, None);
             assert_eq!(args.flag_port, 3000);
             assert_eq!(args.flag_wsport, 4000);
             assert_eq!(args.flag_register, "http://localhost:4242/register");
@@ -243,7 +243,7 @@ describe! main {
             let argv = || vec!["foxbox",
                                "-v",
                                "-p", "1234",
-                               "-n", "foobar",
+                               "-l", "foobar",
                                "-w", "4567",
                                "-r", "http://foo.bar:6868/register",
                                "-i", "eth99",
@@ -254,7 +254,7 @@ describe! main {
                .decode().unwrap();
 
             assert_eq!(args.flag_verbose, true);
-            assert_eq!(args.flag_name.unwrap(), "foobar");
+            assert_eq!(args.flag_local_name.unwrap(), "foobar");
             assert_eq!(args.flag_port, 1234);
             assert_eq!(args.flag_wsport, 4567);
             assert_eq!(args.flag_register, "http://foo.bar:6868/register");
@@ -267,7 +267,7 @@ describe! main {
             let argv = || vec!["foxbox",
                                "--verbose",
                                "--port", "1234",
-                               "--name", "foobar",
+                               "--local-name", "foobar",
                                "--wsport", "4567",
                                "--register", "http://foo.bar:6868/register",
                                "--iface", "eth99",
@@ -278,7 +278,7 @@ describe! main {
                 .decode().unwrap();
 
             assert_eq!(args.flag_verbose, true);
-            assert_eq!(args.flag_name.unwrap(), "foobar");
+            assert_eq!(args.flag_local_name.unwrap(), "foobar");
             assert_eq!(args.flag_port, 1234);
             assert_eq!(args.flag_wsport, 4567);
             assert_eq!(args.flag_register, "http://foo.bar:6868/register");
