@@ -115,7 +115,9 @@ pub fn create<T: Controller>(controller: T) -> Chain {
         match req.method {
             Method::Get |
             Method::Post |
-            Method::Put => {
+            Method::Put |
+            Method::Delete |
+            Method::Options => {
                 // Call a function on a service.
                 let id = req.extensions.get::<Router>().unwrap()
                     .find("service").unwrap_or("").to_owned();
