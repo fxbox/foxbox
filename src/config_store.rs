@@ -193,7 +193,7 @@ describe! config {
 
     describe! config_service {
         before_each {
-            let mut config = ConfigService::new(&config_file_name);
+            let config = ConfigService::new(&config_file_name);
         }
 
         it "should remember properties" {
@@ -261,7 +261,7 @@ describe! config {
         it "ConfigService should remember things over restarts" {
             // Block to make `config` go out of scope
             {
-                let mut config = ConfigService::new(&config_file_name);
+                let config = ConfigService::new(&config_file_name);
                 config.set("foo", "bar", "baz");
             }
             // `config` should now be out of scope and dropped

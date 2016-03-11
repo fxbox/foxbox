@@ -13,6 +13,7 @@ use http_server::HttpServer;
 use iron::{Request, Response, IronResult};
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
+use profile_service::ProfileService;
 use self::collections::vec::IntoIter;
 use service::{ Service, ServiceAdapter, ServiceProperties };
 use std::collections::hash_map::HashMap;
@@ -35,6 +36,7 @@ pub struct FoxBox {
     websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
     pub config: Arc<ConfigService>,
     upnp: Arc<UpnpManager>,
+    profile_service: Arc<ProfileService>
 }
 
 const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
@@ -59,6 +61,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
 
     fn get_config(&self) -> &ConfigService;
     fn get_upnp_manager(&self) -> Arc<UpnpManager>;
+    fn get_profile(&self) -> &ProfileService;
 }
 
 impl FoxBox {
@@ -68,6 +71,7 @@ impl FoxBox {
                http_port: u16,
                ws_port: u16) -> Self {
 
+        let profile_service = ProfileService::new(None);
         FoxBox {
             services: Arc::new(Mutex::new(HashMap::new())),
             websockets: Arc::new(Mutex::new(HashMap::new())),
@@ -77,8 +81,9 @@ impl FoxBox {
             }),
             http_port: http_port,
             ws_port: ws_port,
-            config: Arc::new(ConfigService::new("foxbox.conf")),
-            upnp: Arc::new(UpnpManager::new())
+            config: Arc::new(ConfigService::new(&profile_service.path_for("foxbox.conf"))),
+            upnp: Arc::new(UpnpManager::new()),
+            profile_service: Arc::new(profile_service)
         }
     }
 }
@@ -201,6 +206,10 @@ impl Controller for FoxBox {
 
     fn get_config(&self) -> &ConfigService {
         &self.config
+    }
+
+    fn get_profile(&self) -> &ProfileService {
+        &self.profile_service
     }
 
     fn get_upnp_manager(&self) -> Arc<UpnpManager> {

@@ -65,6 +65,7 @@ mod config_store;
 mod controller;
 mod http_server;
 mod managed_process;
+mod profile_service;
 mod registration;
 mod service;
 mod upnp;
