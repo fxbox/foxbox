@@ -91,7 +91,7 @@ use std::mem;
 use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-c <namespace;key;value>]...
+Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [-u <hostname>] [-c <namespace;key;value>]...
 
 Options:
     -v, --verbose            Toggle verbose output.
@@ -101,6 +101,8 @@ Options:
     -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242/register]
     -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
+    -s, --tunnel-secret <secret>    Set the tunnel shared secret. [default: secret]
+    -u, --remote-name <hostname>    Set remote hostname. This the URL to access the box through the bridge. If omitted, the tunnel is disabled
     -c, --config <namespace;key;value>  Set configuration override
     -h, --help               Print this help menu.
 ",
@@ -110,6 +112,8 @@ Options:
         flag_register: String,
         flag_iface: Option<String>,
         flag_tunnel: Option<String>,
+        flag_tunnel_secret: String,
+        flag_remote_name: Option<String>,
         flag_config: Option<Vec<String>>);
 
 /// Updates local host name with the provided host name string. If requested host name
@@ -186,9 +190,15 @@ fn main() {
 
     // Start the tunnel.
     let mut tunnel: Option<Tunnel> = None;
-    if let Some(host) = args.flag_tunnel {
-        tunnel = Some(Tunnel::new(TunnelConfig::new(args.flag_port, host)));
-        tunnel.as_mut().unwrap().start().unwrap();
+    if let Some(tunnel_url) = args.flag_tunnel {
+        if let Some(remote_name) = args.flag_remote_name {
+            tunnel = Some(Tunnel::new(TunnelConfig::new(tunnel_url,
+                                                        args.flag_tunnel_secret,
+                                                        args.flag_port,
+                                                        args.flag_wsport,
+                                                        remote_name)));
+            tunnel.as_mut().unwrap().start().unwrap();
+        }
     }
 
     let mut controller = FoxBox::new(
