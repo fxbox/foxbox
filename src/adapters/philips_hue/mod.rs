@@ -18,10 +18,15 @@ use router::Router;
 use self::hub_api::structs::*;
 use self::light::Light;
 use service::{ Service, ServiceAdapter, ServiceProperties };
+use std::collections::BTreeMap;
 use std::io::Read;
 use std::thread;
 use std::time::Duration;
 use stable_uuid as StableUuid;
+
+const CUSTOM_PROPERTY_MANUFACTURER: &'static str = "manufacturer";
+const CUSTOM_PROPERTY_TYPE: &'static str = "type";
+const CUSTOM_PROPERTY_MODEL: &'static str = "model";
 
 pub struct PhilipsHueAdapter<T> {
     name: String,
@@ -105,7 +110,19 @@ impl<T: Controller> ServiceAdapter for PhilipsHueAdapter<T> {
                     for light in lights {
                         debug!("Creating service for {:?}", light);
                         id += 1;
-                        let service = HueLightService::new(controller.clone(), id, light);
+
+                        let light_status = hub.get_light_status(&light.hue_id);
+
+                        let mut custom_properties = BTreeMap::<String, String>::new();
+                        custom_properties.insert(CUSTOM_PROPERTY_TYPE.to_owned(),
+                                                 light_status.lighttype);
+                        custom_properties.insert(CUSTOM_PROPERTY_MANUFACTURER.to_owned(),
+                                                 light_status.manufacturername);
+                        custom_properties.insert(CUSTOM_PROPERTY_MODEL.to_owned(),
+                                                 light_status.modelid);
+
+                        let service = HueLightService::new(controller.clone(), id, light,
+                                                           custom_properties);
                         service.start();
                         controller.add_service(Box::new(service));
                     }
@@ -128,7 +145,7 @@ struct HueLightService<T> {
 }
 
 impl<T: Controller> HueLightService<T> {
-    fn new(controller: T, id: u32, light: Light) -> Self {
+    fn new(controller: T, id: u32, light: Light, properties: BTreeMap<String, String>) -> Self {
         debug!("Creating HueLightService {} for Light {:?}", id, light);
         let service_id = StableUuid::from_str(light.get_unique_id()).to_simple_string();
         HueLightService {
@@ -138,9 +155,10 @@ impl<T: Controller> HueLightService<T> {
                 name: "philips hue service".to_owned(),
                 description: "Service for Philips Hue Light".to_owned(),
                 http_url: controller.get_http_root_for_service(service_id.clone()),
-                ws_url: controller.get_ws_root_for_service(service_id)
+                ws_url: controller.get_ws_root_for_service(service_id),
+                custom_properties: properties,
             },
-            light: light
+            light: light,
         }
     }
 
