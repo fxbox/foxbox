@@ -25,6 +25,29 @@ pub struct ServiceId;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct AdapterId;
 
+// A marker for Id.
+/// Only useful for writing `Id<TagId>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
+pub struct TagId;
+
+// A helper macro to create a Id<ServiceId> without boilerplate.
+#[macro_export]
+macro_rules! service_id {
+    ($val:expr) => (Id::<ServiceId>::new($val.to_owned()))
+}
+
+// A helper macro to create a Id<AdapterId> without boilerplate.
+#[macro_export]
+macro_rules! adapter_id {
+    ($val:expr) => (Id::<AdapterId>::new($val.to_owned()))
+}
+
+// A helper macro to create a Id<TagId> without boilerplate.
+#[macro_export]
+macro_rules! tag_id {
+    ($val:expr) => (Id::<TagId>::new($val.to_owned()))
+}
+
 /// Metadata on a service. A service is a device or collection of devices
 /// that may offer services. The FoxBox itself is a service offering
 /// services such as a clock, communicating with the user through her
@@ -42,7 +65,7 @@ pub struct Service {
     /// controlling blue lights. An adapter may set tags "plugged" or
     /// "battery" to devices that respectively depend on a plugged
     /// power source or on a battery.
-    pub tags: HashSet<String>,
+    pub tags: HashSet<Id<TagId>>,
 
     /// An id unique to this service.
     pub id: Id<ServiceId>,
@@ -54,6 +77,7 @@ pub struct Service {
     /// Identifier of the adapter for this service.
     pub adapter: Id<AdapterId>,
 }
+
 impl Service {
     /// Create an empty service.
     pub fn empty(id: Id<ServiceId>, adapter: Id<AdapterId>) -> Self {
@@ -168,7 +192,6 @@ impl ChannelKind {
     }
 }
 
-
 /// A getter operation available on a channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Getter {
@@ -209,6 +232,7 @@ pub struct Getter {
     /// polling or through a trigger.
     pub updated: Option<TimeStamp>,
 }
+
 impl IOMechanism for Getter {
 }
 
@@ -227,6 +251,7 @@ pub struct Setter {
     #[serde(default)]
     pub updated: Option<TimeStamp>,
 }
+
 impl IOMechanism for Setter {
 }
 
@@ -244,7 +269,7 @@ pub struct Channel<IO> where IO: IOMechanism {
     ///
     /// For instance "entrance".
     #[serde(default)]
-    pub tags: HashSet<String>,
+    pub tags: HashSet<Id<TagId>>,
 
     /// An id unique to this channel.
     pub id: Id<IO>,
@@ -262,13 +287,16 @@ pub struct Channel<IO> where IO: IOMechanism {
     #[serde(default)]
     pub last_seen: Option<TimeStamp>,
 }
+
 impl<IO> Eq for Channel<IO> where IO: IOMechanism {
 }
+
 impl<IO> PartialEq for Channel<IO> where IO: IOMechanism {
      fn eq(&self, other: &Self) -> bool {
          self.id.eq(&other.id)
      }
 }
+
 impl<IO> Hash for Channel<IO> where IO: IOMechanism {
     fn hash<H>(&self, state: &mut H) where H: Hasher {
         self.id.hash(state)

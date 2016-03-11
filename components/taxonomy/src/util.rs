@@ -60,8 +60,6 @@ impl<T> Default for Exactly<T> {
     }
 }
 
-
-
 /// A variant of `PhantomData` that supports [De]serialization
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub struct Phantom<T> {
@@ -74,7 +72,6 @@ impl<T> Default for Phantom<T> {
     }
 }
 
-#[allow(new_without_default)]
 impl<T> Phantom<T> {
     pub fn new() -> Self {
         Phantom {
@@ -127,6 +124,7 @@ pub struct Id<T> {
 
     phantom: Phantom<T>,
 }
+
 impl<T> Id<T> {
     pub fn new(id: String) -> Self {
         Id {
@@ -139,24 +137,29 @@ impl<T> Id<T> {
         &self.id
     }
 }
+
 impl<T> PartialEq for Id<T> {
     fn eq(&self, other: &Self) -> bool {
         self.id.eq(&other.id)
     }
 }
+
 impl<T> Eq for Id<T> {
 }
+
 impl<T> Hash for Id<T> {
     fn hash<H>(&self, state: &mut H) where H: Hasher {
         self.id.hash(state)
     }
 }
+
 impl<T> Serialize for Id<T> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer {
         self.id.as_ref().serialize(serializer)
     }
 }
+
 impl<T> Deserialize for Id<T> {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer {
@@ -171,7 +174,6 @@ impl<T> Deserialize for Id<T> {
 
 /// A bunch of results grouped in an array of (key, result).
 pub type ResultSet<I, T, E> = Vec<(I, Result<T, E>)>;
-
 
 /// By default, the (de)serialization of trivial enums by Serde is surprising, e.g.
 /// in JSON,  `enum Foo {A, B, C}` will produce `{"\"A\": []"}` for `A`, where `"\"A\""`
@@ -210,6 +212,7 @@ pub type ResultSet<I, T, E> = Vec<(I, Result<T, E>)>;
 pub struct TrivialEnumVisitor<T> where T: Deserialize {
     parser: Box<Fn(&str) -> Result<T, ()>>
 }
+
 impl<T> TrivialEnumVisitor<T> where T: Deserialize {
     pub fn new<F>(parser: F) -> Self
         where F: Fn(&str) -> Result<T, ()> + 'static {
