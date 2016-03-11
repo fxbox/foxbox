@@ -14,8 +14,9 @@ clippy = "0.0.48"
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
+foxbox_adapters = { git = "https://github.com/fxbox/adapters.git", rev = "7a3f2de" }
+foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "16e7f37" }
 foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "a9b86cd" }
-foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "2dcf729" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
 multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
@@ -34,7 +35,7 @@ serde_macros = "0.6.14"
 staticfile = "0.1.0"
 unicase = "1.3.0"
 time = "0.1"
-timer = "0.1.4"
+timer = "0.1.6"
 uuid = "0.1.18"
 url = "0.5.5"
 ws = { git = "https://github.com/housleyjk/ws-rs.git", rev = "d154fc5" }

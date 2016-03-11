@@ -8,9 +8,6 @@ use std::collections::HashMap;
 use std::io::Read;
 use xml::reader::{ EventReader, XmlEvent };
 
-use std::thread;
-use std::sync::mpsc::{ channel, Sender };
-
 // Macros to help with json serializing of undeclared structs.
 // json_value!({ }) returns a serde_json::value::Value from an anonymous struct.
 // json!({ }) returns a string from an anonymous struct.
@@ -229,46 +226,3 @@ describe! string_escaping {
     }
 }
 
-
-/// Operations
-enum DispatchOp {
-    /// Dispatch a closure for execution on the thread.
-    Dispatch(Box<FnMut() + Send + 'static>),
-
-    /// Stop the thread.
-    Stop
-}
-
-/// A thread to which we can dispatch closures.
-#[derive(Clone)]
-pub struct DispatchThread {
-    tx: Sender<DispatchOp>
-}
-
-impl DispatchThread {
-    pub fn new() -> Self {
-        let (tx, rx) = channel();
-        thread::spawn(move || {
-            for msg in rx.iter() {
-                match msg {
-                    DispatchOp::Stop => return,
-                    DispatchOp::Dispatch(mut cb) => cb()
-                }
-            }
-        });
-        DispatchThread {
-            tx: tx
-        }
-    }
-
-    pub fn dispatch<F>(&self, cb: F) where F: FnMut() + Send + 'static {
-        self.tx.send(DispatchOp::Dispatch(Box::new(cb))).unwrap();
-    }
-}
-
-/// Stop the underlying thread when the DispatchThread is dropped.
-impl Drop for DispatchThread {
-    fn drop(&mut self) {
-        let _ignore = self.tx.send(DispatchOp::Stop);
-    }
-}

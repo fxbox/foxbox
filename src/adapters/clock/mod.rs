@@ -1,15 +1,16 @@
 //! An adapter providing time-related services, such as the current
 //! timestamp or the current time of day.
 
-use adapt::*;
-use utils::DispatchThread;
-
-use foxbox_taxonomy::values::{Value, ValDuration, TimeStamp};
+use foxbox_adapters::adapter::*;
+use foxbox_taxonomy::api::{ AdapterError, ResultMap };
+use foxbox_taxonomy::values::{ Range, TimeStamp, Type, ValDuration, Value };
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::util::Id;
 
-use std::boxed::FnBox;
-use std::collections::{HashMap, HashSet};
+use std::collections::{ HashMap, HashSet };
+use std::sync::Arc;
+use std::thread;
+use std::sync::mpsc:: { channel, Sender };
 
 use chrono;
 use chrono::*;
@@ -19,20 +20,26 @@ static ADAPTER_NAME: &'static str = "Clock adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
 static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 
+#[derive(Clone)]
+enum Op {
+    Enter(Id<Getter>, Value),
+    Exit(Id<Getter>, Value),
+}
+
+enum Movement { Enter, Exit }
+
 pub struct Clock {
     /// Timer used to dispatch `register_watch` requests.
     timer: timer::Timer,
-    /// Thread used to execute callbacks.
-    thread: DispatchThread,
-
     getter_timestamp_id: Id<Getter>,
     getter_time_of_day_id: Id<Getter>,
+
     service_clock_id: Id<ServiceId>,
 }
 
 /// A guard used to cancel watching for values.
-struct Guard(Option<timer::Guard>);
-impl WatchGuard for Guard {
+struct Guard(Vec<timer::Guard>);
+impl AdapterWatchGuard for Guard {
 }
 
 impl Clock {
@@ -66,117 +73,243 @@ impl Adapter for Clock {
         &ADAPTER_VERSION
     }
 
-    fn get_values(&self, set: Vec<Id<Getter>>) -> Vec<Result<Option<Value>, Error>> {
+    fn fetch_values(&self, set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, AdapterError> {
         set.iter().map(|id| {
             if *id == self.getter_timestamp_id {
                 let date = TimeStamp::from_datetime(chrono::UTC::now());
-                Ok(Some(Value::TimeStamp(date)))
+                (id.clone(), Ok(Some(Value::TimeStamp(date))))
             } else if *id == self.getter_time_of_day_id {
                 use chrono::Timelike;
                 let date = chrono::Local::now();
                 let duration = chrono::Duration::seconds(date.num_seconds_from_midnight() as i64);
-                Ok(Some(Value::Duration(ValDuration::new(duration))))
+                (id.clone(), Ok(Some(Value::Duration(ValDuration::new(duration)))))
             } else {
-                Err(Error::NoSuchGetter(id.clone()))
+                (id.clone(), Err(AdapterError::NoSuchGetter(id.clone())))
             }
         }).collect()
     }
 
-    fn set_values(&self, mut values: Vec<(Id<Setter>, Value)>) -> Result<(), Error> {
-        // This adapter doesn't support any setter.
-        match values.pop() {
-            None => Ok(()),
-            Some((id, _)) => Err(Error::NoSuchSetter(id))
-        }
+    fn send_values(&self, values: Vec<(Id<Setter>, Value)>) -> ResultMap<Id<Setter>, (), AdapterError> {
+        values.iter()
+            .map(|&(ref id, _)| {
+                (id.clone(), Err(AdapterError::NoSuchSetter(id.clone())))
+            })
+            .collect()
     }
 
-    fn register_watch(&self, id: Id<Getter>, threshold: Option<Value>, cb: Box<Fn(Value) + Send>) -> Result<Box<WatchGuard>, Error> {
-        let threshold = match threshold {
-            None => return Err(Error::GetterRequiresThresholdForWatching(id)),
-            Some(threshold) => threshold
-        };
-
-        // Hack to workaround the fact that only `FnOnce` can move
-        // values, but `Box<FnOnce>` is not implemented. We replace
-        // the move with a call to `take()`.
-        // This is part 1 of the hack.
-        let mut cb = Some(cb);
-        if id == self.getter_timestamp_id {
-            let ts = try!(threshold.as_timestamp().map_err(Error::TypeError));
-            // Use universal time.
-            let now = chrono::offset::utc::UTC::now();
-            if *ts.as_datetime() < now {
-                // Too late to execute.
-                return Ok(Box::new(Guard(None)));
+    fn register_watch(&self, mut watch: Vec<(Id<Getter>, Option<Range>)>,
+        cb: Box<Fn(WatchEvent) + Send>) ->
+            ResultMap<Id<Getter>, Box<AdapterWatchGuard>, AdapterError>
+    {
+        let (tx, rx) = channel();
+        thread::spawn(move || {
+            let cb = cb;
+            for msg in rx {
+                match msg {
+                    Op::Enter(id, value) => {
+                        cb(WatchEvent::Enter {
+                            id: id,
+                            value: value
+                        })
+                    },
+                    Op::Exit(id, value) => {
+                        cb(WatchEvent::Exit {
+                            id: id,
+                            value: value
+                        })
+                    },
+                }
             }
-
-            let thread = self.thread.clone();
-            let guard = self.timer.schedule_with_date(*ts.as_datetime(), move || {
-                // Hack to workaround the fact that only `FnOnce` can move
-                // values, but `Box<FnOnce>` is not implemented. We replace
-                // the move with a call to `take()`.
-                // This is part 2 of the hack.
-                let mut cb = Some(cb.take().unwrap());
-                let cb2 = move || {
-                    let value = Value::TimeStamp(TimeStamp::from_datetime(chrono::UTC::now()));
-                    // Hack to workaround the fact that only `FnOnce` can move
-                    // values, but `Box<FnOnce>` is not implemented. We replace
-                    // the move with a call to `take()`.
-                    // This is part 3 of the hack.
-                    let cb = cb.take().unwrap();
-                    cb(value);
-                };
-                thread.dispatch(cb2);
-            });
-            Ok(Box::new(Guard(Some(guard))))
-        } else if id == self.getter_time_of_day_id {
-            let time_of_day = try!(threshold.as_duration().map_err(Error::TypeError)).as_duration();
-            let thread = self.thread.clone();
-
-            // Use local time.
-            let ts : chrono::DateTime<_> = match chrono::Local::today().and_time(NaiveTime::from_hms(0, 0, 0) + *time_of_day) {
-                None => return Err(Error::InvalidValue),
-                Some(ts) => ts.with_timezone(&UTC)
-            };
-
-            let guard = self.timer.schedule(ts, Some(Duration::days(1)), move || {
-                // Hack to workaround the fact that only `FnOnce` can move
-                // values, but `Box<FnOnce>` is not implemented. We replace
-                // the move with a call to `take()`.
-                // This is part 2 of the hack.
-                let mut cb = Some(cb.take().unwrap());
-                let cb2 = move || {
-                    let value = Value::TimeStamp(TimeStamp::from_datetime(chrono::UTC::now()));
-                    // Hack to workaround the fact that only `FnOnce` can move
-                    // values, but `Box<FnOnce>` is not implemented. We replace
-                    // the move with a call to `take()`.
-                    // This is part 3 of the hack.
-                    let cb = cb.take().unwrap();
-                    cb(value);
-                };
-                thread.dispatch(cb2);
-            });
-            Ok(Box::new(Guard(Some(guard))))
-        } else {
-            Err(Error::GetterDoesNotSupportWatching(id))
-        }
+        });
+        watch.drain(..).map(|(id, filter)| {
+            (id.clone(), match filter {
+                None => Err(AdapterError::GetterRequiresThresholdForWatching(id)),
+                Some(range) => self.aux_register_watch(&id, range, tx.clone())
+            })
+        }).collect()
     }
 }
 
 impl Clock {
-    pub fn init(adapt: &AdapterControl, cb: Box<FnBox(Result<(), Error>) + Send> ) {
-        // Setup a thread to execute callbacks.
-        let thread = DispatchThread::new();
+    fn aux_register_watch(&self, id: &Id<Getter>, range: Range, tx: Sender<Op>)
+        -> Result<Box<AdapterWatchGuard>, AdapterError>
+    {
+        match () {
+            _ if *id == self.getter_time_of_day_id => self.aux_register_watch_timeofday(id, range, tx),
+            _ if *id == self.getter_timestamp_id => self.aux_register_watch_timestamp(id, range, tx),
+            _ => Err(AdapterError::GetterDoesNotSupportWatching(id.clone()))
+        }
+    }
+
+    fn aux_register_watch_timeofday(&self, id: &Id<Getter>, range: Range, tx: Sender<Op>)
+        -> Result<Box<AdapterWatchGuard>, AdapterError>
+    {
+        use foxbox_taxonomy::values::Range::*;
+
+        // Sanity checks
+        let typ = try!(range.get_type().map_err(AdapterError::TypeError));
+        try!(Type::Duration.ensure_eq(&typ).map_err(AdapterError::TypeError));
+
+        // Now determine when to call the trigger. Repeat duration is always one day.
+        let mut thresholds = match range {
+            Leq (ref val) => {
+                // Equivalent to BetweenEq { min: 0am, max: val }
+                let ts = *try!(val.as_duration().map_err(AdapterError::TypeError))
+                    .as_duration();
+                vec![(Movement::Enter, Duration::seconds(0)), (Movement::Exit, ts)]
+            }
+            Geq (ref val) => {
+                // Equivalent to BetweenEq { min: val, max: 0am }
+                let ts = *try!(val.as_duration().map_err(AdapterError::TypeError))
+                    .as_duration();
+                vec![(Movement::Enter, ts), (Movement::Exit, Duration::days(1))]
+            }
+            BetweenEq { ref min, ref max } => {
+                let ts_min = *try!(min.as_duration().map_err(AdapterError::TypeError))
+                    .as_duration();
+                let ts_max = *try!(max.as_duration().map_err(AdapterError::TypeError))
+                    .as_duration();
+                vec![(Movement::Enter, ts_min), (Movement::Exit, ts_max)]
+            }
+            OutOfStrict { ref min, ref max } => {
+                // Equivalent to BetweenEq {min: 0am, max: min} and BetweenEq {min: max, max: 0am}
+                let ts_min = *try!(min.as_duration().map_err(AdapterError::TypeError))
+                    .as_duration();
+                let ts_max = *try!(max.as_duration().map_err(AdapterError::TypeError))
+                    .as_duration();
+                vec![(Movement::Exit, ts_min), (Movement::Enter, ts_max)]
+            }
+            Eq (ref val) => {
+                let ts = *try!(val.as_duration().map_err(AdapterError::TypeError))
+                    .as_duration();
+                vec![(Movement::Enter, ts.clone()), (Movement::Exit, ts)]
+            }
+        };
+
+        // Determine when the next timers needs to launch.
+        let now = chrono::Local::now();
+        let guards : Vec<timer::Guard> = thresholds.drain(..).filter_map(|(movement, threshold)| {
+            let date = match Self::get_next_date(&now, threshold) {
+                Err(_) => return None,
+                Ok(date) => date,
+            };
+            let id = id.clone();
+            let tx = tx.clone();
+            let guard = self.timer.schedule(date, Some(Duration::days(1)), move || {
+                let naive_time = chrono::Local::now().time();
+                let duration = Duration::hours(naive_time.hour() as i64)
+                    + Duration::minutes(naive_time.minute() as i64)
+                    + Duration::seconds(naive_time.second() as i64);
+
+                let event = match movement {
+                    Movement::Enter => Op::Enter(id.clone(),
+                        Value::Duration(ValDuration::new(duration))),
+                    Movement::Exit => Op::Exit(id.clone(),
+                        Value::Duration(ValDuration::new(duration))),
+                };
+                let _ = tx.send(event);
+            });
+            Some(guard)
+        }).collect();
+        Ok(Box::new(Guard(guards)))
+    }
+
+    fn get_next_date(now: &DateTime<Local>, time_of_day: Duration)
+        -> Result<DateTime<Local>, AdapterError>
+    {
+        match chrono::Local::today().and_time(NaiveTime::from_hms(0, 0, 0) + time_of_day) {
+            None => Err(AdapterError::InvalidValue),
+            Some(date) => {
+                if date >= *now  {
+                    Ok(date)
+                } else {
+                    // Otherwise, shift to tomorrow.
+                    match date.checked_add(Duration::days(1)) {
+                        None => Err(AdapterError::InvalidValue),
+                        Some(date) => Ok(date)
+                    }
+                }
+            }
+        }
+    }
+
+    fn aux_register_watch_timestamp(&self, id: &Id<Getter>, range: Range, tx: Sender<Op>)
+        -> Result<Box<AdapterWatchGuard>, AdapterError>
+    {
+        use foxbox_taxonomy::values::Range::*;
+
+        // Sanity checks
+        let typ = try!(range.get_type().map_err(AdapterError::TypeError));
+        try!(Type::TimeStamp.ensure_eq(&typ).map_err(AdapterError::TypeError));
+
+        // Now determine when/if to call the trigger.
+        let mut thresholds = match range {
+            Leq (_) => {
+                // This variant doesn't make sense.
+                return Ok(Box::new(Guard(vec![])))
+            }
+            Geq (ref val) | Eq (ref val) => {
+                let ts = *try!(val.as_timestamp().map_err(AdapterError::TypeError))
+                    .as_datetime();
+                vec![(Movement::Enter, ts)]
+            }
+            OutOfStrict { ref min, ref max } => {
+                let ts_min = *try!(min.as_timestamp().map_err(AdapterError::TypeError))
+                    .as_datetime();
+                let ts_max = *try!(max.as_timestamp().map_err(AdapterError::TypeError))
+                    .as_datetime();
+                vec![(Movement::Exit, ts_min), (Movement::Enter, ts_max)]
+            }
+            BetweenEq { ref min, ref max } => {
+                let ts_min = *try!(min.as_timestamp().map_err(AdapterError::TypeError))
+                    .as_datetime();
+                let ts_max = *try!(max.as_timestamp().map_err(AdapterError::TypeError))
+                    .as_datetime();
+                vec![(Movement::Enter, ts_min), (Movement::Exit, ts_max)]
+            }
+        };
+
+        // Determine when/if the next timers needs to launch.
+        let now = chrono::UTC::now();
+        let guards : Vec<timer::Guard> = thresholds.drain(..).filter_map(|(movement, date)| {
+            if date < now {
+                return None
+            }
+            let id = id.clone();
+            let tx = tx.clone();
+            let guard = self.timer.schedule_with_date(date, move || {
+                let naive_time = chrono::Local::now().time();
+                let duration = Duration::hours(naive_time.hour() as i64)
+                    + Duration::minutes(naive_time.minute() as i64)
+                    + Duration::seconds(naive_time.second() as i64);
+
+                let event = match movement {
+                    Movement::Enter => Op::Enter(id.clone(),
+                        Value::Duration(ValDuration::new(duration))),
+                    Movement::Exit => Op::Exit(id.clone(),
+                        Value::Duration(ValDuration::new(duration))),
+                };
+                let _ = tx.send(event);
+            });
+            Some(guard)
+        }).collect();
+        Ok(Box::new(Guard(guards)))
+    }
+}
+
+impl Clock {
+    pub fn init<T>(adapt: &Arc<T>) -> Result<(), AdapterError>
+        where T: AdapterManagerHandle
+    {
         let getter_timestamp_id = Clock::getter_timestamp_id();
         let getter_time_of_day_id = Clock::getter_time_of_day_id();
         let service_clock_id = Clock::service_clock_id();
-        let clock = Clock {
-            thread: thread,
+        let clock = Box::new(Clock {
             timer: timer::Timer::new(),
             getter_timestamp_id: getter_timestamp_id.clone(),
             getter_time_of_day_id: getter_time_of_day_id.clone(),
             service_clock_id: service_clock_id.clone(),
-        };
+        });
         adapt.add_adapter(clock, vec![Service {
             adapter: Clock::id(),
             tags: HashSet::new(),
@@ -186,6 +319,7 @@ impl Clock {
                 // Time of day
                 (getter_time_of_day_id.clone(), Channel {
                     tags: HashSet::new(),
+                    adapter: Clock::id(),
                     id: getter_time_of_day_id.clone(),
                     last_seen: None,
                     service: service_clock_id.clone(),
@@ -201,6 +335,7 @@ impl Clock {
                 // Current time
                 (getter_timestamp_id.clone(), Channel {
                     tags: HashSet::new(),
+                    adapter: Clock::id(),
                     id: getter_timestamp_id.clone(),
                     last_seen: None,
                     service: service_clock_id.clone(),
@@ -212,183 +347,6 @@ impl Clock {
                         updated: None
                     }
                 })].iter().cloned().collect(),
-        }],
-        cb);
+        }])
     }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use adapt::*;
-
-    use foxbox_taxonomy::util::Id;
-    use foxbox_taxonomy::services::*;
-
-    use std::collections::HashSet;
-    use std::sync::mpsc::channel;
-    use std::boxed::FnBox;
-
-    fn make_sync<F, T>(cb: F) -> T
-        where F: FnOnce(Box<FnBox(T) + Send>),
-              T : 'static + Send {
-        let (tx, rx) = channel();
-        let cb2 = move |result: T| {
-            tx.send(result).unwrap();
-        };
-        cb(Box::new(cb2));
-        rx.recv().unwrap()
-    }
-    #[test]
-    fn test_add_remove_clock() {
-        let control = AdapterControl::new();
-        println!("Initializing the clock the first time should work");
-        assert!(make_sync(|done| Clock::init(&control, done)).is_ok());
-
-        println!("Initializing the clock the first time should fail because of a duplicate adapter");
-        match make_sync(|done| Clock::init(&control, done)) {
-            Err(Error::DuplicateAdapter(_)) => {},
-            other => panic!("Didn't expect result {:?}", other)
-        }
-
-        println!("Try removing twice");
-        make_sync(|done| control.remove_adapter(&Clock::id(), done)).unwrap();
-
-        match make_sync(|done| control.remove_adapter(&Clock::id(), done)) {
-            Err(Error::NoSuchAdapter(_)) => {},
-            other => panic!("Didn't expect result {:?}", other)
-        }
-
-        println!("Initializing the clock should work again");
-        assert!(make_sync(|done| Clock::init(&control, done)).is_ok());
-    }
-
-    #[test]
-    fn test_add_remove_services() {
-        let control = AdapterControl::new();
-        assert!(make_sync(|done| Clock::init(&control, done)).is_ok());
-
-        let no_such_adapter_id : Id<AdapterId> = Id::new("no such adapter".to_owned());
-        let example_service_id : Id<ServiceId> = Id::new("example service".to_owned());
-        let example_service_2_id : Id<ServiceId> = Id::new("example service 2".to_owned());
-        let no_such_service_id : Id<ServiceId> = Id::new("no such service".to_owned());
-        let example_getter_id : Id<Getter> = Id::new("example getter".to_owned());
-
-        println!("Attempting to add a service to a non-existing adapter");
-        match make_sync(|done| control.add_service(&no_such_adapter_id,
-            Service::empty(example_service_id.clone(), Clock::id()), done)) {
-                Err(Error::NoSuchAdapter(_)) => {},
-                other => panic!("Didn't expect result {:?}", other)
-            }
-
-        println!("Attempting to overwrite a service that was already installed by the adapter");
-        match make_sync(|done| control.add_service(&Clock::id(),
-            Service::empty(Clock::service_clock_id(), Clock::id()), done)) {
-                Err(Error::DuplicateService(_)) => {},
-                other => panic!("Didn't expect result {:?}", other)
-            }
-
-        println!("Attempting to add a service that would overwrite a getter");
-        match make_sync(|done| control.add_service(&Clock::id(),
-            Service {
-                getters: vec![(
-                    Clock::getter_timestamp_id(),
-                    Channel {
-                        id: Clock::getter_timestamp_id(),
-                        tags: HashSet::new(),
-                        last_seen: None,
-                        service: Clock::service_clock_id(),
-                        mechanism: Getter {
-                            kind: ChannelKind::Ready,
-                            poll: None,
-                            trigger: None,
-                            watch: false,
-                            updated: None,
-                        }
-                    }
-                )].iter().cloned().collect(),
-                .. Service::empty(no_such_service_id.clone(), Clock::id())
-            }, done)) {
-                Err(Error::DuplicateGetter(_)) => {},
-                other => panic!("Didn't expect result {:?}", other)
-            }
-
-            println!("Attempting to add a service that with a fresh getter");
-            match make_sync(|done| control.add_service(&Clock::id(),
-                Service {
-                    getters: vec![(
-                        example_getter_id.clone(),
-                        Channel {
-                            id: example_getter_id.clone(),
-                            tags: HashSet::new(),
-                            last_seen: None,
-                            service: Clock::service_clock_id(),
-                            mechanism: Getter {
-                                kind: ChannelKind::Ready,
-                                poll: None,
-                                trigger: None,
-                                watch: false,
-                                updated: None,
-                            }
-                        }
-                    )].iter().cloned().collect(),
-                    .. Service::empty(example_service_id.clone(), Clock::id())
-                }, done)) {
-                    Ok(_) => {},
-                    other => panic!("Didn't expect result {:?}", other)
-                }
-
-                println!("Attempting to add a service that also offers the no-longer-fresh getter.");
-                match make_sync(|done| control.add_service(&Clock::id(),
-                    Service {
-                        getters: vec![(
-                            Clock::getter_timestamp_id(),
-                            Channel {
-                                id: example_getter_id.clone(),
-                                tags: HashSet::new(),
-                                last_seen: None,
-                                service: Clock::service_clock_id(),
-                                mechanism: Getter {
-                                    kind: ChannelKind::Ready,
-                                    poll: None,
-                                    trigger: None,
-                                    watch: false,
-                                    updated: None,
-                                }
-                            }
-                        )].iter().cloned().collect(),
-                        .. Service::empty(example_service_2_id.clone(), Clock::id())
-                    }, done)) {
-                        Err(Error::DuplicateGetter(_)) => {},
-                        other => panic!("Didn't expect result {:?}", other)
-                    }
-
-
-                println!("Now, removing the fresh service");
-                make_sync(|done| control.remove_service(&Clock::id(), &example_service_id, done)).unwrap();
-
-                println!("Can we remove it twice?");
-                match make_sync(|done| control.remove_service(&Clock::id(), &example_service_id, done)) {
-                    Err(Error::NoSuchService(_)) => {},
-                    other => panic!("Didn't expect result {:?}", other)
-                }
-
-                println!("Remove a service that hasn't been added");
-                match make_sync(|done| control.remove_service(&Clock::id(), &no_such_service_id, done)) {
-                    Err(Error::NoSuchService(_)) => {},
-                    other => panic!("Didn't expect result {:?}", other)
-                }
-
-                println!("Now, removing a built-in service");
-                make_sync(|done| control.remove_service(&Clock::id(), &Clock::service_clock_id(), done)).unwrap();
-
-                println!("Checking that we can still remove the adapter");
-                make_sync(|done| control.remove_adapter(&Clock::id(), done)).unwrap();
-
-                println!("And add it back, despite our manipulations");
-                make_sync(|done| Clock::init(&control, done)).unwrap();
-    }
-
 }
