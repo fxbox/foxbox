@@ -4,7 +4,8 @@
 
 use controller::Controller;
 use foxbox_users::users_router::UsersRouter;
-use iron::{ Iron, Request, Response, IronResult, AfterMiddleware, Chain };
+use iron::{ AfterMiddleware, Chain, Handler, Iron, IronResult,
+            Request, Response };
 use iron::error::{ IronError };
 use iron::status::Status;
 use mount::Mount;
@@ -37,6 +38,14 @@ impl AfterMiddleware for Custom404 {
     }
 }
 
+struct Ping;
+
+impl Handler for Ping {
+    fn handle (&self, _: &mut Request) -> IronResult<Response> {
+        Ok(Response::with(Status::Ok))
+    }
+}
+
 pub struct HttpServer<T: Controller> {
     controller: T
 }
@@ -51,6 +60,7 @@ impl<T: Controller> HttpServer<T> {
 
         let mut mount = Mount::new();
         mount.mount("/", static_router::create())
+             .mount("/ping", Ping)
              .mount("/services", router)
              .mount("/users", UsersRouter::init());
 
@@ -63,5 +73,26 @@ impl<T: Controller> HttpServer<T> {
                               .spawn(move || {
             Iron::new(chain).http(addrs[0]).unwrap();
         }).unwrap();
+    }
+}
+
+#[cfg(test)]
+describe! ping {
+    before_each {
+        use mount::Mount;
+        use iron::Headers;
+        use iron::status::Status;
+        use iron_test::request;
+        use super::Ping;
+
+        let mut mount = Mount::new();
+        mount.mount("/ping", Ping);
+    }
+
+    it "should response 200 Ok" {
+        let response = request::get("http://localhost:3000/ping",
+                                    Headers::new(),
+                                    &mount).unwrap();
+        assert_eq!(response.status.unwrap(), Status::Ok);
     }
 }
