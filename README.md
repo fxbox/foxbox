@@ -88,7 +88,7 @@ $ cargo run
 To run with custom local host name (eg. foxbox.local):
 
 ```bash
-$ cargo run -- -n foxbox
+$ cargo run -- -l foxbox
 ```
 
 __NOTE:__ currently changing of host name is done via ```avahi-daemon``` and therefore supported only on Linux platform. To be able to change local host machine name user must be either included into ```netdev``` group or allow any other suitable user group to manage host name by adding the following policy to ```/etc/dbus-1/system.d/avahi-dbus.conf```:
@@ -139,14 +139,14 @@ $ npm test
 It is equal to:
 
 ```bash
-$ BOX_HOST_NAME=localhost BOX_PORT=3000 npm test
+$ BOX_LOCAL_NAME=localhost BOX_PORT=3000 npm test
 ```
 
 ## Cross compiling to ARM
 
 There is no one solution for this. The process will be different depending on
 your operating system. You may be able to build on a RPi, but the larger the
-applicatoin gets, the slower and more painful this will be (not recommended).
+application gets, the slower and more painful this will be (not recommended).
 
 ### Linux
 
