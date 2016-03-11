@@ -34,6 +34,7 @@ pub enum AdapterError {
     DuplicateService(Id<ServiceId>),
     NoSuchService(Id<ServiceId>),
     TypeError(TypeError),
+    RangeError(Range),
 
     DuplicateAdapter(Id<AdapterId>),
     ConflictingAdapter(Id<AdapterId>, Id<AdapterId>),

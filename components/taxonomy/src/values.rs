@@ -81,6 +81,17 @@ impl Type {
             Unit | String | Json | Binary | OnOff | OpenClosed | ExtBool => true,
         }
     }
+
+    pub fn ensure_eq(&self, other: &Self) -> Result<(), TypeError> {
+        if self == other {
+            Ok(())
+        } else {
+            Err(TypeError {
+                expected: self.clone(),
+                got: other.clone(),
+            })
+        }
+    }
 }
 
 /// An on/off state.
@@ -596,7 +607,7 @@ impl Range {
     ///
     /// If this range has a `min` and a `max` with conflicting types,
     /// produce an error.
-    pub fn get_type(&self) -> Result<Type, ()> {
+    pub fn get_type(&self) -> Result<Type, TypeError> {
         use self::Range::*;
         match *self {
             Leq(ref v) | Geq(ref v) | Eq(ref v) => Ok(v.get_type()),
@@ -606,7 +617,10 @@ impl Range {
                 if min_typ == max_typ {
                     Ok(min_typ)
                 } else {
-                    Err(())
+                    Err(TypeError {
+                        expected: min_typ,
+                        got: max_typ
+                    })
                 }
             }
         }
