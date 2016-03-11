@@ -64,8 +64,20 @@ pub enum Error {
 /// An event during watching.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum WatchEvent {
-    /// A new value is available.
-    Value {
+    /// If a range was specified when we registered for watching, `EnterRange` is fired whenever
+    /// we enter this range. If `Always` was specified, `EnterRange` is fired whenever a new value
+    /// is available. Otherwise, never fired.
+    EnterRange {
+        /// The channel that sent the value.
+        from: Id<Getter>,
+
+        /// The actual value.
+        value: Value
+    },
+
+    /// If a range was specified when we registered for watching, `ExitRange` is fired whenever
+    /// we exit this range. Otherwise, never fired.
+    ExitRange {
         /// The channel that sent the value.
         from: Id<Getter>,
 
