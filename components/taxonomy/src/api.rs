@@ -375,7 +375,7 @@ pub trait API {
     /// values coming from these channels, if they fall within `range`. This is the most common
     /// case. In this case, `on_event` receives `WatcherEvent::GetterAdded`,
     /// `WatcherEvent::GetterRemoved` and `WatcherEvent::Value`, whenever a new value is available
-    /// in the range.
+    /// in the range. Values that do not have the same type as `range` are dropped silently.
     ///
     /// - If argument `Exactly<Range>` is `Exactly::Never`, the watch is not interested in the
     /// values coming from these channels, only in connection/disconnection events. Argument
@@ -384,6 +384,8 @@ pub trait API {
     /// - If the `Exactly<Range>` argument is `Exactly::Always`, the watch is interested in
     /// receiving *every single value coming from the channels*. This is very rarely a good idea.
     /// Many devices may reject such requests.
+    ///
+    /// The watcher is disconnected once the `WatchGuard` returned by this method is dropped.
     ///
     /// # WebSocket API
     ///
