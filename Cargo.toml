@@ -16,7 +16,7 @@ docopt_macros = "0.6.80"
 env_logger = "0.3.2"
 foxbox_adapters = { git = "https://github.com/fxbox/adapters.git", rev = "7a3f2de" }
 foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "16e7f37" }
-foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "a9b86cd" }
+foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "5b5beaa" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
 multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
