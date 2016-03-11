@@ -97,6 +97,18 @@ impl<T> Deserialize for Phantom<T> {
 
 /// A unique id for values of a given kind.
 ///
+/// # Performance
+///
+/// This data structure is tuned for specific use cases and should be used accordingly.
+///
+/// - Using an instances of `Id` as a key in a `HashMap` or `HashSet` is much faster than
+///   using a `String`.
+/// - Comparing two instances of `Id` is much faster than comparing two `String`s.
+/// - Instances of `Id` take very little memory.
+/// - Cloning an instance of `Id` is relatively fast, but should be avoided if possible.
+/// - Calling `Id::new`, on the other hand, is *very slow*. **Always prefer cloning to calling
+///   `Id::new`**.
+///
 /// # (De)serialization
 ///
 /// Serialized values of this type are represented by plain strings.

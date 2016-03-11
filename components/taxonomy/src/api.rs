@@ -193,7 +193,7 @@ pub trait API {
     /// ```ignore
     /// {
     ///   set: Vec<ServiceSelector>,
-    ///   tags: Vec<String>,
+    ///   tags: Vec<Id<TagId>>,
     /// }
     /// ```
     ///
@@ -205,7 +205,7 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON string representing a number.
-    fn add_service_tags(&self, selectors: &[ServiceSelector], tags: &[String]) -> usize;
+    fn add_service_tags(&self, selectors: &[ServiceSelector], tags: &[Id<TagId>]) -> usize;
 
     /// Remove a set of tags from a set of services.
     ///
@@ -232,7 +232,7 @@ pub trait API {
     /// ```ignore
     /// {
     ///   set: Vec<ServiceSelector>,
-    ///   tags: Vec<String>,
+    ///   tags: Vec<Id<TagId>>,
     /// }
     /// ```
     ///
@@ -244,7 +244,7 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_service_tags(&self, selectors: &[ServiceSelector], tags: &[String]) -> usize;
+    fn remove_service_tags(&self, selectors: &[ServiceSelector], tags: &[Id<TagId>]) -> usize;
 
     /// Get a list of getters matching some conditions
     ///
@@ -279,14 +279,14 @@ pub trait API {
     /// ```ignore
     /// {
     ///   set: Vec<GetterSelector>,
-    ///   tags: Vec<String>,
+    ///   tags: Vec<Id<TagId>>,
     /// }
     /// ```
     /// or
     /// ```ignore
     /// {
     ///   set: Vec<SetterSelector>,
-    ///   tags: Vec<String>,
+    ///   tags: Vec<Id<TagId>>,
     /// }
     /// ```
     ///
@@ -298,8 +298,8 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn add_getter_tags(&self, selectors: &[GetterSelector], tags: &[String]) -> usize;
-    fn add_setter_tags(&self, selectors: &[SetterSelector], tags: &[String]) -> usize;
+    fn add_getter_tags(&self, selectors: &[GetterSelector], tags: &[Id<TagId>]) -> usize;
+    fn add_setter_tags(&self, selectors: &[SetterSelector], tags: &[Id<TagId>]) -> usize;
 
     /// Remove a set of tags from a set of channels.
     ///
@@ -326,14 +326,14 @@ pub trait API {
     /// ```ignore
     /// {
     ///   set: Vec<GetterSelector>,
-    ///   tags: Vec<String>,
+    ///   tags: Vec<Id<TagId>>,
     /// }
     /// ```
     /// or
     /// ```ignore
     /// {
     ///   set: Vec<SetterSelector>,
-    ///   tags: Vec<String>,
+    ///   tags: Vec<Id<TagId>>,
     /// }
     /// ```
     ///
@@ -345,8 +345,8 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_getter_tags(&self, selectors: &[GetterSelector], tags: &[String]) -> usize;
-    fn remove_setter_tags(&self, selectors: &[SetterSelector], tags: &[String]) -> usize;
+    fn remove_getter_tags(&self, selectors: &[GetterSelector], tags: &[Id<TagId>]) -> usize;
+    fn remove_setter_tags(&self, selectors: &[SetterSelector], tags: &[Id<TagId>]) -> usize;
 
     /// Read the latest value from a set of channels
     ///
@@ -367,7 +367,7 @@ pub trait API {
     /// # WebSocket API
     ///
     /// `/api/v1/channels/watch`
-    fn register_channel_watch(&self, selectors: Vec<GetterSelector>, range: Exactly<Range>, on_event: Box<Fn(WatchEvent)>) -> Self::WatchGuard;
+    fn register_channel_watch(&self, selectors: Vec<GetterSelector>, range: Exactly<Range>, on_event: Box<Fn(WatchEvent) + Send>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
