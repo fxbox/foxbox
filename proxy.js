@@ -14,7 +14,7 @@ var ports = {
 };
 var os = require('os');
 var TUNNEL_IPADDR = '52.36.71.23';
-var DNS_ZONE = 'xob.useraddress.net';
+var DNS_ZONE = 'box.knilxof.org';
 var qrCodeMsg = '';
 
 function run(cmd, ignoreStdErr) {

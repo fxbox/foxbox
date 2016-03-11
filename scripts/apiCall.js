@@ -8,7 +8,8 @@ var options = {
   path: args[4],
   method: 'POST',
   key: fs.readFileSync('certs/server/my-server.key.pem'),
-  cert: fs.readFileSync('certs/server/my-server.crt.pem')
+  cert: fs.readFileSync('certs/server/my-server.crt.pem'),
+  rejectUnauthorized: false
 };
 console.log(options);
 var req = https.request(options, (res) => {
