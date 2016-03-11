@@ -53,7 +53,11 @@ var SessionUI = {
       new URLSearchParams(window.location.search.substring(1));
 
     if (searchParams.has('redirect_url')) {
-      SessionUI.redirect = searchParams.get('redirect_url');
+      try {
+        SessionUI.redirect = new URL(searchParams.get('redirect_url'));
+      } catch(e) {
+        console.error(e);
+      }
     }
 
     if (SessionUI.session === null) {
@@ -119,7 +123,11 @@ var SessionUI = {
     Session.start('admin', pwd, SessionUI.redirect === undefined).then(
       function(token) {
       if (SessionUI.redirect) {
-        window.location.replace(SessionUI.redirect + '?session_token=' + token);
+        var url = SessionUI.redirect;
+        url.search +=
+         (url.search.split('?')[1] ? '&':'?') + 'session_token=' + token;
+        url.hash = window.location.hash;
+        window.location.replace(url.toString());
       } else {
         SessionUI.show(SIGNED_IN);
       }
