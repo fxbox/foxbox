@@ -5,7 +5,7 @@ authors = ["fabrice <fabrice@desre.org>"]
 build = "build.rs"
 
 [features]
-default = ["authentication"]
+default = []
 authentication = []
 
 [dependencies]

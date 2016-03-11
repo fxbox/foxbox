@@ -8,12 +8,15 @@ extern crate serde_json;
 extern crate time;
 extern crate url;
 
+mod mjpeg_proxy;
+
 use controller::Controller;
 use iron::{ Request, Response, IronResult };
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
 use router::Router;
 use service::{ Service, ServiceAdapter, ServiceProperties };
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::{ BufWriter, Error, ErrorKind };
 use std::io::prelude::*;
@@ -28,6 +31,12 @@ use self::url::{ Host, Url };
 static CAMERA_USERNAME: &'static str = "admin";
 static CAMERA_PASSWORD: &'static str = "password";
 static SNAPSHOT_DIR: &'static str = "snapshots";
+
+const CUSTOM_PROPERTY_MANUFACTURER: &'static str = "manufacturer";
+const CUSTOM_PROPERTY_TYPE: &'static str = "type";
+const CUSTOM_PROPERTY_MODEL: &'static str = "model";
+
+const SERVICE_TYPE: &'static str = "ipcamera";
 
 fn response_json(json_str: String) -> IronResult<Response> {
     let mut response = Response::with(json_str);
@@ -98,12 +107,12 @@ struct IpCameraService<T> {
     properties: ServiceProperties,
     ip: String,
     snapshot_dir: String,
-    name : String,
-    model: String,
+    name: String,
 }
 
 impl<T: Controller> IpCameraService<T> {
-    fn new(controller: T, id: &str, ip: &str, name: &str, model: &str) -> Self {
+    fn new(controller: T, id: &str, ip: &str, name: &str, properties: BTreeMap<String, String>)
+           -> Self {
         debug!("Creating IpCameraService");
         IpCameraService {
             controller: controller.clone(),
@@ -112,12 +121,12 @@ impl<T: Controller> IpCameraService<T> {
                 name: "IpCameraService".to_owned(),
                 description: format!("IP Camera: {}", name).to_owned(),
                 http_url: controller.get_http_root_for_service(id.to_owned()),
-                ws_url: controller.get_ws_root_for_service(id.to_owned())
+                ws_url: controller.get_ws_root_for_service(id.to_owned()),
+                custom_properties: properties,
             },
             ip: ip.to_owned(),
             snapshot_dir: format!("{}/{}", SNAPSHOT_DIR, id),
             name: name.to_owned(),
-            model: model.to_owned(),
         }
     }
 
@@ -215,6 +224,16 @@ impl<T: Controller> IpCameraService<T> {
         }
         success_response!(format!("{}.jpg", filename), "Took a snapshot from {}: {}", self.name, full_filename)
     }
+
+    fn cmd_view(&self) -> IronResult<Response> {
+        let response = mjpeg_proxy::MJPEGProxy::create_response(
+            format!("http://{}/video/mjpg.cgi", self.ip),
+            CAMERA_USERNAME.to_owned(),
+            Some(CAMERA_PASSWORD.to_owned())
+        );
+
+        Ok(response)
+    }
 }
 
 impl<T: Controller> Service for IpCameraService<T> {
@@ -226,7 +245,9 @@ impl<T: Controller> Service for IpCameraService<T> {
         let props = self.properties.clone();
         let controller = self.controller.clone();
 
-        info!("Starting IpCamera {} Model: {} Name: {}", props.id, self.model, self.name);
+        let model_name = props.custom_properties.get(CUSTOM_PROPERTY_MODEL).unwrap();
+
+        info!("Starting IpCamera {} Model: {} Name: {}", props.id, model_name, self.name);
 
         // Create a directory to store snapshots for this camera.
         match fs::create_dir_all(&self.snapshot_dir) {
@@ -251,6 +272,7 @@ impl<T: Controller> Service for IpCameraService<T> {
         match cmd {
             "snapshot" => self.cmd_snapshot(),
             "list" => self.cmd_list(),
+            "view" => self.cmd_view(),
             "get" => {
                 if let Some(filename) = req.url.query.clone() {
                     // For now we assume that the query is the filename
@@ -333,10 +355,19 @@ impl<T: Controller> UpnpListener for IpCameraUpnpListener<T> {
         }
 
         let name = try_get!(service.description, "/root/device/friendlyName").clone();
-        debug!("Adding IpCamera {} Model: {} Name: {}", udn, model_name, name.clone());
+        let manufacturer = try_get!(service.description, "/root/device/manufacturer");
+
+        debug!("Adding IpCamera {} Manufacturer: {} Model: {} Name: {}", udn, manufacturer,
+               model_name, name);
+
+        let mut custom_properties = BTreeMap::<String, String>::new();
+        custom_properties.insert(CUSTOM_PROPERTY_MANUFACTURER.to_owned(), manufacturer.to_owned());
+        custom_properties.insert(CUSTOM_PROPERTY_TYPE.to_owned(), SERVICE_TYPE.to_owned());
+        custom_properties.insert(CUSTOM_PROPERTY_MODEL.to_owned(), model_name.to_owned());
 
         // Create the IpCameraService.
-        let service = IpCameraService::new(self.controller.clone(), &udn, &ip, &name, model_name);
+        let service = IpCameraService::new(self.controller.clone(), &udn, &ip, &name,
+                                           custom_properties);
         service.start();
         self.controller.add_service(Box::new(service));
 
