@@ -15,55 +15,69 @@
 
 use services::*;
 use selector::*;
-use values::{Value, Range, TypeError};
-use util::{Exactly, Id};
+use values::{ Value, Range, TypeError };
+use util::{ Exactly, Id };
 
-/// An error that took place while communicating with either an adapter or the mechanism that
-/// handles registeration of adapters.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum AdapterError {
-    DuplicateGetter(Id<Getter>),
-    NoSuchGetter(Id<Getter>),
+/// An error that arose during interaction with either a device, an adapter or the
+/// adapter manager
+#[derive(Serialize, Debug, Clone)]
+pub enum Error {
+    /// Attempting to fetch a value from a Channel<Getter> that doesn't support this operation.
     GetterDoesNotSupportPolling(Id<Getter>),
+
+    /// Attempting to watch a value from a Channel<Getter> that doesn't support this operation.
     GetterDoesNotSupportWatching(Id<Getter>),
+
+    /// Attempting to watch all values from a Channel<Getter> that requires a filter.
+    /// For instance, some Channel<Getter> may be updated 60 times per second. Attempting to
+    /// watch all values could easily exceed the capacity of the network or exhaust the battery.
+    /// In such a case, the adapter should return this error.
     GetterRequiresThresholdForWatching(Id<Getter>),
 
-    DuplicateSetter(Id<Setter>),
-    NoSuchSetter(Id<Setter>),
-
-    DuplicateService(Id<ServiceId>),
-    NoSuchService(Id<ServiceId>),
+    /// Attempting to send a value with a wrong type.
     TypeError(TypeError),
+
+    /// Attempting to use an inconsistent range. For instance, one with `min > max`.
     RangeError(Range),
 
-    DuplicateAdapter(Id<AdapterId>),
-    ConflictingAdapter(Id<AdapterId>, Id<AdapterId>),
-    NoSuchAdapter(Id<AdapterId>),
-    InvalidValue
+    /// Attempting to send an invalid value. For instance, a time of day larger than 24h.
+    InvalidValue(Value),
+
+    /// An error internal to the foxbox or an adapter. Normally, these errors should never
+    /// arise from the high-level API.
+    InternalError(InternalError),
 }
 
-
-/// An error produced by one of the APIs in this module.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Error {
-    /// There is no such service connected to the Foxbox, even indirectly.
-    NoSuchService(Id<ServiceId>),
-
-    /// There is no such getter channel connected to the Foxbox, even indirectly.
+#[derive(Serialize, Debug, Clone)]
+pub enum InternalError {
+    /// Attempting to fetch or watch a getter that isn't registered.
     NoSuchGetter(Id<Getter>),
-
-    /// There is no such setter channel connected to the Foxbox, even indirectly.
+    /// Attempting to send values to a setter that isn't registered.
     NoSuchSetter(Id<Setter>),
+    /// Attempting to access a service that isn't registered.
+    NoSuchService(Id<ServiceId>),
+    /// Attempting to access an adapter that isn't registered.
+    NoSuchAdapter(Id<AdapterId>),
 
-    /// Attempting to set a value with the wrong type.{}
-    TypeError,
+    /// Attempting to register a getter with an id that is already used.
+    DuplicateGetter(Id<Getter>),
+    /// Attempting to register a setter with an id that is already used.
+    DuplicateSetter(Id<Setter>),
+    /// Attempting to register a service with an id that is already used.
+    DuplicateService(Id<ServiceId>),
+    /// Attempting to register an adapter with an id that is already used.
+    DuplicateAdapter(Id<AdapterId>),
 
-    /// An error arose when talking to the adapter.
-    AdapterError(AdapterError),
+    /// Attempting to register a channel with an adapter that doesn't match that of its service.
+    ConflictingAdapter(Id<AdapterId>, Id<AdapterId>),
+
+    /// Attempting to register a service in an invalid initial state. Typically, a service that
+    /// pretends that it already has channels.
+    InvalidInitialService,
 }
 
 /// An event during watching.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub enum WatchEvent {
     /// If a range was specified when we registered for watching, `EnterRange` is fired whenever
     /// we enter this range. If `Always` was specified, `EnterRange` is fired whenever a new value
@@ -101,7 +115,7 @@ pub enum WatchEvent {
     /// watched.
     InitializationError {
         channel: Id<Getter>,
-        error: AdapterError
+        error: Error
     },
 }
 

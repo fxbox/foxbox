@@ -70,8 +70,10 @@ pub struct Service {
     /// An id unique to this service.
     pub id: Id<ServiceId>,
 
-    /// Channels connected directly to this service.
+    /// Getter channels connected directly to this service.
     pub getters: HashMap<Id<Getter>, Channel<Getter>>,
+
+    /// Setter channels connected directly to this service.
     pub setters: HashMap<Id<Setter>, Channel<Setter>>,
 
     /// Identifier of the adapter for this service.

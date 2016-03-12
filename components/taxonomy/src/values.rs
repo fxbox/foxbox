@@ -358,8 +358,10 @@ pub struct Binary {
    data: Arc<Vec<u8>>,
 
    /// The mime type. Should probably be an Id<MimeTypeId>.
-   mimetype: String,
+   mimetype: Id<MimeTypeId>,
 }
+#[derive(Clone, Debug)]
+struct MimeTypeId;
 
 /// Representation of an actual value that can be sent to/received
 /// from a service.
