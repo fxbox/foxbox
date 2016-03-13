@@ -45,6 +45,7 @@ extern crate serde;
 extern crate staticfile;
 extern crate time;
 extern crate timer;
+extern crate transformable_channels;
 extern crate unicase;
 extern crate uuid;
 extern crate ws;
