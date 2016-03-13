@@ -40,6 +40,7 @@ extern crate chrono;
 extern crate serde;
 extern crate serde_json;
 extern crate string_cache;
+extern crate transformable_channels;
 
 /// Metadata on devices
 pub mod services;

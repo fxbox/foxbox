@@ -18,6 +18,8 @@ use selector::*;
 use values::{ Value, Range, TypeError };
 use util::{ Exactly, Id };
 
+use transformable_channels::mpsc::*;
+
 /// An error that arose during interaction with either a device, an adapter or the
 /// adapter manager
 #[derive(Serialize, Debug, Clone)]
@@ -418,7 +420,7 @@ pub trait API {
     ///
     /// `/api/v1/channels/watch`
     fn register_channel_watch(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
-            on_event: Box<Fn(WatchEvent) + Send>) -> Self::WatchGuard;
+            on_event: Box<ExtSender<WatchEvent>>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
