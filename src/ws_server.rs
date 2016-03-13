@@ -35,8 +35,7 @@ impl WsServer {
 impl<T: Controller> WsHandler<T> {
 
     fn close_with_error(&mut self, reason: &'static str) -> Result<()> {
-        self.out.close_with_reason(ws::CloseCode::Error, reason);
-        Ok(())
+        self.out.close_with_reason(ws::CloseCode::Error, reason)
     }
 }
 
