@@ -26,6 +26,7 @@ extern crate env_logger;
 extern crate foxbox_adapters;
 extern crate foxbox_taxonomy;
 extern crate foxbox_users;
+#[macro_use]
 extern crate hyper;
 #[macro_use]
 extern crate iron;
@@ -40,8 +41,10 @@ extern crate mount;
 extern crate nix;
 extern crate openssl;
 extern crate openssl_sys;
+extern crate rand;
 extern crate router;
 extern crate rustc_serialize;
+extern crate rusqlite;
 extern crate serde;
 extern crate serde_json;
 extern crate staticfile;
