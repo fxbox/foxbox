@@ -178,5 +178,9 @@ This is required to build the openssl crate using homebrew's openssl:
 
 ``` bash
 $ export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
-$ export OPENSSL_INCLUDE_DIR=/usr/local/Cellar/openssl/1.0.2f/include/
 ```
+
+Previous versions of these instructions described setting ```OPENSSL_INCLUDE_DIR```.
+Make sure it is unset. In fact, an obsolete value may have been cached by cargo
+which is fixed by ```cargo clean```.
+
