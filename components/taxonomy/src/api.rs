@@ -128,7 +128,7 @@ pub type ResultMap<K, T, E> = Vec<(K, Result<T, E>)>;
 pub type TargetMap<K, T> = Vec<(Vec<K>, T)>;
 
 /// A handle to the public API.
-pub trait API {
+pub trait API: Send {
     /// Get the metadata on services matching some conditions.
     ///
     /// A call to `API::get_services(vec![req1, req2, ...])` will return
@@ -199,7 +199,7 @@ pub trait API {
     ///   ]
     /// }]
     /// ```
-    fn get_services(&self, &[ServiceSelector]) -> Vec<Service>;
+    fn get_services(&self, Vec<ServiceSelector>) -> Vec<Service>;
 
     /// Label a set of services with a set of tags.
     ///
@@ -238,7 +238,7 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON string representing a number.
-    fn add_service_tags(&self, selectors: &[ServiceSelector], tags: &[Id<TagId>]) -> usize;
+    fn add_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Remove a set of tags from a set of services.
     ///
@@ -277,15 +277,15 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_service_tags(&self, selectors: &[ServiceSelector], tags: &[Id<TagId>]) -> usize;
+    fn remove_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Get a list of getters matching some conditions
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels`
-    fn get_getter_channels(&self, selectors: &[GetterSelector]) -> Vec<Channel<Getter>>;
-    fn get_setter_channels(&self, selectors: &[SetterSelector]) -> Vec<Channel<Setter>>;
+    fn get_getter_channels(&self, selectors: Vec<GetterSelector>) -> Vec<Channel<Getter>>;
+    fn get_setter_channels(&self, selectors: Vec<SetterSelector>) -> Vec<Channel<Setter>>;
 
     /// Label a set of channels with a set of tags.
     ///
@@ -331,8 +331,8 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn add_getter_tags(&self, selectors: &[GetterSelector], tags: &[Id<TagId>]) -> usize;
-    fn add_setter_tags(&self, selectors: &[SetterSelector], tags: &[Id<TagId>]) -> usize;
+    fn add_getter_tags(&self, selectors: Vec<GetterSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn add_setter_tags(&self, selectors: Vec<SetterSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Remove a set of tags from a set of channels.
     ///
@@ -378,15 +378,15 @@ pub trait API {
     /// ## Success
     ///
     /// A JSON representing a number.
-    fn remove_getter_tags(&self, selectors: &[GetterSelector], tags: &[Id<TagId>]) -> usize;
-    fn remove_setter_tags(&self, selectors: &[SetterSelector], tags: &[Id<TagId>]) -> usize;
+    fn remove_getter_tags(&self, selectors: Vec<GetterSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn remove_setter_tags(&self, selectors: Vec<SetterSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Read the latest value from a set of channels
     ///
     /// # REST API
     ///
     /// `GET /api/v1/channels/value`
-    fn fetch_values(&self, &[GetterSelector]) -> ResultMap<Id<Getter>, Option<Value>, Error>;
+    fn fetch_values(&self, Vec<GetterSelector>) -> ResultMap<Id<Getter>, Option<Value>, Error>;
 
     /// Send a bunch of values to a set of channels
     ///
