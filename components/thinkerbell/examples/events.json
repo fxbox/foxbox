@@ -1,108 +1,52 @@
-[
-    {
-	"AddGetters": [{
-	    "tags": [],
-	    "id": "Clock #1",
-	    "node": "simulator",
-	    "mechanism": {
-		"kind": {
-		    "CurrentTimeOfDay": []
-		},
-		"trigger": "1000"
-	    }
-	}]
-    },
-    {
-	"AddSetters": [{
-	    "tags": [],
-	    "id": "Ready #1",
-	    "node": "simulator",
-	    "mechanism": {
-		"kind": {
-		    "Ready": []
-		},
-		"push": "0"
-	    }
-	}]
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": "0"
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 1
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 2
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 3
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 4
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 5
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 6
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 7
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 8
-	    }
-	}
-    },
-    {
-	"InjectGetterValue": {
-	    "id": "Clock #1",
-	    "value": {
-		"Duration": 9
-	    }
-	}
-    }
-]
+[{ "AddAdapters": ["Simulator"] },
+ { "AddServices": [{
+        "adapter": "Simulator",
+        "tags": [],
+        "id": "Simulator service",
+        "getters": {},
+        "setters": {}
+ }]}, {
+    "AddGetters": [{
+        "adapter": "Simulator",
+        "tags": [],
+        "id": "Clock #1",
+        "service": "Simulator service",
+        "mechanism": {
+            "kind": {
+                "CurrentTimeOfDay": []
+            },
+            "trigger": "1000"
+        }
+    }]
+}, {
+    "AddSetters": [{
+       "adapter": "Simulator",
+        "tags": [],
+        "id": "Ready #1",
+        "service": "Simulator service",
+        "mechanism": {
+            "kind": {
+                "Ready": []
+            },
+            "push": "0"
+        }
+    }]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 1}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 2}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 3}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 4}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 5}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 6}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 7}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 8}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 9}]]
+}]

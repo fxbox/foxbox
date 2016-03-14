@@ -32,7 +32,7 @@ use serde::de::{Deserialize, Deserializer};
 /// The environment in which the code is meant to be executed.  This
 /// can typically be instantiated either with actual bindings to
 /// devices, or with a unit-testing framework. // FIXME: Move this to run.rs
-pub trait ExecutableDevEnv: Serialize + Deserialize + Default + Send {
+pub trait ExecutableDevEnv: Serialize + Deserialize + Send {
     type WatchGuard;
     type API: API<WatchGuard = Self::WatchGuard>;
     fn api(&self) -> Self::API;
@@ -59,7 +59,7 @@ impl<Env> Default for CompiledCtx<Env> where Env: Serialize + Deserialize {
 impl<Env> Context for CompiledCtx<Env> where Env: Serialize + Deserialize {
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum SourceError {
     /// The source doesn't define any rule.
     NoRule,
@@ -77,7 +77,7 @@ pub enum SourceError {
     NoStatementDestination,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum TypeError {
     /// The range cannot be typed.
     InvalidRange,
@@ -91,7 +91,7 @@ pub enum TypeError {
     KindAndValueDoNotAgree,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum Error {
     SourceError(SourceError),
     TypeError(TypeError),

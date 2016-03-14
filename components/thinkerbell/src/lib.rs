@@ -14,6 +14,7 @@
 extern crate chrono;
 extern crate serde;
 extern crate serde_json;
+extern crate transformable_channels;
 
 extern crate foxbox_taxonomy;
 

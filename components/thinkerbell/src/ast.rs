@@ -5,12 +5,12 @@
 //! and module `run` to execute it.
 
 use foxbox_taxonomy::values::*;
-use foxbox_taxonomy::devices::*;
 use foxbox_taxonomy::selector::*;
+use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::util::Phantom;
 
-use serde::ser::{Serialize, Serializer};
-use serde::de::{Deserialize, Deserializer, Error};
+use serde::ser::{ Serialize, Serializer };
+use serde::de::{ Deserialize, Deserializer, Error };
 
 /// A thinkerbell script.
 #[derive(Serialize, Deserialize)]

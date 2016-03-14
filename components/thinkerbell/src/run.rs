@@ -1,26 +1,24 @@
 //! Launching and running the script
 
-use ast::{Script, Statement, UncheckedCtx};
-use compile::{Compiler, CompiledCtx, ExecutableDevEnv};
+use ast::{ Script, Statement, UncheckedCtx} ;
+use compile::{ Compiler, CompiledCtx, ExecutableDevEnv} ;
 use compile;
 
-use foxbox_taxonomy;
 use foxbox_taxonomy::api;
-use foxbox_taxonomy::api::{API, WatchEvent};
-use foxbox_taxonomy::devices::{Getter, Setter};
-use foxbox_taxonomy::util::Id;
+use foxbox_taxonomy::api::{ API, Error as APIError, WatchEvent };
+use foxbox_taxonomy::services::{ Getter, Setter };
+use foxbox_taxonomy::util::{ Exactly, Id };
 use foxbox_taxonomy::values::Range;
 
-use std::sync::mpsc::{channel, Receiver, Sender};
+use transformable_channels::mpsc::*;
+
 use std::marker::PhantomData;
-use std::result::Result;
-use std::result::Result::*;
 use std::thread;
 use std::collections::HashMap;
 
 /// Running and controlling a single script.
 pub struct Execution<Env> where Env: ExecutableDevEnv + 'static {
-    command_sender: Option<Sender<ExecutionOp>>,
+    command_sender: Option<Box<ExtSender<ExecutionOp>>>,
     phantom: PhantomData<Env>,
 }
 
@@ -34,33 +32,55 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + 'static {
 
     /// Start executing the script.
     ///
+    /// # Memory warning
+    ///
+    /// If you do not consume the values from `on_event`, they will remain stored forever.
+    /// You have been warned.
+    ///
     /// # Errors
     ///
-    /// Produces RunningError:AlreadyRunning if the script is already running.
-    pub fn start<F>(&mut self, api: Env::API, script: Script<UncheckedCtx>, on_event: F) where F: Fn(ExecutionEvent) + Send + 'static {
+    /// The first event sent to `on_event` is a `ExecutionEvent::Starting`, which informs the
+    /// caller of whether the execution could start. Possible reasons that would prevent execution
+    /// are:
+    /// - `RunningError:AlreadyRunning` if the script is already running;
+    /// - a compilation error if the script was incorrect.
+    pub fn start<S>(&mut self, api: Env::API, script: Script<UncheckedCtx>, on_event: S) ->
+        Result<(), Error>
+        where S: ExtSender<ExecutionEvent>
+    {
         if self.command_sender.is_some() {
-            on_event(ExecutionEvent::Starting {
-                result: Err(Error::RunningError(RunningError::AlreadyRunning))
+            let err = Err(Error::StartStopError(StartStopError::AlreadyRunning));
+            let _ = on_event.send(ExecutionEvent::Starting {
+                result: err.clone()
             });
+            err
         } else {
+            // One-time channel, used to wait until compilation is complete.
+            let (tx_init, rx_init) = channel();
+
             let (tx, rx) = channel();
-            let tx2 = tx.clone();
-            self.command_sender = Some(tx);
+            self.command_sender = Some(Box::new(tx.clone()));
             thread::spawn(move || {
-                match ExecutionTask::<Env>::new(script, tx2, rx) {
+                match ExecutionTask::<Env>::new(script, tx, rx) {
                     Err(er) => {
-                        on_event(ExecutionEvent::Starting {
-                            result: Err(er)
+                        let _ = on_event.send(ExecutionEvent::Starting {
+                            result: Err(er.clone())
                         });
+                        let _ = tx_init.send(Err(er));
                     },
                     Ok(mut task) => {
-                        on_event(ExecutionEvent::Starting {
+                        let _ = on_event.send(ExecutionEvent::Starting {
                             result: Ok(())
                         });
+                        let _ = tx_init.send(Ok(()));
                         task.run(api, on_event);
                     }
                 }
             });
+            match rx_init.recv() {
+                Ok(result) => result,
+                Err(_) => Err(Error::StartStopError(StartStopError::ThreadError))
+            }
         }
     }
 
@@ -74,7 +94,7 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + 'static {
         match self.command_sender {
             None => {
                 /* Nothing to stop */
-                on_result(Err(Error::RunningError(RunningError::NotRunning)));
+                on_result(Err(Error::StartStopError(StartStopError::NotRunning)));
             },
             Some(ref tx) => {
                 // Shutdown the application, asynchronously.
@@ -97,7 +117,7 @@ pub struct ExecutionTask<Env> where Env: ExecutableDevEnv {
     script: Script<CompiledCtx<Env>>,
 
     /// Communicating with the thread running script.
-    tx: Sender<ExecutionOp>,
+    tx: Box<ExtSender<ExecutionOp>>,
     rx: Receiver<ExecutionOp>,
 }
 
@@ -118,6 +138,10 @@ pub enum ExecutionEvent {
         rule_index: usize,
         statement_index: usize,
         result: Vec<(Id<Setter>, Result<(), Error>)>
+    },
+    ChannelError {
+        id: Id<Getter>,
+        error: APIError,
     }
 }
 
@@ -133,20 +157,22 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     ///
     /// The caller is responsible for spawning a new thread and
     /// calling `run()`.
-    fn new(script: Script<UncheckedCtx>, tx: Sender<ExecutionOp>, rx: Receiver<ExecutionOp>) -> Result<Self, Error> {
+    fn new<S>(script: Script<UncheckedCtx>, tx: S, rx: Receiver<ExecutionOp>) -> Result<Self, Error>
+        where S: ExtSender<ExecutionOp>
+    {
         let compiler = try!(Compiler::new().map_err(|err| Error::CompileError(err)));
         let script = try!(compiler.compile(script).map_err(|err| Error::CompileError(err)));
-        
+
         Ok(ExecutionTask {
             script: script,
             rx: rx,
-            tx: tx
+            tx: Box::new(tx)
         })
     }
 
     /// Execute the monitoring task.
     /// This currently expects to be executed in its own thread.
-    fn run<F>(&mut self, api: Env::API, on_event: F) where F: Fn(ExecutionEvent) {
+    fn run<S>(&mut self, api: Env::API, on_event: S) where S: ExtSender<ExecutionEvent> {
         let mut witnesses = Vec::new();
 
         struct ConditionState {
@@ -162,14 +188,12 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
         // Generate the state of rules, conditions, getters and start
         // listening to changes in the getters.
 
+        println!("Thinkerbell: {} rules", self.script.rules.len());
+        // FIXME: We could optimize requests by grouping per `TargetMap<GetterSelector, Exactly<Range>>`
         let mut per_rule : Vec<_> = self.script.rules.iter().zip(0 as usize..).map(|(rule, rule_index)| {
+            println!("Thinkerbell: rule {} has {} conditions", rule_index, rule.conditions.len());
             let per_condition = rule.conditions.iter().zip(0 as usize..).map(|(condition, condition_index)| {
-                let options: Vec<_> = condition.source.iter().map(|getter| {
-                    foxbox_taxonomy::api::WatchOptions::new()
-                        .with_watch_values(true)
-                        .with_watch_topology(true)
-                        .with_getters(getter.clone())
-                }).collect();
+                println!("Thinkerbell: look at condition {}", condition_index);
                 // We will often end up watching several times the
                 // same channel. For the moment, we do not attempt to
                 // optimize either I/O (which we expect will be
@@ -177,21 +201,18 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                 // (which we should eventually optimize, if we find
                 // out that we end up with large rulesets).
 
-                let tx2 = self.tx.clone();
+                let rule_index = rule_index.clone();
+                let condition_index = condition_index.clone();
                 witnesses.push(
                     api.register_channel_watch(
-                        options,
-                        Box::new(move |event| {
-                            let _ignored = tx2.send(ExecutionOp::Update {
+                        vec![(condition.source.clone(), Exactly::Exactly(condition.range.clone())) ],
+                        Box::new(self.tx.map(move |event| {
+                            ExecutionOp::Update {
                                 event: event,
                                 rule_index: rule_index,
-                                condition_index: condition_index,
-                            });
-                            // We ignore the result. Errors simply
-                            // mean that the thread is already down,
-                            // in which case we don't care about
-                            // messages.
-                        })));
+                                condition_index: condition_index
+                            }
+                        }))));
                 let range = condition.range.clone();
                 ConditionState {
                     match_is_met: false,
@@ -219,6 +240,15 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                     rule_index,
                     condition_index,
                 } => match event {
+                    WatchEvent::InitializationError {
+                        channel,
+                        error
+                    } => {
+                        let _ = on_event.send(ExecutionEvent::ChannelError {
+                            id: channel,
+                            error: error,
+                        });
+                    },
                     WatchEvent::GetterRemoved(id) => {
                         per_rule[rule_index]
                             .per_condition[condition_index]
@@ -235,7 +265,10 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                             .per_getter
                             .insert(id, false);
                     }
-                    WatchEvent::Value{from: id, value} => {
+                    WatchEvent::EnterRange { from: id, value }
+                    | WatchEvent::ExitRange { from: id, value }
+                        // FIXME: EnterRange/ExitRange would let us simplify condition checking 
+                    => {
                         use std::mem::replace;
 
                         // An getter was updated. Note that there is
@@ -288,7 +321,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                             // Ahah, we have just triggered the statements!
                             for (statement, statement_index) in self.script.rules[rule_index].execute.iter().zip(0..) {
                                 let result = statement.eval(&api);
-                                on_event(ExecutionEvent::Sent {
+                                let _ = on_event.send(ExecutionEvent::Sent {
                                     rule_index: rule_index,
                                     statement_index: statement_index,
                                     result: result,
@@ -305,7 +338,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
 impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
     fn eval(&self, api: &Env::API) ->  Vec<(Id<Setter>, Result<(), Error>)> {
-        api.put_channel_value(&self.destination, self.value.clone())
+        api.send_values(vec![(self.destination.clone(), self.value.clone())])
             .into_iter()
             .map(|(id, result)|
                  (id, result.map_err(|err| Error::APIError(err))))
@@ -315,16 +348,17 @@ impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
 
 
 
-#[derive(Debug)]
-pub enum RunningError {
+#[derive(Clone, Debug, Serialize)]
+pub enum StartStopError {
     AlreadyRunning,
     NotRunning,
+    ThreadError,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum Error {
     CompileError(compile::Error),
-    RunningError(RunningError),
+    StartStopError(StartStopError),
     APIError(api::Error),
 }
 
