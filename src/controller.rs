@@ -25,6 +25,7 @@ use std::sync::atomic::{ AtomicBool, Ordering };
 use upnp::UpnpManager;
 use ws_server::WsServer;
 use ws;
+use foxbox_users::UsersManager;
 
 #[derive(Clone)]
 pub struct FoxBox {
@@ -36,7 +37,8 @@ pub struct FoxBox {
     websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
     pub config: Arc<ConfigService>,
     upnp: Arc<UpnpManager>,
-    profile_service: Arc<ProfileService>
+    users_manager: Arc<UsersManager>,
+    profile_service: Arc<ProfileService>,
 }
 
 const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
@@ -61,6 +63,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
 
     fn get_config(&self) -> &ConfigService;
     fn get_upnp_manager(&self) -> Arc<UpnpManager>;
+    fn get_users_manager(&self) -> Arc<UsersManager>;
     fn get_profile(&self) -> &ProfileService;
 }
 
@@ -83,6 +86,7 @@ impl FoxBox {
             ws_port: ws_port,
             config: Arc::new(ConfigService::new(&profile_service.path_for("foxbox.conf"))),
             upnp: Arc::new(UpnpManager::new()),
+            users_manager: Arc::new(UsersManager::new(&profile_service.path_for("users_db.sqlite"))),
             profile_service: Arc::new(profile_service)
         }
     }
@@ -214,6 +218,10 @@ impl Controller for FoxBox {
 
     fn get_upnp_manager(&self) -> Arc<UpnpManager> {
         self.upnp.clone()
+    }
+
+    fn get_users_manager(&self) -> Arc<UsersManager> {
+        self.users_manager.clone()
     }
 }
 

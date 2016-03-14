@@ -9,7 +9,7 @@ dependencies = [
  "env_logger 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "foxbox_adapters 0.1.0 (git+https://github.com/fxbox/adapters.git?rev=ba54c80)",
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=4ff36cd)",
- "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=5b5beaa)",
+ "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=8b82110)",
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -199,7 +199,7 @@ dependencies = [
 [[package]]
 name = "foxbox_users"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/users.git?rev=5b5beaa#5b5beaa1260cf07aab3b0b8a82ca172565d6f6fe"
+source = "git+https://github.com/fxbox/users.git?rev=8b82110#8b8211072d79bc77df524d890c4c78eae0c35ead"
 dependencies = [
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "jwt 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",

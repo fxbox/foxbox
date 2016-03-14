@@ -4,7 +4,6 @@
 extern crate url;
 
 use controller::Controller;
-use foxbox_users::auth_middleware::AuthMiddleware;
 use self::url::Url;
 use std::thread;
 use ws;
@@ -66,7 +65,7 @@ impl<T: Controller> Handler for WsHandler<T> {
             _ => return self.close_with_error("Missing authorization"),
         };
 
-        if let Err(_) = AuthMiddleware::verify(&token) {
+        if let Err(_) = self.controller.get_users_manager().verify_token(&token) {
             return self.close_with_error("Authorization failed");
         }
 

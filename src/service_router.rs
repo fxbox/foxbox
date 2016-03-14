@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use controller::Controller;
-use foxbox_users::auth_middleware::{ AuthEndpoint, AuthMiddleware };
+use foxbox_users::AuthEndpoint;
 use iron::{ AfterMiddleware, headers, IronError, IronResult, Request,
             Response };
 use iron::headers::ContentType;
@@ -140,9 +140,7 @@ pub fn create<T: Controller>(controller: T) -> Chain {
     };
 
     let mut chain = Chain::new(router);
-    chain.around(AuthMiddleware {
-        auth_endpoints: auth_endpoints
-    });
+    chain.around(controller.get_users_manager().get_middleware(auth_endpoints));
 
     chain.link_after(CORS);
 
@@ -153,7 +151,6 @@ pub fn create<T: Controller>(controller: T) -> Chain {
 describe! service_router {
     before_each {
         use controller::FoxBox;
-        use foxbox_users::users_router::UsersRouter;
         use iron::Headers;
         use iron_test::request;
         use mount::Mount;
@@ -162,19 +159,27 @@ describe! service_router {
         let service_router = create(controller.clone());
 
         let mut mount = Mount::new();
-        mount.mount("", service_router)
-             .mount("/users", UsersRouter::init());
+        // This is ugly here, but 1/ I can do 'use controller::Controller'
+        // in this block and 2/ if I don't, I get told I need to do it
+        // for the trait.
+        let manager = {
+            use controller::Controller;
+            let manager = controller.get_users_manager();
+            mount.mount("", service_router)
+                .mount("/users", manager.get_router_chain());
+            manager
+        };
     }
 
     describe! services {
         before_each {
             extern crate serde_json;
 
-            use foxbox_users::users_db::{ UserBuilder, UsersDb };
+            use foxbox_users::UserBuilder;
             use iron::headers::{ Authorization, Basic, Bearer };
             use iron_test::response;
 
-            let db = UsersDb::new();
+            let db = manager.get_db();
             db.clear().ok();
             let user = UserBuilder::new()
                 .id(1).name(String::from("username"))
@@ -252,7 +257,7 @@ describe! service_router {
                 assert!(headers.has::<headers::AccessControlAllowOrigin>());
                 assert!(headers.has::<headers::AccessControlAllowHeaders>());
                 assert!(headers.has::<headers::AccessControlAllowMethods>());
-            }
+            };
         }
     }
 }

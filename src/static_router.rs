@@ -2,16 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use foxbox_users::users_db::{ UsersDb, ReadFilter };
+use foxbox_users::{ UsersManager, UsersDb, ReadFilter };
 use iron::middleware::Handler;
 use iron::prelude::*;
 use iron::status;
 use router::Router;
 use staticfile::Static;
 use std::path::Path;
+use std::sync::Arc;
 
-fn handler(req: &mut Request) -> IronResult<Response> {
-    let db = UsersDb::new();
+fn handler(req: &mut Request, db: &UsersDb) -> IronResult<Response> {
     let handler = match db.read(ReadFilter::IsAdmin(true)) {
         Ok(users) => {
             if users.is_empty() {
@@ -27,9 +27,15 @@ fn handler(req: &mut Request) -> IronResult<Response> {
     Handler::handle(&handler, req)
 }
 
-pub fn create() -> Router {
+pub fn create(manager: Arc<UsersManager>) -> Router {
     let mut router = Router::new();
-    router.any("", handler);
-    router.any("*", handler);
+    let usersmanager = manager.clone();
+    router.any("", move |req: &mut Request| -> IronResult<Response> {
+        handler(req, &usersmanager.get_db())
+    });
+    let usersmanager = manager.clone();
+    router.any("*", move |req: &mut Request| -> IronResult<Response> {
+        handler(req, &usersmanager.get_db())
+    });
     router
 }

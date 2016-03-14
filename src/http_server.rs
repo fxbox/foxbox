@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use controller::Controller;
-use foxbox_users::users_router::UsersRouter;
 use iron::{ AfterMiddleware, Chain, Handler, Iron, IronResult,
             Request, Response };
 use iron::error::{ IronError };
@@ -58,11 +57,12 @@ impl<T: Controller> HttpServer<T> {
     pub fn start(&mut self) {
         let router = service_router::create(self.controller.clone());
 
+        let users_manager = self.controller.get_users_manager();
         let mut mount = Mount::new();
-        mount.mount("/", static_router::create())
+        mount.mount("/", static_router::create(users_manager.clone()))
              .mount("/ping", Ping)
              .mount("/services", router)
-             .mount("/users", UsersRouter::init());
+             .mount("/users", users_manager.get_router_chain());
 
         let mut chain = Chain::new(mount);
         chain.link_after(Custom404);
