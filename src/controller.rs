@@ -96,7 +96,6 @@ impl Controller for FoxBox {
 
     fn run(&mut self, shutdown_flag: &AtomicBool) {
         debug!("Starting controller");
-
         let mut event_loop = mio::EventLoop::new().unwrap();
 
         {

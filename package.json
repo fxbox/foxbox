@@ -6,7 +6,9 @@
     "node": ">=4.0.0"
   },
   "scripts": {
-    "test": "rm -f *sqlite && ./node_modules/.bin/mocha test/selenium/*_test.js"
+    "test-selenium": "npm run clean_db && ./node_modules/.bin/mocha test/selenium/*_test.js",
+    "test-integration": "npm run clean_db && ./node_modules/.bin/mocha test/integration/test/*.js",
+    "clean_db": "rm -f ~/.local/share/foxbox/users_db.sqlite"
   },
   "repository": {
     "type": "git",
@@ -21,6 +23,16 @@
   "devDependencies": {
     "jshint": "2.9.1",
     "mocha": "2.4.5",
-    "selenium-webdriver": "2.48.2"
+    "selenium-webdriver": "2.48.2",
+    "chai": "^3.5.0",
+    "body-parser": "^1.15.0",
+    "should": "^8.2.2",
+    "socket.io": "^1.4.5",
+    "supertest": "^1.2.0",
+    "node-ssdp": "^2.7.0",
+    "chakram": "^1.2.2",
+    "path": "^0.12.7",
+    "config-js": "^1.1.9",
+    "express": "^4.13.4"
   }
 }
