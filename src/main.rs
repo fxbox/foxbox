@@ -30,6 +30,8 @@ extern crate foxbox_adapters;
 extern crate foxbox_taxonomy;
 extern crate foxbox_users;
 #[macro_use]
+extern crate hyper;
+#[macro_use]
 extern crate iron;
 extern crate iron_cors;
 #[cfg(test)]
@@ -40,6 +42,7 @@ extern crate log;
 extern crate mio;
 extern crate mount;
 extern crate nix;
+extern crate rand;
 extern crate router;
 extern crate rustc_serialize;
 extern crate serde;
@@ -73,6 +76,7 @@ mod service_router;
 mod stable_uuid;
 mod static_router;
 mod tunnel_controller;
+mod webpush;
 mod ws_server;
 
 #[cfg(test)]
