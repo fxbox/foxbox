@@ -1,3 +1,4 @@
 language: rust
 rust:
-  - nightly
+  - nightly-2016-03-07
+  
