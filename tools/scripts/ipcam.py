@@ -85,7 +85,7 @@ def main():
     args = parser.parse_args(sys.argv[1:])
 
     server_url = 'http://{}:{}'.format(args.server, args.port)
-    services_url = '{}/services/list.json'.format(server_url)
+    services_url = '{}/services/list'.format(server_url)
 
     username = args.username
     password = args.password
@@ -157,7 +157,7 @@ def main():
                 if args.get:
                     filename = args.get
                     #print('get filename =', filename)
-                    get_snap_url = '{}/services/{}/get?{}'.format(server_url, service_id, filename)
+                    get_snap_url = '{}/services/{}/get?filename={}'.format(server_url, service_id, filename)
                     get_req = requests.get(get_snap_url, headers=auth_header)
                     if get_req.status_code == 200 and get_req.headers['content-type'] == 'image/jpeg':
                         with open(filename, 'wb') as f:

@@ -35,6 +35,7 @@ const CUSTOM_PROPERTY_TYPE: &'static str = "type";
 const CUSTOM_PROPERTY_MODEL: &'static str = "model";
 
 const SERVICE_TYPE: &'static str = "ipcamera";
+const FILENAME_QUERY_PARAMETER_NAME: &'static str = "filename";
 
 fn response_json(json_str: String) -> IronResult<Response> {
     let mut response = Response::with(json_str);
@@ -261,11 +262,22 @@ impl<T: Controller> Service for IpCameraService<T> {
             "snapshot" => self.cmd_snapshot(),
             "list" => self.cmd_list(),
             "get" => {
-                if let Some(filename) = req.url.query.clone() {
-                    // For now we assume that the query is the filename
-                    return self.cmd_get(&filename);
+                if let Some(query) = req.url.query.as_ref() {
+                    // Creating a fake URL to get the query parsed.
+                    let url = Url::parse(&format!("http://box.fox?{}", query)).unwrap();
+                    if let Some(pairs) = url.query_pairs() {
+                        let filename =  pairs.iter()
+                            .find(|ref set| set.0.to_lowercase() == FILENAME_QUERY_PARAMETER_NAME)
+                            .map(|ref set| set.1.clone());
+
+                        if let Some(filename) = filename {
+                            return self.cmd_get(&filename);
+                        }
+                    }
                 }
-                error_response!("get needs a query")
+
+                error_response!("`get` command needs a `{}` query string parameter",
+                                FILENAME_QUERY_PARAMETER_NAME)
             },
             _ => error_response!("Unrecognized command: {}", cmd)
         }
