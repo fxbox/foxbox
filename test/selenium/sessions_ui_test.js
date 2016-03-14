@@ -64,6 +64,7 @@ describe('sessions ui', function() {
           };
           setUpWebapp = new SetUpWebapp(driver);
           setUpPage = setUpWebapp.getSetUpView();
+          return setUpPage;
         });
 
       it('should show the signup screen by default', function() {
@@ -77,7 +78,8 @@ describe('sessions ui', function() {
           set: 'submit'
         };
         var promises = Object.keys(elements).map(function(key) {
-          return elements[key].getAttribute('type').then(function(value) {
+          return elements[key].getAttribute('type')
+          .then(function(value) {
             assert.equal(value, types[key]);
           });
         });
@@ -85,14 +87,8 @@ describe('sessions ui', function() {
       });
 
       it('should reject non-matching passwords', function() {
-          
-          return setUpPage.typePassword('12345678').then(function(){
-              return setUpPage.confirmTypePassword('123456');
-          }).then(function(){
-              return setUpPage.tapSubmitButton();
-          }).then(function(){
-              return setUpPage.alertMessage();
-          }).then(function(text){
+          return setUpPage.failureLogin(12345678, 1234)
+          .then(function(text) {
               assert.equal(text, errorPasswordDoNotMatch);
           }).then(function(){
               return setUpPage.dismissAlert();
@@ -100,13 +96,8 @@ describe('sessions ui', function() {
       });
 
       it('should reject short passwords', function () {
-          return setUpPage.typePassword('asdf').then(function() {
-            return setUpPage.confirmTypePassword('asdf');
-          }).then(function() {
-            return setUpPage.tapSubmitButton();
-          }).then(function() {
-            return setUpPage.alertMessage();
-          }).then(function(text){
+          return setUpPage.failureLogin(1234, 1234)
+          .then(function(text) {
               assert.equal(text, shortPasswordErrorMessage);
           }).then(function() {
               return setUpPage.dismissAlert();
@@ -114,9 +105,7 @@ describe('sessions ui', function() {
         });
 
       it('should fail if password is not set', function() {
-          return setUpPage.tapSubmitButton().then(function(){
-              return setUpPage.alertMessage();
-          }).then(function(text){
+          return setUpPage.failureLogin('', '').then(function(text){
               assert.equal(text, shortPasswordErrorMessage);
           }).then(function(){
               return setUpPage.dismissAlert();
@@ -124,12 +113,9 @@ describe('sessions ui', function() {
         });
 
       it('should accept matching, long-enough passwords', function() {
-          return setUpPage.typePassword('12345678').then(function() {
-              return setUpPage.confirmTypePassword('12345678');
-          }).then(function(){
-              return setUpPage.tapSubmitButtonSignUp();
-          }).then(function(successfulPageView) {
-              return successfulPageView.successLogin();
+          return setUpPage.successLogin(12345678, 12345678)
+          .then(function(successfulPageView) {
+              return successfulPageView.loginMessage();
           }).then(function(text) {
               assert.equal(text, successMessage);
           });

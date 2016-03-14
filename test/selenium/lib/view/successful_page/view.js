@@ -9,7 +9,7 @@ function SuccessfulPageView(driver) {
 };
 
 SuccessfulPageView.prototype = {
-    successLogin: function() {
+    loginMessage: function() {
         return this.accessors.successMessageLocator.getText();
     }
 };

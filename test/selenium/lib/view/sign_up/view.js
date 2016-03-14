@@ -38,13 +38,25 @@ SetUpView.prototype = {
         return this.accessors.confirmPassword.sendKeys(text);
     },
 
-    tapSubmitButton: function() {
-        return this.accessors.submitButton.click();
+    successLogin: function(password, confirmPassword) {
+        return this.accessors.insertPassword.sendKeys(password)
+        .then(() => {
+            return this.accessors.confirmPassword.sendKeys(confirmPassword);
+        }).then(() => {
+            return this.accessors.submitButton.click();
+        }).then(() => {
+            return successfulPageView;
+        });
     },
 
-    tapSubmitButtonSignUp: function() {
-        return this.accessors.submitButton.click().then(function(){
-            return successfulPageView;
+    failureLogin: function(password, confirmPassword) {
+        return this.accessors.insertPassword.sendKeys(password)
+        .then(() => {
+            return this.accessors.confirmPassword.sendKeys(confirmPassword);
+        }).then(() => {
+            return this.accessors.submitButton.click();
+        }).then(() => {
+            return this.alertMessage();
         });
     },
 
