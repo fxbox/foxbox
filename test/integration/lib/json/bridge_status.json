@@ -1,0 +1,173 @@
+{
+  "lights": {
+    "1": {
+      "state": {
+        "on": true,
+        "bri": 255,
+        "hue": 16384,
+        "sat": 255,
+        "effect": "none",
+        "xy": [
+        0.4596,
+        0.4105
+        ],
+        "ct": 370,
+        "alert": "none",
+        "colormode": "ct",
+        "reachable": false
+      },
+      "type": "Extended color light",
+      "name": "Hue color lamp 1",
+      "modelid": "LCT007",
+      "manufacturername": "Philips",
+      "uniqueid": "00:17:88:01:10:41:87:79-0b",
+      "swversion": "66014919"
+    },
+    "2": {
+      "state": {
+        "on": true,
+        "bri": 0,
+        "hue": 0,
+        "sat": 0,
+        "effect": "none",
+        "xy": [
+        0.5186,
+        0.2357
+        ],
+        "ct": 233,
+        "alert": "none",
+        "colormode": "xy",
+        "reachable": false
+      },
+      "type": "Extended color light",
+      "name": "Hue color lamp 2",
+      "modelid": "LCT007",
+      "manufacturername": "Philips",
+      "uniqueid": "00:17:88:01:10:56:b6:21-0b",
+      "swversion": ""
+    },
+    "3": {
+      "state": {
+        "on": true,
+        "bri": 255,
+        "hue": 16384,
+        "sat": 255,
+        "effect": "none",
+        "xy": [
+        0.4596,
+        0.4105
+        ],
+        "ct": 370,
+        "alert": "none",
+        "colormode": "ct",
+        "reachable": false
+      },
+      "type": "Extended color light",
+      "name": "Hue color lamp 3",
+      "modelid": "LCT007",
+      "manufacturername": "Philips",
+      "uniqueid": "00:17:88:01:10:56:ba:92-0b",
+      "swversion": "66014919"
+    }
+  },
+  "groups": {},
+  "config": {
+    "name": "Philips hue",
+    "zigbeechannel": 11,
+    "bridgeid": "001788FFFE230B96",
+    "mac": "00:17:88:23:0b:96",
+    "dhcp": true,
+    "ipaddress": "192.168.1.140",
+    "netmask": "255.255.255.0",
+    "gateway": "192.168.1.1",
+    "proxyaddress": "none",
+    "proxyport": 0,
+    "UTC": "2016-02-29T21:44:47",
+    "localtime": "2016-02-29T16:44:47",
+    "timezone": "America/Toronto",
+    "modelid": "BSB002",
+    "swversion": "01030262",
+    "apiversion": "1.11.0",
+    "swupdate": {
+      "updatestate": 0,
+      "checkforupdate": false,
+      "devicetypes": {
+        "bridge": false,
+        "lights": [],
+        "sensors": []
+      },
+      "url": "",
+      "text": "",
+      "notify": false
+    },
+    "linkbutton": false,
+    "portalservices": true,
+    "portalconnection": "connected",
+    "portalstate": {
+      "signedon": true,
+      "incoming": true,
+      "outgoing": true,
+      "communication": "disconnected"
+    },
+    "factorynew": false,
+    "replacesbridgeid": null,
+    "backup": {
+      "status": "idle",
+      "errorcode": 0
+    }
+  },
+  "schedules": {},
+  "scenes": {
+    "2e1dbbb4a-on-0": {
+      "name": "Pencils on 1456451356535",
+      "lights": [
+      "1",
+      "2",
+      "3"
+      ],
+      "owner": "2aebf17e5cbd09c3712b116b68325934",
+      "recycle": true,
+      "locked": false,
+      "appdata": {},
+      "picture": "",
+      "lastupdated": "2016-02-26T01:49:18",
+      "version": 1
+    },
+    "087f88f52-on-0": {
+      "name": "Sunset on 1456451364390",
+      "lights": [
+      "1",
+      "2",
+      "3"
+      ],
+      "owner": "2aebf17e5cbd09c3712b116b68325934",
+      "recycle": true,
+      "locked": false,
+      "appdata": {},
+      "picture": "",
+      "lastupdated": "2016-02-26T01:49:26",
+      "version": 1
+    }
+  },
+  "rules": {},
+  "sensors": {
+    "1": {
+      "state": {
+        "daylight": null,
+        "lastupdated": "none"
+      },
+      "config": {
+        "on": true,
+        "long": "none",
+        "lat": "none",
+        "sunriseoffset": 30,
+        "sunsetoffset": -30
+      },
+      "name": "Daylight",
+      "type": "Daylight",
+      "modelid": "PHDL00",
+      "manufacturername": "Philips",
+      "swversion": "1.0"
+    }
+  }
+}
