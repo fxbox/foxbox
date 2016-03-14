@@ -9,6 +9,7 @@ extern crate mio;
 use adapters::AdapterManager;
 use config_store::ConfigService;
 use core::marker::Reflect;
+use foxbox_users::UsersManager;
 use http_server::HttpServer;
 use iron::{Request, Response, IronResult};
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
@@ -25,7 +26,6 @@ use std::sync::atomic::{ AtomicBool, Ordering };
 use upnp::UpnpManager;
 use ws_server::WsServer;
 use ws;
-use foxbox_users::UsersManager;
 
 #[derive(Clone)]
 pub struct FoxBox {

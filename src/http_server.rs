@@ -5,7 +5,9 @@
 use controller::Controller;
 use iron::{ AfterMiddleware, Chain, Handler, Iron, IronResult,
             Request, Response };
+use iron_cors::CORS;
 use iron::error::{ IronError };
+use iron::method::Method;
 use iron::status::Status;
 use mount::Mount;
 use router::NoRoute;
@@ -67,6 +69,14 @@ impl<T: Controller> HttpServer<T> {
         let mut chain = Chain::new(mount);
         chain.link_after(Custom404);
 
+        let cors = CORS::new(vec![
+            (vec![Method::Get], "ping".to_owned()),
+            (vec![Method::Get, Method::Post, Method::Put, Method::Delete],
+             "services/:service/:command".to_owned()),
+            (vec![Method::Get], "services/list".to_owned())
+        ]);
+        chain.link_after(cors);
+
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
 
         thread::Builder::new().name("HttpServer".to_owned())
@@ -96,3 +106,37 @@ describe! ping {
         assert_eq!(response.status.unwrap(), Status::Ok);
     }
 }
+
+#[cfg(test)]
+describe! cors {
+    before_each {
+        extern crate hyper;
+
+        use iron::headers;
+        use iron::method::Method;
+        use stubs::controller::ControllerStub;
+
+        let mut http_server = HttpServer::new(ControllerStub::new());
+        http_server.start();
+    }
+
+    it "should get the appropriate CORS headers" {
+        let endpoints = vec![
+            (vec![Method::Get, Method::Post, Method::Put],
+             "services/:service/:command".to_owned()),
+            (vec![Method::Get], "services/list".to_owned())
+        ];
+        let client = hyper::Client::new();
+        for endpoint in endpoints {
+            let (_, path) = endpoint;
+            let path = "http://localhost:3000/".to_owned() +
+                       &(path.replace(":", "foo"));
+            let res = client.get(&path).send();
+            let headers = &res.unwrap().headers;
+            assert!(headers.has::<headers::AccessControlAllowOrigin>());
+            assert!(headers.has::<headers::AccessControlAllowHeaders>());
+            assert!(headers.has::<headers::AccessControlAllowMethods>());
+        };
+    }
+}
+

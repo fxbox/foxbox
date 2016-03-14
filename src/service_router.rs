@@ -4,96 +4,12 @@
 
 use controller::Controller;
 use foxbox_users::AuthEndpoint;
-use iron::{ AfterMiddleware, headers, IronError, IronResult, Request,
-            Response };
+use iron::{ IronResult, Request, Response };
 use iron::headers::ContentType;
 use iron::method::Method;
-use iron::method::Method::*;
 use iron::prelude::Chain;
 use iron::status::Status;
 use router::Router;
-use unicase::UniCase;
-
-type Endpoint = (&'static[Method], &'static str);
-
-struct CORS;
-
-impl CORS {
-    // Only endpoints listed here will allow CORS.
-    // Endpoints containing a variable path part can use ':foo' like in:
-    // "/foo/:bar" for a URL like https://domain.com/foo/123 where 123 is
-    // variable.
-    pub const ENDPOINTS: &'static[Endpoint] = &[
-        (&[Method::Get], "list"),
-        (&[Method::Get, Method::Post, Method::Put], ":service/:command")
-    ];
-
-    pub fn is_allowed(req: &mut Request) -> bool {
-        let mut is_cors_endpoint = false;
-        for endpoint in CORS::ENDPOINTS {
-            let (ref methods, path) = *endpoint;
-
-            if !methods.contains(&req.method) &&
-               req.method != Method::Options {
-                continue;
-            }
-
-            let path: Vec<&str> = if path.starts_with('/') {
-                path[1..].split('/').collect()
-            } else {
-                path[0..].split('/').collect()
-            };
-
-            if path.len() != req.url.path.len() {
-                continue;
-            }
-
-            for (i, req_path) in req.url.path.iter().enumerate() {
-                is_cors_endpoint = false;
-                if req_path != path[i] && !path[i].starts_with(':') {
-                    break;
-                }
-                is_cors_endpoint = true;
-            }
-            if is_cors_endpoint {
-                break;
-            }
-        }
-        is_cors_endpoint
-    }
-
-    pub fn add_headers(res: &mut Response) {
-        res.headers.set(headers::AccessControlAllowOrigin::Any);
-        res.headers.set(headers::AccessControlAllowHeaders(
-            vec![
-                UniCase(String::from("accept")),
-                UniCase(String::from("authorization")),
-                UniCase(String::from("content-type"))
-            ]
-        ));
-        res.headers.set(headers::AccessControlAllowMethods(
-            vec![Get, Post, Put]
-        ));
-    }
-}
-
-impl AfterMiddleware for CORS {
-    fn after(&self, req: &mut Request, mut res: Response)
-        -> IronResult<Response> {
-        if CORS::is_allowed(req) {
-            CORS::add_headers(&mut res);
-        }
-        Ok(res)
-    }
-
-    fn catch(&self, req: &mut Request, mut err: IronError)
-        -> IronResult<Response> {
-        if CORS::is_allowed(req) {
-            CORS::add_headers(&mut err.response);
-        }
-        Err(err)
-    }
-}
 
 pub fn create<T: Controller>(controller: T) -> Chain {
     let mut router = Router::new();
@@ -141,8 +57,6 @@ pub fn create<T: Controller>(controller: T) -> Chain {
 
     let mut chain = Chain::new(router);
     chain.around(controller.get_users_manager().get_middleware(auth_endpoints));
-
-    chain.link_after(CORS);
 
     chain
 }
@@ -238,26 +152,6 @@ describe! service_router {
 
             let result = response::extract_body_to_string(response);
             assert_eq!(result, r#"{"error":"NoSuchService","id":"unknown-id"}"#);
-        }
-    }
-
-    describe! cors {
-        before_each {
-            use iron::headers;
-            use super::super::CORS;
-        }
-
-        it "should get the appropriate CORS headers" {
-            for endpoint in CORS::ENDPOINTS {
-                let (_, path) = *endpoint;
-                let path = "http://localhost:1234/".to_owned() +
-                           &(path.replace(":", "foo"));
-                let response = request::options(&path, Headers::new(), &mount).unwrap();
-                let headers = &response.headers;
-                assert!(headers.has::<headers::AccessControlAllowOrigin>());
-                assert!(headers.has::<headers::AccessControlAllowHeaders>());
-                assert!(headers.has::<headers::AccessControlAllowMethods>());
-            };
         }
     }
 }

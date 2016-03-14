@@ -31,6 +31,7 @@ extern crate foxbox_taxonomy;
 extern crate foxbox_users;
 #[macro_use]
 extern crate iron;
+extern crate iron_cors;
 #[cfg(test)]
 extern crate iron_test;
 extern crate libc;
@@ -74,11 +75,13 @@ mod static_router;
 mod tunnel_controller;
 mod ws_server;
 
+#[cfg(test)]
 mod stubs {
     #![allow(dead_code)]
     #![allow(unused_variables)]
     #![allow(boxed_local)]
     pub mod service;
+    pub mod controller;
 }
 
 use controller::{ Controller, FoxBox };
