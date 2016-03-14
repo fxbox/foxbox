@@ -36,12 +36,12 @@ to install and switch between versions of Rust.
 
 #### Build requirements
 
-| Dependency   | Debian/Raspian        | Fedora          | Arch             | OS X |
-| ------------ | --------------------- | --------------- | ---------------- | ---- |
-| `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `libupnp`        | `?`  |
-| `libssl`     | `libssl-dev`          | `?`             | via `base-devel` | `?`  |
-| `libavahi`   | `libavahi-client-dev` | `?`             | `avahi`          | `?`  |
-| `libsqlite3` | `libsqlite3-dev`      | `?`             | `sqlite`         | `?`  |
+| Dependency   | Debian/Raspian        | Fedora          | Arch             | OS X (Homebrew) |
+| ------------ | --------------------- | --------------- | ---------------- | --------------- |
+| `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `libupnp`        | `libupnp`       |
+| `libssl`     | `libssl-dev`          | `?`             | via `base-devel` | `openssl`       |
+| `libavahi`   | `libavahi-client-dev` | `?`             | `avahi`          | `n.a.`          |
+| `libsqlite3` | `libsqlite3-dev`      | `?`             | `sqlite`         | `sqlite`        |
 
 ### Node
 
@@ -171,7 +171,7 @@ Cross compiling on Mac hasn't been documented. A PR is welcomed. :wink:
 You'll need some dependencies installed to build.
 
 ``` bash
-$ brew install openssl
+$ brew install openssl libupnp sqlite
 ```
 
 This is required to build the openssl crate using homebrew's openssl:
