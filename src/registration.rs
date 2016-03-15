@@ -46,7 +46,7 @@ impl Registrar {
         let mut map = BTreeMap::new();
         map.insert("local_ip".to_owned(), ip_addr);
         if let Some(ref tunnel) = *tunnel {
-            map.insert("tunnel_url".to_owned(), tunnel.get_url());
+            map.insert("tunnel_url".to_owned(), tunnel.get_remote_hostname());
         }
         let body = match serde_json::to_string(&map) {
             Ok(body) => body,

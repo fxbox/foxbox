@@ -99,11 +99,11 @@ impl Tunnel {
         }
     }
 
-    pub fn get_url(&self) -> Option<String> {
+    pub fn get_remote_hostname(&self) -> Option<String> {
         if let None = self.tunnel_process {
             return None;
         }
 
-        Some(self.config.clone().tunnel_url)
+        Some(self.config.clone().remote_name)
     }
 }
