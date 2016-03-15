@@ -7,7 +7,7 @@ use self::crypto::aes::KeySize;
 use self::crypto::hkdf::hkdf_extract;
 use self::crypto::hmac::Hmac;
 use self::crypto::sha2::Sha256;
-use self::crypto::mac::{ Mac, MacResult };
+use self::crypto::mac::Mac;
 
 use std::ffi::{ CString, CStr };
 use std::ptr;
@@ -44,7 +44,6 @@ extern "C" {
 
     fn EC_POINT_hex2point(group: *const EcGroup, hex: *const libc::c_char, p: *mut EcPoint, ctx: *mut BnCtx) -> *mut EcPoint;
     fn EC_POINT_point2hex(group: *const EcGroup, point: *const EcPoint, form: EcPointConversion, ctx: *mut BnCtx) -> *mut libc::c_char;
-    //fn EC_POINT_point2buf(group: *const EcGroup, point: *const EcPoint, form: EcPointConversion, pbuf: *mut *mut libc::c_char, ctx: *mut BnCtx) -> libc::size_t;
     fn EC_POINT_free(point: *mut EcPoint);
 
     fn EVP_PKEY_new() -> *mut EvpPkey;
@@ -68,12 +67,6 @@ extern "C" {
     fn EVP_PKEY_derive(ctx: *mut EvpPkeyCtx, key: *mut libc::c_char, size: *mut libc::size_t) -> libc::c_int;
 
     fn CRYPTO_free(ptr: *mut libc::c_void);
-}
-
-#[derive(Debug)]
-struct EcdhKeyData {
-    public_key: String,
-    shared_key: Vec<u8>
 }
 
 /// Creates an OpenSSL representation of the given ECDH X9.62 public key,
@@ -306,6 +299,11 @@ fn ecdh_export_public_key(key: *mut EvpPkey) -> Option<String> {
     status
 }
 
+struct EcdhKeyData {
+    public_key: String,
+    shared_key: Vec<u8>
+}
+
 fn ecdh_derive_keys(raw_peer_key : String) -> Option<EcdhKeyData> {
     let peer_key = ecdh_import_public_key(raw_peer_key);
     let local_key = ecdh_generate_key_pair();
@@ -325,6 +323,55 @@ fn ecdh_derive_keys(raw_peer_key : String) -> Option<EcdhKeyData> {
         public_key: public_key.unwrap(),
         shared_key: shared_key.unwrap()
     })
+}
+
+fn aesgcm128_encrypt(input: String, shared_key: Vec<u8>, salt: &[u8]) -> Vec<u8> {
+    // Create the HKDF salt from our shared key and transaction salt
+    let mut salt_hmac = Hmac::new(Sha256::new(), salt);
+    salt_hmac.input(shared_key.as_slice());
+    let hkdf_salt = salt_hmac.result();
+
+    // Create the AES-GCM encryption key
+    // https://tools.ietf.org/html/draft-thomson-http-encryption-01#section-3.2
+    let encrypt_info = b"Content-Encoding: aesgcm128\x01";
+    let mut encrypt_key = [0u8; 32];
+    hkdf_extract(Sha256::new(), hkdf_salt.code(), encrypt_info, &mut encrypt_key);
+
+    // Create the AES-GCM nonce
+    // https://tools.ietf.org/html/draft-thomson-http-encryption-01#section-3.3
+    let nonce_info = b"Content-Encoding: nonce\x01";
+    let mut nonce = [0u8; 32];
+    hkdf_extract(Sha256::new(), hkdf_salt.code(), nonce_info, &mut nonce);
+
+    // Add padding to input data in accordance with
+    // https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-00#section-2
+    //
+    // "Padding consists of a length byte, followed that number of zero-valued octets.
+    //  A receiver MUST fail to decrypt if any padding octet other than the first is
+    //  non-zero"
+    //
+    // "Valid records always contain at least one byte of padding"
+    let mut raw_input = input.into_bytes();
+    raw_input.insert(0, 0);
+
+    // TODO: if the data is greater than 4096, we need to encrypt
+    // in chunks and change the nonce appropriately
+    assert!(raw_input.len() <= 4095);
+
+    // With the generation AES-GCM key/nonce pair, encrypt the payload
+    let mut cipher = AesGcm::new(KeySize::KeySize128, &encrypt_key[0..16], &nonce[0..12], &[0; 0]);
+    let mut tag = [0u8; 16];
+    let mut out = vec![0u8; raw_input.len() + tag.len()];
+    out.truncate(raw_input.len());
+    cipher.encrypt(raw_input.as_slice(), &mut out, &mut tag);
+
+    // Append the authentication tag to the record payload
+    // https://tools.ietf.org/html/draft-thomson-http-encryption-01#section-2
+    //
+    // "Valid records always contain at least one byte of padding and a 16
+    // octet authentication tag."
+    out.extend_from_slice(&tag);
+    out
 }
 
 #[derive(Debug)]
@@ -352,45 +399,6 @@ pub fn encrypt(peer_key: &String, input: String) -> Option<EncryptData> {
         }
     };
 
-    // Create the salt for this transaction
-    let mut gen = OsRng::new().unwrap();
-    let mut salt = [0u8; 16];
-    gen.fill_bytes(&mut salt);
-
-    // Create the HKDF salt from our shared key and transaction salt
-    let mut salt_hmac = Hmac::new(Sha256::new(), &salt);
-    salt_hmac.input(ecdh.shared_key.as_slice());
-    let hkdf_salt = salt_hmac.result();
-
-    // Create the AES-GCM encryption key
-    let encrypt_info = b"Content-Encoding: aesgcm128\x01";
-    // Add padding in accordance with
-    // https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-00#section-3.3
-    let mut encrypt_key = [0u8; 32];
-    hkdf_extract(Sha256::new(), hkdf_salt.code(), encrypt_info, &mut encrypt_key);
-
-    // Create the AES-GCM nonce
-    let nonce_info = b"Content-Encoding: nonce\x01";
-    let mut nonce = [0u8; 32];
-    hkdf_extract(Sha256::new(), hkdf_salt.code(), nonce_info, &mut nonce);
-
-    // Add padding to input data in accordance with
-    // https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-00#section-2
-    let mut raw_input = input.into_bytes();
-    raw_input.insert(0, 0);
-
-    // TODO: if the data is greater than 4096, we need to encrypt
-    // in chunks and change the nonce appropriately
-    assert!(raw_input.len() <= 4095);
-
-    // With the generation AES-GCM key/nonce pair, encrypt the payload
-    let mut cipher = AesGcm::new(KeySize::KeySize128, &encrypt_key[0..16], &nonce[0..12], &[0; 0]);
-    let mut tag = [0u8; 16];
-    let mut out = vec![0u8; raw_input.len() + tag.len()];
-    out.truncate(raw_input.len());
-    cipher.encrypt(raw_input.as_slice(), &mut out, &mut tag);
-    out.extend_from_slice(&tag);
-
     let public_key_bytes = match ecdh.public_key.from_hex() {
         Ok(x) => x,
         Err(e) => {
@@ -399,10 +407,35 @@ pub fn encrypt(peer_key: &String, input: String) -> Option<EncryptData> {
         }
     };
 
+    // Create the salt for this transaction
+    // https://tools.ietf.org/html/draft-thomson-http-encryption-01#section-3.1
+    //
+    // "The "salt" parameter MUST be present, and MUST be exactly 16 octets long
+    //  when decoded.  The "salt" parameter MUST NOT be reused for two different
+    //  payload bodies that have the same input keying material; generating a
+    //  random salt for every application of the content encoding ensures that
+    //  content encryption key reuse is highly unlikely."
+    let mut gen = OsRng::new().unwrap();
+    let mut salt = [0u8; 16];
+    gen.fill_bytes(&mut salt);
+
     Some(EncryptData {
         public_key: public_key_bytes.to_base64(URL_SAFE),
         salt: salt.to_base64(URL_SAFE),
-        output: out
+        output: aesgcm128_encrypt(input, ecdh.shared_key, &salt)
     })
 }
 
+#[cfg(test)]
+describe! aesgcm128_encrypt {
+    it "should encrypt one record" {
+        use super::aesgcm128_encrypt;
+
+        let input = String::from("test");
+        let shared_key = vec![14, 55, 71, 109, 215, 177, 33, 176, 142, 43, 241, 48, 179, 164, 96, 220, 146, 176, 76, 1, 63, 108, 78, 67, 141, 55, 125, 200, 40, 153, 252, 85];
+        let salt = [23, 249, 70, 109, 205, 73, 187, 20, 140, 197, 163, 250, 114, 55, 122, 88];
+        let output = aesgcm128_encrypt(input, shared_key, &salt);
+        let expected = vec![177, 172, 8, 114, 38, 164, 249, 255, 11, 140, 152, 0, 194, 82, 79, 121, 26, 116, 68, 34, 182];
+        assert_eq!(output, expected);
+    }
+}
