@@ -35,6 +35,8 @@ type EvpPkey = libc::c_void;
 type EvpPkeyCtx = libc::c_void;
 type BnCtx = libc::c_void;
 
+// TODO: switch to rust-openssl crate once the missing EC_*** and EVP_PKEY_*** APIs are added
+//       instead of using the FFI directly
 extern "C" {
     fn EC_KEY_new_by_curve_name(nid: libc::c_int) -> *mut EcKey;
     fn EC_KEY_free(key: *mut EcKey);
