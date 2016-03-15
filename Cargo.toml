@@ -21,6 +21,7 @@ get_if_addrs = "0.3.1"
 hyper = "0.7.2"
 multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
 iron = "0.2.6"
+iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "137d42f" }
 libc = "0.2.7"
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
@@ -46,3 +47,4 @@ xml-rs = "0.3.0"
 stainless = "0.1.4"
 iron-test = "0.2.0"
 regex = "0.1.55"
+rand = "0.3.14"
