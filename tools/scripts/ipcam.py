@@ -3,6 +3,7 @@
 # Simple client for connecting with the IpCameraService.
 
 import argparse
+import getpass
 import requests
 import json
 import os
@@ -101,32 +102,56 @@ def main():
         print('username =', username)
         print('password =', password)
 
-    try:
-        with open(auth_filename, 'rt') as f:
-            token = f.read()
-    except:
-        login_url = '{}/users/login'.format(server_url)
-        r = requests.post(login_url, auth=(username, password))
-        if r.status_code != 201:
-            print('Authentication failed')
-            print('Status Code:', r.status_code)
-            print('Headers:', r.headers)
-            print('Content:', r.content)
-            return
+    token = None
+    token_changed = False
+    if not password:
+        try:
+            with open(auth_filename, 'rt') as f:
+                token = f.read()
+        except:
+            # Unable to read token. This means that a password must be provided
+            pass
+    while True:
+        if not password and not token:
+            # User didn't provide a password as an argument, or it was invalid
+            # prompt the user for a password
+            password = getpass.getpass(prompt='Enter password for {} user: '.format(username))
+        if password:
+            # if a password was provided - use it, even if we had stashed a token
+            login_url = '{}/users/login'.format(server_url)
+            r = requests.post(login_url, auth=(username, password))
+            if r.status_code != 201:
+                print('Authentication failed')
+                password = None
+                if args.verbose:
+                    print('Status Code:', r.status_code)
+                    print('Headers:', r.headers)
+                    print('Content:', r.content)
+                continue
 
-        print('login successful')
-        j_resp = json.loads(str(r.content, 'utf-8'))
-        token = j_resp['session_token']
+            # login was successful
+            j_resp = json.loads(str(r.content, 'utf-8'))
+            token = j_resp['session_token']
+            token_changed = True
+
+        # We now have a token - try it out
+        auth_header = {'Authorization': 'Bearer {}'.format(token)}
+        r = requests.get(services_url, headers=auth_header)
+        if r.status_code == 200:
+            # Token was accepted
+            break
+        print('Login failed')
+        if args.verbose:
+            print('Unable to get service list from {} ({})'.format(server_url, r.status_code))
+            print(str(r.content, 'utf-8'))
+        token = None
+        password = None
+
+    if token_changed:
         # Persist the token
+        print('Saving authentication token')
         with open(auth_filename, 'wt') as f:
             f.write(token)
-
-    auth_header = {'Authorization': 'Bearer {}'.format(token)}
-    r = requests.get(services_url, headers=auth_header)
-    if r.status_code != 200:
-        print('Unable to get service list from {} ({})'.format(server_url, r.status_code))
-        print(str(r.content, 'utf-8'))
-        return
 
     services = json.loads(str(r.content, 'utf-8'))
 
