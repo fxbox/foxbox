@@ -166,7 +166,7 @@ fn ecdh_generate_params() -> *mut EvpPkey {
 /// Generates an OpenSSL representation of an ECDH X9.62 key pair.
 fn ecdh_generate_key_pair() -> *mut EvpPkey {
     let params;
-    let mut key_ctx = ptr::null_mut();
+    let mut ctx = ptr::null_mut();
     let mut key = ptr::null_mut();
 
     unsafe {
@@ -176,18 +176,18 @@ fn ecdh_generate_key_pair() -> *mut EvpPkey {
                 break;
             }
 
-            key_ctx = EVP_PKEY_CTX_new(params, ptr::null_mut());
-            if key_ctx.is_null() {
+            ctx = EVP_PKEY_CTX_new(params, ptr::null_mut());
+            if ctx.is_null() {
                 warn!("cannot create key context");
                 break;
             }
 
-            if EVP_PKEY_keygen_init(key_ctx) != 1 {
+            if EVP_PKEY_keygen_init(ctx) != 1 {
                 warn!("cannot init key context");
                 break;
             }
 
-            if EVP_PKEY_keygen(key_ctx, &mut key) != 1 || key.is_null() {
+            if EVP_PKEY_keygen(ctx, &mut key) != 1 || key.is_null() {
                 warn!("cannot generate public/private key pair from key context");
                 break;
             }
@@ -195,7 +195,7 @@ fn ecdh_generate_key_pair() -> *mut EvpPkey {
             break;
         }
 
-        if !key_ctx.is_null() { EVP_PKEY_CTX_free(key_ctx); }
+        if !ctx.is_null() { EVP_PKEY_CTX_free(ctx); }
         if !params.is_null() { EVP_PKEY_free(params); }
     }
 
