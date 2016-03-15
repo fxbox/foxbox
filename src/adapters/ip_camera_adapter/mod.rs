@@ -123,7 +123,7 @@ impl<T: Controller> IpCameraService<T> {
                 custom_properties: properties,
             },
             ip: ip.to_owned(),
-            snapshot_dir: format!("{}/{}", SNAPSHOT_DIR, id),
+            snapshot_dir: format!("{}/{}", controller.get_profile().path_for(SNAPSHOT_DIR), id),
             name: name.to_owned(),
         }
     }
