@@ -3,12 +3,11 @@
 const spawn = require('child_process').spawn;
 const chakram = require('chakram'), expect = chakram.expect;
 const Config = require('config-js');
-const fs = require('fs');
 
 var philipshue_server = require('../lib/philipsHue_server.js');
 var nupnp_server = require('../lib/nupnp_PhilipsHue.js');
-var config = new Config('./lib/config/foxbox.js');
-var header = new Config('./lib/config/header.js').get('header');
+var config = new Config('./test/integration/lib/config/foxbox.js');
+var header = new Config('./test/integration/lib/config/header.js');
 
 describe('Initiate the connection with foxbox as Philips Hue hub',function(){
   var credential = config.get('credential'); 
@@ -29,18 +28,11 @@ describe('Initiate the connection with foxbox as Philips Hue hub',function(){
     philipshue_server.turnOffLight(2);
     philipshue_server.turnOffLight(3);
 
-    // kick off the foxbox within 10 seconds
-    fs.access('users_db.sqlite', fs.F_OK, function(err) {
-      if (!err) {
-          fs.unlink('users_db.sqlite');
-      } else {
-          // It isn't accessible
-      }
-    });
-    
-    foxbox_process = spawn('../../target/debug/foxbox', 
+    foxbox_process = spawn('./target/debug/foxbox', 
       ['-c', 'philips_hue;nupnp_url;http://localhost:'+ 
       config.get('nupnp_server.port')+'/']);
+
+    // give time until foxbox is operational
     setTimeout(done, FOXBOX_STARTUP_WAIT_TIME_IN_MS);  
   });
   
