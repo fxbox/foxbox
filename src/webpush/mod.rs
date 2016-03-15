@@ -206,7 +206,7 @@ impl WebPush {
 
     pub fn notify(&self, grp: String, msg: String) {
         info!("notify group={} msg={}", grp, msg);
-        let json = json!({group: grp, message: msg});
+        let json = String::from("test");//json!({group: grp, message: msg});
         let subs = self.subscriptions.clone();
 
         thread::spawn(move || {

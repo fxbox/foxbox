@@ -14,7 +14,7 @@ use std::ptr;
 use rand::Rng;
 use rand::os::OsRng;
 
-use rustc_serialize::base64::{ FromBase64, ToBase64, STANDARD };
+use rustc_serialize::base64::{ FromBase64, ToBase64, URL_SAFE };
 use rustc_serialize::hex::{ ToHex, FromHex };
 
 const NID_X9_62_PRIMVE256V1: libc::c_int = 415;
@@ -310,24 +310,34 @@ pub fn encrypt(peer_key: &String, data: &String) -> Option<EncryptData> {
     salt_hmac.input(ecdh.shared_key.as_slice());
     let salt_hmac_res = salt_hmac.result();
 
-    // Create the encryption key
-    let encrypt_info = String::from("Content-Encoding: aesgcm128").into_bytes();
+    // Create the encryiption key and nonce
+    let mut encrypt_info = String::from("Content-Encoding: aesgcm128").into_bytes();
+    // Add padding in accordance with
+    // https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-00#section-3.3
+    //encrypt_info.push(0);
+    encrypt_info.push(1);
     let mut encrypt_key = vec![0u8; 32];
     hkdf_extract(Sha256::new(), salt_hmac_res.code(), encrypt_info.as_slice(), encrypt_key.as_mut_slice());
     encrypt_key.truncate(16);
 
     // Create the nonce
-    let nonce_info = String::from("Content-Encoding: nonce").into_bytes();
+    let mut nonce_info = String::from("Content-Encoding: nonce").into_bytes();
+    //nonce_info.push(0);
+    nonce_info.push(1);
     let mut nonce = vec![0u8; 32];
     hkdf_extract(Sha256::new(), salt_hmac_res.code(), nonce_info.as_slice(), nonce.as_mut_slice());
     nonce.truncate(12);
 
     // Encrypt the payload with derived key and nonce
-    let raw_data = data.as_bytes();
+    let mut raw_data = data.clone().into_bytes();
+    // Add padding in accordance with
+    // https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-00#section-2
+    raw_data.insert(0, 0);
     let mut cipher = AesGcm::new(KeySize::KeySize128, encrypt_key.as_slice(), nonce.as_slice(), &[0; 0]);
     let mut out: Vec<u8> = vec![0; raw_data.len()];
     let mut out_tag: Vec<u8> = vec![0; 16];
-    cipher.encrypt(raw_data, &mut out, &mut out_tag);
+    cipher.encrypt(raw_data.as_slice(), &mut out, &mut out_tag);
+    out.extend_from_slice(out_tag.as_slice());
 
     let public_key_bytes = match ecdh.public_key.from_hex() {
         Ok(x) => x,
@@ -338,8 +348,8 @@ pub fn encrypt(peer_key: &String, data: &String) -> Option<EncryptData> {
     };
 
     let ed = EncryptData {
-        public_key: public_key_bytes.to_base64(STANDARD),
-        salt: salt.to_base64(STANDARD),
+        public_key: public_key_bytes.to_base64(URL_SAFE),
+        salt: salt.to_base64(URL_SAFE),
         output: out
     };
 
