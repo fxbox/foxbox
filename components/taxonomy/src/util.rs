@@ -7,6 +7,7 @@ use serde::de::{Deserialize, Deserializer, Error as DeserializationError, Type a
 
 use std::cmp::PartialEq;
 use std::hash::{Hash, Hasher};
+use std::string::ToString;
 
 /// A marker for a request that a expects a specific value.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -123,6 +124,8 @@ impl<T> Deserialize for Phantom<T> {
 ///
 /// let my_id = foxbox_taxonomy::util::Id::<UniqueId>::new("Unique Identifier".to_owned());
 ///
+/// assert_eq!(my_id.to_string(), "Unique Identifier");
+///
 /// let my_serialized_id = serde_json::to_string(&my_id).unwrap();
 /// assert_eq!(my_serialized_id, "\"Unique Identifier\"");
 ///
@@ -147,6 +150,12 @@ impl<T> Id<T> {
 
     pub fn as_atom(&self) -> &Atom {
         &self.id
+    }
+}
+
+impl<T> ToString for Id<T> {
+    fn to_string(&self) -> String {
+        String::from(self.id.as_ref())
     }
 }
 
