@@ -185,18 +185,43 @@ fn main() {
         libc::signal(SIGINT, mem::transmute(handle_sigint));
     }
 
-    let format = |record: &LogRecord| {
-        let t = time::now();
-        format!("{}.{:03}: {}{:5} {}",
-            time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
-            t.tm_nsec / 1000_000,
-            tid_str(),
-            record.level(),
-            record.args()
-        )
-    };
     let mut builder = LogBuilder::new();
-    builder.format(format).filter(None, LogLevelFilter::Info);
+    let istty = unsafe { libc::isatty(libc::STDERR_FILENO as i32) } != 0;
+    if istty {
+        // Colorized output formatter
+        let format = |record: &LogRecord| {
+            let t = time::now();
+            let level_color = match record.level() {
+                log::LogLevel::Error => "\x1b[1;31m",  // bold red
+                log::LogLevel::Warn  => "\x1b[1;33m",  // bold yellow
+                log::LogLevel::Info  => "\x1b[1;32m",  // bold green
+                log::LogLevel::Debug => "\x1b[1;34m",  // bold blue
+                log::LogLevel::Trace => "\x1b[1;35m"   // bold magenta
+            };
+            format!("[\x1b[90m{}.{:03}\x1b[0m] {}{}{:5}\x1b[0m {}",
+                time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
+                t.tm_nsec / 1_000_000,
+                tid_str(),
+                level_color,
+                record.level(),
+                record.args()
+            )
+        };
+        builder.format(format).filter(None, LogLevelFilter::Info);
+    } else {
+        // Plain output formatter
+        let format = |record: &LogRecord| {
+            let t = time::now();
+            format!("{}.{:03} {}{:5} {}",
+                time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
+                t.tm_nsec / 1_000_000,
+                tid_str(),
+                record.level(),
+                record.args()
+            )
+        };
+        builder.format(format).filter(None, LogLevelFilter::Info);
+    }
 
     if env::var("RUST_LOG").is_ok() {
        builder.parse(&env::var("RUST_LOG").unwrap());
