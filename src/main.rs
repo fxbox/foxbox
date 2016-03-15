@@ -42,6 +42,7 @@ extern crate nix;
 extern crate router;
 extern crate rustc_serialize;
 extern crate serde;
+extern crate serde_json;
 extern crate staticfile;
 extern crate time;
 extern crate timer;
@@ -186,9 +187,6 @@ fn main() {
 
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
-    let registrar = registration::Registrar::new();
-    registrar.start(args.flag_register, args.flag_iface);
-
     // Start the tunnel.
     let mut tunnel: Option<Tunnel> = None;
     if let Some(tunnel_url) = args.flag_tunnel {
@@ -201,6 +199,10 @@ fn main() {
             tunnel.as_mut().unwrap().start().unwrap();
         }
     }
+
+    // Register with the nUPNP server.
+    let registrar = registration::Registrar::new();
+    registrar.start(args.flag_register, args.flag_iface, &tunnel);
 
     let mut controller = FoxBox::new(
         args.flag_verbose, args.flag_local_name.map_or(None, update_hostname), args.flag_port,

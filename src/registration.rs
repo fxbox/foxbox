@@ -13,9 +13,12 @@ use self::hyper::Client;
 use self::hyper::header::Connection;
 use self::hyper::status::StatusCode;
 use self::get_if_addrs::{ IfAddr, Interface };
+use serde_json;
+use std::collections::BTreeMap;
 use std::io::Read;
 use std::time::Duration;
 use std::thread;
+use tunnel_controller:: { Tunnel };
 
 const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
 
@@ -26,8 +29,11 @@ impl Registrar {
         Registrar
     }
 
-    pub fn start(&self, endpoint_url: String, iface: Option<String>) {
+    pub fn start(&self, endpoint_url: String, iface: Option<String>,
+                 tunnel: &Option<Tunnel>) {
         info!("Starting registration with {}", endpoint_url);
+        let endpoint_url = format!("{}/register", endpoint_url);
+
         let ip_addr = self.get_ip_addr(&iface);
         if ip_addr == None {
             // TODO: retry later, in case we're racing with the network
@@ -36,15 +42,28 @@ impl Registrar {
         }
 
         info!("Got ip address: {}", ip_addr.clone().unwrap());
-        let full_address = format!("{}?ip={}", endpoint_url, ip_addr.unwrap());
+
+        let mut map = BTreeMap::new();
+        map.insert("local_ip".to_owned(), ip_addr);
+        if let Some(ref tunnel) = *tunnel {
+            map.insert("tunnel_url".to_owned(), tunnel.get_url());
+        }
+        let body = match serde_json::to_string(&map) {
+            Ok(body) => body,
+            Err(_) => {
+                error!("Serialization error");
+                return;
+            }
+        };
 
         // Spawn a thread to register every REGISTRATION_INTERVAL_IN_MINUTES.
         thread::Builder::new().name("Registrar".to_owned())
                               .spawn(move || {
             loop {
                 let client = Client::new();
-                let res = client.get(&full_address)
+                let res = client.post(&endpoint_url)
                     .header(Connection::close())
+                    .body(&body)
                     .send();
 
                 // Sanity checks, mostly to debug errors since we don't try
@@ -55,11 +74,11 @@ impl Registrar {
                         if let Ok(_) = response.read_to_string(&mut body) {
                             info!("Server responded with: {}", body);
                         } else {
-                            info!("Unable to read answer from {}", full_address);
+                            info!("Unable to read answer from {}", endpoint_url);
                         }
                     }
                 } else {
-                    info!("Unable to send request to {}", full_address);
+                    info!("Unable to send request to {}", endpoint_url);
                 }
 
                 // Go to sleep.

@@ -98,4 +98,12 @@ impl Tunnel {
             Some(process) => process.shutdown()
         }
     }
+
+    pub fn get_url(&self) -> Option<String> {
+        if let None = self.tunnel_process {
+            return None;
+        }
+
+        Some(self.config.clone().tunnel_url)
+    }
 }
