@@ -80,7 +80,7 @@ struct EcdhKeyData {
 /// represented as a string of hex digits.
 fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
     let eckey;
-    let mut ecpt = ptr::null_mut();
+    let mut ecpoint = ptr::null_mut();
     let mut peer_key = ptr::null_mut();
     let native_key = CString::new(public_key).unwrap();
 
@@ -92,13 +92,19 @@ fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
                 break;
             }
 
-            ecpt = EC_POINT_hex2point(EC_KEY_get0_group(eckey), native_key.as_ptr(), ptr::null_mut(), ptr::null_mut());
-            if ecpt.is_null() {
+            let ecgroup = EC_KEY_get0_group(eckey);
+            if ecgroup.is_null() {
+                warn!("cannot get EC group from key");
+                break;
+            }
+
+            ecpoint = EC_POINT_hex2point(ecgroup, native_key.as_ptr(), ptr::null_mut(), ptr::null_mut());
+            if ecpoint.is_null() {
                 warn!("cannot convert raw EC public key to EC point");
                 break;
             }
 
-            if EC_KEY_set_public_key(eckey, ecpt) != 1 {
+            if EC_KEY_set_public_key(eckey, ecpoint) != 1 {
                 warn!("cannot set EC public key");
                 break;
             }
@@ -120,7 +126,7 @@ fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
         }
 
         if !eckey.is_null() { EC_KEY_free(eckey); }
-        if !ecpt.is_null() { EC_POINT_free(ecpt); }
+        if !ecpoint.is_null() { EC_POINT_free(ecpoint); }
     }
 
     peer_key
@@ -129,28 +135,28 @@ fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
 /// Generates an OpenSSL representation of the parameters describing
 /// an ECDH X9.62 key pair.
 fn ecdh_generate_params() -> *mut EvpPkey {
-    let param_ctx;
+    let ctx;
     let mut params = ptr::null_mut();
 
     unsafe {
         loop {
-            param_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, ptr::null_mut());
-            if param_ctx.is_null() {
+            ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, ptr::null_mut());
+            if ctx.is_null() {
                 warn!("cannot create param context");
                 break;
             }
 
-            if EVP_PKEY_paramgen_init(param_ctx) != 1 {
+            if EVP_PKEY_paramgen_init(ctx) != 1 {
                 warn!("cannot init param context");
                 break;
             }
 
-            if EVP_PKEY_CTX_ctrl(param_ctx, EVP_PKEY_EC, EVP_PKEY_OP_PARAMGEN, EVP_PKEY_CTRL_EC_PARAMGEN_CURVE_NID, NID_X9_62_PRIMVE256V1, ptr::null_mut()) != 1 {
+            if EVP_PKEY_CTX_ctrl(ctx, EVP_PKEY_EC, EVP_PKEY_OP_PARAMGEN, EVP_PKEY_CTRL_EC_PARAMGEN_CURVE_NID, NID_X9_62_PRIMVE256V1, ptr::null_mut()) != 1 {
                 warn!("cannot set param context as X9.62 P256V1");
                 break;
             }
 
-            if EVP_PKEY_paramgen(param_ctx, &mut params) != 1 || params.is_null() {
+            if EVP_PKEY_paramgen(ctx, &mut params) != 1 || params.is_null() {
                 warn!("cannot generate params from context");
                 break;
             }
@@ -158,7 +164,7 @@ fn ecdh_generate_params() -> *mut EvpPkey {
             break;
         }
 
-        if !param_ctx.is_null() { EVP_PKEY_CTX_free(param_ctx); }
+        if !ctx.is_null() { EVP_PKEY_CTX_free(ctx); }
     }
 
     params
@@ -206,6 +212,10 @@ fn ecdh_generate_key_pair() -> *mut EvpPkey {
 /// Derives a shared key from an ECDH X9.62 public/private key pair and
 /// another (peer) ECDH X9.62 public key.
 fn ecdh_derive_shared_key(local_key: *mut EvpPkey, peer_key: *mut EvpPkey) -> Option<Vec<u8>> {
+    if local_key.is_null() || peer_key.is_null() {
+        return None;
+    }
+
     let mut status = None;
     let ctx;
 
@@ -233,7 +243,7 @@ fn ecdh_derive_shared_key(local_key: *mut EvpPkey, peer_key: *mut EvpPkey) -> Op
                 break;
             }
 
-            let shared_key : Vec<u8> = vec![0; shared_len];
+            let shared_key = vec![0u8; shared_len];
             if EVP_PKEY_derive(ctx, shared_key.as_ptr() as *mut libc::c_char, &mut shared_len) != 1 {
                 warn!("cannot get shared key from shared context");
                 break;
@@ -252,10 +262,13 @@ fn ecdh_derive_shared_key(local_key: *mut EvpPkey, peer_key: *mut EvpPkey) -> Op
 /// Creates a string of hex digits representing an ECDH X9.62 public key
 /// given an OpenSSL public/private key pair.
 fn ecdh_export_public_key(key: *mut EvpPkey) -> Option<String> {
+    if key.is_null() {
+        return None;
+    }
+
     let mut status = None;
+    let mut buf = ptr::null_mut();
     let eckey;
-    let mut ecpoint = ptr::null_mut();
-    let mut pkbuf = ptr::null_mut();
 
     unsafe {
         loop {
@@ -265,24 +278,28 @@ fn ecdh_export_public_key(key: *mut EvpPkey) -> Option<String> {
                 break;
             }
 
-            ecpoint = EC_KEY_get0_public_key(eckey);
+            let ecpoint = EC_KEY_get0_public_key(eckey);
             if ecpoint.is_null() {
                 warn!("cannot get public key from local ec key");
                 break;
             }
 
-            pkbuf = EC_POINT_point2hex(EC_KEY_get0_group(eckey), ecpoint, EcPointConversion::Uncompressed, ptr::null_mut());
-            if pkbuf == ptr::null_mut() {
+            let ecgroup = EC_KEY_get0_group(eckey);
+            if ecgroup.is_null() {
+                warn!("cannot get group from local ec key");
+            }
+
+            buf = EC_POINT_point2hex(ecgroup, ecpoint, EcPointConversion::Uncompressed, ptr::null_mut());
+            if buf == ptr::null_mut() {
                 warn!("cannot get uncompressed public key from local ec point");
                 break;
             }
 
-            status = Some(CStr::from_ptr(pkbuf).to_string_lossy().into_owned());
+            status = Some(CStr::from_ptr(buf).to_string_lossy().into_owned());
             break;
         }
 
-        if !pkbuf.is_null() { CRYPTO_free(pkbuf as *mut libc::c_void); }
-        if !ecpoint.is_null() { EC_POINT_free(ecpoint); }
+        if !buf.is_null() { CRYPTO_free(buf as *mut libc::c_void); }
         if !eckey.is_null() { EC_KEY_free(eckey); }
     }
 
@@ -292,18 +309,21 @@ fn ecdh_export_public_key(key: *mut EvpPkey) -> Option<String> {
 fn ecdh_derive_keys(raw_peer_key : String) -> Option<EcdhKeyData> {
     let peer_key = ecdh_import_public_key(raw_peer_key);
     let local_key = ecdh_generate_key_pair();
-    let shared_key = ecdh_derive_shared_key(local_key, peer_key).unwrap();
-    let public_key = ecdh_export_public_key(local_key).unwrap();
+    let shared_key = ecdh_derive_shared_key(local_key, peer_key);
+    let public_key = ecdh_export_public_key(local_key);
 
-    // TODO: if we free both then it crashes, must be some double free happening
     unsafe {
-        //if !peer_key.is_null() { EVP_PKEY_free(peer_key); }
-        //if !local_key.is_null() { EVP_PKEY_free(local_key); }
+        if !peer_key.is_null() { EVP_PKEY_free(peer_key); }
+        if !local_key.is_null() { EVP_PKEY_free(local_key); }
+    }
+
+    if shared_key.is_none() || public_key.is_none() {
+        return None;
     }
 
     Some(EcdhKeyData {
-        public_key: public_key,
-        shared_key: shared_key
+        public_key: public_key.unwrap(),
+        shared_key: shared_key.unwrap()
     })
 }
 
