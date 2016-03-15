@@ -102,15 +102,17 @@ use std::env;
 use std::mem;
 use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 use tls::TlsOption;
+use profile_service::ProfilePath;
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--remote-name <hostname>] [-c <namespace;key;value>]...
+Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-d <profile_path>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--remote-name <hostname>] [-c <namespace;key;value>]...
 
 Options:
     -v, --verbose            Toggle verbose output.
     -l, --local-name <hostname>    Set local hostname. Linux only. Requires to be a member of the netdev group.
     -p, --port <port>        Set port to listen on for http connections. [default: 3000]
     -w, --wsport <wsport>    Set port to listen on for websocket. [default: 4000]
+    -d, --profile <path>     Set profile path to store user data.
     -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242/register]
     -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
@@ -123,6 +125,7 @@ Options:
         flag_local_name: Option<String>,
         flag_port: u16,
         flag_wsport: u16,
+        flag_profile: Option<String>,
         flag_register: String,
         flag_iface: Option<String>,
         flag_tunnel: Option<String>,
@@ -220,7 +223,11 @@ fn main() {
     let mut controller = FoxBox::new(
         args.flag_verbose, args.flag_local_name.map_or(None, update_hostname), args.flag_port,
         args.flag_wsport,
-        if args.flag_disable_tls { TlsOption::Disabled } else { TlsOption::Enabled });
+        if args.flag_disable_tls { TlsOption::Disabled } else { TlsOption::Enabled },
+        match args.flag_profile {
+            Some(p) => ProfilePath::Custom(p),
+            None => ProfilePath::Default
+        });
 
     // Override config values
     {

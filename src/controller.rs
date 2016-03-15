@@ -15,7 +15,7 @@ use http_server::HttpServer;
 use iron::{Request, Response, IronResult};
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
-use profile_service::ProfileService;
+use profile_service::{ ProfilePath, ProfileService };
 use self::collections::vec::IntoIter;
 use service::{ Service, ServiceAdapter, ServiceProperties };
 use std::collections::hash_map::HashMap;
@@ -82,9 +82,10 @@ impl FoxBox {
                hostname: Option<String>,
                http_port: u16,
                ws_port: u16,
-               tls_option: TlsOption) -> Self {
-        let profile_service = ProfileService::new(None);
+               tls_option: TlsOption,
+               profile_path: ProfilePath) -> Self {
 
+        let profile_service = ProfileService::new(profile_path);
         FoxBox {
             certificate_manager: CertificateManager::new(),
             tls_option: tls_option,
@@ -289,9 +290,12 @@ describe! controller {
     before_each {
         use stubs::service::ServiceStub;
         use tls::TlsOption;
+        use profile_service::ProfilePath;
 
         let service = ServiceStub;
-        let controller = FoxBox::new(false, Some("foxbox".to_owned()), 1234, 5678, TlsOption::Disabled);
+        let controller = FoxBox::new(
+          false, Some("foxbox".to_owned()), 1234, 5678,
+                      TlsOption::Disabled, ProfilePath::Default);
     }
 
     describe! add_service {
@@ -316,7 +320,9 @@ describe! controller {
             assert_eq!(controller.get_http_root_for_service("1".to_string()),
                        "http://foxbox.local:1234/services/1/");
 
-            let controller = FoxBox::new(false, Some("foxbox".to_owned()), 1234, 5678, TlsOption::Enabled);
+            let controller = FoxBox::new(false, Some("foxbox".to_owned()),
+                                         1234, 5678, TlsOption::Enabled,
+                                         ProfilePath::Default);
             controller.add_service(Box::new(service));
             assert_eq!(controller.get_http_root_for_service("1".to_string()),
                        "https://foxbox.local:1234/services/1/");
