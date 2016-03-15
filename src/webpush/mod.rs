@@ -135,7 +135,7 @@ impl Subscription {
         };
 
         info!("prepare notify user={}", self.user);
-        let enc = match self::crypto::encrypt(&public_key, msg) {
+        let enc = match self::crypto::encrypt(&public_key, msg.clone()) {
             Some(x) => x,
             None => {
                 warn!("failed to encrypt {} for {}", msg, self.user);

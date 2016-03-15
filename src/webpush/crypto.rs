@@ -334,62 +334,62 @@ pub struct EncryptData {
     pub output: Vec<u8>
 }
 
-pub fn encrypt(peer_key: &String, data: &String) -> Option<EncryptData> {
+pub fn encrypt(peer_key: &String, input: String) -> Option<EncryptData> {
+    // Derive public and secret keys from peer public key
     let peer_key_bytes = match peer_key.from_base64() {
         Ok(x) => x,
         Err(e) => {
-            warn!("Could not base64 decode peer key: {:?}", e);
+            warn!("could not base64 decode peer key: {:?}", e);
             return None;
         }
     };
 
-    // Derive public and secret keys from peer public key
     let ecdh = match ecdh_derive_keys(peer_key_bytes.to_hex()) {
         Some(ekd) => ekd,
         None => {
-            warn!("Could not derive keys");
+            warn!("could not derive keys");
             return None;
         }
     };
 
-    // Create the salt
+    // Create the salt for this transaction
     let mut gen = OsRng::new().unwrap();
-    let mut salt = vec![0u8; 16];
-    gen.fill_bytes(salt.as_mut_slice());
+    let mut salt = [0u8; 16];
+    gen.fill_bytes(&mut salt);
 
-    // Create the HKDF
-    let mut salt_hmac = Hmac::new(Sha256::new(), salt.as_slice());
+    // Create the HKDF salt from our shared key and transaction salt
+    let mut salt_hmac = Hmac::new(Sha256::new(), &salt);
     salt_hmac.input(ecdh.shared_key.as_slice());
-    let salt_hmac_res = salt_hmac.result();
+    let hkdf_salt = salt_hmac.result();
 
-    // Create the encryiption key and nonce
-    let mut encrypt_info = String::from("Content-Encoding: aesgcm128").into_bytes();
+    // Create the AES-GCM encryption key
+    let encrypt_info = b"Content-Encoding: aesgcm128\x01";
     // Add padding in accordance with
     // https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-00#section-3.3
-    //encrypt_info.push(0);
-    encrypt_info.push(1);
-    let mut encrypt_key = vec![0u8; 32];
-    hkdf_extract(Sha256::new(), salt_hmac_res.code(), encrypt_info.as_slice(), encrypt_key.as_mut_slice());
-    encrypt_key.truncate(16);
+    let mut encrypt_key = [0u8; 32];
+    hkdf_extract(Sha256::new(), hkdf_salt.code(), encrypt_info, &mut encrypt_key);
 
-    // Create the nonce
-    let mut nonce_info = String::from("Content-Encoding: nonce").into_bytes();
-    //nonce_info.push(0);
-    nonce_info.push(1);
-    let mut nonce = vec![0u8; 32];
-    hkdf_extract(Sha256::new(), salt_hmac_res.code(), nonce_info.as_slice(), nonce.as_mut_slice());
-    nonce.truncate(12);
+    // Create the AES-GCM nonce
+    let nonce_info = b"Content-Encoding: nonce\x01";
+    let mut nonce = [0u8; 32];
+    hkdf_extract(Sha256::new(), hkdf_salt.code(), nonce_info, &mut nonce);
 
-    // Encrypt the payload with derived key and nonce
-    let mut raw_data = data.clone().into_bytes();
-    // Add padding in accordance with
+    // Add padding to input data in accordance with
     // https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-00#section-2
-    raw_data.insert(0, 0);
-    let mut cipher = AesGcm::new(KeySize::KeySize128, encrypt_key.as_slice(), nonce.as_slice(), &[0; 0]);
-    let mut out: Vec<u8> = vec![0; raw_data.len()];
-    let mut out_tag: Vec<u8> = vec![0; 16];
-    cipher.encrypt(raw_data.as_slice(), &mut out, &mut out_tag);
-    out.extend_from_slice(out_tag.as_slice());
+    let mut raw_input = input.into_bytes();
+    raw_input.insert(0, 0);
+
+    // TODO: if the data is greater than 4096, we need to encrypt
+    // in chunks and change the nonce appropriately
+    assert!(raw_input.len() <= 4095);
+
+    // With the generation AES-GCM key/nonce pair, encrypt the payload
+    let mut cipher = AesGcm::new(KeySize::KeySize128, &encrypt_key[0..16], &nonce[0..12], &[0; 0]);
+    let mut tag = [0u8; 16];
+    let mut out = vec![0u8; raw_input.len() + tag.len()];
+    out.truncate(raw_input.len());
+    cipher.encrypt(raw_input.as_slice(), &mut out, &mut tag);
+    out.extend_from_slice(&tag);
 
     let public_key_bytes = match ecdh.public_key.from_hex() {
         Ok(x) => x,
@@ -399,13 +399,10 @@ pub fn encrypt(peer_key: &String, data: &String) -> Option<EncryptData> {
         }
     };
 
-    let ed = EncryptData {
+    Some(EncryptData {
         public_key: public_key_bytes.to_base64(URL_SAFE),
         salt: salt.to_base64(URL_SAFE),
         output: out
-    };
-
-    info!("ed: {:?}", ed);
-    Some(ed)
+    })
 }
 
