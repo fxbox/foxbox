@@ -1,4 +1,4 @@
-use services::{Service, ServiceId, ChannelKind, Channel, Getter, Setter, TagId};
+use services::{ AdapterId, Service, ServiceId, ChannelKind, Channel, Getter, Setter, TagId };
 use util::{Exactly, Id};
 use values;
 
@@ -18,6 +18,45 @@ fn merge<T>(mut a: HashSet<T>, b: Vec<T>) -> HashSet<T> where T: Hash + Eq {
 
 pub trait SelectedBy<T> {
     fn matches(&self, &T) -> bool;
+}
+
+/// A trait used to let ServiceSelector work on complex data structures
+/// that are not necessarily exactly Selector.
+pub trait ServiceLike {
+    fn id(&self) -> &Id<ServiceId>;
+    fn tags(&self) -> &HashSet<Id<TagId>>;
+    fn adapter(&self) -> &Id<AdapterId>;
+    fn has_getters<F>(&self, f: F) -> bool where F: Fn(&Channel<Getter>) -> bool;
+    fn has_setters<F>(&self, f: F) -> bool where F: Fn(&Channel<Setter>) -> bool;
+}
+
+impl ServiceLike for Service {
+    fn id(&self) -> &Id<ServiceId> {
+        &self.id
+    }
+    fn tags(&self) -> &HashSet<Id<TagId>> {
+        &self.tags
+    }
+    fn adapter(&self) -> &Id<AdapterId> {
+        &self.adapter
+    }
+    fn has_getters<F>(&self, f: F) -> bool where F: Fn(&Channel<Getter>) -> bool {
+        for chan in self.getters.values() {
+            if f(chan) {
+                return true;
+            }
+        }
+        false
+    }
+    fn has_setters<F>(&self, f: F) -> bool where F: Fn(&Channel<Setter>) -> bool {
+        for chan in self.setters.values() {
+            if f(chan) {
+                return true;
+            }
+        }
+        false
+    }
+
 }
 
 /// A selector for one or more services.
@@ -106,19 +145,21 @@ impl ServiceSelector {
         }
     }
 
-    pub fn matches(&self, service: &Service) -> bool {
-        if !self.id.matches(&service.id) {
+    pub fn matches<T>(&self, service: &T) -> bool
+        where T: ServiceLike
+    {
+        if !self.id.matches(service.id()) {
             return false;
         }
-        if !has_selected_tags(&self.tags, &service.tags) {
+        if !has_selected_tags(&self.tags, service.tags()) {
             return false;
         }
         // If any of the getter selectors doesn't find a getter,
         // we don't match.
         let getters_fail = self.getters.iter().find(|selector| {
-            service.getters.values().find(|getter| {
-                selector.matches(getter)
-            }).is_none()
+            !service.has_getters(|channel| {
+                selector.matches(channel)
+            })
         }).is_some();
         if getters_fail {
             return false;
@@ -126,9 +167,9 @@ impl ServiceSelector {
         // If any of the setter selectors doesn't find a setter,
         // we don't match.
         let setters_fail = self.setters.iter().find(|selector| {
-            service.setters.values().find(|setter| {
-                selector.matches(setter)
-            }).is_none()
+            !service.has_setters(|channel| {
+                selector.matches(channel)
+            })
         }).is_some();
         if setters_fail {
             return false;
