@@ -7,11 +7,29 @@ use taxonomy::util::Id as TaxId;
 use taxonomy::services::{ AdapterId, Getter, Setter };
 use taxonomy::values::{ Value, Range };
 use taxonomy::api::{ ResultMap, Error as TaxError };
-use adapters::adapter::{ AdapterWatchGuard, WatchEvent };
+use adapters::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
 use transformable_channels::mpsc::ExtSender;
 
 struct OpenzwaveAdapter {
-    version: [u32; 4]
+    name: String,
+    vendor: String,
+    version: [u32; 4],
+    manager: Box<AdapterManagerHandle + Send>
+}
+
+impl OpenzwaveAdapter {
+    fn init<T: AdapterManagerHandle + Clone + Send + 'static> (manager: &T) -> Result<(), TaxError> {
+        let adapter = Box::new(OpenzwaveAdapter {
+            name: String::from("OpenZwave Adapter"),
+            vendor: String::from("Mozilla"),
+            version: [1, 0, 0, 0],
+            manager: Box::new(manager.clone())
+        });
+
+        try!(manager.add_adapter(adapter));
+
+        Ok(())
+    }
 }
 
 impl adapters::adapter::Adapter for OpenzwaveAdapter {
@@ -20,11 +38,11 @@ impl adapters::adapter::Adapter for OpenzwaveAdapter {
     }
 
     fn name(&self) -> &str {
-        unimplemented!()
+        &self.name
     }
 
     fn vendor(&self) -> &str {
-        unimplemented!()
+        &self.vendor
     }
 
     fn version(&self) -> &[u32; 4] {
