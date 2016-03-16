@@ -7,6 +7,7 @@
 
 use std::env;
 use std::fs;
+use std::io::ErrorKind;
 
 pub struct ProfileService {
     profile_dir: String
@@ -53,7 +54,9 @@ impl ProfileService {
             },
             Err(_) => {
                 fs::create_dir_all(dir.clone()).unwrap_or_else(|err| {
-                    panic!("Unable to create directory {} : {}", dir, err);
+                    if err.kind() != ErrorKind::AlreadyExists {
+                        panic!("Unable to create directory {} : {}", dir, err);
+                    }
                 });
             }
         }
