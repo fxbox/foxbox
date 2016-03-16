@@ -8,6 +8,7 @@ use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
 use router::Router;
 use service::{ Service, ServiceAdapter, ServiceProperties };
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
@@ -31,7 +32,8 @@ impl<T: Controller> DummyService<T> {
                 name: "dummy service".to_owned(),
                 description: "really nothing to see".to_owned(),
                 http_url: controller.get_http_root_for_service(service_id.clone()),
-                ws_url: controller.get_ws_root_for_service(service_id)
+                ws_url: controller.get_ws_root_for_service(service_id),
+                custom_properties: BTreeMap::new()
             },
             dont_kill: id % 3 == 0
         }
@@ -131,6 +133,7 @@ impl<T: Controller> ServiceAdapter for DummyAdapter<T> {
                 let service = DummyService::new(controller.clone(), id);
                 service.start();
                 controller.add_service(Box::new(service));
+                controller.get_web_push().notify("adapter/dummy/created".to_owned(), "".to_owned());
 
                 // Create at most 7 dummy services.
                 if id == 7 {

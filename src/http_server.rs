@@ -14,6 +14,7 @@ use router::NoRoute;
 use service_router;
 use static_router;
 use std::thread;
+use webpush::WebPushRouter;
 
 struct Custom404;
 
@@ -58,13 +59,15 @@ impl<T: Controller> HttpServer<T> {
 
     pub fn start(&mut self) {
         let router = service_router::create(self.controller.clone());
+        let wp_router = WebPushRouter::create(self.controller.clone());
 
         let users_manager = self.controller.get_users_manager();
         let mut mount = Mount::new();
         mount.mount("/", static_router::create(users_manager.clone()))
              .mount("/ping", Ping)
              .mount("/services", router)
-             .mount("/users", users_manager.get_router_chain());
+             .mount("/users", users_manager.get_router_chain())
+             .mount("/push", wp_router);
 
         let mut chain = Chain::new(mount);
         chain.link_after(Custom404);
