@@ -5,3 +5,6 @@ authors = ["Julien Wajsberg <felash@gmail.com>"]
 
 [dependencies]
 "openzwave" = { git = "https://github.com/fxbox/openzwave-rust" }
+"foxbox_adapters" = { git = "https://github.com/fxbox/adapters" }
+"foxbox_taxonomy" = { git = "https://github.com/fxbox/taxonomy", rev = "cb77821" }
+transformable_channels = "^0.1"
