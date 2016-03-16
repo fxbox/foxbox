@@ -6,19 +6,16 @@ extern crate serde_json;
 
 pub mod crypto;
 
-use std::collections::HashMap;
 use std::thread;
-use std::sync::{ Arc, Mutex };
+use std::sync::Arc;
 
 use iron::status;
 use router::Router;
 use iron::prelude::*;
+use iron::method::Method;
 use rustc_serialize::json;
-/*
-use foxbox_users::users_db::{ UsersDb, ReadFilter };
-use iron::middleware::Handler;
-use staticfile::Static;
-use std::path::Path;*/
+use controller::Controller;
+use foxbox_users::{ AuthEndpoint, ReadFilter, User, UsersManager };
 use hyper::header::{ ContentEncoding, Encoding };
 use hyper::Client;
 use hyper::client::Body;
@@ -30,21 +27,21 @@ header! { (EncryptionKey, "Encryption-Key") => [String] }
 pub struct WebPushRouter;
 
 impl WebPushRouter {
-    pub fn create(web_push: Arc<WebPush>) -> Router {
+    pub fn create<T: Controller>(controller: T) -> Chain {
         let mut router = Router::new();
 
-        let wp1 = web_push.clone();
-        router.post("subscribe", move |req1: &mut Request| -> IronResult<Response> {
+        let ctl = controller.clone();
+        router.post("subscribe", move |req: &mut Request| -> IronResult<Response> {
             #[derive(RustcDecodable, Debug)]
             struct SubscribeBody {
-                username: String,
-                pushuri: String,
-                publickey: String,
-                groups: Vec<String>
+                user: Option<String>,
+                push_uri: String,
+                push_key: String,
+                resources: Vec<String>
             }
 
             let mut payload = String::new();
-            req1.body.read_to_string(&mut payload).unwrap();
+            req.body.read_to_string(&mut payload).unwrap();
             let body: SubscribeBody = match json::decode(&payload) {
                 Ok(body) => body,
                 Err(e) => {
@@ -53,166 +50,130 @@ impl WebPushRouter {
                 }
             };
 
-            let pushuri = if body.pushuri.is_empty() {
-                None
+            let db = ctl.get_users_manager().get_db();
+            let mut user = if cfg!(feature = "authentication") {
+                req.extensions.get::<User>().unwrap().clone()
             } else {
-                Some(body.pushuri)
-            };
-            let publickey = if body.publickey.is_empty() {
-                None
-            } else {
-                Some(body.publickey)
-            };
+                let name = match body.user {
+                    Some(n) => n,
+                    None => {
+                        warn!("not using auth and no user provided");
+                        return Ok(Response::with(status::BadRequest));
+                    }
+                };
 
-            wp1.add_user(body.username.clone(), pushuri, publickey);
-            for group in &body.groups {
-                wp1.add_group(&body.username, group.clone());
-            }
+                let mut users = match db.read(ReadFilter::Name(name)) {
+                    Ok(u) => u,
+                    Err(_) => Vec::new()
+                };
 
-            Ok(Response::with(status::Ok))
-        });
-
-        let wp2 = web_push.clone();
-        router.post("unsubscribe", move |req2: &mut Request| -> IronResult<Response> {
-            #[derive(RustcDecodable, Debug)]
-            struct UnsubscribeBody {
-                username: String,
-                groups: Vec<String>
-            }
-
-            let mut payload = String::new();
-            req2.body.read_to_string(&mut payload).unwrap();
-            let body: UnsubscribeBody = match json::decode(&payload) {
-                Ok(body) => body,
-                Err(e) => {
-                    warn!("invalid unsubscribe payload {:?}", e);
+                if users.len() != 1 {
+                    warn!("user not found in database");
                     return Ok(Response::with(status::BadRequest));
                 }
+
+                users.pop().unwrap().clone()
             };
 
-            for group in &body.groups {
-                wp2.remove_group(&body.username, group);
+            user.push_uri = if body.push_uri.is_empty() {
+                None
+            } else {
+                Some(body.push_uri)
+            };
+            user.push_key = if body.push_key.is_empty() {
+                None
+            } else {
+                Some(body.push_key)
+            };
+
+            let id = user.id.unwrap();
+            if let Err(e) = db.update(id, &user) {
+                warn!("cannot update push subscription for user {}: {:?}", user.name, e);
+                return Ok(Response::with(status::InternalServerError));
+            }
+            if let Err(e) = db.update_push_resources(id, &body.resources) {
+                warn!("cannot update push resources for user {}: {:?}", user.name, e);
+                return Ok(Response::with(status::InternalServerError));
             }
 
             Ok(Response::with(status::Ok))
         });
 
-        let wp3 = web_push.clone();
+        /*
+        let wp = controller.get_web_push();
         router.post("test", move |_: &mut Request| -> IronResult<Response> {
-            wp3.notify(String::from("mygroup"), String::from("mymessage"));
+            wp.notify(String::from("mygroup"), String::from("mymessage"));
             Ok(Response::with(status::Ok))
-        });
+        });*/
 
-        router
+        let auth_endpoints = if cfg!(feature = "authentication") {
+            vec![
+                AuthEndpoint(vec![Method::Post], "subscribe".to_owned())
+            ]
+        } else {
+            vec![]
+        };
+
+        let mut chain = Chain::new(router);
+        chain.around(controller.get_users_manager().get_middleware(auth_endpoints));
+
+        chain
     }
 }
 
-struct Subscription {
-    user: String,
-    url: Option<String>,
-    public_key: Option<String>,
-    groups: HashMap<String, String>
+pub struct WebPush {
+    users_manager: Arc<UsersManager>
 }
 
-impl Subscription {
-    fn notify(&self, grp: &String, msg: &String) {
-        info!("notify user={}", self.user);
+impl WebPush {
+    pub fn new(users_manager: Arc<UsersManager>) -> Self {
+        WebPush {
+            users_manager: users_manager
+        }
+    }
 
-        // Not all users will be subscribed for these notifications nor will they
-        // always have an active subscription
-        if !self.groups.contains_key(grp) {
+    pub fn notify(&self, resource: String, message: String) {
+        info!("notify on resource {}: {}", resource, message);
+
+        let json = json!({resource: resource, message: message});
+        let db = self.users_manager.get_db();
+        let users = match db.read(ReadFilter::PushResource(resource)) {
+            Ok(u) => u,
+            Err(_) => Vec::new()
+        };
+        if users.is_empty() {
+            debug!("no users listening on push resource");
             return;
         }
 
-        let url = match self.url {
-            Some(ref x) => x.clone(),
-            None => { return; }
-        };
+        thread::spawn(move || {
+            for user in users {
+                WebPush::notify_user(user, &json);
+            }
+        });
+    }
 
-        let public_key = match self.public_key {
-            Some(ref x) => x.clone(),
-            None => { return; }
-        };
-
-        info!("prepare notify user={}", self.user);
-        let enc = match self::crypto::encrypt(&public_key, msg.clone()) {
+    fn notify_user(user: User, message: &String) {
+        let enc = match self::crypto::encrypt(&user.push_key.unwrap(), message.clone()) {
             Some(x) => x,
             None => {
-                warn!("failed to encrypt {} for {}", msg, self.user);
+                warn!("notity user {} failed for {}", user.name, message);
                 return;
             }
         };
 
+        let uri = user.push_uri.unwrap();
         let client = Client::new();
-        let res = match client.post(&url)
+        let res = match client.post(&uri)
             .header(ContentEncoding(vec![Encoding::EncodingExt(String::from("aesgcm128"))]))
             .header(EncryptionKey(format!("keyid=p256dh;dh={}", enc.public_key)))
             .header(Encryption(format!("keyid=p256dh;salt={}", enc.salt)))
             .body(Body::BufBody(&enc.output, enc.output.len()))
             .send() {
                 Ok(x) => x,
-                Err(e) => { warn!("failed to push to {} at {}: {:?}", self.user, url, e); return; }
+                Err(e) => { warn!("notify user {} via {} failed: {:?}", user.name, uri, e); return; }
             };
 
-        info!("notified {} of {} ({:?})", self.user, grp, res.status);
-    }
-}
-
-pub struct WebPush {
-    subscriptions: Arc<Mutex<HashMap<String, Subscription>>>
-}
-
-impl WebPush {
-    pub fn new() -> Self {
-        WebPush {
-            subscriptions: Arc::new(Mutex::new(HashMap::new()))
-        }
-    }
-
-    pub fn add_user(&self, user: String, url: Option<String>, public_key: Option<String>) {
-        info!("add/update user={} url={:?} public_key={:?}", user, url, public_key);
-        let mut subs = self.subscriptions.lock().unwrap();
-        if let Some(mut sub) = subs.get_mut(&user) {
-            sub.url = url;
-            sub.public_key = public_key;
-            return;
-        }
-
-        subs.insert(user.clone(), Subscription {
-            user: user,
-            url: url,
-            public_key: public_key,
-            groups: HashMap::new()
-        });
-    }
-
-    pub fn remove_user(&self, user: &String) {
-        self.subscriptions.lock().unwrap().remove(user);
-    }
-
-    pub fn add_group(&self, user: &String, grp: String) {
-        info!("add group user={} group={}", user, grp);
-        if let Some(mut sub) = self.subscriptions.lock().unwrap().get_mut(user) {
-            sub.groups.insert(grp.clone(), grp.clone());
-        }
-    }
-
-    pub fn remove_group(&self, user: &String, grp: &String) {
-        info!("remove group user={} group={}", user, grp);
-        if let Some(mut sub) = self.subscriptions.lock().unwrap().get_mut(user) {
-            sub.groups.remove(grp);
-        }
-    }
-
-    pub fn notify(&self, grp: String, msg: String) {
-        info!("notify group={} msg={}", grp, msg);
-        let json = String::from("test");//json!({group: grp, message: msg});
-        let subs = self.subscriptions.clone();
-
-        thread::spawn(move || {
-            for sub in subs.lock().unwrap().values() {
-                sub.notify(&grp, &json);
-            }
-        });
+        info!("notified user {} (status {:?})", user.name, res.status);
     }
 }

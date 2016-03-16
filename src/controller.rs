@@ -78,6 +78,7 @@ impl FoxBox {
                ws_port: u16) -> Self {
 
         let profile_service = ProfileService::new(None);
+        let users_manager = Arc::new(UsersManager::new(&profile_service.path_for("users_db.sqlite")));
         FoxBox {
             services: Arc::new(Mutex::new(HashMap::new())),
             websockets: Arc::new(Mutex::new(HashMap::new())),
@@ -89,9 +90,9 @@ impl FoxBox {
             ws_port: ws_port,
             config: Arc::new(ConfigService::new(&profile_service.path_for("foxbox.conf"))),
             upnp: Arc::new(UpnpManager::new()),
-            users_manager: Arc::new(UsersManager::new(&profile_service.path_for("users_db.sqlite"))),
+            users_manager: users_manager.clone(),
             profile_service: Arc::new(profile_service),
-            web_push: Arc::new(WebPush::new())
+            web_push: Arc::new(WebPush::new(users_manager))
         }
     }
 }

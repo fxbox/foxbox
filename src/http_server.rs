@@ -59,7 +59,7 @@ impl<T: Controller> HttpServer<T> {
 
     pub fn start(&mut self) {
         let router = service_router::create(self.controller.clone());
-        let wp_router = WebPushRouter::create(self.controller.get_web_push());
+        let wp_router = WebPushRouter::create(self.controller.clone());
 
         let users_manager = self.controller.get_users_manager();
         let mut mount = Mount::new();
