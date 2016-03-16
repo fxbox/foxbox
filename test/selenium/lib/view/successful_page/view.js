@@ -10,7 +10,9 @@ function SuccessfulPageView(driver) {
 
 SuccessfulPageView.prototype = {
     loginMessage: function() {
-        return this.accessors.successMessageLocator.getText();
+        return this.accessors.successMessageLocator.then((element) => {
+            return element.getText();
+        });
     }
 };
 

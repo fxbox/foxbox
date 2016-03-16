@@ -12,7 +12,14 @@ function SuccessfulPageAccessor(driver) {
 
 SuccessfulPageAccessor.prototype = {
    get successMessageLocator() {
-        return this.driver.findElement(SELECTORS.successMessage);
+        return this.driver.wait(
+            webdriver.until.elementLocated(SELECTORS.successMessage))
+                .then((element) =>  {
+                    return this.driver.wait(
+                        webdriver.until.elementIsVisible(element));
+                }).then(() => {
+                    return this.driver.findElement(SELECTORS.successMessage);
+                });
    }
 };
 
