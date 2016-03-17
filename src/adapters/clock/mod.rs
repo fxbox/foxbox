@@ -10,7 +10,6 @@ use foxbox_taxonomy::util::Id;
 use transformable_channels::mpsc::*;
 
 use std::collections::{ HashSet };
-use std::sync::Arc;
 
 use chrono;
 use chrono::*;
@@ -292,7 +291,7 @@ impl Clock {
 }
 
 impl Clock {
-    pub fn init<T>(adapt: &Arc<T>) -> Result<(), Error>
+    pub fn init<T>(adapt: &T) -> Result<(), Error>
         where T: AdapterManagerHandle
     {
         let getter_timestamp_id = Clock::getter_timestamp_id();

@@ -8,24 +8,17 @@ mod ip_camera_adapter;
 mod philips_hue;
 
 /// An adapter providing time services.
-mod clock;
+pub mod clock;
 
 use controller::Controller;
+use foxbox_adapters::adapter::AdapterManagerHandle;
 use self::ip_camera_adapter::IpCameraAdapter;
 use self::philips_hue::PhilipsHueAdapter;
 use service::ServiceAdapter;
 
-/// Work in progress replacing the AdapterManager by that of foxbox_adapters.
-use foxbox_adapters::manager::AdapterManager as AdapterManager2;
-
-use std::sync::Arc;
-
 pub struct AdapterManager<T> {
     controller: T,
     adapters: Vec<Box<ServiceAdapter>>,
-
-    // FIXME: This field isn't used for the time being.
-    manager2: Arc<AdapterManager2>,
 }
 
 impl<T: Controller> AdapterManager<T> {
@@ -34,16 +27,16 @@ impl<T: Controller> AdapterManager<T> {
         AdapterManager {
             controller: controller,
             adapters: Vec::new(),
-            manager2: Arc::new(AdapterManager2::new()),
         }
     }
 
     /// Start all the adapters.
-    pub fn start(&mut self) {
+    pub fn start<A>(&mut self, adapter_manager: &A)
+        where A: AdapterManagerHandle {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
         self.start_adapter(Box::new(PhilipsHueAdapter::new(c.clone())));
         self.start_adapter(Box::new(IpCameraAdapter::new(c)));
-        clock::Clock::init(&self.manager2).unwrap(); // FIXME: We should have a way to report errors
+        clock::Clock::init(adapter_manager).unwrap(); // FIXME: We should have a way to report errors
     }
 
     fn start_adapter(&mut self, adapter: Box<ServiceAdapter>) {
