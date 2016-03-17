@@ -2,11 +2,12 @@ use std::marker::PhantomData;
 
 use string_cache::Atom;
 
-use serde::ser::{Serialize, Serializer};
-use serde::de::{Deserialize, Deserializer, Error as DeserializationError, Type as DeserializationType};
+use serde::ser::{ Serialize, Serializer };
+use serde::de::{ Deserialize, Deserializer, Error as DeserializationError, Type as DeserializationType };
 
+use std::collections::HashMap;
 use std::cmp::PartialEq;
-use std::hash::{Hash, Hasher};
+use std::hash::{ Hash, Hasher };
 use std::string::ToString;
 
 /// A marker for a request that a expects a specific value.
@@ -194,7 +195,7 @@ impl<T> Deserialize for Id<T> {
 }
 
 /// A bunch of results grouped in an array of (key, result).
-pub type ResultSet<I, T, E> = Vec<(I, Result<T, E>)>;
+pub type ResultSet<I, T, E> = HashMap<I, Result<T, E>>;
 
 /// By default, the (de)serialization of trivial enums by Serde is surprising, e.g.
 /// in JSON,  `enum Foo {A, B, C}` will produce `{"\"A\": []"}` for `A`, where `"\"A\""`

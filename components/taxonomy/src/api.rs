@@ -20,6 +20,8 @@ use util::{ Exactly, Id };
 
 use transformable_channels::mpsc::*;
 
+use std::collections::HashMap;
+
 /// An error that arose during interaction with either a device, an adapter or the
 /// adapter manager
 #[derive(Serialize, Debug, Clone)]
@@ -122,7 +124,7 @@ pub enum WatchEvent {
 }
 
 /// A bunch of results coming from different sources.
-pub type ResultMap<K, T, E> = Vec<(K, Result<T, E>)>;
+pub type ResultMap<K, T, E> = HashMap<K, Result<T, E>>;
 
 /// A bunch of instructions, going to different targets.
 pub type TargetMap<K, T> = Vec<(Vec<K>, T)>;
