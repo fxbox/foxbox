@@ -70,7 +70,7 @@ impl ServiceLike for Service {
 /// use foxbox_taxonomy::util::Id;
 ///
 /// let selector = ServiceSelector::new()
-///   .with_tags(vec![Id::<TagId>::new("entrance".to_owned())])
+///   .with_tags(vec![Id::<TagId>::new("entrance")])
 ///   .with_getters(vec![GetterSelector::new() /* can be more restrictive */]);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -196,7 +196,7 @@ impl SelectedBy<ServiceSelector> for Service {
 /// use foxbox_taxonomy::util::Id;
 ///
 /// let selector = GetterSelector::new()
-///   .with_parent(Id::new("foxbox".to_owned()))
+///   .with_parent(Id::new("foxbox"))
 ///   .with_kind(ChannelKind::CurrentTimeOfDay);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
