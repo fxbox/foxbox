@@ -133,13 +133,8 @@ $ npm install
 Then you can run the Selenium tests via:
 
 ```bash
-$ npm test
-```
-
-It is equal to:
-
-```bash
-$ BOX_LOCAL_NAME=localhost BOX_PORT=3000 npm test
+$ cargo run -- --disable-tls
+$ npm run test-selenium
 ```
 
 ## Cross compiling to ARM
