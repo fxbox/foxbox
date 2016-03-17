@@ -33,19 +33,19 @@ pub struct TagId;
 // A helper macro to create a Id<ServiceId> without boilerplate.
 #[macro_export]
 macro_rules! service_id {
-    ($val:expr) => (Id::<ServiceId>::new($val.to_owned()))
+    ($val:expr) => (Id::<ServiceId>::new($val))
 }
 
 // A helper macro to create a Id<AdapterId> without boilerplate.
 #[macro_export]
 macro_rules! adapter_id {
-    ($val:expr) => (Id::<AdapterId>::new($val.to_owned()))
+    ($val:expr) => (Id::<AdapterId>::new($val))
 }
 
 // A helper macro to create a Id<TagId> without boilerplate.
 #[macro_export]
 macro_rules! tag_id {
-    ($val:expr) => (Id::<TagId>::new($val.to_owned()))
+    ($val:expr) => (Id::<TagId>::new($val))
 }
 
 /// Metadata on a service. A service is a device or collection of devices
