@@ -3,6 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use controller::Controller;
+use foxbox_adapters::manager::WatchGuard;
+use foxbox_taxonomy::api::API;
 use hyper::net::{ NetworkListener };
 use iron::{ AfterMiddleware, Chain, Handler,
             HttpServerFactory, Iron, IronResult, Request,
@@ -17,6 +19,7 @@ use service_router;
 use static_router;
 use std::net::SocketAddr;
 use std::thread;
+use taxonomy_router;
 use tls::SniServerFactory;
 
 const THREAD_COUNT: usize = 8;
@@ -62,14 +65,19 @@ impl<T: Controller> HttpServer<T> {
         HttpServer { controller: controller }
     }
 
-    pub fn start(&mut self) {
+    pub fn start<A>(&mut self, adapter_api: A)
+        where A: API<WatchGuard=WatchGuard> + 'static {
+
         let router = service_router::create(self.controller.clone());
+        let taxonomy_chain = taxonomy_router::create(self.controller.clone(),
+                                                      adapter_api);
 
         let users_manager = self.controller.get_users_manager();
         let mut mount = Mount::new();
         mount.mount("/", static_router::create(users_manager.clone()))
              .mount("/ping", Ping)
              .mount("/services", router)
+             .mount("/api/v1", taxonomy_chain)
              .mount("/users", users_manager.get_router_chain());
 
         let mut chain = Chain::new(mount);
@@ -133,12 +141,15 @@ describe! cors {
     before_each {
         extern crate hyper;
 
+        use foxbox_adapters::manager::AdapterManager;
         use iron::headers;
         use iron::method::Method;
         use stubs::controller::ControllerStub;
 
+        let taxo_manager = AdapterManager::new();
+
         let mut http_server = HttpServer::new(ControllerStub::new());
-        http_server.start();
+        http_server.start(taxo_manager);
     }
 
     it "should get the appropriate CORS headers" {

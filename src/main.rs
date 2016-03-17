@@ -75,6 +75,7 @@ mod upnp;
 mod service_router;
 mod stable_uuid;
 mod static_router;
+mod taxonomy_router;
 mod tls;
 mod tunnel_controller;
 mod ws_server;

@@ -9,6 +9,7 @@ extern crate mio;
 use adapters::AdapterManager;
 use config_store::ConfigService;
 use core::marker::Reflect;
+use foxbox_adapters::manager::AdapterManager as AdapterManager2;
 use foxbox_users::UsersManager;
 use http_server::HttpServer;
 use iron::{Request, Response, IronResult};
@@ -106,6 +107,7 @@ impl FoxBox {
 impl Controller for FoxBox {
 
     fn run(&mut self, shutdown_flag: &AtomicBool) {
+
         debug!("Starting controller");
         let mut event_loop = mio::EventLoop::new().unwrap();
 
@@ -122,11 +124,15 @@ impl Controller for FoxBox {
             self.certificate_manager.reload_from_directory(certificate_directory).unwrap_or(());
         }
 
-        HttpServer::new(self.clone()).start();
-        WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
+        // Create the taxonomy based AdapterManager
+        let taxo_manager = AdapterManager2::new();
 
         let mut adapter_manager = AdapterManager::new(self.clone());
-        adapter_manager.start();
+        adapter_manager.start(&taxo_manager);
+
+        HttpServer::new(self.clone()).start(taxo_manager);
+        WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
+
         self.upnp.search(None).unwrap();
 
         event_loop.run(&mut FoxBoxEventLoop {
