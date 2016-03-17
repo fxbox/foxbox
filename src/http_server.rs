@@ -144,6 +144,8 @@ describe! cors {
         use foxbox_adapters::manager::AdapterManager;
         use iron::headers;
         use iron::method::Method;
+        use std::thread;
+        use std::time::Duration;
         use stubs::controller::ControllerStub;
 
         let taxo_manager = AdapterManager::new();
@@ -158,6 +160,8 @@ describe! cors {
              "services/:service/:command".to_owned()),
             (vec![Method::Get], "services/list".to_owned())
         ];
+        // HACK: Let some time for the http server to start.
+        thread::sleep(Duration::new(3, 0));
         let client = hyper::Client::new();
         for endpoint in endpoints {
             let (_, path) = endpoint;
