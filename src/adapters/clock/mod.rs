@@ -2,14 +2,15 @@
 //! timestamp or the current time of day.
 
 use foxbox_adapters::adapter::*;
-use foxbox_taxonomy::api::{ Error, InternalError, ResultMap };
+use foxbox_taxonomy::api::{ Error, InternalError };
 use foxbox_taxonomy::values::{ Range, TimeStamp, Type, ValDuration, Value };
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::util::Id;
 
 use transformable_channels::mpsc::*;
 
-use std::collections::{ HashSet };
+use std::collections::{ HashMap, HashSet };
+use std::sync::Arc;
 
 use chrono;
 use chrono::*;
@@ -41,16 +42,16 @@ impl AdapterWatchGuard for Guard {
 
 impl Clock {
     pub fn id() -> Id<AdapterId> {
-        Id::new("clock@link.mozilla.org".to_owned())
+        Id::new("clock@link.mozilla.org")
     }
     pub fn service_clock_id() -> Id<ServiceId> {
-        Id::new("service:clock@link.mozilla.org".to_owned())
+        Id::new("service:clock@link.mozilla.org")
     }
     pub fn getter_timestamp_id() -> Id<Getter> {
-        Id::new("getter:timestamp.clock@link.mozilla.org".to_owned())
+        Id::new("getter:timestamp.clock@link.mozilla.org")
     }
     pub fn getter_time_of_day_id() -> Id<Getter> {
-        Id::new("getter:timeofday.clock@link.mozilla.org".to_owned())
+        Id::new("getter:timeofday.clock@link.mozilla.org")
     }
 }
 impl Adapter for Clock {
@@ -70,26 +71,26 @@ impl Adapter for Clock {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
-        set.iter().map(|id| {
-            if *id == self.getter_timestamp_id {
+    fn fetch_values(&self, mut set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+        set.drain(..).map(|id| {
+            if id == self.getter_timestamp_id {
                 let date = TimeStamp::from_datetime(chrono::UTC::now());
-                (id.clone(), Ok(Some(Value::TimeStamp(date))))
-            } else if *id == self.getter_time_of_day_id {
+                (id, Ok(Some(Value::TimeStamp(date))))
+            } else if id == self.getter_time_of_day_id {
                 use chrono::Timelike;
                 let date = chrono::Local::now();
                 let duration = chrono::Duration::seconds(date.num_seconds_from_midnight() as i64);
-                (id.clone(), Ok(Some(Value::Duration(ValDuration::new(duration)))))
+                (id, Ok(Some(Value::Duration(ValDuration::new(duration)))))
             } else {
-                (id.clone(), Err(Error::InternalError(InternalError::NoSuchGetter(id.clone()))))
+                (id.clone(), Err(Error::InternalError(InternalError::NoSuchGetter(id))))
             }
         }).collect()
     }
 
-    fn send_values(&self, values: Vec<(Id<Setter>, Value)>) -> ResultMap<Id<Setter>, (), Error> {
-        values.iter()
-            .map(|&(ref id, _)| {
-                (id.clone(), Err(Error::InternalError(InternalError::NoSuchSetter(id.clone()))))
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+        values.drain()
+            .map(|(id, _)| {
+                (id.clone(), Err(Error::InternalError(InternalError::NoSuchSetter(id))))
             })
             .collect()
     }
