@@ -9,8 +9,8 @@ var webdriver = require('selenium-webdriver'),
 
 var HOST_URL = util.format(
     'http://%s:%s/',
-    process.env.BOX_LOCAL_NAME ?
-        (process.env.BOX_LOCAL_NAME + '.local') : 'localhost',
+    process.env.BOX_LOCAL_NAME && process.env.BOX_LOCAL_NAME != 'localhost' ?
+        (process.env.BOX_LOCAL_NAME + '.local.') : 'localhost',
     process.env.BOX_PORT || '3000'
 );
 
