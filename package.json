@@ -34,5 +34,7 @@
     "path": "^0.12.7",
     "config-js": "^1.1.9",
     "express": "^4.13.4"
+  },
+  "dependencies": {
   }
 }

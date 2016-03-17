@@ -19,7 +19,7 @@
       "type": "Extended color light",
       "name": "Hue color lamp 1",
       "modelid": "LCT007",
-      "manufacturername": "Philips",
+      "manufacturername": "Simulated",
       "uniqueid": "00:17:88:01:10:41:87:79-0b",
       "swversion": "66014919"
     },
@@ -42,7 +42,7 @@
       "type": "Extended color light",
       "name": "Hue color lamp 2",
       "modelid": "LCT007",
-      "manufacturername": "Philips",
+      "manufacturername": "Simulated",
       "uniqueid": "00:17:88:01:10:56:b6:21-0b",
       "swversion": ""
     },
@@ -65,7 +65,7 @@
       "type": "Extended color light",
       "name": "Hue color lamp 3",
       "modelid": "LCT007",
-      "manufacturername": "Philips",
+      "manufacturername": "Simulated",
       "uniqueid": "00:17:88:01:10:56:ba:92-0b",
       "swversion": "66014919"
     }
