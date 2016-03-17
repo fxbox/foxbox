@@ -33,4 +33,4 @@ script:
     - $TRAVIS_BUILD_DIR/tools/execute-unit-tests-with-coverage
     - jshint static/main/js/*.js static/setup/js/*.js test/selenium/*.js test/integration/lib/*.js test/integration/test/*.js
     - npm run test-integration # starts foxbox and kills it within the test script
-    - (cargo run -- -l $BOX_LOCAL_NAME -p $BOX_PORT &> /dev/null &) ; npm run test-selenium
+    - (cargo run -- -l $BOX_LOCAL_NAME -p $BOX_PORT --disable-tls &> /dev/null &) ; npm run test-selenium

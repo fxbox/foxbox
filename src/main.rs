@@ -29,6 +29,7 @@ extern crate env_logger;
 extern crate foxbox_adapters;
 extern crate foxbox_taxonomy;
 extern crate foxbox_users;
+extern crate hyper;
 #[macro_use]
 extern crate iron;
 extern crate iron_cors;
@@ -40,6 +41,8 @@ extern crate log;
 extern crate mio;
 extern crate mount;
 extern crate nix;
+extern crate openssl;
+extern crate openssl_sys;
 extern crate router;
 extern crate rustc_serialize;
 extern crate serde;
@@ -72,6 +75,7 @@ mod upnp;
 mod service_router;
 mod stable_uuid;
 mod static_router;
+mod tls;
 mod tunnel_controller;
 mod ws_server;
 
@@ -94,9 +98,10 @@ use multicast_dns::host::HostManager;
 use std::env;
 use std::mem;
 use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
+use tls::TlsOption;
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [-u <hostname>] [-c <namespace;key;value>]...
+Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [-u <hostname>] [-c <namespace;key;value>]...
 
 Options:
     -v, --verbose            Toggle verbose output.
@@ -107,7 +112,8 @@ Options:
     -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
     -s, --tunnel-secret <secret>    Set the tunnel shared secret. [default: secret]
-    -u, --remote-name <hostname>    Set remote hostname. This the URL to access the box through the bridge. If omitted, the tunnel is disabled
+        --disable-tls               Run as a plain HTTP server, disabling encryption.
+        --remote-name <hostname>    Set remote hostname. This the URL to access the box through the bridge. If omitted, the tunnel is disabled
     -c, --config <namespace;key;value>  Set configuration override
     -h, --help               Print this help menu.
 ",
@@ -118,6 +124,7 @@ Options:
         flag_iface: Option<String>,
         flag_tunnel: Option<String>,
         flag_tunnel_secret: String,
+        flag_disable_tls: bool,
         flag_remote_name: Option<String>,
         flag_config: Option<Vec<String>>);
 
@@ -209,7 +216,8 @@ fn main() {
 
     let mut controller = FoxBox::new(
         args.flag_verbose, args.flag_local_name.map_or(None, update_hostname), args.flag_port,
-        args.flag_wsport);
+        args.flag_wsport,
+        if args.flag_disable_tls { TlsOption::Disabled } else { TlsOption::Enabled });
 
     // Override config values
     {

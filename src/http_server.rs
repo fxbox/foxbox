@@ -3,8 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use controller::Controller;
-use iron::{ AfterMiddleware, Chain, Handler, Iron, IronResult,
-            Request, Response };
+use hyper::net::{ NetworkListener };
+use iron::{ AfterMiddleware, Chain, Handler,
+            HttpServerFactory, Iron, IronResult, Request,
+            Response, ServerFactory };
 use iron_cors::CORS;
 use iron::error::{ IronError };
 use iron::method::Method;
@@ -13,7 +15,11 @@ use mount::Mount;
 use router::NoRoute;
 use service_router;
 use static_router;
+use std::net::SocketAddr;
 use std::thread;
+use tls::SniServerFactory;
+
+const THREAD_COUNT: usize = 8;
 
 struct Custom404;
 
@@ -79,11 +85,26 @@ impl<T: Controller> HttpServer<T> {
 
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
 
-        thread::Builder::new().name("HttpServer".to_owned())
-                              .spawn(move || {
-            Iron::new(chain).http(addrs[0]).unwrap();
-        }).unwrap();
+        if self.controller.get_tls_enabled() {
+            let mut certificate_manager = self.controller.get_certificate_manager();
+            let server_factory = SniServerFactory::new(&mut certificate_manager);
+            start_server(addrs, chain, server_factory);
+        } else {
+            start_server(addrs, chain, HttpServerFactory {});
+        }
     }
+}
+
+fn start_server<TListener, T>(addrs: Vec<SocketAddr>, chain: Chain, factory: T)
+    where TListener: NetworkListener + Send + 'static,
+          T: ServerFactory<TListener> + Send + 'static {
+
+    thread::Builder::new().name("HttpServer".to_owned())
+                          .spawn(move || {
+        Iron::new(chain)
+             .listen_with(addrs[0], THREAD_COUNT, &factory, None)
+             .unwrap();
+    }).unwrap();
 }
 
 #[cfg(test)]

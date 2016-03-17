@@ -24,12 +24,16 @@ use std::net::ToSocketAddrs;
 use std::sync::{ Arc, Mutex };
 use std::sync::atomic::{ AtomicBool, Ordering };
 use upnp::UpnpManager;
+use std::path::PathBuf;
+use tls::{ CertificateManager, TlsOption };
 use ws_server::WsServer;
 use ws;
 
 #[derive(Clone)]
 pub struct FoxBox {
     pub verbose: bool,
+    tls_option: TlsOption,
+    certificate_manager: CertificateManager,
     hostname: String,
     http_port: u16,
     ws_port: u16,
@@ -57,6 +61,10 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn get_http_root_for_service(&self, service_id: String) -> String;
     fn get_ws_root_for_service(&self, service_id: String) -> String;
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error>;
+
+    fn get_tls_enabled(&self) -> bool;
+    fn get_certificate_manager(&self) -> CertificateManager;
+
     fn add_websocket(&mut self, socket: ws::Sender);
     fn remove_websocket(&mut self, socket: ws::Sender);
     fn broadcast_to_websockets(&self, data: serde_json::value::Value);
@@ -72,10 +80,13 @@ impl FoxBox {
     pub fn new(verbose: bool,
                hostname: Option<String>,
                http_port: u16,
-               ws_port: u16) -> Self {
-
+               ws_port: u16,
+               tls_option: TlsOption) -> Self {
         let profile_service = ProfileService::new(None);
+
         FoxBox {
+            certificate_manager: CertificateManager::new(),
+            tls_option: tls_option,
             services: Arc::new(Mutex::new(HashMap::new())),
             websockets: Arc::new(Mutex::new(HashMap::new())),
             verbose: verbose,
@@ -101,8 +112,19 @@ impl Controller for FoxBox {
         {
             Arc::get_mut(&mut self.upnp).unwrap().start().unwrap();
         }
+
+        if self.get_tls_enabled() {
+            let certificate_directory = PathBuf::from(
+                self.config.get_or_set_default("foxbox", "certificate_directory", "certs/"));
+
+            // If this fails, it just means that no certificates will be configured, which
+            // shouldn't cause a crash.
+            self.certificate_manager.reload_from_directory(certificate_directory).unwrap_or(());
+        }
+
         HttpServer::new(self.clone()).start();
         WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
+
         let mut adapter_manager = AdapterManager::new(self.clone());
         adapter_manager.start();
         self.upnp.search(None).unwrap();
@@ -177,7 +199,8 @@ impl Controller for FoxBox {
     }
 
     fn get_http_root_for_service(&self, service_id: String) -> String {
-        format!("http://{}:{}/services/{}/", self.hostname, self.http_port, service_id)
+        let scheme = if self.get_tls_enabled() { "https" } else { "http" };
+        format!("{}://{}:{}/services/{}/", scheme , self.hostname, self.http_port, service_id)
     }
 
     fn get_ws_root_for_service(&self, service_id: String) -> String {
@@ -222,6 +245,14 @@ impl Controller for FoxBox {
     fn get_users_manager(&self) -> Arc<UsersManager> {
         self.users_manager.clone()
     }
+
+    fn get_certificate_manager(&self) -> CertificateManager {
+        self.certificate_manager.clone()
+    }
+
+    fn get_tls_enabled(&self) -> bool {
+        self.tls_option == TlsOption::Enabled
+    }
 }
 
 #[allow(dead_code)]
@@ -247,9 +278,10 @@ describe! controller {
 
     before_each {
         use stubs::service::ServiceStub;
+        use tls::TlsOption;
 
         let service = ServiceStub;
-        let controller = FoxBox::new(false, Some("foxbox".to_owned()), 1234, 5678);
+        let controller = FoxBox::new(false, Some("foxbox".to_owned()), 1234, 5678, TlsOption::Disabled);
     }
 
     describe! add_service {
@@ -269,10 +301,15 @@ describe! controller {
             }
         }
 
-        it "should create http root" {
+        it "should create https root if tls enabled and http root id disabled" {
             controller.add_service(Box::new(service));
             assert_eq!(controller.get_http_root_for_service("1".to_string()),
                        "http://foxbox.local:1234/services/1/");
+
+            let controller = FoxBox::new(false, Some("foxbox".to_owned()), 1234, 5678, TlsOption::Enabled);
+            controller.add_service(Box::new(service));
+            assert_eq!(controller.get_http_root_for_service("1".to_string()),
+                       "https://foxbox.local:1234/services/1/");
         }
 
         it "should create ws root" {
