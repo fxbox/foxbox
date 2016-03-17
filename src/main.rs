@@ -101,7 +101,7 @@ use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 use tls::TlsOption;
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [-u <hostname>] [-c <namespace;key;value>]...
+Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--remote-name <hostname>] [-c <namespace;key;value>]...
 
 Options:
     -v, --verbose            Toggle verbose output.
