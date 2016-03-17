@@ -11,6 +11,7 @@ use adapters::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
 use transformable_channels::mpsc::ExtSender;
 
 struct OpenzwaveAdapter {
+    id: TaxId<AdapterId>,
     name: String,
     vendor: String,
     version: [u32; 4],
@@ -19,8 +20,10 @@ struct OpenzwaveAdapter {
 
 impl OpenzwaveAdapter {
     fn init<T: AdapterManagerHandle + Clone + Send + 'static> (manager: &T) -> Result<(), TaxError> {
+        let name = String::from("OpenZwave Adapter");
         let adapter = Box::new(OpenzwaveAdapter {
-            name: String::from("OpenZwave Adapter"),
+            id: TaxId::new(name.clone()), // replace with &name once we update to latest taxonomy
+            name: name,
             vendor: String::from("Mozilla"),
             version: [1, 0, 0, 0],
             manager: Box::new(manager.clone())
@@ -34,7 +37,7 @@ impl OpenzwaveAdapter {
 
 impl adapters::adapter::Adapter for OpenzwaveAdapter {
     fn id(&self) -> TaxId<AdapterId> {
-        unimplemented!()
+        self.id.clone()
     }
 
     fn name(&self) -> &str {
