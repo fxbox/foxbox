@@ -10,7 +10,6 @@ use foxbox_taxonomy::util::Id;
 use transformable_channels::mpsc::*;
 
 use std::collections::{ HashMap, HashSet };
-use std::sync::Arc;
 
 use chrono;
 use chrono::*;
