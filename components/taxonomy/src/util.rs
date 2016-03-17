@@ -122,7 +122,7 @@ impl<T> Deserialize for Phantom<T> {
 /// #[derive(Debug)]
 /// struct UniqueId;
 ///
-/// let my_id = foxbox_taxonomy::util::Id::<UniqueId>::new("Unique Identifier".to_owned());
+/// let my_id = foxbox_taxonomy::util::Id::<UniqueId>::new("Unique Identifier");
 ///
 /// assert_eq!(my_id.to_string(), "Unique Identifier");
 ///
@@ -141,7 +141,7 @@ pub struct Id<T> {
 }
 
 impl<T> Id<T> {
-    pub fn new(id: String) -> Self {
+    pub fn new(id: &str) -> Self {
         Id {
             id: Atom::from(id),
             phantom: Phantom::new(),
