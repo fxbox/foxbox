@@ -303,6 +303,7 @@ impl Drop for TestAdapterWatchGuard {
 
 
 /// The test environment.
+#[derive(Clone)]
 struct TestEnv {
     /// The manager in charge of all adapters.
     manager: AdapterManager,
@@ -318,6 +319,11 @@ impl ExecutableDevEnv for TestEnv {
 
     fn api(&self) -> Self::API {
         self.manager.clone()
+    }
+
+    type TimerGuard = (); // FIXME: Implement
+    fn start_timer(&self, duration: Duration, timer: Box<ExtSender<()>>) -> Self::TimerGuard {
+        unimplemented!()
     }
 }
 impl TestEnv {
@@ -473,7 +479,7 @@ fn main () {
 
         let mut runner = Execution::<TestEnv>::new();
         let (tx, rx) = channel();
-        runner.start(env.api(), script, tx).unwrap();
+        runner.start(env.clone(), script, tx).unwrap();
         match rx.recv().unwrap() {
             Starting { result: Ok(()) } => println!("ready."),
             err => panic!("Could not launch script {:?}", err)

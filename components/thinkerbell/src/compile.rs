@@ -17,13 +17,16 @@
 //! - Transform each `Statement` to make sure that the kind of the
 //!   `destination` matches the `kind`, even if devices change.
 
-use std::marker::PhantomData;
-
-use ast::{Script, Rule, Statement, Match, Context, UncheckedCtx};
+use ast::{ Script, Rule, Statement, Match, Context, UncheckedCtx };
 use util::*;
 
 use foxbox_taxonomy::api::API;
 use foxbox_taxonomy::util::Phantom;
+use foxbox_taxonomy::values::Duration;
+
+use transformable_channels::mpsc::*;
+
+use std::marker::PhantomData;
 
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer};
@@ -35,7 +38,12 @@ use serde::de::{Deserialize, Deserializer};
 pub trait ExecutableDevEnv: Serialize + Deserialize + Send {
     type WatchGuard;
     type API: API<WatchGuard = Self::WatchGuard>;
+
+    /// Return a handle to the API.
     fn api(&self) -> Self::API;
+
+    type TimerGuard;
+    fn start_timer(&self, duration: Duration, timer: Box<ExtSender<()>>) -> Self::TimerGuard;
 }
 
 
