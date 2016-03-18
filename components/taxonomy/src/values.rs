@@ -657,8 +657,8 @@ impl Deserialize for Duration {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
     {
-        struct F64Visitor;
-        impl DeserializationVisitor for F64Visitor
+        struct DurationVisitor;
+        impl DeserializationVisitor for DurationVisitor
         {
             type Value = Duration;
             fn visit_f64<E>(&mut self, v: f64) -> Result<Self::Value, E>
@@ -666,7 +666,18 @@ impl Deserialize for Duration {
             {
                 Ok(Duration(ChronoDuration::milliseconds((v * 1000.) as i64)))
             }
+            fn visit_i64<E>(&mut self, v: i64) -> Result<Self::Value, E>
+                where E: Error,
+            {
+                Ok(Duration(ChronoDuration::milliseconds(v * 1000)))
+            }
+            fn visit_u64<E>(&mut self, v: u64) -> Result<Self::Value, E>
+                where E: Error,
+            {
+                self.visit_i64(v as i64)
+            }
         }
-        deserializer.visit_f64(F64Visitor)
+        deserializer.visit_f64(DurationVisitor)
+            .or_else(|_| deserializer.visit_i64(DurationVisitor))
     }
 }

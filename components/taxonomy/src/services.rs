@@ -232,6 +232,7 @@ pub struct Getter {
 
     /// Date at which the latest value was received, whether through
     /// polling or through a trigger.
+    #[serde(default)]
     pub updated: Option<TimeStamp>,
 }
 
