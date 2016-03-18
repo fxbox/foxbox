@@ -204,7 +204,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                 let rule_index = rule_index.clone();
                 let condition_index = condition_index.clone();
                 witnesses.push(
-                    api.register_channel_watch(
+                    api.watch_values(
                         vec![(condition.source.clone(), Exactly::Exactly(condition.range.clone())) ],
                         Box::new(self.tx.map(move |event| {
                             ExecutionOp::Update {
