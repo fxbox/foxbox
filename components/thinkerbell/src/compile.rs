@@ -170,6 +170,7 @@ impl<Env> Compiler<Env> where Env: ExecutableDevEnv {
             source: source,
             kind: match_.kind,
             range: match_.range,
+            duration: match_.duration,
             phantom: Phantom::new()
         })
     }

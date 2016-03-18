@@ -65,6 +65,13 @@ pub struct Match<Ctx> where Ctx: Context {
     /// compatible with that of `getter`.
     pub range: Range,
 
+    /// If specified, the values must remain in the `range` for at least
+    /// `duration` before the match is considered valid. This is useful
+    /// for sensors that may oscillate around a threshold or for detecting
+    /// e.g. that a door has been forgotten open.
+    #[serde(default)]
+    pub duration: Option<Duration>,
+
     #[serde(default)]
     #[allow(dead_code)]
     pub phantom: Phantom<Ctx>,

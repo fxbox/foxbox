@@ -18,7 +18,7 @@ use foxbox_thinkerbell::compile::ExecutableDevEnv;
 use foxbox_thinkerbell::run::Execution;
 use foxbox_thinkerbell::parse::Parser;
 
-use foxbox_taxonomy::api::{ API, Error, ResultMap };
+use foxbox_taxonomy::api::{ API, Error };
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
 use foxbox_taxonomy::util::Id;
@@ -27,7 +27,7 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::collections::HashMap;
 use std::thread;
-use std::time::Duration;
+use std::time::Duration as StdDuration;
 use std::str::FromStr;
 
 use serde::ser::{Serialize, Serializer};
@@ -42,7 +42,7 @@ Usage: simulator [options]...
 -h, --help            Show this message.
 -r, --ruleset <path>  Load decision rules from a file.
 -e, --events <path>   Load events from a file.
--s, --slowdown <num>  Duration of each tick, in floating point seconds. Default: no slowdown.
+-s, --slowdown <num>  StdDuration of each tick, in floating point seconds. Default: no slowdown.
 ";
 
 static VERSION : [u32;4] = [0, 0, 0, 0];
@@ -77,8 +77,8 @@ impl TestSharedAdapterBackend {
         }).collect()
     }
 
-    fn send_values(&self, mut values: Vec<(Id<Setter>, Value)>) -> ResultMap<Id<Setter>, (), Error> {
-        values.drain(..).map(|(id, value)| {
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+        values.drain().map(|(id, value)| {
             let event = SimulatorEvent::Send {
                 id: id.clone(),
                 value: value
@@ -236,7 +236,7 @@ impl Adapter for TestAdapter {
     ///
     /// The AdapterManager always attempts to group calls to `send_values` by `Adapter`, and then
     /// expects the adapter to attempt to minimize the connections with the actual devices.
-    fn send_values(&self, values: Vec<(Id<Setter>, Value)>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
         let (tx, rx) = channel();
         self.back_end.send(AdapterOp::SendValues {
             values: values,
@@ -272,14 +272,14 @@ impl Adapter for TestAdapter {
         }).unwrap();
         let received = rx.recv().unwrap();
         let tx_unregister = self.back_end.clone();
-        received.iter().cloned().map(|(id, result)| {
+        received.iter().map(|(id, result)| {
             let tx_unregister = tx_unregister.clone();
-            (id, match result {
-                Err(err) => Err(err),
-                Ok(key) => {
+            (id.clone(), match *result {
+                Err(ref err) => Err(err.clone()),
+                Ok(ref key) => {
                     let guard = TestAdapterWatchGuard {
                         tx: Box::new(tx_unregister),
-                        key: key
+                        key: key.clone()
                     };
                     Ok(Box::new(guard) as Box<AdapterWatchGuard>)
                 }
@@ -353,7 +353,7 @@ impl TestEnv {
         match instruction {
             AddAdapters(vec) => {
                 for id in vec {
-                    let id = Id::new(id);
+                    let id = Id::new(&id);
                     let adapter = Box::new(TestAdapter::new(id, self.back_end.clone()));
                     let result = self.manager.add_adapter(adapter);
                     self.report_error(result);
@@ -413,7 +413,7 @@ enum AdapterOp {
         tx: Box<ExtSender<ResultMap<Id<Getter>, Option<Value>, Error>>>
     },
     SendValues {
-        values: Vec<(Id<Setter>, Value)>,
+        values: HashMap<Id<Setter>, Value>,
         tx: Box<ExtSender<ResultMap<Id<Setter>, (), Error>>>
     },
     Watch {
@@ -448,14 +448,14 @@ fn main () {
         .unwrap_or_else(|e| e.exit());
 
     let slowdown = match args.find("--slowdown") {
-        None => Duration::new(0, 0),
+        None => StdDuration::new(0, 0),
         Some(value) => {
             let vec = value.as_vec();
             if vec.is_empty() || vec[0].is_empty() {
-                Duration::new(0, 0)
+                StdDuration::new(0, 0)
             } else {
                 let s = f64::from_str(vec[0]).unwrap();
-                Duration::new(s as u64, (s.fract() * 1_000_000.0) as u32)
+                StdDuration::new(s as u64, (s.fract() * 1_000_000.0) as u32)
             }
         }
     };
@@ -499,6 +499,6 @@ fn main () {
     }
 
     println!("Simulation complete.");
-    thread::sleep(Duration::new(100, 0));
+    thread::sleep(StdDuration::new(100, 0));
 }
 

@@ -14,4 +14,4 @@ transformable_channels = "*"
 
 [dev-dependencies]
 docopt = "0.6.78"
-foxbox_adapters = { git = "https://github.com/fxbox/adapters.git", rev="0384a92" }
+foxbox_adapters = { git = "https://github.com/fxbox/adapters.git", rev="3d521c6" }
