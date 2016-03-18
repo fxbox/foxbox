@@ -188,12 +188,9 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
         // Generate the state of rules, conditions, getters and start
         // listening to changes in the getters.
 
-        println!("Thinkerbell: {} rules", self.script.rules.len());
         // FIXME: We could optimize requests by grouping per `TargetMap<GetterSelector, Exactly<Range>>`
         let mut per_rule : Vec<_> = self.script.rules.iter().zip(0 as usize..).map(|(rule, rule_index)| {
-            println!("Thinkerbell: rule {} has {} conditions", rule_index, rule.conditions.len());
             let per_condition = rule.conditions.iter().zip(0 as usize..).map(|(condition, condition_index)| {
-                println!("Thinkerbell: look at condition {}", condition_index);
                 // We will often end up watching several times the
                 // same channel. For the moment, we do not attempt to
                 // optimize either I/O (which we expect will be

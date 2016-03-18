@@ -7,16 +7,16 @@
         "setters": {}
  }]}, {
     "AddGetters": [{
-        "adapter": "Simulator",
-        "tags": [],
-        "id": "Clock #1",
-        "service": "Simulator service",
         "mechanism": {
             "kind": {
                 "CurrentTimeOfDay": []
             },
-            "trigger": "1000"
-        }
+            "watch": true
+        },
+        "adapter": "Simulator",
+        "tags": [],
+        "id": "Clock #1",
+        "service": "Simulator service"
     }]
 }, {
     "AddSetters": [{
@@ -28,7 +28,7 @@
             "kind": {
                 "Ready": []
             },
-            "push": "0"
+            "push": 0
         }
     }]
 }, {
