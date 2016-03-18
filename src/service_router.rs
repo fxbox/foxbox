@@ -70,10 +70,15 @@ describe! service_router {
         use mount::Mount;
         use tls::TlsOption;
         use profile_service::ProfilePath;
+        use tempdir::TempDir;
+
+        let profile_dir = TempDir::new_in("/tmp", "foxbox").unwrap();
+        let profile_path = String::from(profile_dir.into_path()
+                                            .to_str().unwrap());
 
         let controller = FoxBox::new(false, Some("localhost".to_owned()),
                                      1234, 5678, TlsOption::Disabled,
-                                     ProfilePath::Default);
+                                     ProfilePath::Custom(profile_path));
         let service_router = create(controller.clone());
 
         let mut mount = Mount::new();
