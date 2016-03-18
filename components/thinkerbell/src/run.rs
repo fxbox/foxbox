@@ -8,7 +8,6 @@ use foxbox_taxonomy::api;
 use foxbox_taxonomy::api::{ API, Error as APIError, WatchEvent };
 use foxbox_taxonomy::services::{ Getter, Setter };
 use foxbox_taxonomy::util::{ Exactly, Id };
-use foxbox_taxonomy::values::Range;
 
 use transformable_channels::mpsc::*;
 
@@ -151,6 +150,14 @@ enum ExecutionOp {
     Stop(Box<Fn(Result<(), Error>) + Send>)
 }
 
+struct ConditionState {
+    match_is_met: bool,
+    per_getter: HashMap<Id<Getter>, bool>,
+}
+struct RuleState {
+    rule_is_met: bool,
+    per_condition: Vec<ConditionState>,
+}
 
 impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     /// Create a new execution task.
@@ -174,16 +181,6 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     /// This currently expects to be executed in its own thread.
     fn run<S>(&mut self, api: Env::API, on_event: S) where S: ExtSender<ExecutionEvent> {
         let mut witnesses = Vec::new();
-
-        struct ConditionState {
-            match_is_met: bool,
-            per_getter: HashMap<Id<Getter>, bool>,
-            range: Range,
-        };
-        struct RuleState {
-            rule_is_met: bool,
-            per_condition: Vec<ConditionState>,
-        };
 
         // Generate the state of rules, conditions, getters and start
         // listening to changes in the getters.
@@ -210,11 +207,9 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                                 condition_index: condition_index
                             }
                         }))));
-                let range = condition.range.clone();
                 ConditionState {
                     match_is_met: false,
                     per_getter: HashMap::new(),
-                    range: range,
                 }
             }).collect();
 
@@ -262,72 +257,73 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                             .per_getter
                             .insert(id, false);
                     }
-                    WatchEvent::EnterRange { from: id, value }
-                    | WatchEvent::ExitRange { from: id, value }
-                        // FIXME: EnterRange/ExitRange would let us simplify condition checking 
-                    => {
-                        use std::mem::replace;
-
-                        // An getter was updated. Note that there is
-                        // a possibility that the getter was
-                        // empty, in case we received messages in
-                        // the wrong order.
-
-                        let getter_is_met : bool =
-                            per_rule[rule_index]
-                            .per_condition[condition_index]
-                            .range
-                            .contains(&value);
-
-                        per_rule[rule_index]
-                            .per_condition[condition_index]
-                            .per_getter
-                            .insert(id, getter_is_met); // FIXME: Could be used to optimize
-
-                        // 1. Is the match met?
-                        //
-                        // The match is met iff any of the getters
-                        // meets the condition.
-                        let some_getter_is_met = getter_is_met ||
-                            per_rule[rule_index]
-                            .per_condition[condition_index]
-                            .per_getter
-                            .values().find(|is_met| **is_met).is_some();
-
-                        per_rule[rule_index]
-                            .per_condition[condition_index]
-                            .match_is_met = some_getter_is_met;
-
-                        // 2. Is the condition met?
-                        //
-                        // The condition is met iff all of the
-                        // matches are met.
-                        let condition_is_met =
-                            per_rule[rule_index]
-                            .per_condition
-                            .iter()
-                            .find(|condition_state| condition_state.match_is_met)
-                            .is_some();
-
-                        // 3. Are we in a case in which the
-                        // condition was not met and is now met?
-                        let condition_was_met =
-                            replace(&mut per_rule[rule_index].rule_is_met, condition_is_met);
-
-                        if !condition_was_met && condition_is_met {
-                            // Ahah, we have just triggered the statements!
-                            for (statement, statement_index) in self.script.rules[rule_index].execute.iter().zip(0..) {
-                                let result = statement.eval(&api);
-                                let _ = on_event.send(ExecutionEvent::Sent {
-                                    rule_index: rule_index,
-                                    statement_index: statement_index,
-                                    result: result,
-                                });
-                            }
-                        }
-                    }
+                    WatchEvent::EnterRange { from: id, .. } =>
+                        self.update_conditions(id, true, &mut per_rule,
+                            rule_index, condition_index, &api, &on_event),
+                    WatchEvent::ExitRange { from: id, .. } =>
+                        self.update_conditions(id, false, &mut per_rule,
+                            rule_index, condition_index, &api, &on_event)
                 }
-            };
+            }
+        };
+    }
+
+    fn update_conditions<S>(&self, id: Id<Getter>, getter_is_met: bool,
+            per_rule: &mut Vec<RuleState>, rule_index: usize, condition_index: usize,
+            api: &Env::API, on_event: &S) where S: ExtSender<ExecutionEvent>
+    {
+        use std::mem::replace;
+
+        // An getter was updated. Note that there is
+        // a possibility that the getter was
+        // empty, in case we received messages in
+        // the wrong order.
+
+        per_rule[rule_index]
+            .per_condition[condition_index]
+            .per_getter
+            .insert(id, getter_is_met); // FIXME: Could be used to optimize
+
+        // 1. Is the match met?
+        //
+        // The match is met iff any of the getters
+        // meets the condition.
+        let some_getter_is_met = getter_is_met ||
+            per_rule[rule_index]
+            .per_condition[condition_index]
+            .per_getter
+            .values().find(|is_met| **is_met).is_some();
+
+        per_rule[rule_index]
+            .per_condition[condition_index]
+            .match_is_met = some_getter_is_met;
+
+        // 2. Is the condition met?
+        //
+        // The condition is met iff all of the
+        // matches are met.
+        let condition_is_met =
+            per_rule[rule_index]
+            .per_condition
+            .iter()
+            .find(|condition_state| condition_state.match_is_met)
+            .is_some();
+
+        // 3. Are we in a case in which the
+        // condition was not met and is now met?
+        let condition_was_met =
+            replace(&mut per_rule[rule_index].rule_is_met, condition_is_met);
+
+        if !condition_was_met && condition_is_met {
+            // Ahah, we have just triggered the statements!
+            for (statement, statement_index) in self.script.rules[rule_index].execute.iter().zip(0..) {
+                let result = statement.eval(&api);
+                let _ = on_event.send(ExecutionEvent::Sent {
+                    rule_index: rule_index,
+                    statement_index: statement_index,
+                    result: result,
+                });
+            }
         }
     }
 }
