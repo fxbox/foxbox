@@ -9,11 +9,11 @@
 use values::*;
 use util::Id;
 
-use serde::ser::{Serialize, Serializer};
-use serde::de::{Deserialize, Deserializer, Error};
+use serde::ser::{ Serialize, Serializer };
+use serde::de::{ Deserialize, Deserializer, Error };
 
-use std::hash::{Hash, Hasher};
-use std::collections::{HashSet, HashMap};
+use std::hash::{ Hash, Hasher };
+use std::collections::{ HashSet, HashMap };
 
 /// A marker for Id.
 /// Only useful for writing `Id<ServiceId>`.
@@ -214,7 +214,7 @@ pub struct Getter {
     ///   do not accept requests and rather send batches of
     ///   data every 24h.
     #[serde(default)]
-    pub poll: Option<ValDuration>,
+    pub poll: Option<Duration>,
 
     /// If `Some(duration)`, this channel can send the data to
     /// the FoxBox whenever it is updated. Parameter `duration`
@@ -223,7 +223,7 @@ pub struct Getter {
     /// Otherwise, the channel cannot send data to the FoxBox
     /// and needs to be polled.
     #[serde(default)]
-    pub trigger: Option<ValDuration>,
+    pub trigger: Option<Duration>,
 
     /// If `true`, this channel supports watching for specific
     /// changes.
@@ -247,7 +247,7 @@ pub struct Setter {
     /// If `Some(duration)`, this channel supports pushing,
     /// i.e. the FoxBox can send values.
     #[serde(default)]
-    pub push: Option<ValDuration>,
+    pub push: Option<Duration>,
 
     /// Date at which the latest value was sent to the channel.
     #[serde(default)]

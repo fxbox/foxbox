@@ -3,14 +3,15 @@
 //!
 use util::*;
 
-use std::cmp::{PartialOrd, Ordering};
+use std::cmp::{ PartialOrd, Ordering };
 use std::str::FromStr;
 use std::sync::Arc;
 
+use chrono::{ Duration as ChronoDuration, DateTime, UTC };
+
 use serde_json;
-use chrono::{Duration, DateTime, UTC};
-use serde::ser::{Serialize, Serializer};
-use serde::de::{Deserialize, Deserializer, Error};
+use serde::ser::{ Serialize, Serializer };
+use serde::de::{ Deserialize, Deserializer, Error, Visitor as DeserializationVisitor };
 
 /// Representation of a type error.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -405,7 +406,7 @@ pub enum Value {
     Unit,
     OnOff(OnOff),
     OpenClosed(OpenClosed),
-    Duration(ValDuration),
+    Duration(Duration),
     TimeStamp(TimeStamp),
     Temperature(Temperature),
     Color(Color),
@@ -454,7 +455,7 @@ impl Value {
         }
     }
 
-    pub fn as_duration(&self) -> Result<&ValDuration, TypeError> {
+    pub fn as_duration(&self) -> Result<&Duration, TypeError> {
         match *self {
             Value::Duration(ref x) => Ok(x),
             _ => Err(TypeError {expected: Type::Duration, got: self.get_type()})
@@ -510,30 +511,6 @@ impl PartialOrd for Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
-pub struct ValDuration(Duration);
-impl ValDuration {
-    pub fn new(duration: Duration) -> Self {
-        ValDuration(duration)
-    }
-    pub fn as_duration(&self) -> &Duration {
-        &self.0
-    }
-}
-impl Serialize for ValDuration {
-    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
-        where S: Serializer {
-        let as_sec = (self.0.num_milliseconds() as f64) / (1000 as f64);
-        as_sec.serialize(serializer)
-    }
-}
-impl Deserialize for ValDuration {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer {
-        let as_sec : f64 = try!(f64::deserialize(deserializer));
-        Ok(ValDuration(Duration::milliseconds((as_sec * 1000.) as i64)))
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub struct TimeStamp(DateTime<UTC>);
@@ -626,5 +603,70 @@ impl Range {
                 }
             }
         }
+    }
+}
+
+
+/// A serializable wrapper around chrono::Duration.
+///
+/// # Serialization
+///
+/// Values are deserialized to a floating-point number of seconds.
+///
+/// ```
+/// extern crate serde;
+/// extern crate serde_json;
+/// extern crate foxbox_taxonomy;
+/// extern crate chrono;
+///
+/// # fn main() {
+/// use foxbox_taxonomy::values::*;
+///
+/// let duration = Duration::from(chrono::Duration::milliseconds(3141));
+///
+/// let duration_as_json = serde_json::to_string(&duration).unwrap();
+/// assert_eq!(duration_as_json, "3.141");
+///
+/// let duration_back : Duration = serde_json::from_str(&duration_as_json).unwrap();
+/// assert_eq!(duration, duration_back);
+/// # }
+/// ```
+#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq)]
+pub struct Duration(ChronoDuration);
+
+impl Serialize for Duration {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+     {
+         serializer.visit_f64(self.0.num_milliseconds() as f64 / 1000 as f64)
+     }
+}
+impl From<ChronoDuration> for Duration {
+    fn from(source: ChronoDuration) -> Self {
+        Duration(source)
+    }
+}
+impl Into<ChronoDuration> for Duration {
+    fn into(self) -> ChronoDuration {
+        self.0
+    }
+}
+
+impl Deserialize for Duration {
+    /// Deserialize this value given this `Deserializer`.
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        struct F64Visitor;
+        impl DeserializationVisitor for F64Visitor
+        {
+            type Value = Duration;
+            fn visit_f64<E>(&mut self, v: f64) -> Result<Self::Value, E>
+                where E: Error,
+            {
+                Ok(Duration(ChronoDuration::milliseconds((v * 1000.) as i64)))
+            }
+        }
+        deserializer.visit_f64(F64Visitor)
     }
 }

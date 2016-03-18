@@ -1,13 +1,13 @@
 use services::{ AdapterId, Service, ServiceId, ChannelKind, Channel, Getter, Setter, TagId };
-use util::{Exactly, Id};
-use values;
-
-use serde::ser::Serializer;
-use serde::de::Deserializer;
+use util::{ Exactly, Id };
+use values::Duration;
 
 use std::cmp;
 use std::hash::Hash;
 use std::collections::HashSet;
+
+use serde::ser::Serializer;
+use serde::de::Deserializer;
 
 fn merge<T>(mut a: HashSet<T>, b: Vec<T>) -> HashSet<T> where T: Hash + Eq {
     for x in b {
@@ -454,9 +454,9 @@ impl SelectedBy<SetterSelector> for Channel<Setter> {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Period {
     #[serde(default)]
-    pub min: Option<values::ValDuration>,
+    pub min: Option<Duration>,
     #[serde(default)]
-    pub max: Option<values::ValDuration>,
+    pub max: Option<Duration>,
 }
 impl Period {
     pub fn and(self, other: Self) -> Self {
@@ -484,7 +484,7 @@ impl Period {
         }
     }
 
-    pub fn matches(&self, duration: &values::ValDuration) -> bool {
+    pub fn matches(&self, duration: &Duration) -> bool {
         if let Some(ref min) = self.min {
             if min > duration {
                 return false;
@@ -498,7 +498,7 @@ impl Period {
         true
     }
 
-    pub fn matches_option(period: &Option<Self>, duration: &Option<values::ValDuration>) -> bool {
+    pub fn matches_option(period: &Option<Self>, duration: &Option<Duration>) -> bool {
         match (period, duration) {
             (&Some(ref period), &Some(ref duration))
                 if !period.matches(duration) => false,

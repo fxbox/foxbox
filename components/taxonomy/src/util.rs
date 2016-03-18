@@ -1,14 +1,13 @@
+use std::cmp::PartialEq;
+use std::collections::HashMap;
+use std::hash::{ Hash, Hasher };
 use std::marker::PhantomData;
+use std::string::ToString;
 
 use string_cache::Atom;
 
 use serde::ser::{ Serialize, Serializer };
 use serde::de::{ Deserialize, Deserializer, Error as DeserializationError, Type as DeserializationType };
-
-use std::collections::HashMap;
-use std::cmp::PartialEq;
-use std::hash::{ Hash, Hasher };
-use std::string::ToString;
 
 /// A marker for a request that a expects a specific value.
 #[derive(Clone, Debug, Serialize, Deserialize)]
