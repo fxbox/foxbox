@@ -421,7 +421,7 @@ pub trait API: Send {
     /// # WebSocket API
     ///
     /// `/api/v1/channels/watch`
-    fn register_channel_watch(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
+    fn watch_values(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
             on_event: Box<ExtSender<WatchEvent>>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
