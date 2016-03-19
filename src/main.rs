@@ -59,6 +59,8 @@ extern crate xml;
 
 #[cfg(test)]
 extern crate regex;
+#[cfg(test)]
+extern crate tempdir;
 
 // Need to be declared first so to let the macros be visible from other modules.
 #[macro_use]

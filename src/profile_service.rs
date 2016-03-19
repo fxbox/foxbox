@@ -94,3 +94,18 @@ fn test_default_profile() {
     fs::remove_file(path).unwrap();
     assert!(true);
 }
+
+#[test]
+fn test_custom_profile() {
+
+    use tempdir::TempDir;
+
+    let profile_dir = TempDir::new_in("/tmp", "foxbox").unwrap();
+    let profile_path = String::from(profile_dir.into_path()
+                                    .to_str().unwrap());
+
+    let profile = ProfileService::new(Some(profile_path.to_owned()));
+
+    let path = profile.path_for("test.conf");
+    assert_eq!(path, format!("{}/test.conf", profile_path));
+}
