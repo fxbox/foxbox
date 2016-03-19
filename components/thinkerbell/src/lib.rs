@@ -11,12 +11,15 @@
 //!
 //! See module `ast` for more details on the grammar of scripts.
 
+extern crate foxbox_adapters;
+extern crate foxbox_taxonomy;
+
+extern crate transformable_channels;
+
 extern crate chrono;
 extern crate serde;
 extern crate serde_json;
-extern crate transformable_channels;
 
-extern crate foxbox_taxonomy;
 
 /// Definition of the AST.
 pub mod ast;
@@ -33,3 +36,5 @@ pub mod run;
 /// Miscellaneous internal utilities.
 pub mod util;
 
+/// An implementation of Thinkerbell on top of simulated devices.
+pub mod simulator;
