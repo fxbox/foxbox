@@ -1,7 +1,8 @@
 //! Launching and running the script
 
-use ast::{ Script, Statement, UncheckedCtx} ;
-use compile::{ Compiler, CompiledCtx, ExecutableDevEnv} ;
+use ast::{ Script, Statement, UncheckedCtx } ;
+use compile::{ Compiler, CompiledCtx, ExecutableDevEnv } ;
+pub use compile::{ Error as CompileError, SourceError, TypeError };
 use compile;
 
 use foxbox_taxonomy::api;
