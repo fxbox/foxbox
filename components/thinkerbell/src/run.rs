@@ -13,7 +13,7 @@ use foxbox_taxonomy::values::Duration;
 
 use transformable_channels::mpsc::*;
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::thread;
 use std::sync::Mutex;
@@ -182,7 +182,9 @@ enum ExecutionOp {
 
 struct ConditionState {
     match_is_met: bool,
-    per_getter: HashMap<Id<Getter>, bool>,
+
+    /// The set of getters for which the condition is met.
+    per_getter: HashSet<Id<Getter>>,
 
     /// If `None`, a duration is attached to this condition and we need to make sure that the
     /// condition remains true for at least `duration` before we decide whether to proceed with
@@ -246,7 +248,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                         }))));
                 ConditionState {
                     match_is_met: false,
-                    per_getter: HashMap::new(),
+                    per_getter: HashSet::new(),
                     duration: condition.duration.clone(),
                 }
             }).collect();
@@ -281,20 +283,18 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                         });
                     },
                     WatchEvent::GetterRemoved(id) => {
-                        per_rule[rule_index]
-                            .per_condition[condition_index]
-                            .per_getter
-                            .remove(&id);
+                        // A getter was removed. Its condition is therefore not met anymore.
+                        let msg = ExecutionOp::UpdateCondition {
+                            id: id.clone(),
+                            is_met: false,
+                            rule_index: rule_index,
+                            condition_index: condition_index
+                        };
+                        // This send will fail only if the thread is already down.
+                        let _ = self.tx.send(msg);
                     },
-                    WatchEvent::GetterAdded(id) => {
-                        // An getter was added. Note that there is
-                        // a possibility that the getter was not
-                        // empty, in case we received messages in
-                        // the wrong order.
-                        per_rule[rule_index]
-                            .per_condition[condition_index]
-                            .per_getter
-                            .insert(id, false);
+                    WatchEvent::GetterAdded(_) => {
+                        // An getter was added. Nothing to do.
                     }
                     WatchEvent::EnterRange { from: id, .. } => {
                         // We have entered a range. If there is a
@@ -354,20 +354,21 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     {
         use std::mem::replace;
 
-        // An getter was updated. Note that there is
-        // a possibility that the getter was
-        // empty, in case we received messages in
-        // the wrong order.
+        let was_met = if getter_is_met {
+            !per_rule[rule_index]
+                .per_condition[condition_index]
+                .per_getter
+                .insert(id)
+        } else {
+             per_rule[rule_index]
+                .per_condition[condition_index]
+                .per_getter
+                .remove(&id)
+        };
 
-        let was_met = per_rule[rule_index]
-            .per_condition[condition_index]
-            .per_getter
-            .insert(id, getter_is_met); // FIXME: Could be used to optimize
-        if let Some(ref was_met) = was_met {
-            if *was_met == getter_is_met {
-                // Nothing has changed, no need to update any further.
-                return;
-            }
+        if was_met == getter_is_met {
+            // Nothing has changed, no need to update any further.
+            return;
         }
 
         // 1. Is the match met?
@@ -378,7 +379,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
             per_rule[rule_index]
             .per_condition[condition_index]
             .per_getter
-            .values().find(|is_met| **is_met).is_some();
+            .len() > 0;
 
         per_rule[rule_index]
             .per_condition[condition_index]
