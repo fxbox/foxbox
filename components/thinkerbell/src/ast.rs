@@ -9,11 +9,10 @@ use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::util::Phantom;
 
-use serde::ser::{ Serialize, Serializer };
 use serde::de::{ Deserialize, Deserializer, Error };
 
 /// A thinkerbell script.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Script<Ctx> where Ctx: Context {
     /// A set of rules, stating what must be done in which circumstance.
     pub rules: Vec<Rule<Ctx>>,
@@ -25,7 +24,7 @@ pub struct Script<Ctx> where Ctx: Context {
 
 /// A single rule, i.e. "when some condition becomes true, do
 /// something".
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Rule<Ctx> where Ctx: Context {
     /// The condition in which to execute the trigger. The condition
     /// is matched once *all* the `Match` branches are true. Whenever
@@ -47,7 +46,7 @@ pub struct Rule<Ctx> where Ctx: Context {
 ///
 /// A condition is true if *any* of the corresponding getter channels
 /// yielded a value that is in the given range.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Match<Ctx> where Ctx: Context {
     /// The set of getters to watch. Note that the set of getters may
     /// change (e.g. when devices are added/removed) without rebooting
@@ -79,7 +78,7 @@ pub struct Match<Ctx> where Ctx: Context {
 
 
 /// Stuff to actually do. In practice, this means placing calls to devices.
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Statement<Ctx> where Ctx: Context {
     /// The set of setters to which to send a command. Note that the
     /// set of setters may change (e.g. when devices are
@@ -111,12 +110,12 @@ pub struct Statement<Ctx> where Ctx: Context {
 /// been compiled/checked yet and must not be executed;
 /// - `compile::CompiledCtx`, designed to mark the fact that a script
 /// has been compiled and can be executed.
-pub trait Context: Serialize + Deserialize + Default {
+pub trait Context: Deserialize + Default {
 }
 
 /// A Context used to represent a script that hasn't been compiled
 /// yet.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Deserialize)]
 pub struct UncheckedCtx;
 impl Context for UncheckedCtx {
 }
