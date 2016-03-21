@@ -24,7 +24,7 @@ use std::collections::HashMap;
 
 /// An error that arose during interaction with either a device, an adapter or the
 /// adapter manager
-#[derive(Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum Error {
     /// Attempting to fetch a value from a Channel<Getter> that doesn't support this operation.
     GetterDoesNotSupportPolling(Id<Getter>),
@@ -52,7 +52,7 @@ pub enum Error {
     InternalError(InternalError),
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum InternalError {
     /// Attempting to fetch or watch a getter that isn't registered.
     NoSuchGetter(Id<Getter>),
