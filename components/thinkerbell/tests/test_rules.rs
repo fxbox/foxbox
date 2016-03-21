@@ -4,9 +4,10 @@ extern crate transformable_channels;
 use foxbox_thinkerbell::fake_env::*;
 use foxbox_thinkerbell::parse::*;
 use foxbox_thinkerbell::run::*;
-use foxbox_thinkerbell::ast::Script;
+use foxbox_thinkerbell::ast::{ Script, UncheckedCtx };
 
 use std::thread;
+use std::marker::PhantomData;
 
 use transformable_channels::mpsc::*;
 
@@ -64,6 +65,11 @@ fn test_run() {
             println!("LOG: {:?}", msg)
         }
     });
+
+    let script = Script::<UncheckedCtx> {
+        rules: vec![],
+        phantom: PhantomData,
+    };
 
 /*
     println!("* Attempting to parse an run an empty script will raise an error.");
