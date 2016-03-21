@@ -118,6 +118,8 @@ fn test_run() {
     let getter_id_1 = Id::<Getter>::new("Getter 1");
     let getter_id_2 = Id::<Getter>::new("Getter 2");
     let setter_id_1 = Id::<Setter>::new("Setter 1");
+    let setter_id_2 = Id::<Setter>::new("Setter 2");
+    let setter_id_3 = Id::<Setter>::new("Setter 3");
 
     println!("* We can start executing a trivial rule.");
     exec.start(env.clone(), script_1, tx_run).unwrap();
@@ -301,6 +303,80 @@ fn test_run() {
     let (id, value) = rx_send.recv().unwrap();
     assert_eq!(id, setter_id_1);
     assert_eq!(value, Value::OnOff(OnOff::Off));
+
+    println!("* If we add a second setter, it also receives these sends.");
+    env.execute(Instruction::AddSetters(vec![
+        Channel {
+            id: setter_id_2.clone(),
+            adapter: adapter_id_1.clone(),
+            service: service_id_1.clone(),
+            last_seen: None,
+            tags: HashSet::new(),
+            mechanism: Setter {
+                push: None,
+                updated: None,
+                kind: ChannelKind::OnOff,
+            }
+        }
+    ]));
+    rx_done.recv().unwrap();
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+
+    let events : HashMap<_, _> = (0..2).map(|_| {
+        rx_send.recv().unwrap()
+    }).collect();
+    assert_eq!(events.len(), 2);
+    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::OnOff(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* If we add a setter of a mismatched type, it does not receive these sends.");
+    env.execute(Instruction::AddSetters(vec![
+        Channel {
+            id: setter_id_3.clone(),
+            adapter: adapter_id_1.clone(),
+            service: service_id_1.clone(),
+            last_seen: None,
+            tags: HashSet::new(),
+            mechanism: Setter {
+                push: None,
+                updated: None,
+                kind: ChannelKind::Ready,
+            }
+        }
+    ]));
+    rx_done.recv().unwrap();
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+
+    let events : HashMap<_, _> = (0..2).map(|_| {
+        rx_send.recv().unwrap()
+    }).collect();
+    assert_eq!(events.len(), 2);
+    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::OnOff(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
+    assert!(rx_send.try_recv().is_err());
 
     println!("");
 }
