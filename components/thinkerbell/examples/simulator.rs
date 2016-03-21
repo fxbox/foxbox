@@ -11,7 +11,7 @@ extern crate serde_json;
 
 use foxbox_thinkerbell::run::Execution;
 use foxbox_thinkerbell::parse::Parser;
-use foxbox_thinkerbell::simulator::*;
+use foxbox_thinkerbell::fake_env::*;
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -37,12 +37,12 @@ fn main () {
 
     println!("Preparing simulator.");
     let (tx, rx) = channel();
-    let env = TestEnv::new(Box::new(tx));
+    let env = FakeEnv::new(Box::new(tx));
     let (tx_done, rx_done) = channel();
     thread::spawn(move || {
         for event in rx {
             match event {
-                SimulatorEvent::Done => {
+                FakeEnvEvent::Done => {
                     let _ = tx_done.send(()).unwrap();
                 },
                 event => println!("<<< {:?}", event)
@@ -78,7 +78,7 @@ fn main () {
         let script = Parser::parse(source).unwrap();
         print!("Ruleset loaded, launching... ");
 
-        let mut runner = Execution::<TestEnv>::new();
+        let mut runner = Execution::<FakeEnv>::new();
         let (tx, rx) = channel();
         runner.start(env.clone(), script, tx).unwrap();
         match rx.recv().unwrap() {

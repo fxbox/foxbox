@@ -36,5 +36,6 @@ pub mod run;
 /// Miscellaneous internal utilities.
 pub mod util;
 
-/// An implementation of Thinkerbell on top of simulated devices.
-pub mod simulator;
+/// An implementation of Thinkerbell's Execution Environment on top of fake devices.
+/// Useful mainly for writing tests.
+pub mod fake_env;
