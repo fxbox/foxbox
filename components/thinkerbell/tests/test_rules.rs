@@ -116,6 +116,7 @@ fn test_run() {
     let adapter_id_1 = Id::<AdapterId>::new("Adapter 1");
     let service_id_1 = Id::<ServiceId>::new("Service 1");
     let getter_id_1 = Id::<Getter>::new("Getter 1");
+    let getter_id_2 = Id::<Getter>::new("Getter 2");
     let setter_id_1 = Id::<Setter>::new("Setter 1");
 
     println!("* We can start executing a trivial rule.");
@@ -204,6 +205,98 @@ fn test_run() {
         (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
     ]));
 
+    rx_done.recv().unwrap();
+    let (id, value) = rx_send.recv().unwrap();
+    assert_eq!(id, setter_id_1);
+    assert_eq!(value, Value::OnOff(OnOff::Off));
+
+    println!("* Adding a second getter doesn't break the world.");
+    env.execute(Instruction::AddGetters(vec![
+        Channel {
+            id: getter_id_2.clone(),
+            adapter: adapter_id_1.clone(),
+            service: service_id_1.clone(),
+            tags: HashSet::new(),
+            last_seen: None,
+            mechanism: Getter {
+                watch: true,
+                poll: None,
+                updated: None,
+                trigger: None,
+                kind: ChannelKind::OnOff,
+            }
+        }
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* Changing the state of the second getter while the condition remains true with the second getter doesn't do anything.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* Changing the state of the first getter while the condition remains true with the second getter doesn't do anything.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* If neither condition is met, the second getter can trigger the send.");
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+    let (id, value) = rx_send.recv().unwrap();
+    assert_eq!(id, setter_id_1);
+    assert_eq!(value, Value::OnOff(OnOff::Off));
+
+    println!("* If neither condition is met, the first getter can trigger the send.");
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
     rx_done.recv().unwrap();
     let (id, value) = rx_send.recv().unwrap();
     assert_eq!(id, setter_id_1);
