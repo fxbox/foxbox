@@ -6,7 +6,7 @@
     "node": ">=4.0.0"
   },
   "scripts": {
-    "test-selenium": "npm run clean_db && ./node_modules/.bin/mocha test/selenium/*_test.js",
+    "test-selenium": "./tools/execute-selenium-tests",
     "test-integration": "npm run clean_db && ./node_modules/.bin/mocha test/integration/test/*.js",
     "clean_db": "rm -f ~/.local/share/foxbox/users_db.sqlite"
   },

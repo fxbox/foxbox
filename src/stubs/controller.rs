@@ -11,7 +11,7 @@ use controller::Controller;
 use foxbox_users::UsersManager;
 use iron::{Request, Response, IronResult};
 use iron::status::Status;
-use profile_service::ProfileService;
+use profile_service::{ ProfilePath, ProfileService };
 use self::collections::vec::IntoIter;
 use service::{ Service, ServiceProperties };
 use std::io;
@@ -32,7 +32,7 @@ pub struct ControllerStub {
 impl ControllerStub {
     pub fn new() -> Self {
         let path = format!("/tmp/{}", rand::random::<i32>());
-        let profile_service = ProfileService::new(Some(path));
+        let profile_service = ProfileService::new(ProfilePath::Custom(path));
         ControllerStub {
             config: Arc::new(
                 ConfigService::new(&profile_service.path_for("foxbox.conf"))
