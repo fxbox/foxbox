@@ -58,13 +58,26 @@ fn test_compile() {
     println!("");
 }
 
+fn race<T>(receivers: &[Receiver<T>]) -> T {
+    use std::time::Duration;
+    loop {
+        for rx in receivers {
+            if let Ok(result) = rx.try_recv() {
+                return result
+            }
+        }
+        thread::sleep(std::time::Duration::new(1, 0));
+    }
+}
+
 #[test]
 fn test_run() {
-    let (tx, rx) : (_, Receiver<Event>) = channel();
+    let (tx, rx) : (_, Receiver<Event>)= channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
     let tx_run = tx.map(|event| Event::Run(event));
     let (tx_done, rx_done) = channel();
+    let (tx_send, rx_send) = channel();
 
     let env = FakeEnv::new(tx_env);
     let mut exec = Execution::<FakeEnv>::new();
@@ -73,13 +86,15 @@ fn test_run() {
         for msg in rx {
             if let Event::Env(FakeEnvEvent::Done) = msg {
                 tx_done.send(()).unwrap();
+            } else if let Event::Env(FakeEnvEvent::Send { id, value }) = msg {
+                tx_send.send((id, value)).unwrap();
             } else {
                 println!("LOG: {:?}", msg);
             }
         }
     });
 
-    let script = Script {
+    let script_1 = Script {
         rules: vec![
             Rule {
                 conditions: vec![
@@ -115,7 +130,7 @@ fn test_run() {
     let setter_id_1 = Id::<Setter>::new("Setter 1");
 
     println!("* We can start executing a trivial rule.");
-    exec.start(env.clone(), script, tx_run).unwrap();
+    exec.start(env.clone(), script_1, tx_run).unwrap();
 
     println!("* Changing the structure of the network doesn't break the rule.");
     env.execute(Instruction::AddAdapters(vec![adapter_id_1.to_string()]));
@@ -166,7 +181,16 @@ fn test_run() {
     ]));
     rx_done.recv().unwrap();
 
-    println!("FIXME: Injecting the expected value triggers the send.");
+    println!("* Injecting the expected value triggers the send.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Value::OnOff(OnOff::On))
+    ]));
+
+
+    rx_done.recv().unwrap();
+    let (id, value) = rx_send.recv().unwrap();
+    assert_eq!(id, setter_id_1);
+    assert_eq!(value, Value::OnOff(OnOff::Off));
 
     println!("");
 }
