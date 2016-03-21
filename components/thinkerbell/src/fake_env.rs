@@ -359,9 +359,21 @@ impl FakeEnv {
                     self.report_error(result);
                 }
             },
+            RemoveGetters(vec) => {
+                for getter in vec {
+                    let result = self.manager.remove_getter(&getter);
+                    self.report_error(result);
+                }
+            },
             AddSetters(vec) => {
                 for setter in vec {
                     let result = self.manager.add_setter(setter);
+                    self.report_error(result);
+                }
+            },
+            RemoveSetters(vec) => {
+                for setter in vec {
+                    let result = self.manager.remove_setter(&setter);
                     self.report_error(result);
                 }
             },
@@ -391,6 +403,8 @@ pub enum Instruction {
     AddServices(Vec<Service>),
     AddGetters(Vec<Channel<Getter>>),
     AddSetters(Vec<Channel<Setter>>),
+    RemoveGetters(Vec<Id<Getter>>),
+    RemoveSetters(Vec<Id<Setter>>),
     InjectGetterValues(Vec<(Id<Getter>, Result<Value, Error>)>),
 }
 

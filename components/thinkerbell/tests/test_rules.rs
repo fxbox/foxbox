@@ -378,5 +378,54 @@ fn test_run() {
     assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
     assert!(rx_send.try_recv().is_err());
 
+    println!("* Removing a getter resets its condition_is_met to false.");
+    env.execute(Instruction::RemoveGetters(vec![
+        getter_id_1.clone()
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+
+    let events : HashMap<_, _> = (0..2).map(|_| {
+        rx_send.recv().unwrap()
+    }).collect();
+    assert_eq!(events.len(), 2);
+    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::OnOff(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* Removing a setter does not prevent the other setter from receiving.");
+    env.execute(Instruction::RemoveSetters(vec![
+        setter_id_1.clone()
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+    rx_done.recv().unwrap();
+
+    let (id, value) = rx_send.recv().unwrap();
+    assert_eq!(id, setter_id_2);
+    assert_eq!(value, Value::OnOff(OnOff::Off));
+    assert!(rx_send.try_recv().is_err());
+
     println!("");
 }
