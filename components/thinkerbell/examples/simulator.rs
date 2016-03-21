@@ -10,7 +10,7 @@ extern crate serde;
 extern crate serde_json;
 
 use foxbox_thinkerbell::run::Execution;
-use foxbox_thinkerbell::parse::Parser;
+use foxbox_thinkerbell::ast::Script;
 use foxbox_thinkerbell::fake_env::*;
 
 use std::io::prelude::*;
@@ -75,7 +75,7 @@ fn main () {
         let mut file = File::open(path).unwrap();
         let mut source = String::new();
         file.read_to_string(&mut source).unwrap();
-        let script = Parser::parse(source).unwrap();
+        let script = Script::parse(&source).unwrap();
         print!("Ruleset loaded, launching... ");
 
         let mut runner = Execution::<FakeEnv>::new();

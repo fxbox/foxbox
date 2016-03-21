@@ -2,6 +2,7 @@ extern crate foxbox_thinkerbell;
 extern crate foxbox_taxonomy;
 extern crate serde_json;
 
+use foxbox_thinkerbell::ast::*;
 use foxbox_thinkerbell::parse::*;
 
 #[test]
@@ -10,12 +11,16 @@ fn test_parse_bad_field() {
       \"requirements\": [],
       \"allocations\": [],
       \"rules\": []
-    }".to_owned();
+  }";
 
-    let result = Parser::parse(src);
+    let result = Script::parse(src);
     match result {
-        Err(serde_json::error::Error::SyntaxError(serde_json::error::ErrorCode::UnknownField(field), _, _)) => {
-            assert!(field == "requirements".to_owned() || field == "allocations".to_owned())
+        Err(ParseError::UnknownFields {
+            names: fields,
+            ..
+        }) => {
+            assert!(fields.contains(&"requirements".to_owned()));
+            assert!(fields.contains(&"allocations".to_owned()));
         },
         _ => assert!(false)
     };
@@ -23,8 +28,8 @@ fn test_parse_bad_field() {
 
 #[test]
 fn test_parse_empty() {
-    let src = "{ \"rules\": []}".to_owned();
-    let script = Parser::parse(src).unwrap();
+    let src = "{ \"rules\": []}";
+    let script = Script::parse(src).unwrap();
     assert_eq!(script.rules.len(), 0);
 }
 
@@ -39,7 +44,7 @@ fn test_parse_simple_rule() {
       ]
     }
   ]
-}".to_owned();
-    Parser::parse(src).unwrap();
+}";
+    Script::parse(src).unwrap();
 }
 
