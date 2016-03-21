@@ -45,4 +45,6 @@ fn test_compile() {
     println!("//FIXME: Attempting to parse a script with a type error in a match will raise an error.");
     println!("//FIXME: Attempting to parse a script with a type error in a send will raise an error.");
 
+    println!("");
 }
+
