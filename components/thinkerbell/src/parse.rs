@@ -37,7 +37,9 @@ impl Path {
     }
 
     /// Push a suffix after a path.
-    pub fn push(&self, suffix: &str) -> Self {
+    pub fn push<F, T>(&self, suffix: &str, cb: F) -> T
+        where F: FnOnce(Path) -> T
+    {
         let buf = self.buf.clone();
         let len;
         {
@@ -46,21 +48,21 @@ impl Path {
             str.push_str(suffix);
             len = str.len();
         }
-        Path {
+        let path = Path {
             buf: buf,
             len: len,
+        };
+        let result = cb(path);
+        {
+            let mut str = self.buf.borrow_mut();
+            str.truncate(self.len)
         }
+        result
     }
     pub fn to_string(&self) -> String {
         let mut str = self.buf.borrow().clone();
         str.truncate(self.len);
         str
-    }
-}
-impl Drop for Path {
-    fn drop(&mut self) {
-        let mut str = self.buf.borrow_mut();
-        str.truncate(self.len);
     }
 }
 
@@ -137,8 +139,10 @@ pub trait Parse<T: Sized> {
                 if let JSON::Array(ref mut vec) = *json {
                     let mut result = Vec::with_capacity(vec.len());
                     for (json, i) in vec.drain(..).zip(0..) {
-                        let path = path.push(&format!("{}#{}", field_name, i));
-                        let parsed = try!(Self::parse(path, json));
+                        let json = json;
+                        let parsed = try!(path.push(&format!("{}#{}", field_name, i),
+                            |path| Self::parse(path, json)
+                        ));
                         result.push(parsed);
                     }
                     return Ok(result)

@@ -35,7 +35,7 @@ impl Script<UncheckedCtx> {
 
 impl Parse<Script<UncheckedCtx>> for Script<UncheckedCtx> {
     fn parse(path: Path, mut source: JSON) -> Result<Self, ParseError> {
-        let rules = try!(Rule::take_vec(path.push(""), &mut source, "rules"));
+        let rules = try!(path.push("", |path| Rule::take_vec(path, &mut source, "rules")));
         try!(check_no_more_fields(path, source));
         Ok(Script {
             rules: rules,
@@ -59,8 +59,12 @@ pub struct Rule<Ctx> where Ctx: Context {
 }
 impl Parse<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
     fn parse(path: Path, mut source: JSON) -> Result<Self, ParseError> {
-        let conditions = try!(Match::take_vec(path.push("conditions"), &mut source, "conditions"));
-        let execute = try!(Statement::take_vec(path.push("execute"), &mut source, "execute"));
+        let conditions = try!(path.push("conditions",
+            |path| Match::take_vec(path, &mut source, "conditions"))
+        );
+        let execute = try!(path.push("execute",
+            |path| Statement::take_vec(path, &mut source, "execute"))
+        );
         try!(check_no_more_fields(path, source));
         Ok(Rule {
             conditions: conditions,
@@ -103,10 +107,18 @@ pub struct Match<Ctx> where Ctx: Context {
 }
 impl Parse<Match<UncheckedCtx>> for Match<UncheckedCtx> {
     fn parse(path: Path, mut source: JSON) -> Result<Self, ParseError> {
-        let sources = try!(GetterSelector::take_vec(path.push("source"), &mut source, "source"));
-        let kind = try!(ChannelKind::take(path.push("kind"), &mut source, "kind"));
-        let range = try!(Range::take(path.push("range"), &mut source, "range"));
-        let duration = match Duration::take(path.push("range"), &mut source, "duration") {
+        let sources = try!(path.push("source",
+            |path| GetterSelector::take_vec(path, &mut source, "source"))
+        );
+        let kind = try!(path.push("kind",
+            |path| ChannelKind::take(path, &mut source, "kind"))
+        );
+        let range = try!(path.push("range",
+            |path| Range::take(path, &mut source, "range"))
+        );
+        let duration = match path.push("range",
+            |path| Duration::take(path, &mut source, "duration"))
+        {
             Err(ParseError::MissingField {..}) => None,
             Err(err) => return Err(err),
             Ok(ok) => Some(ok)
@@ -144,9 +156,15 @@ pub struct Statement<Ctx> where Ctx: Context {
 }
 impl Parse<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
     fn parse(path: Path, mut source: JSON) -> Result<Self, ParseError> {
-        let destination = try!(SetterSelector::take_vec(path.push("destination"), &mut source, "destination"));
-        let kind = try!(ChannelKind::take(path.push("kind"), &mut source, "kind"));
-        let value = try!(Value::take(path.push("value"), &mut source, "value"));
+        let destination = try!(path.push("destination",
+            |path| SetterSelector::take_vec(path, &mut source, "destination"))
+        );
+        let kind = try!(path.push("kind",
+            |path| ChannelKind::take(path, &mut source, "kind"))
+        );
+        let value = try!(path.push("value",
+            |path| Value::take(path, &mut source, "value"))
+        );
         try!(check_no_more_fields(path, source));
         Ok(Statement {
             destination: destination,
