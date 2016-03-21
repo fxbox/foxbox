@@ -35,7 +35,7 @@ use serde::de::{Deserialize, Deserializer};
 /// The environment in which the code is meant to be executed.  This
 /// can typically be instantiated either with actual bindings to
 /// devices, or with a unit-testing framework. // FIXME: Move this to run.rs
-pub trait ExecutableDevEnv: Serialize + Deserialize + Send {
+pub trait ExecutableDevEnv: Serialize + Deserialize + Send + Clone {
     type WatchGuard;
     type API: API<WatchGuard = Self::WatchGuard>;
 
