@@ -132,7 +132,7 @@ impl<Env> Compiler<Env> where Env: ExecutableDevEnv {
         }));
         Ok(Script {
             rules: rules,
-            phantom: Phantom::new()
+            phantom: PhantomData
         })
     }
 
@@ -153,7 +153,7 @@ impl<Env> Compiler<Env> where Env: ExecutableDevEnv {
         Ok(Rule {
             conditions: conditions,
             execute: execute,
-            phantom: Phantom::new()
+            phantom: PhantomData
         })
     }
 
@@ -179,7 +179,7 @@ impl<Env> Compiler<Env> where Env: ExecutableDevEnv {
             kind: match_.kind,
             range: match_.range,
             duration: match_.duration,
-            phantom: Phantom::new()
+            phantom: PhantomData
         })
     }
 
@@ -200,7 +200,7 @@ impl<Env> Compiler<Env> where Env: ExecutableDevEnv {
             destination: destination,
             value: statement.value,
             kind: statement.kind,
-            phantom: Phantom::new()
+            phantom: PhantomData
         })
     }
 }
