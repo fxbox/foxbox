@@ -10,9 +10,9 @@ serde_macros = "0.6.14"
 chrono = "0.2.19"
 foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git" }
 foxbox_adapters = { git = "https://github.com/fxbox/adapters.git" }
+# foxbox_adapters = { path = "../adapters" }
 # foxbox_taxonomy = { path = "../taxonomy" }
 transformable_channels = "*"
 
 [dev-dependencies]
 docopt = "0.6.78"
-# foxbox_adapters = { path = "../adapters" }

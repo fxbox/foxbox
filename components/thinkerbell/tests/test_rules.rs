@@ -8,10 +8,11 @@ use foxbox_thinkerbell::parse::*;
 use foxbox_thinkerbell::run::*;
 use foxbox_thinkerbell::ast::*;
 
+use foxbox_taxonomy::api::{ Error as APIError };
 use foxbox_taxonomy::util::Id;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ OnOff, Range, Value };
+use foxbox_taxonomy::values::{ OnOff, Range, Type, TypeError as APITypeError , Value };
 
 use std::marker::PhantomData;
 use std::thread;
@@ -56,18 +57,6 @@ fn test_compile() {
     println!("//FIXME: Attempting to parse a script with a type error in a send will raise an error.");
 
     println!("");
-}
-
-fn race<T>(receivers: &[Receiver<T>]) -> T {
-    use std::time::Duration;
-    loop {
-        for rx in receivers {
-            if let Ok(result) = rx.try_recv() {
-                return result
-            }
-        }
-        thread::sleep(std::time::Duration::new(1, 0));
-    }
 }
 
 #[test]
@@ -183,9 +172,37 @@ fn test_run() {
 
     println!("* Injecting the expected value triggers the send.");
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Value::OnOff(OnOff::On))
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
     ]));
 
+    rx_done.recv().unwrap();
+    let (id, value) = rx_send.recv().unwrap();
+    assert_eq!(id, setter_id_1);
+    assert_eq!(value, Value::OnOff(OnOff::Off));
+
+    println!("* Injecting an out-of-range value does not trigger the send.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* Injecting an error does not trigger the send.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Err(APIError::TypeError(APITypeError {
+            expected: Type::OnOff,
+            got: Type::OpenClosed
+        })))
+    ]));
+
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* Injecting the expected value again triggers the send again.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
 
     rx_done.recv().unwrap();
     let (id, value) = rx_send.recv().unwrap();
