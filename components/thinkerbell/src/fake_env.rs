@@ -25,7 +25,7 @@ struct TestSharedAdapterBackend {
     getter_values: HashMap<Id<Getter>, Value>,
 
     /// A channel to inform when things happen.
-    on_event: Box<ExtSender<SimulatorEvent>>,
+    on_event: Box<ExtSender<FakeEnvEvent>>,
 
     /// All watchers. 100% counter-optimized
     counter: usize,
@@ -33,7 +33,7 @@ struct TestSharedAdapterBackend {
 }
 
 impl TestSharedAdapterBackend {
-    fn new(on_event: Box<ExtSender<SimulatorEvent>>) -> Self {
+    fn new(on_event: Box<ExtSender<FakeEnvEvent>>) -> Self {
         TestSharedAdapterBackend {
             getter_values: HashMap::new(),
             on_event: on_event,
@@ -51,7 +51,7 @@ impl TestSharedAdapterBackend {
 
     fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
         values.drain().map(|(id, value)| {
-            let event = SimulatorEvent::Send {
+            let event = FakeEnvEvent::Send {
                 id: id.clone(),
                 value: value
             };
@@ -140,7 +140,7 @@ impl TestSharedAdapterBackend {
 
 /// Events of interest, that should be displayed to the user of the simulator.
 #[derive(Debug)]
-pub enum SimulatorEvent {
+pub enum FakeEnvEvent {
     /// Some value was sent to a setter channel.
     Send {
         id: Id<Setter>,
@@ -276,15 +276,15 @@ impl Drop for TestAdapterWatchGuard {
 
 /// The test environment.
 #[derive(Clone)]
-pub struct TestEnv {
+pub struct FakeEnv {
     /// The manager in charge of all adapters.
     manager: AdapterManager,
 
     ///
-    on_event: Box<ExtSender<SimulatorEvent>>,
+    on_event: Box<ExtSender<FakeEnvEvent>>,
     back_end: Box<ExtSender<AdapterOp>>,
 }
-impl ExecutableDevEnv for TestEnv {
+impl ExecutableDevEnv for FakeEnv {
     // Don't bother stopping watches.
     type WatchGuard = <AdapterManager as API>::WatchGuard;
     type API = AdapterManager;
@@ -298,8 +298,8 @@ impl ExecutableDevEnv for TestEnv {
         unimplemented!()
     }
 }
-impl TestEnv {
-    pub fn new(on_event: Box<ExtSender<SimulatorEvent>>) -> Self {
+impl FakeEnv {
+    pub fn new(on_event: Box<ExtSender<FakeEnvEvent>>) -> Self {
         let (tx, rx) = channel();
         let on_event_clone = on_event.clone();
         thread::spawn(move || {
@@ -309,7 +309,7 @@ impl TestEnv {
             }
         });
 
-        TestEnv {
+        FakeEnv {
             on_event: on_event,
             manager: AdapterManager::new(),
             back_end: Box::new(tx),
@@ -320,7 +320,7 @@ impl TestEnv {
         match result {
             Ok(_) => {},
             Err(err) => {
-                let _ = self.on_event.send(SimulatorEvent::Error(err));
+                let _ = self.on_event.send(FakeEnvEvent::Error(err));
             }
         }
     }
@@ -360,15 +360,15 @@ impl TestEnv {
             },
 //            _ => unimplemented!()
         }
-        let _ = self.on_event.send(SimulatorEvent::Done);
+        let _ = self.on_event.send(FakeEnvEvent::Done);
     }
 }
-impl Serialize for TestEnv {
+impl Serialize for FakeEnv {
     fn serialize<S>(&self, _: &mut S) -> Result<(), S::Error> where S: Serializer {
         panic!("Why are we attempting to serialize the env?")
     }
 }
-impl Deserialize for TestEnv {
+impl Deserialize for FakeEnv {
     fn deserialize<D>(_: &mut D) -> Result<Self, D::Error> where D: Deserializer {
          panic!("Why are we attempting to deserialize the env?")
     }
