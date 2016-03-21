@@ -8,10 +8,11 @@ use foxbox_thinkerbell::parse::*;
 use foxbox_thinkerbell::run::*;
 use foxbox_thinkerbell::ast::*;
 
+use foxbox_taxonomy::api::{ Error as APIError };
 use foxbox_taxonomy::util::Id;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ OnOff, Range, Value };
+use foxbox_taxonomy::values::{ OnOff, Range, Type, TypeError as APITypeError , Value };
 
 use std::marker::PhantomData;
 use std::thread;
@@ -60,11 +61,12 @@ fn test_compile() {
 
 #[test]
 fn test_run() {
-    let (tx, rx) : (_, Receiver<Event>) = channel();
+    let (tx, rx) : (_, Receiver<Event>)= channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
     let tx_run = tx.map(|event| Event::Run(event));
     let (tx_done, rx_done) = channel();
+    let (tx_send, rx_send) = channel();
 
     let env = FakeEnv::new(tx_env);
     let mut exec = Execution::<FakeEnv>::new();
@@ -73,13 +75,15 @@ fn test_run() {
         for msg in rx {
             if let Event::Env(FakeEnvEvent::Done) = msg {
                 tx_done.send(()).unwrap();
+            } else if let Event::Env(FakeEnvEvent::Send { id, value }) = msg {
+                tx_send.send((id, value)).unwrap();
             } else {
                 println!("LOG: {:?}", msg);
             }
         }
     });
 
-    let script = Script {
+    let script_1 = Script {
         rules: vec![
             Rule {
                 conditions: vec![
@@ -115,7 +119,7 @@ fn test_run() {
     let setter_id_1 = Id::<Setter>::new("Setter 1");
 
     println!("* We can start executing a trivial rule.");
-    exec.start(env.clone(), script, tx_run).unwrap();
+    exec.start(env.clone(), script_1, tx_run).unwrap();
 
     println!("* Changing the structure of the network doesn't break the rule.");
     env.execute(Instruction::AddAdapters(vec![adapter_id_1.to_string()]));
@@ -166,7 +170,44 @@ fn test_run() {
     ]));
     rx_done.recv().unwrap();
 
-    println!("FIXME: Injecting the expected value triggers the send.");
+    println!("* Injecting the expected value triggers the send.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+
+    rx_done.recv().unwrap();
+    let (id, value) = rx_send.recv().unwrap();
+    assert_eq!(id, setter_id_1);
+    assert_eq!(value, Value::OnOff(OnOff::Off));
+
+    println!("* Injecting an out-of-range value does not trigger the send.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+    ]));
+
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* Injecting an error does not trigger the send.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Err(APIError::TypeError(APITypeError {
+            expected: Type::OnOff,
+            got: Type::OpenClosed
+        })))
+    ]));
+
+    rx_done.recv().unwrap();
+    assert!(rx_send.try_recv().is_err());
+
+    println!("* Injecting the expected value again triggers the send again.");
+    env.execute(Instruction::InjectGetterValues(vec![
+        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+    ]));
+
+    rx_done.recv().unwrap();
+    let (id, value) = rx_send.recv().unwrap();
+    assert_eq!(id, setter_id_1);
+    assert_eq!(value, Value::OnOff(OnOff::Off));
 
     println!("");
 }

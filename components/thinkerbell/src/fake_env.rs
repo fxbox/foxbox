@@ -22,7 +22,7 @@ static VERSION : [u32;4] = [0, 0, 0, 0];
 /// A back-end holding values and watchers, shared by all the virtual adapters of this simulator.
 struct TestSharedAdapterBackend {
     /// The latest known value for each getter.
-    getter_values: HashMap<Id<Getter>, Value>,
+    getter_values: HashMap<Id<Getter>, Result<Value, Error>>,
 
     /// A channel to inform when things happen.
     on_event: Box<ExtSender<FakeEnvEvent>>,
@@ -45,7 +45,11 @@ impl TestSharedAdapterBackend {
     fn fetch_values(&self, mut getters: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         getters.drain(..).map(|id| {
             let got = self.getter_values.get(&id).cloned();
-            (id, Ok(got))
+            match got {
+                None => (id, Ok(None)),
+                Some(Ok(value)) => (id, Ok(Some(value))),
+                Some(Err(err)) => (id, Err(err)),
+            }
         }).collect()
     }
 
@@ -77,40 +81,46 @@ impl TestSharedAdapterBackend {
         let _ = self.watchers.remove(&key);
     }
 
-    fn inject_getter_values(&mut self, mut values: Vec<(Id<Getter>, Value)>)
+    fn inject_getter_values(&mut self, mut values: Vec<(Id<Getter>, Result<Value, Error>)>)
     {
         for (id, value) in values.drain(..) {
             let old = self.getter_values.insert(id.clone(), value.clone());
-            for watcher in self.watchers.values() {
-                let (ref watched_id, ref range, ref cb) = *watcher;
-                if *watched_id != id {
-                    continue;
-                }
-                if let Some(ref range) = *range {
-                    let was_met = match old {
-                        None => false,
-                        Some(ref value) => range.contains(value)
-                    };
-                    match (was_met, range.contains(&value)) {
-                        (false, true) => {
+            match value {
+                Err(_) => continue,
+                Ok(value) => {
+                    for watcher in self.watchers.values() {
+                        let (ref watched_id, ref range, ref cb) = *watcher;
+                        if *watched_id != id {
+                            continue;
+                        }
+                        if let Some(ref range) = *range {
+                            let was_met = if let Some(Ok(ref value)) = old {
+                                range.contains(value)
+                            } else {
+                                false
+                            };
+                            match (was_met, range.contains(&value)) {
+                                (false, true) => {
+                                    let _ = cb.send(WatchEvent::Enter {
+                                        id: id.clone(),
+                                        value: value.clone()
+                                    });
+                                }
+                                (true, false) => {
+                                    let _ = cb.send(WatchEvent::Exit {
+                                        id: id.clone(),
+                                        value: value.clone()
+                                    });
+                                }
+                                _ => continue
+                            }
+                        } else {
                             let _ = cb.send(WatchEvent::Enter {
                                 id: id.clone(),
                                 value: value.clone()
                             });
                         }
-                        (true, false) => {
-                            let _ = cb.send(WatchEvent::Exit {
-                                id: id.clone(),
-                                value: value.clone()
-                            });
-                        }
-                        _ => continue
                     }
-                } else {
-                    let _ = cb.send(WatchEvent::Enter {
-                        id: id.clone(),
-                        value: value.clone()
-                    });
                 }
             }
         }
@@ -381,7 +391,7 @@ pub enum Instruction {
     AddServices(Vec<Service>),
     AddGetters(Vec<Channel<Getter>>),
     AddSetters(Vec<Channel<Setter>>),
-    InjectGetterValues(Vec<(Id<Getter>, Value)>),
+    InjectGetterValues(Vec<(Id<Getter>, Result<Value, Error>)>),
 }
 
 /// Operations internal to a TestAdapter.
@@ -400,7 +410,7 @@ enum AdapterOp {
         tx: Box<ExtSender<ResultMap<Id<Getter>, usize, Error>>>
     },
     Unwatch(usize),
-    InjectGetterValues(Vec<(Id<Getter>, Value)>),
+    InjectGetterValues(Vec<(Id<Getter>, Result<Value, Error>)>),
 }
 
 
