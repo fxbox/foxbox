@@ -2,7 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use std::collections::HashMap;
+use hyper::client::{ Body, Client };
+use hyper::net::{ HttpsConnector, Openssl };
+use hyper::status::StatusCode;
+
+use serde_json;
+
+use std::collections::{ BTreeMap, HashMap };
 use std::fs::{ self };
 use std::io::{ Error, ErrorKind };
 use std::path::PathBuf;
@@ -38,11 +44,10 @@ fn create_records_from_directory(path: &PathBuf) -> Result<HashMap<String, Certi
             let mut private_key_file = host_path.clone();
             private_key_file.push("private_key.pem");
 
-            records.insert(hostname.clone(), CertificateRecord {
-                hostname: hostname,
-                private_key_file: private_key_file,
-                cert_file: cert_path
-            });
+            records.insert(hostname.clone(),
+                           try!(CertificateRecord::new(hostname,
+                                                  cert_path,
+                                                  private_key_file)));
         }
 
         info!("Loaded certificates from directory: {:?}", path);
@@ -116,6 +121,56 @@ impl CertificateManager {
         self.notify_provider();
     }
 
+    fn create_https_client_with_crt_for(&self, hostname: String) -> Option<(Client, CertificateRecord)> {
+        if let Some(certificate_record) = self.get_certificate(hostname.clone()) {
+            let ssl_ctx = Openssl::with_cert_and_key(
+                                &certificate_record.cert_file,
+                                &certificate_record.private_key_file);
+
+            if let Ok(ssl_ctx) = ssl_ctx {
+                Some((Client::with_connector(HttpsConnector::new(ssl_ctx)), certificate_record))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn register_for_dns_challenge(&mut self, hostname: String, dns_endpoint: String, ip_address: String) -> Result<bool, String> {
+        if let Some((https_client, cert_record)) = self.create_https_client_with_crt_for(hostname.clone()) {
+
+            let hash = cert_record.get_certificate_fingerprint();
+
+            let request_url = format!("{}/v1/dns/{}/{}", dns_endpoint,  hostname.rsplit(".").fold("".to_owned(), |url, component| {
+                format!("{}/{}", url, component)
+            }), hash);
+
+            let mut map = BTreeMap::new();
+            map.insert("type".to_owned(), "A".to_owned());
+            map.insert("value".to_owned(), ip_address.clone());
+
+            let payload = serde_json::to_vec(&map).unwrap();
+
+            info!("Registering ip '{}' at '{}'", &ip_address, &request_url);
+            https_client.post(&request_url)
+                        .body(Body::BufBody(payload.as_slice(), payload.len()))
+                        .send()
+                        .or_else(|error| {
+                            // import Error trait for description
+                            use std::error::Error;
+                            Err(error.description().to_owned())
+                        })
+                        .map(|response| {
+                            response.status == StatusCode::Ok
+                        })
+        } else  {
+            error!("Could not register a DNS entry for {}", hostname);
+            Ok(false)
+        }
+    }
+
     fn notify_provider(&mut self) {
         let ssl_hosts = checklock!(self.ssl_hosts.read()).clone();
 
@@ -163,11 +218,12 @@ mod certificate_manager {
     }
 
     fn test_cert_record() -> CertificateRecord {
-        CertificateRecord {
-            hostname: "test.example.com".to_owned(),
-            private_key_file: PathBuf::from("/test/key.pem"),
-            cert_file:        PathBuf::from("/test/crt.pem")
-        }
+        CertificateRecord::new_for_test(
+            "test.example.com".to_owned(),
+            PathBuf::from("/test/key.pem"),
+            PathBuf::from("/test/crt.pem"),
+            "010203040506070809000a0b0c0d0e0f".to_owned()
+        ).unwrap()
     }
 
     #[test]

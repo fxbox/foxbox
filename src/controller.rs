@@ -121,7 +121,11 @@ impl Controller for FoxBox {
 
             // If this fails, it just means that no certificates will be configured, which
             // shouldn't cause a crash.
-            self.certificate_manager.reload_from_directory(certificate_directory).unwrap_or(());
+            if let Err(error) = self.certificate_manager.reload_from_directory(certificate_directory) {
+                error!("{}", error);
+            } else {
+                // Configure
+            }
         }
 
         // Create the taxonomy based AdapterManager

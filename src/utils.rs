@@ -64,6 +64,18 @@ macro_rules! json_value {
     }
 }
 
+macro_rules! current_dir {
+    () => {
+        {
+            use std::path::PathBuf;
+            let mut this_file = PathBuf::from(file!());
+            this_file.pop();
+            this_file.to_str().unwrap().to_owned()
+        }
+    };
+}
+
+
 #[cfg(test)]
 #[macro_use]
 describe! json {
