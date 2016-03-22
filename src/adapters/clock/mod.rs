@@ -3,7 +3,7 @@
 
 use foxbox_adapters::adapter::*;
 use foxbox_taxonomy::api::{ Error, InternalError };
-use foxbox_taxonomy::values::{ Range, TimeStamp, Type, ValDuration, Value };
+use foxbox_taxonomy::values::{ Duration as ValDuration, Range, TimeStamp, Type, Value };
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::util::Id;
 
@@ -79,7 +79,7 @@ impl Adapter for Clock {
                 use chrono::Timelike;
                 let date = chrono::Local::now();
                 let duration = chrono::Duration::seconds(date.num_seconds_from_midnight() as i64);
-                (id, Ok(Some(Value::Duration(ValDuration::new(duration)))))
+                (id, Ok(Some(Value::Duration(ValDuration::from(duration)))))
             } else {
                 (id.clone(), Err(Error::InternalError(InternalError::NoSuchGetter(id))))
             }
@@ -147,34 +147,34 @@ impl Clock {
         let mut thresholds = match range {
             Leq (ref val) => {
                 // Equivalent to BetweenEq { min: 0am, max: val }
-                let ts = *try!(val.as_duration().map_err(Error::TypeError))
-                    .as_duration();
-                vec![(Movement::Enter, Duration::seconds(0)), (Movement::Exit, ts)]
+                let ts : chrono::Duration = try!(val.as_duration().map_err(Error::TypeError))
+                    .clone().into();
+                vec![(Movement::Enter, chrono::Duration::seconds(0)), (Movement::Exit, ts)]
             }
             Geq (ref val) => {
                 // Equivalent to BetweenEq { min: val, max: 0am }
-                let ts = *try!(val.as_duration().map_err(Error::TypeError))
-                    .as_duration();
+                let ts = try!(val.as_duration().map_err(Error::TypeError))
+                    .clone().into();
                 vec![(Movement::Enter, ts), (Movement::Exit, Duration::days(1))]
             }
             BetweenEq { ref min, ref max } => {
-                let ts_min = *try!(min.as_duration().map_err(Error::TypeError))
-                    .as_duration();
-                let ts_max = *try!(max.as_duration().map_err(Error::TypeError))
-                    .as_duration();
+                let ts_min = try!(min.as_duration().map_err(Error::TypeError))
+                    .clone().into();
+                let ts_max = try!(max.as_duration().map_err(Error::TypeError))
+                    .clone().into();
                 vec![(Movement::Enter, ts_min), (Movement::Exit, ts_max)]
             }
             OutOfStrict { ref min, ref max } => {
                 // Equivalent to BetweenEq {min: 0am, max: min} and BetweenEq {min: max, max: 0am}
-                let ts_min = *try!(min.as_duration().map_err(Error::TypeError))
-                    .as_duration();
-                let ts_max = *try!(max.as_duration().map_err(Error::TypeError))
-                    .as_duration();
+                let ts_min = try!(min.as_duration().map_err(Error::TypeError))
+                    .clone().into();
+                let ts_max = try!(max.as_duration().map_err(Error::TypeError))
+                    .clone().into();
                 vec![(Movement::Exit, ts_min), (Movement::Enter, ts_max)]
             }
             Eq (ref val) => {
-                let ts = *try!(val.as_duration().map_err(Error::TypeError))
-                    .as_duration();
+                let ts : chrono::Duration = try!(val.as_duration().map_err(Error::TypeError))
+                    .clone().into();
                 vec![(Movement::Enter, ts.clone()), (Movement::Exit, ts)]
             }
         };
@@ -196,9 +196,9 @@ impl Clock {
 
                 let event = match movement {
                     Movement::Enter => Op::Enter(id.clone(),
-                        Value::Duration(ValDuration::new(duration))),
+                        Value::Duration(ValDuration::from(duration))),
                     Movement::Exit => Op::Exit(id.clone(),
-                        Value::Duration(ValDuration::new(duration))),
+                        Value::Duration(ValDuration::from(duration))),
                 };
                 let _ = tx.send(event);
             });
@@ -211,14 +211,14 @@ impl Clock {
         -> Result<DateTime<Local>, Error>
     {
         match chrono::Local::today().and_time(NaiveTime::from_hms(0, 0, 0) + time_of_day) {
-            None => Err(Error::InvalidValue(Value::Duration(ValDuration::new(time_of_day)))),
+            None => Err(Error::InvalidValue(Value::Duration(ValDuration::from(time_of_day)))),
             Some(date) => {
                 if date >= *now  {
                     Ok(date)
                 } else {
                     // Otherwise, shift to tomorrow.
                     match date.checked_add(Duration::days(1)) {
-                        None => Err(Error::InvalidValue(Value::Duration(ValDuration::new(time_of_day)))),
+                        None => Err(Error::InvalidValue(Value::Duration(ValDuration::from(time_of_day)))),
                         Some(date) => Ok(date)
                     }
                 }
@@ -278,9 +278,9 @@ impl Clock {
 
                 let event = match movement {
                     Movement::Enter => Op::Enter(id.clone(),
-                        Value::Duration(ValDuration::new(duration))),
+                        Value::Duration(ValDuration::from(duration))),
                     Movement::Exit => Op::Exit(id.clone(),
-                        Value::Duration(ValDuration::new(duration))),
+                        Value::Duration(ValDuration::from(duration))),
                 };
                 let _ = tx.send(event);
             });
@@ -312,7 +312,7 @@ impl Clock {
                 service: service_clock_id.clone(),
                 mechanism: Getter {
                     kind: ChannelKind::CurrentTimeOfDay,
-                    poll: Some(ValDuration::new(chrono::Duration::seconds(1))),
+                    poll: Some(ValDuration::from(chrono::Duration::seconds(1))),
                     trigger: None,
                     watch: true,
                     updated: None
@@ -326,7 +326,7 @@ impl Clock {
                 service: service_clock_id.clone(),
                 mechanism: Getter {
                     kind: ChannelKind::CurrentTime,
-                    poll: Some(ValDuration::new(chrono::Duration::seconds(1))),
+                    poll: Some(ValDuration::from(chrono::Duration::seconds(1))),
                     trigger: None,
                     watch: true,
                     updated: None

@@ -7,8 +7,8 @@ dependencies = [
  "docopt 0.6.78 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt_macros 0.6.81 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_adapters 0.1.0 (git+https://github.com/fxbox/adapters.git?rev=82c160b)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=9bd1d36)",
+ "foxbox_adapters 0.1.0 (git+https://github.com/fxbox/adapters.git?rev=0399940)",
+ "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=88596b2)",
  "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=73e8943)",
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -189,10 +189,10 @@ dependencies = [
 [[package]]
 name = "foxbox_adapters"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/adapters.git?rev=82c160b#82c160b33b3dad331d52e64ae293648d3d8861aa"
+source = "git+https://github.com/fxbox/adapters.git?rev=0399940#03999400b58003deeba035a94b40d0969c6aaede"
 dependencies = [
  "clippy 0.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=9bd1d36)",
+ "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=88596b2)",
  "serde 0.6.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_macros 0.6.14 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -202,7 +202,7 @@ dependencies = [
 [[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git?rev=9bd1d36#9bd1d36683eef6b606bd602b052ba124c9f1cf6a"
+source = "git+https://github.com/fxbox/taxonomy.git?rev=88596b2#88596b217140bea0d5aa6c7fae6701ed35d68abd"
 dependencies = [
  "chrono 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
