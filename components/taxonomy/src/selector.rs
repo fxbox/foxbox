@@ -158,7 +158,7 @@ impl ServiceSelector {
         // we don't match.
         let getters_fail = self.getters.iter().find(|selector| {
             !service.has_getters(|channel| {
-                selector.matches(channel)
+                selector.matches(&self.tags, channel)
             })
         }).is_some();
         if getters_fail {
@@ -168,7 +168,7 @@ impl ServiceSelector {
         // we don't match.
         let setters_fail = self.setters.iter().find(|selector| {
             !service.has_setters(|channel| {
-                selector.matches(channel)
+                selector.matches(&self.tags, channel)
             })
         }).is_some();
         if setters_fail {
@@ -213,6 +213,10 @@ pub struct GetterSelector {
     ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
     pub tags: HashSet<Id<TagId>>,
+
+    ///  Restrict results to channels offered by a service that has all the tags in `tags`.
+    #[serde(default)]
+    pub service_tags: HashSet<Id<TagId>>,
 
     /// If `Exatly(k)`, restrict results to channels that produce values
     /// of kind `k`.
@@ -261,19 +265,28 @@ impl GetterSelector {
         }
     }
 
+    ///  Restrict to channels offered by a service that has all the tags in `tags`.
+    pub fn with_service_tags(self, tags: Vec<Id<TagId>>) -> Self {
+        GetterSelector {
+            service_tags: merge(self.service_tags, tags),
+            .. self
+        }
+    }
+
     /// Restrict to channels that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
         GetterSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
             tags: self.tags.union(&other.tags).cloned().collect(),
+            service_tags: self.service_tags.union(&other.service_tags).cloned().collect(),
             kind: self.kind.and(other.kind),
             private: (),
         }
     }
 
     /// Determine if a channel is matched by this selector.
-    pub fn matches(&self, channel: &Channel<Getter>) -> bool {
+    pub fn matches(&self, service_tags: &HashSet<Id<TagId>>, channel: &Channel<Getter>) -> bool {
         if !self.id.matches(&channel.id) {
             return false;
         }
@@ -286,13 +299,10 @@ impl GetterSelector {
         if !has_selected_tags(&self.tags, &channel.tags) {
             return false;
         }
+        if !has_selected_tags(&self.service_tags, service_tags) {
+            return false;
+        }
         true
-    }
-}
-
-impl SelectedBy<GetterSelector> for Channel<Getter> {
-    fn matches(&self, selector: &GetterSelector) -> bool {
-        selector.matches(self)
     }
 }
 
@@ -311,6 +321,10 @@ pub struct SetterSelector {
     ///  Restrict results to channels that have all the tags in `tags`.
     #[serde(default)]
     pub tags: HashSet<Id<TagId>>,
+
+    ///  Restrict results to channels offered by a service that has all the tags in `tags`.
+    #[serde(default)]
+    pub service_tags: HashSet<Id<TagId>>,
 
     /// If `Exactly(k)`, restrict results to channels that accept values
     /// of kind `k`.
@@ -360,19 +374,28 @@ impl SetterSelector {
         }
     }
 
+    ///  Restrict to channels offered by a service that has all the tags in `tags`.
+    pub fn with_service_tags(self, tags: Vec<Id<TagId>>) -> Self {
+        SetterSelector {
+            service_tags: merge(self.service_tags, tags),
+            .. self
+        }
+    }
+
     /// Restrict results to channels that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
         SetterSelector {
             id: self.id.and(other.id),
             parent: self.parent.and(other.parent),
             tags: self.tags.union(&other.tags).cloned().collect(),
+            service_tags: self.service_tags.union(&other.service_tags).cloned().collect(),
             kind: self.kind.and(other.kind),
             private: (),
         }
     }
 
     /// Determine if a channel is matched by this selector.
-    pub fn matches(&self, channel: &Channel<Setter>) -> bool {
+    pub fn matches(&self, service_tags: &HashSet<Id<TagId>>, channel: &Channel<Setter>) -> bool {
         if !self.id.matches(&channel.id) {
             return false;
         }
@@ -385,16 +408,12 @@ impl SetterSelector {
         if !has_selected_tags(&self.tags, &channel.tags) {
             return false;
         }
+        if !has_selected_tags(&self.service_tags, service_tags) {
+            return false;
+        }
         true
     }
 }
-
-impl SelectedBy<SetterSelector> for Channel<Setter> {
-    fn matches(&self, selector: &SetterSelector) -> bool {
-        selector.matches(self)
-    }
-}
-
 
 /// An acceptable interval of time.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
