@@ -247,7 +247,7 @@ describe! taxonomy_router {
         let body = response::extract_body_to_string(response);
         let observed: Vec<Service> = serde_json::from_str(&body).unwrap();
 
-        let s = r#"[{"tags":[],"id":"service:clock@link.mozilla.org","getters":{"getter:timestamp.clock@link.mozilla.org":{"tags":[],"id":"getter:timestamp.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTime":[]},"poll":1,"trigger":null,"watch":true,"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null},"getter:timeofday.clock@link.mozilla.org":{"tags":[],"id":"getter:timeofday.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTimeOfDay":[]},"poll":1,"trigger":null,"watch":true,"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null}},"setters":{},"adapter":"clock@link.mozilla.org"}]"#;
+        let s = r#"[{"tags":[],"id":"service:clock@link.mozilla.org","getters":{"getter:timestamp.clock@link.mozilla.org":{"tags":[],"id":"getter:timestamp.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTime":[]},"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null},"getter:timeofday.clock@link.mozilla.org":{"tags":[],"id":"getter:timeofday.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTimeOfDay":[]},"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null}},"setters":{},"adapter":"clock@link.mozilla.org"}]"#;
         let expected: Vec<Service> = serde_json::from_str(&s).unwrap();
 
         // We only registered the clock service.
@@ -263,7 +263,7 @@ describe! taxonomy_router {
         let body = response::extract_body_to_string(response);
         let observed: Vec<Service> = serde_json::from_str(&body).unwrap();
 
-        let s = r#"[{"tags":[],"id":"service:clock@link.mozilla.org","getters":{"getter:timestamp.clock@link.mozilla.org":{"tags":[],"id":"getter:timestamp.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTime":[]},"poll":1,"trigger":null,"watch":true,"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null},"getter:timeofday.clock@link.mozilla.org":{"tags":[],"id":"getter:timeofday.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTimeOfDay":[]},"poll":1,"trigger":null,"watch":true,"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null}},"setters":{},"adapter":"clock@link.mozilla.org"}]"#;
+        let s = r#"[{"tags":[],"id":"service:clock@link.mozilla.org","getters":{"getter:timestamp.clock@link.mozilla.org":{"tags":[],"id":"getter:timestamp.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTime":[]},"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null},"getter:timeofday.clock@link.mozilla.org":{"tags":[],"id":"getter:timeofday.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTimeOfDay":[]},"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null}},"setters":{},"adapter":"clock@link.mozilla.org"}]"#;
         let expected: Vec<Service> = serde_json::from_str(&s).unwrap();
 
         // We only registered the clock service.
