@@ -312,9 +312,6 @@ impl Clock {
                 service: service_clock_id.clone(),
                 mechanism: Getter {
                     kind: ChannelKind::CurrentTimeOfDay,
-                    poll: Some(ValDuration::from(chrono::Duration::seconds(1))),
-                    trigger: None,
-                    watch: true,
                     updated: None
                 }
         }));
@@ -326,9 +323,6 @@ impl Clock {
                 service: service_clock_id.clone(),
                 mechanism: Getter {
                     kind: ChannelKind::CurrentTime,
-                    poll: Some(ValDuration::from(chrono::Duration::seconds(1))),
-                    trigger: None,
-                    watch: true,
                     updated: None
                 }
         }));
