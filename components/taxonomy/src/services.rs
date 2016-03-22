@@ -200,36 +200,6 @@ pub struct Getter {
     /// The kind of value that can be obtained from this channel.
     pub kind: ChannelKind,
 
-    /// If `Some(duration)`, this channel can be polled, i.e. it
-    /// will respond when the FoxBox requests the latest value.
-    /// Parameter `duration` indicates the smallest interval
-    /// between two updates.
-    ///
-    /// Otherwise, the channel cannot be polled and will push
-    /// data to the FoxBox when it is available.
-    ///
-    /// # Examples
-    ///
-    /// - Long-running pollution or humidity sensors typically
-    ///   do not accept requests and rather send batches of
-    ///   data every 24h.
-    #[serde(default)]
-    pub poll: Option<Duration>,
-
-    /// If `Some(duration)`, this channel can send the data to
-    /// the FoxBox whenever it is updated. Parameter `duration`
-    /// indicates the smallest interval between two updates.
-    ///
-    /// Otherwise, the channel cannot send data to the FoxBox
-    /// and needs to be polled.
-    #[serde(default)]
-    pub trigger: Option<Duration>,
-
-    /// If `true`, this channel supports watching for specific
-    /// changes.
-    #[serde(default)]
-    pub watch: bool,
-
     /// Date at which the latest value was received, whether through
     /// polling or through a trigger.
     #[serde(default)]
@@ -244,11 +214,6 @@ impl IOMechanism for Getter {
 pub struct Setter {
     /// The kind of value that can be sent to this channel.
     pub kind: ChannelKind,
-
-    /// If `Some(duration)`, this channel supports pushing,
-    /// i.e. the FoxBox can send values.
-    #[serde(default)]
-    pub push: Option<Duration>,
 
     /// Date at which the latest value was sent to the channel.
     #[serde(default)]
