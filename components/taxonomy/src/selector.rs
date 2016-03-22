@@ -219,16 +219,6 @@ pub struct GetterSelector {
     #[serde(default)]
     pub kind: Exactly<ChannelKind>,
 
-    /// If `Some(r)`, restrict results to channels that support polling
-    /// with the acceptable period.
-    #[serde(default)]
-    pub poll: Option<Period>,
-
-    /// If `Some(r)`, restrict results to channels that support trigger
-    /// with the acceptable period.
-    #[serde(default)]
-    pub trigger: Option<Period>,
-
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
     private: (),
@@ -271,24 +261,6 @@ impl GetterSelector {
         }
     }
 
-    /// Restrict to channels that support polling with the acceptable
-    /// period
-    pub fn with_poll(self, period: Period) -> Self {
-        GetterSelector {
-            poll: Period::and_option(self.poll, Some(period)),
-            .. self
-        }
-    }
-
-    /// Restrict to channels that support trigger with the acceptable
-    /// period
-    pub fn with_trigger(self, period: Period) -> Self {
-        GetterSelector {
-            trigger: Period::and_option(self.trigger, Some(period)),
-            .. self
-        }
-    }
-
     /// Restrict to channels that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
         GetterSelector {
@@ -296,8 +268,6 @@ impl GetterSelector {
             parent: self.parent.and(other.parent),
             tags: self.tags.union(&other.tags).cloned().collect(),
             kind: self.kind.and(other.kind),
-            poll: Period::and_option(self.poll, other.poll),
-            trigger: Period::and_option(self.trigger, other.trigger),
             private: (),
         }
     }
@@ -311,12 +281,6 @@ impl GetterSelector {
             return false;
         }
         if !self.kind.matches(&channel.mechanism.kind) {
-            return false;
-        }
-        if !Period::matches_option(&self.poll, &channel.mechanism.poll) {
-            return false;
-        }
-        if !Period::matches_option(&self.trigger, &channel.mechanism.trigger) {
             return false;
         }
         if !has_selected_tags(&self.tags, &channel.tags) {
@@ -352,11 +316,6 @@ pub struct SetterSelector {
     /// of kind `k`.
     #[serde(default)]
     pub kind: Exactly<ChannelKind>,
-
-    /// If `Some(r)`, restrict results to channels that support pushing
-    /// with the acceptable period.
-    #[serde(default)]
-    pub push: Option<Period>,
 
     /// Make sure that we can't instantiate from another crate.
     #[serde(default, skip_serializing)]
@@ -401,15 +360,6 @@ impl SetterSelector {
         }
     }
 
-    /// Restrict to channels that support push with the acceptable
-    /// period
-    pub fn with_push(self, period: Period) -> Self {
-        SetterSelector {
-            push: Period::and_option(self.push, Some(period)),
-            .. self
-        }
-    }
-
     /// Restrict results to channels that are accepted by two selector.
     pub fn and(self, other: Self) -> Self {
         SetterSelector {
@@ -417,7 +367,6 @@ impl SetterSelector {
             parent: self.parent.and(other.parent),
             tags: self.tags.union(&other.tags).cloned().collect(),
             kind: self.kind.and(other.kind),
-            push: Period::and_option(self.push, other.push),
             private: (),
         }
     }
@@ -431,9 +380,6 @@ impl SetterSelector {
             return false;
         }
         if !self.kind.matches(&channel.mechanism.kind) {
-            return false;
-        }
-        if !Period::matches_option(&self.push, &channel.mechanism.push) {
             return false;
         }
         if !has_selected_tags(&self.tags, &channel.tags) {
