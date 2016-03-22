@@ -7,7 +7,7 @@ use std::cmp::{ PartialOrd, Ordering };
 use std::str::FromStr;
 use std::sync::Arc;
 
-use chrono::{ Duration as ChronoDuration, DateTime, Local, UTC };
+use chrono::{ Duration as ChronoDuration, DateTime, Local, TimeZone, UTC };
 
 use serde_json;
 use serde::ser::{ Serialize, Serializer };
@@ -536,6 +536,11 @@ impl Into<DateTime<UTC>> for TimeStamp  {
 impl Into<DateTime<Local>> for TimeStamp  {
     fn into(self) -> DateTime<Local> {
         self.0.with_timezone(&Local)
+    }
+}
+impl<T> From<DateTime<T>> for TimeStamp where T: TimeZone {
+    fn from(date: DateTime<T>) -> Self {
+        TimeStamp(date.with_timezone(&UTC))
     }
 }
 
