@@ -291,11 +291,17 @@ describe! controller {
         use stubs::service::ServiceStub;
         use tls::TlsOption;
         use profile_service::ProfilePath;
+        use tempdir::TempDir;
+
+        let profile_dir = TempDir::new_in("/tmp", "foxbox").unwrap();
+        let profile_path = String::from(profile_dir.into_path()
+                                        .to_str().unwrap());
 
         let service = ServiceStub;
         let controller = FoxBox::new(
-          false, Some("foxbox".to_owned()), 1234, 5678,
-                      TlsOption::Disabled, ProfilePath::Default);
+            false, Some("foxbox".to_owned()), 1234, 5678,
+            TlsOption::Disabled,
+            ProfilePath::Custom(profile_path));
     }
 
     describe! add_service {
@@ -320,9 +326,13 @@ describe! controller {
             assert_eq!(controller.get_http_root_for_service("1".to_string()),
                        "http://foxbox.local:1234/services/1/");
 
+            let profile_dir = TempDir::new_in("/tmp", "foxbox").unwrap();
+            let profile_path = String::from(profile_dir.into_path()
+                                            .to_str().unwrap());
+
             let controller = FoxBox::new(false, Some("foxbox".to_owned()),
                                          1234, 5678, TlsOption::Enabled,
-                                         ProfilePath::Default);
+                                         ProfilePath::Custom(profile_path));
             controller.add_service(Box::new(service));
             assert_eq!(controller.get_http_root_for_service("1".to_string()),
                        "https://foxbox.local:1234/services/1/");
