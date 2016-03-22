@@ -9,7 +9,7 @@ dependencies = [
  "env_logger 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "foxbox_adapters 0.1.0 (git+https://github.com/fxbox/adapters.git?rev=82c160b)",
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=9bd1d36)",
- "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=3db32f0)",
+ "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=73e8943)",
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -216,11 +216,12 @@ dependencies = [
 [[package]]
 name = "foxbox_users"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/users.git?rev=3db32f0#3db32f0057bc70c78e8132b5d03b9a0a3dedbad7"
+source = "git+https://github.com/fxbox/users.git?rev=73e8943#73e89435b590416822f90f3b3f0106dd5496f288"
 dependencies = [
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "jwt 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pwhash 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "router 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusqlite 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -595,6 +596,15 @@ version = "1.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "tempdir 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "pwhash"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rust-crypto 0.2.34 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
