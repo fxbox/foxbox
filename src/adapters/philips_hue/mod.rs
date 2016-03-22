@@ -9,7 +9,6 @@ mod hub_api;
 mod light;
 mod nupnp;
 
-use controller::Controller;
 use iron::{ Request, Response, IronResult };
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::method::Method;
@@ -23,6 +22,7 @@ use std::io::Read;
 use std::thread;
 use std::time::Duration;
 use stable_uuid as StableUuid;
+use traits::Controller;
 
 const CUSTOM_PROPERTY_MANUFACTURER: &'static str = "manufacturer";
 const CUSTOM_PROPERTY_TYPE: &'static str = "type";

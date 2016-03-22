@@ -4,7 +4,6 @@
 
 extern crate serde_json;
 
-use controller::Controller;
 use foxbox_adapters::manager::WatchGuard;
 use foxbox_taxonomy::api::{ API, TargetMap };
 use foxbox_taxonomy::values::Value;
@@ -20,6 +19,7 @@ use iron::status::Status;
 use serde::Serialize;
 use std::io::Read;
 use std::sync::Mutex;
+use traits::Controller;
 
 /// This is a specialized Router for the taxonomy API.
 /// It handles all the calls under the api/v1/ url space.

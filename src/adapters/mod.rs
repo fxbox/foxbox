@@ -10,11 +10,11 @@ mod philips_hue;
 /// An adapter providing time services.
 pub mod clock;
 
-use controller::Controller;
 use foxbox_adapters::adapter::AdapterManagerHandle;
 use self::ip_camera_adapter::IpCameraAdapter;
 use self::philips_hue::PhilipsHueAdapter;
 use service::ServiceAdapter;
+use traits::Controller;
 
 pub struct AdapterManager<T> {
     controller: T,

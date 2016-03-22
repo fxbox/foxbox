@@ -8,7 +8,6 @@ extern crate serde_json;
 extern crate time;
 extern crate url;
 
-use controller::Controller;
 use iron::{ Request, Response, IronResult };
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
@@ -21,6 +20,7 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::sync::Arc;
 use upnp::{ UpnpListener, UpnpService };
+use traits::Controller;
 
 use self::hyper::header::{ Authorization, Basic, Connection };
 use self::url::{ Host, Url };
@@ -243,7 +243,7 @@ impl<T: Controller> Service for IpCameraService<T> {
             Ok(_) => {},
             Err(err) => {
                 error!("Unable to create directory {}: {}", self.snapshot_dir, err);
-                controller.remove_service(props.id.to_string());
+                controller.remove_service(props.id);
             }
         }
     }

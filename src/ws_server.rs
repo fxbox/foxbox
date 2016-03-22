@@ -3,9 +3,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 extern crate url;
 
-use controller::Controller;
 use self::url::Url;
 use std::thread;
+use traits::Controller;
 use ws;
 use ws::{ Handler, Sender, Result, Message, Handshake, CloseCode, Error };
 use ws::listen;

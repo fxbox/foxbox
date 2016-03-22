@@ -155,7 +155,7 @@ impl CertificateManager {
 
             info!("Registering ip '{}' at '{}'", &ip_address, &request_url);
             https_client.post(&request_url)
-                        .body(Body::BufBody(payload.as_slice(), payload.len()))
+                        .body(Body::BufBody(&payload[..], payload.len()))
                         .send()
                         .or_else(|error| {
                             // import Error trait for description
