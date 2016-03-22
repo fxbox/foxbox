@@ -24,8 +24,8 @@ pub trait SelectedBy<T> {
 /// that are not necessarily exactly Selector.
 pub trait ServiceLike {
     fn id(&self) -> &Id<ServiceId>;
-    fn tags(&self) -> &HashSet<Id<TagId>>;
     fn adapter(&self) -> &Id<AdapterId>;
+    fn with_tags<F>(&self, f: F) -> bool where F: Fn(&HashSet<Id<TagId>>) -> bool;
     fn has_getters<F>(&self, f: F) -> bool where F: Fn(&Channel<Getter>) -> bool;
     fn has_setters<F>(&self, f: F) -> bool where F: Fn(&Channel<Setter>) -> bool;
 }
@@ -34,11 +34,11 @@ impl ServiceLike for Service {
     fn id(&self) -> &Id<ServiceId> {
         &self.id
     }
-    fn tags(&self) -> &HashSet<Id<TagId>> {
-        &self.tags
-    }
     fn adapter(&self) -> &Id<AdapterId> {
         &self.adapter
+    }
+    fn with_tags<F>(&self, f: F) -> bool where F: Fn(&HashSet<Id<TagId>>) -> bool {
+        f(&self.tags)
     }
     fn has_getters<F>(&self, f: F) -> bool where F: Fn(&Channel<Getter>) -> bool {
         for chan in self.getters.values() {
@@ -151,7 +151,7 @@ impl ServiceSelector {
         if !self.id.matches(service.id()) {
             return false;
         }
-        if !has_selected_tags(&self.tags, service.tags()) {
+        if !service.with_tags(|tags| has_selected_tags(&self.tags, tags)) {
             return false;
         }
         // If any of the getter selectors doesn't find a getter,
