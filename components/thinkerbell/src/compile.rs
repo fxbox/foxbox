@@ -21,27 +21,23 @@ use ast::{ Script, Rule, Statement, Match, Context, UncheckedCtx };
 use util::*;
 
 use foxbox_taxonomy::api::API;
-use foxbox_taxonomy::util::Phantom;
 use foxbox_taxonomy::values::Duration;
 
 use transformable_channels::mpsc::*;
 
 use std::marker::PhantomData;
 
-use serde::ser::{Serialize, Serializer};
-use serde::de::{Deserialize, Deserializer};
-
-
 /// The environment in which the code is meant to be executed.  This
 /// can typically be instantiated either with actual bindings to
 /// devices, or with a unit-testing framework. // FIXME: Move this to run.rs
-pub trait ExecutableDevEnv: Serialize + Deserialize + Send + Clone {
+pub trait ExecutableDevEnv: Send {
     type WatchGuard;
     type API: API<WatchGuard = Self::WatchGuard>;
 
     /// Return a handle to the API.
     fn api(&self) -> Self::API;
 
+    /// A guard returned by `start_timer`. When the guard is dropped, the timer is cancelled.
     type TimerGuard;
     fn start_timer(&self, duration: Duration, timer: Box<ExtSender<()>>) -> Self::TimerGuard;
 }
@@ -51,20 +47,12 @@ pub trait ExecutableDevEnv: Serialize + Deserialize + Send + Clone {
 /// # Precompilation
 ///
 
-#[derive(Serialize, Deserialize)]
-pub struct CompiledCtx<Env> where Env: Serialize + Deserialize {
-    phantom: Phantom<Env>,
+pub struct CompiledCtx<Env>  {
+    phantom: PhantomData<Env>,
 }
 
-/// We implement `Default` to keep derive happy, but this code should
-/// be unreachable.
-impl<Env> Default for CompiledCtx<Env> where Env: Serialize + Deserialize {
-    fn default() -> Self {
-        panic!("Called CompledCtx<_>::default()");
-    }
-}
 
-impl<Env> Context for CompiledCtx<Env> where Env: Serialize + Deserialize {
+impl<Env> Context for CompiledCtx<Env>  {
 }
 
 #[derive(Clone, Debug, Serialize)]

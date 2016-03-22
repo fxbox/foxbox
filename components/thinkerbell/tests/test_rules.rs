@@ -153,10 +153,7 @@ fn test_run() {
             tags: HashSet::new(),
             last_seen: None,
             mechanism: Getter {
-                watch: true,
-                poll: None,
                 updated: None,
-                trigger: None,
                 kind: ChannelKind::OnOff,
             }
         }
@@ -171,7 +168,6 @@ fn test_run() {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Setter {
-                push: None,
                 updated: None,
                 kind: ChannelKind::OnOff,
             }
@@ -227,10 +223,7 @@ fn test_run() {
             tags: HashSet::new(),
             last_seen: None,
             mechanism: Getter {
-                watch: true,
-                poll: None,
                 updated: None,
-                trigger: None,
                 kind: ChannelKind::OnOff,
             }
         }
@@ -319,7 +312,6 @@ fn test_run() {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Setter {
-                push: None,
                 updated: None,
                 kind: ChannelKind::OnOff,
             }
@@ -356,7 +348,6 @@ fn test_run() {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Setter {
-                push: None,
                 updated: None,
                 kind: ChannelKind::Ready,
             }
@@ -442,7 +433,6 @@ fn test_run() {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Setter {
-                push: None,
                 updated: None,
                 kind: ChannelKind::OnOff,
             }
@@ -583,10 +573,7 @@ fn test_run_with_delay() {
             tags: HashSet::new(),
             last_seen: None,
             mechanism: Getter {
-                watch: true,
-                poll: None,
                 updated: None,
-                trigger: None,
                 kind: ChannelKind::OnOff,
             }
         }
@@ -601,7 +588,6 @@ fn test_run_with_delay() {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Setter {
-                push: None,
                 updated: None,
                 kind: ChannelKind::OnOff,
             }
@@ -723,10 +709,7 @@ fn test_run_with_delay() {
             tags: HashSet::new(),
             last_seen: None,
             mechanism: Getter {
-                watch: true,
-                poll: None,
                 updated: None,
-                trigger: None,
                 kind: ChannelKind::OnOff,
             }
         }

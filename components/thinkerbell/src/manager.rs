@@ -35,7 +35,7 @@ pub struct ScriptId;
 /// Each script can be individually enabled or disabled.
 /// When a script is enabled, it is always running (unless an error occured during launch).
 /// Script sources are stored as JSON strings in a SQLite database.
-pub struct ScriptManager<Env, T> where Env: ExecutableDevEnv + 'static {
+pub struct ScriptManager<Env, T> where Env: ExecutableDevEnv + Clone + 'static {
     env: Env,
 
     /// The path to the SQLite file to store, e.g. "./database.sqlite"
@@ -49,7 +49,7 @@ pub struct ScriptManager<Env, T> where Env: ExecutableDevEnv + 'static {
 }
 
 impl<Env, T> ScriptManager<Env, T>
-    where Env: ExecutableDevEnv + 'static,
+    where Env: ExecutableDevEnv + Clone + 'static,
           T: ExtSender<(Id<ScriptId>, ExecutionEvent)> + TransformableSender<(Id<ScriptId>, ExecutionEvent)> {
 
     /// Create a ScriptManager using a SQLite database file with the given path, i.e. filename.
