@@ -107,7 +107,7 @@ impl Registrar {
     /// This is a private function that to which we pass the ifaces
     /// This is so that we can shim get_if_addrs() in tests with a
     /// pre-set list of interfaces.
-    fn get_ip_addr_from_ifaces(&self, ifaces: &Vec<Interface>,
+    fn get_ip_addr_from_ifaces(&self, ifaces: &[Interface],
                                want_iface: &Option<String>) -> Option<String> {
 
         let mut ip_addr: Option<String> = None;

@@ -2,17 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-extern crate collections;
 extern crate serde_json;
 extern crate rand;
 
 use config_store::ConfigService;
-use controller::Controller;
 use foxbox_users::UsersManager;
 use iron::{Request, Response, IronResult};
 use iron::status::Status;
 use profile_service::{ ProfilePath, ProfileService };
-use self::collections::vec::IntoIter;
+use std::vec::IntoIter;
 use service::{ Service, ServiceProperties };
 use std::io;
 use std::net::SocketAddr;
@@ -20,6 +18,7 @@ use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tls::CertificateManager;
+use traits::Controller;
 use upnp::UpnpManager;
 use ws;
 

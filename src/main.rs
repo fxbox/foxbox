@@ -8,9 +8,6 @@
 // For Docopt macro
 #![plugin(docopt_macros)]
 
-// Needed for IntoIter in controller.rs
-#![feature(collections)]
-
 // Make linter fail for every warning
 #![plugin(clippy)]
 #![deny(clippy)]
@@ -79,6 +76,7 @@ mod stable_uuid;
 mod static_router;
 mod taxonomy_router;
 mod tls;
+mod traits;
 mod tunnel_controller;
 mod ws_server;
 
@@ -91,18 +89,19 @@ mod stubs {
     pub mod controller;
 }
 
-use controller::{ Controller, FoxBox };
+use controller::FoxBox;
 use env_logger::LogBuilder;
 use tunnel_controller:: { TunnelConfig, Tunnel };
 use libc::SIGINT;
 use log::{ LogRecord, LogLevelFilter };
 
 use multicast_dns::host::HostManager;
+use profile_service::ProfilePath;
 use std::env;
 use std::mem;
 use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 use tls::TlsOption;
-use profile_service::ProfilePath;
+use traits::Controller;
 
 docopt!(Args derive Debug, "
 Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-d <profile_path>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--remote-name <hostname>] [-c <namespace;key;value>]...

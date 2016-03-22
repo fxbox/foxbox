@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use controller::Controller;
 use foxbox_users::AuthEndpoint;
 use iron::{ IronResult, Request, Response };
 use iron::headers::ContentType;
@@ -10,6 +9,7 @@ use iron::method::Method;
 use iron::prelude::Chain;
 use iron::status::Status;
 use router::Router;
+use traits::Controller;
 
 pub fn create<T: Controller>(controller: T) -> Chain {
     let mut router = Router::new();
@@ -86,7 +86,7 @@ describe! service_router {
         // in this block and 2/ if I don't, I get told I need to do it
         // for the trait.
         let manager = {
-            use controller::Controller;
+            use traits::Controller;
             let manager = controller.get_users_manager();
             mount.mount("", service_router)
                 .mount("/users", manager.get_router_chain());
@@ -143,8 +143,8 @@ describe! service_router {
         }
 
         it "should make service available" {
-            use controller::Controller;
             use stubs::service::ServiceStub;
+            use traits::Controller;
             controller.add_service(Box::new(ServiceStub));
             let response = request::get("http://localhost:1234/1/a-command",
                             auth_header,
