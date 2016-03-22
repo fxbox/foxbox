@@ -48,7 +48,7 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + 'static {
     /// - a compilation error if the script was incorrect.
     pub fn start<S>(&mut self, env: Env, script: Script<UncheckedCtx>, on_event: S) ->
         Result<(), Error>
-        where S: ExtSender<ExecutionEvent>
+        where S: ExtSender<ExecutionEvent> + Clone
     {
         if self.command_sender.is_some() {
             let err = Err(Error::StartStopError(StartStopError::AlreadyRunning));
@@ -131,15 +131,18 @@ pub enum ExecutionEvent {
     Stopped {
         result: Result<(), Error>
     },
-    Updated {
-        event: WatchEvent,
-        rule_index: usize,
-        condition_index: usize
-    },
     Sent {
         rule_index: usize,
         statement_index: usize,
         result: Vec<(Id<Setter>, Result<(), Error>)>
+    },
+    TimerStart {
+        rule_index: usize,
+        condition_index: usize,
+    },
+    TimerCancel {
+        rule_index: usize,
+        condition_index: usize,
     },
     ChannelError {
         id: Id<Getter>,
@@ -203,7 +206,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     /// The caller is responsible for spawning a new thread and
     /// calling `run()`.
     fn new<S>(script: Script<UncheckedCtx>, tx: S, rx: Receiver<ExecutionOp>) -> Result<Self, Error>
-        where S: ExtSender<ExecutionOp>
+        where S: ExtSender<ExecutionOp> + Clone
     {
         let compiler = try!(Compiler::new().map_err(|err| Error::CompileError(err)));
         let script = try!(compiler.compile(script).map_err(|err| Error::CompileError(err)));
@@ -217,7 +220,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
     /// Execute the monitoring task.
     /// This currently expects to be executed in its own thread.
-    fn run<S>(&mut self, env: Env, on_event: S) where S: ExtSender<ExecutionEvent> {
+    fn run<S>(&mut self, env: Env, on_event: S) where S: ExtSender<ExecutionEvent> + Clone {
         let mut witnesses = Vec::new();
         let api = env.api();
 
@@ -270,67 +273,76 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                 },
                 ExecutionOp::UpdateCondition { id, is_met, rule_index, condition_index } => {
                     self.update_conditions(id, is_met, &mut per_rule,
-                        rule_index, condition_index, &api, &on_event)
+                        rule_index, condition_index, &api, &on_event);
                 }
-                ExecutionOp::Update { event, rule_index, condition_index } => match event {
-                    WatchEvent::InitializationError {
-                        channel,
-                        error
-                    } => {
-                        let _ = on_event.send(ExecutionEvent::ChannelError {
-                            id: channel,
-                            error: error,
-                        });
-                    },
-                    WatchEvent::GetterRemoved(id) => {
-                        // A getter was removed. Its condition is therefore not met anymore.
-                        let msg = ExecutionOp::UpdateCondition {
-                            id: id.clone(),
-                            is_met: false,
-                            rule_index: rule_index,
-                            condition_index: condition_index
-                        };
-                        // This send will fail only if the thread is already down.
-                        let _ = self.tx.send(msg);
-                    },
-                    WatchEvent::GetterAdded(_) => {
-                        // An getter was added. Nothing to do.
-                    }
-                    WatchEvent::EnterRange { from: id, .. } => {
-                        // We have entered a range. If there is a
-                        // timer, start it, otherwise update conditions.
-                        let msg = move || {
-                            ExecutionOp::UpdateCondition {
+                ExecutionOp::Update { event, rule_index, condition_index } => {
+                    match event {
+                        WatchEvent::InitializationError {
+                            channel,
+                            error
+                        } => {
+                            let _ = on_event.send(ExecutionEvent::ChannelError {
+                                id: channel,
+                                error: error,
+                            });
+                        },
+                        WatchEvent::GetterRemoved(id) => {
+                            // A getter was removed. Its condition is therefore not met anymore.
+                            let msg = ExecutionOp::UpdateCondition {
                                 id: id.clone(),
-                                is_met: true,
+                                is_met: false,
                                 rule_index: rule_index,
                                 condition_index: condition_index
+                            };
+                            // This send will fail only if the thread is already down.
+                            let _ = self.tx.send(msg);
+                        },
+                        WatchEvent::GetterAdded(_) => {
+                            // An getter was added. Nothing to do.
+                        }
+                        WatchEvent::EnterRange { from: id, .. } => {
+                            // We have entered a range. If there is a
+                            // timer, start it, otherwise update conditions.
+                            let msg = move || {
+                                ExecutionOp::UpdateCondition {
+                                    id: id.clone(),
+                                    is_met: true,
+                                    rule_index: rule_index,
+                                    condition_index: condition_index
+                                }
+                            };
+                            let duration = match per_rule[rule_index].
+                                per_condition[condition_index].
+                                duration {
+                                None => {
+                                    let _ = self.tx.send(msg());
+                                    continue
+                                }
+                                Some(ref duration) => {
+                                    duration.clone()
+                                }
+                            };
+
+                            let tx = self.tx.map(move |()| {
+                                msg()
+                            });
+                            per_rule[rule_index].ongoing_timer =
+                                Some(env.start_timer(duration.clone(), Box::new(tx)));
+                            let _ = on_event.send(ExecutionEvent::TimerStart {
+                                rule_index: rule_index,
+                                condition_index: condition_index,
+                            });
+                        }
+                        WatchEvent::ExitRange { from: id, .. } => {
+                            if per_rule[rule_index].ongoing_timer.is_some() {
+                                // Cancel the timer.
+                                per_rule[rule_index].ongoing_timer.take();
+                                let _ = on_event.send(ExecutionEvent::TimerCancel {
+                                    rule_index: rule_index,
+                                    condition_index: condition_index,
+                                });
                             }
-                        };
-                        let duration = match per_rule[rule_index].
-                            per_condition[condition_index].
-                            duration {
-                            None => {
-                                let _ = self.tx.send(msg());
-                                continue
-                            }
-                            Some(ref duration) => {
-                                duration.clone()
-                            }
-                        };
-                        let tx = self.tx.map(move |()| {
-                            msg()
-                        });
-                        per_rule[rule_index].ongoing_timer =
-                            Some(env.start_timer(duration.clone(), Box::new(tx)))
-                    }
-                    WatchEvent::ExitRange { from: id, .. } => {
-                        if per_rule[rule_index].ongoing_timer.is_some() {
-                            // Cancel the timer. No need to update conditions.
-                            per_rule[rule_index].ongoing_timer.take();
-                        } else {
-                            // No timer, either because it has already fired or because we don't
-                            // have a duration. In either case, update the condition.
+                            // Regardless, update the condition.
                             let msg = ExecutionOp::UpdateCondition {
                                 id: id,
                                 is_met: false,
@@ -350,7 +362,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     fn update_conditions<S>(&self, id: Id<Getter>, getter_is_met: bool,
             per_rule: &mut Vec<RuleState<Env>>, rule_index: usize, condition_index: usize,
             api: &Env::API, on_event: &S)
-            where S: ExtSender<ExecutionEvent>
+            where S: ExtSender<ExecutionEvent> + Clone
     {
         use std::mem::replace;
 

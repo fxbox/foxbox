@@ -8,13 +8,19 @@ use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
 use foxbox_taxonomy::util::Id;
 
-use std::collections::HashMap;
+use std::cmp::{ Ord, PartialOrd, Ordering as OrdOrdering };
+use std::collections::{ BinaryHeap, HashMap };
+use std::sync::Arc;
+use std::sync::atomic::{ AtomicBool, Ordering as AtomicOrdering };
 use std::thread;
+
+use transformable_channels::mpsc::*;
+
+use chrono::{ DateTime, UTC };
 
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer};
 
-use transformable_channels::mpsc::*;
 
 
 static VERSION : [u32;4] = [0, 0, 0, 0];
@@ -23,12 +29,17 @@ static VERSION : [u32;4] = [0, 0, 0, 0];
 struct TestSharedAdapterBackend {
     /// The latest known value for each getter.
     getter_values: HashMap<Id<Getter>, Result<Value, Error>>,
+    setter_errors: HashMap<Id<Setter>, Error>,
 
     /// A channel to inform when things happen.
     on_event: Box<ExtSender<FakeEnvEvent>>,
 
     /// All watchers. 100% counter-optimized
     counter: usize,
+
+    timers: BinaryHeap<Timer>,
+    trigger_timers_until: Option<DateTime<UTC>>,
+
     watchers: HashMap<usize, (Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>,
 }
 
@@ -36,9 +47,12 @@ impl TestSharedAdapterBackend {
     fn new(on_event: Box<ExtSender<FakeEnvEvent>>) -> Self {
         TestSharedAdapterBackend {
             getter_values: HashMap::new(),
+            setter_errors: HashMap::new(),
             on_event: on_event,
             counter: 0,
-            watchers: HashMap::new()
+            watchers: HashMap::new(),
+            timers: BinaryHeap::new(),
+            trigger_timers_until: None,
         }
     }
 
@@ -55,12 +69,19 @@ impl TestSharedAdapterBackend {
 
     fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
         values.drain().map(|(id, value)| {
-            let event = FakeEnvEvent::Send {
-                id: id.clone(),
-                value: value
-            };
-            let _ = self.on_event.send(event);
-            (id, Ok(()))
+            match self.setter_errors.get(&id) {
+                None => {
+                    let event = FakeEnvEvent::Send {
+                        id: id.clone(),
+                        value: value
+                    };
+                    let _ = self.on_event.send(event);
+                    (id, Ok(()))
+                }
+                Some(error) => {
+                    (id, Err(error.clone()))
+                }
+            }
         }).collect()
     }
 
@@ -79,6 +100,20 @@ impl TestSharedAdapterBackend {
 
     fn remove_watch(&mut self, key: usize) {
         let _ = self.watchers.remove(&key);
+    }
+
+    fn inject_setter_errors(&mut self, mut errors: Vec<(Id<Setter>, Option<Error>)>)
+    {
+        for (id, error) in errors.drain(..) {
+            match error {
+                None => {
+                    self.setter_errors.remove(&id);
+                },
+                Some(error) => {
+                    self.setter_errors.insert(id, error);
+                }
+            }
+        }
     }
 
     fn inject_getter_values(&mut self, mut values: Vec<(Id<Getter>, Result<Value, Error>)>)
@@ -126,6 +161,20 @@ impl TestSharedAdapterBackend {
         }
     }
 
+    fn trigger_timers_until(&mut self, date: DateTime<UTC>) {
+        self.trigger_timers_until = Some(date);
+        loop {
+            if let Some(ref timer) = self.timers.peek() {
+                if timer.date > date {
+                    break;
+                }
+            } else {
+                break;
+            }
+            self.timers.pop().unwrap().trigger();
+        }
+    }
+
     fn execute(&mut self, op: AdapterOp) {
         use self::AdapterOp::*;
         match op {
@@ -141,8 +190,35 @@ impl TestSharedAdapterBackend {
             Unwatch(key) => {
                 let _ = self.remove_watch(key);
             }
-            InjectGetterValues(values) => {
+            InjectGetterValues(values, tx) => {
                 let _ = self.inject_getter_values(values);
+                let _ = tx.send(FakeEnvEvent::Done);
+            }
+            InjectSetterErrors(errors, tx) => {
+                let _ = self.inject_setter_errors(errors);
+                let _ = tx.send(FakeEnvEvent::Done);
+            }
+            TriggerTimersUntil(date ,tx) => {
+                let _ = self.trigger_timers_until(date.into());
+                let _ = tx.send(FakeEnvEvent::Done);
+            }
+            ResetTimers(tx) => {
+                self.trigger_timers_until = None;
+                self.timers.clear();
+                let _ = tx.send(FakeEnvEvent::Done);
+            }
+            AddTimer(timer) => {
+                match self.trigger_timers_until {
+                    None => {
+                        self.timers.push(timer);
+                    }
+                    Some(ref date) if *date < timer.date => {
+                        self.timers.push(timer);
+                    }
+                    Some(_) => {
+                        timer.trigger()
+                    }
+                }
             }
         }
     }
@@ -283,6 +359,43 @@ impl Drop for TestAdapterWatchGuard {
     }
 }
 
+#[derive(Clone)]
+struct Timer {
+    is_dropped: Arc<AtomicBool>,
+    date: DateTime<UTC>,
+    on_triggered: Box<ExtSender<()>>,
+}
+impl Timer {
+    fn trigger(&self) {
+        if self.is_dropped.load(AtomicOrdering::Relaxed) {
+            return;
+        }
+        let _ = self.on_triggered.send(());
+    }
+}
+impl Eq for Timer {}
+impl Ord for Timer {
+    fn cmp(&self, other: &Self) -> OrdOrdering {
+        self.date.cmp(&other.date).reverse()
+    }
+}
+impl PartialEq for Timer {
+    fn eq(&self, other: &Self) -> bool {
+        self.date == other.date
+    }
+}
+impl PartialOrd for Timer {
+    fn partial_cmp(&self, other: &Self) -> Option<OrdOrdering> {
+        Some(self.cmp(other))
+    }
+}
+
+pub struct TimerGuard(Arc<AtomicBool>);
+impl Drop for TimerGuard {
+    fn drop(&mut self) {
+        self.0.store(true, AtomicOrdering::Relaxed)
+    }
+}
 
 /// The test environment.
 #[derive(Clone)]
@@ -303,9 +416,16 @@ impl ExecutableDevEnv for FakeEnv {
         self.manager.clone()
     }
 
-    type TimerGuard = (); // FIXME: Implement
+    type TimerGuard = TimerGuard;
     fn start_timer(&self, duration: Duration, timer: Box<ExtSender<()>>) -> Self::TimerGuard {
-        unimplemented!()
+        let is_dropped = Arc::new(AtomicBool::new(false));
+        let trigger = Timer {
+            date: UTC::now() + duration.into(),
+            on_triggered: timer,
+            is_dropped: is_dropped.clone()
+        };
+        let _ = self.back_end.send(AdapterOp::AddTimer(trigger));
+        TimerGuard(is_dropped)
     }
 }
 impl FakeEnv {
@@ -346,43 +466,57 @@ impl FakeEnv {
                     let result = self.manager.add_adapter(adapter);
                     self.report_error(result);
                 }
+                let _ = self.on_event.send(FakeEnvEvent::Done);
             },
             AddServices(vec) => {
                 for service in vec {
                     let result = self.manager.add_service(service);
                     self.report_error(result);
                 }
+                let _ = self.on_event.send(FakeEnvEvent::Done);
             },
             AddGetters(vec) => {
                 for getter in vec {
                     let result = self.manager.add_getter(getter);
                     self.report_error(result);
                 }
+                let _ = self.on_event.send(FakeEnvEvent::Done);
             },
             RemoveGetters(vec) => {
                 for getter in vec {
                     let result = self.manager.remove_getter(&getter);
                     self.report_error(result);
                 }
+                let _ = self.on_event.send(FakeEnvEvent::Done);
             },
             AddSetters(vec) => {
                 for setter in vec {
                     let result = self.manager.add_setter(setter);
                     self.report_error(result);
                 }
+                let _ = self.on_event.send(FakeEnvEvent::Done);
             },
             RemoveSetters(vec) => {
                 for setter in vec {
                     let result = self.manager.remove_setter(&setter);
                     self.report_error(result);
                 }
+                let _ = self.on_event.send(FakeEnvEvent::Done);
             },
             InjectGetterValues(vec) => {
-                self.back_end.send(AdapterOp::InjectGetterValues(vec)).unwrap()
+                self.back_end.send(AdapterOp::InjectGetterValues(vec, self.on_event.clone())).unwrap();
             },
+            InjectSetterErrors(vec) => {
+                self.back_end.send(AdapterOp::InjectSetterErrors(vec, self.on_event.clone())).unwrap();
+            }
+            TriggerTimersUntil(date) => {
+                self.back_end.send(AdapterOp::TriggerTimersUntil(date, self.on_event.clone())).unwrap();
+            }
+            ResetTimers => {
+                self.back_end.send(AdapterOp::ResetTimers(self.on_event.clone())).unwrap();
+            }
 //            _ => unimplemented!()
         }
-        let _ = self.on_event.send(FakeEnvEvent::Done);
     }
 }
 impl Serialize for FakeEnv {
@@ -406,6 +540,9 @@ pub enum Instruction {
     RemoveGetters(Vec<Id<Getter>>),
     RemoveSetters(Vec<Id<Setter>>),
     InjectGetterValues(Vec<(Id<Getter>, Result<Value, Error>)>),
+    InjectSetterErrors(Vec<(Id<Setter>, Option<Error>)>),
+    TriggerTimersUntil(TimeStamp),
+    ResetTimers,
 }
 
 /// Operations internal to a TestAdapter.
@@ -423,8 +560,12 @@ enum AdapterOp {
         cb: Box<ExtSender<WatchEvent>>,
         tx: Box<ExtSender<ResultMap<Id<Getter>, usize, Error>>>
     },
+    AddTimer(Timer),
     Unwatch(usize),
-    InjectGetterValues(Vec<(Id<Getter>, Result<Value, Error>)>),
+    InjectGetterValues(Vec<(Id<Getter>, Result<Value, Error>)>, Box<ExtSender<FakeEnvEvent>>),
+    InjectSetterErrors(Vec<(Id<Setter>, Option<Error>)>, Box<ExtSender<FakeEnvEvent>>),
+    TriggerTimersUntil(TimeStamp, Box<ExtSender<FakeEnvEvent>>),
+    ResetTimers(Box<ExtSender<FakeEnvEvent>>),
 }
 
 
