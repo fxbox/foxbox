@@ -128,6 +128,10 @@ pub enum InternalError {
     /// Attempting to register a channel with an adapter that doesn't match that of its service.
     ConflictingAdapter(Id<AdapterId>, Id<AdapterId>),
 
+    /// Open question: Individual adapters will have errors of many adapter-specific types.
+    /// How do we make this best represent those?
+    GenericError(String),
+
     /// Attempting to register a service in an invalid initial state. Typically, a service that
     /// pretends that it already has channels.
     InvalidInitialService,

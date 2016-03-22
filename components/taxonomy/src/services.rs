@@ -267,6 +267,9 @@ pub enum ChannelKind {
     /// ```
     OvenTemperature,
 
+    AddThinkerbellRule,
+    RemoveThinkerbellRule,
+
     // TODO: Add more
 
     /// An operation of a kind that has not been standardized yet.
@@ -373,6 +376,8 @@ impl ToJSON for ChannelKind {
             CurrentTimeOfDay => JSON::String("CurrentTimeOfDay".to_owned()),
             RemainingTime => JSON::String("RemainingTime".to_owned()),
             OvenTemperature => JSON::String("OvenTemperature".to_owned()),
+            AddThinkerbellRule => JSON::String("AddThinkerbellRule".to_owned()),
+            RemoveThinkerbellRule => JSON::String("RemoveThinkerbellRule".to_owned()),
             Extension { ref vendor, ref adapter, ref kind, ref typ } => {
                 let mut source = vec![
                     ("vendor", vendor.to_json()),
@@ -401,6 +406,8 @@ impl ChannelKind {
             CurrentTime => Type::TimeStamp,
             CurrentTimeOfDay | RemainingTime => Type::Duration,
             OvenTemperature => Type::Temperature,
+            AddThinkerbellRule => Type::ThinkerbellRule,
+            RemoveThinkerbellRule => Type::Unit,
             Extension { ref typ, ..} => typ.clone(),
         }
     }
@@ -535,4 +542,3 @@ impl<IO> Hash for Channel<IO> where IO: IOMechanism {
 /// The communication mechanism used by the channel.
 pub trait IOMechanism: Deserialize + Serialize {
 }
-
