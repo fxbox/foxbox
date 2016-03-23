@@ -10,6 +10,9 @@ mod philips_hue;
 /// An adapter providing time services.
 pub mod clock;
 
+/// An adapter providing WebPush services.
+pub mod webpush;
+
 use foxbox_adapters::adapter::AdapterManagerHandle;
 use self::ip_camera_adapter::IpCameraAdapter;
 use self::philips_hue::PhilipsHueAdapter;
@@ -35,8 +38,9 @@ impl<T: Controller> AdapterManager<T> {
         where A: AdapterManagerHandle {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
         self.start_adapter(Box::new(PhilipsHueAdapter::new(c.clone())));
-        self.start_adapter(Box::new(IpCameraAdapter::new(c)));
+        self.start_adapter(Box::new(IpCameraAdapter::new(c.clone())));
         clock::Clock::init(adapter_manager).unwrap(); // FIXME: We should have a way to report errors
+        webpush::WebPush::init(c, adapter_manager).unwrap();
     }
 
     fn start_adapter(&mut self, adapter: Box<ServiceAdapter>) {

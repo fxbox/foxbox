@@ -7,6 +7,7 @@ build = "build.rs"
 [features]
 default = ["authentication"]
 authentication = []
+webpush = []
 
 [dependencies]
 chrono = "0.2.19"
@@ -28,9 +29,11 @@ mount = "0.0.10"
 nix = { git = "https://github.com/nix-rust/nix.git", rev = "138080" } # Until 0.5.1 is released
 openssl = "0.7.6"
 openssl-sys = "0.7.6"
+rand = "0.3"
 router = "0.1.0"
 rust-crypto = "0.2.34"
 rustc-serialize = "0.3"
+rusqlite = "0.6.0"
 serde = "0.6.13"
 serde_json = "0.6.0"
 serde_macros = "0.6.14"
