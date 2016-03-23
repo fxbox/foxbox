@@ -303,7 +303,9 @@ impl Clock {
             getter_time_of_day_id: getter_time_of_day_id.clone(),
         });
         try!(adapt.add_adapter(clock));
-        try!(adapt.add_service(Service::empty(Clock::service_clock_id(), Clock::id())));
+        let mut service = Service::empty(Clock::service_clock_id(), Clock::id());
+        service.properties.insert("model".to_owned(), "Mozilla clock v1".to_owned());
+        try!(adapt.add_service(service));
         try!(adapt.add_getter(Channel {
                 tags: HashSet::new(),
                 adapter: Clock::id(),
