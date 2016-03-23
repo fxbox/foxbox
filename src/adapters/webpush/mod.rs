@@ -270,9 +270,6 @@ impl<C: Controller> WebPush<C> {
                             kind: $kind_id.to_owned(),
                             typ: Type::Json,
                         },
-                        poll: None,
-                        trigger: None,
-                        watch: false,
                         updated: None
                     }
                 }));
@@ -294,7 +291,6 @@ impl<C: Controller> WebPush<C> {
                             kind: $kind_id.to_owned(),
                             typ: Type::Json,
                         },
-                        push: None,
                         updated: None
                     }
                 }));
