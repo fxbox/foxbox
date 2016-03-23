@@ -190,6 +190,11 @@ impl<Env, T> ScriptManager<Env, T>
         Ok(try!(first_row.get_checked(0)))
     }
 
+    /// Return true if the script is enabled.
+    pub fn is_enabled(&self, id: &Id<ScriptId>) -> bool {
+        self.runners.contains_key(id)
+    }
+
     /// Execute a script. Returns an error if the script is already running,
     /// or it won't parse, or it won't compile.
     fn start_script(&mut self, id: &Id<ScriptId>, source: &String) -> Result<(), Error> {
