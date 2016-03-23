@@ -16,7 +16,6 @@
 use services::*;
 use selector::*;
 use values::{ Value, Range, TypeError };
-use util::{ Exactly, Id };
 
 use transformable_channels::mpsc::*;
 

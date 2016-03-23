@@ -6,29 +6,15 @@
 //! devices may have been added or removed from the FoxBox by the time
 //! these data structures are read.
 
+use parse::*;
 use values::*;
-use util::Id;
+pub use util::*;
 
 use serde::ser::{ Serialize, Serializer };
 use serde::de::{ Deserialize, Deserializer, Error };
 
 use std::hash::{ Hash, Hasher };
 use std::collections::{ HashSet, HashMap };
-
-/// A marker for Id.
-/// Only useful for writing `Id<ServiceId>`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
-pub struct ServiceId;
-
-/// A marker for Id.
-/// Only useful for writing `Id<AdapterId>`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
-pub struct AdapterId;
-
-// A marker for Id.
-/// Only useful for writing `Id<TagId>`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
-pub struct TagId;
 
 // A helper macro to create a Id<ServiceId> without boilerplate.
 #[macro_export]
@@ -110,75 +96,233 @@ impl Service {
 /// pre-existing constructors. For this purpose, this enumeration
 /// offers a constructor `Extension`, designed to describe novel
 /// services.
+///
+/// # JSON
+///
+/// With the exception of the `Extension` kind, of all variants are
+/// represented by a string with their name, e.g.
+///
+/// ```
+/// use foxbox_taxonomy::services::*;
+/// use foxbox_taxonomy::parse::*;
+///
+/// let parsed = ChannelKind::from_str("\"Ready\"").unwrap();
+/// assert_eq!(parsed, ChannelKind::Ready);
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ChannelKind {
-    ///
-    /// # No payload
-    ///
-
     /// The service is ready. Used for instance once a countdown has
     /// reached completion.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "Ready".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"Ready\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::Ready);
+    /// ```
     Ready,
 
-    ///
-    /// # Boolean
-    ///
+    //
+    // # Boolean
+    //
 
     /// The service is used to detect or decide whether some device
     /// is on or off.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "OnOff".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"OnOff\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::OnOff);
+    /// ```
     OnOff,
 
     /// The service is used to detect or decide whether some device
     /// is open or closed.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "OpenClosed".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"OpenClosed\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::OpenClosed);
+    /// ```
     OpenClosed,
 
-    ///
-    /// # Time
-    ///
+    //
+    // # Time
+    //
 
     /// The service is used to read or set the current absolute time.
     /// Used for instance to wait until a specific time and day before
     /// triggering an action, or to set the appropriate time on a new
     /// device.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "CurrentTime".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"CurrentTime\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::CurrentTime);
+    /// ```
     CurrentTime,
 
     /// The service is used to read or set the current time of day.
     /// Used for instance to trigger an action at a specific hour
     /// every day.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "CurrentTimeOfDay".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"CurrentTimeOfDay\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::CurrentTimeOfDay);
+    /// ```
     CurrentTimeOfDay,
 
     /// The service is part of a countdown. This is the time
     /// remaining until the countdown is elapsed.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "RemainingTime".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"RemainingTime\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::RemainingTime);
+    /// ```
     RemainingTime,
 
-    ///
-    /// # Temperature
-    ///
+    //
+    // # Temperature
+    //
 
-    Thermostat,
-    ActualTemperature,
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "OvenTemperature".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"OvenTemperature\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::OvenTemperature);
+    /// ```
+    OvenTemperature,
 
-    /// TODO: Add more
+    // TODO: Add more
 
     /// An operation of a kind that has not been standardized yet.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by an object with the following fields:
+    ///
+    /// - string `vendor`
+    /// - string `adapter`
+    /// - string `kind`
+    /// - string `type` (see Type)
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    /// use foxbox_taxonomy::values::*;
+    ///
+    /// let source = "{
+    ///   \"vendor\": \"mozilla.org\",
+    ///   \"adapter\": \"foxlink@mozilla.org\",
+    ///   \"kind\": \"GroundHumidity\",
+    ///   \"type\": \"ExtNumeric\"
+    /// }";
+    ///
+    /// let parsed = ChannelKind::from_str(source).unwrap();
+    ///
+    /// if let ChannelKind::Extension { vendor, adapter, kind, typ } = parsed {
+    ///   assert_eq!(vendor.to_string(), "mozilla.org");
+    ///   assert_eq!(adapter.to_string(), "foxlink@mozilla.org");
+    ///   assert_eq!(kind.to_string(), "GroundHumidity");
+    ///   assert_eq!(typ, Type::ExtNumeric);
+    /// } else {
+    ///   panic!()
+    /// }
+    ///
+    /// ```
     Extension {
         /// The vendor. Used for namespacing purposes, to avoid
         /// confusing two incompatible extensions with similar
         /// names. For instance, "foxlink@mozilla.com".
-        vendor: String,
+        vendor: Id<VendorId>,
 
         /// Identification of the adapter introducing this operation.
         /// Designed to aid with tracing and debugging.
-        adapter: String,
+        adapter: Id<AdapterId>,
 
         /// A string describing the nature of the value, designed to
         /// let applications discover the devices.
         ///
         /// Examples: `"GroundHumidity"`.
-        kind: String,
+        kind: Id<KindId>,
 
         /// The data type of the value.
         typ: Type
+    }
+}
+
+impl Parser<ChannelKind> for ChannelKind {
+    /// Parse a single value from JSON, consuming as much as necessary from JSON.
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        if let Some(str) = source.as_string() {
+            return match str {
+                "Ready" => Ok(ChannelKind::Ready),
+                "OnOff" => Ok(ChannelKind::OnOff),
+                "OpenClosed" => Ok(ChannelKind::OpenClosed),
+                "CurrentTime" => Ok(ChannelKind::CurrentTime),
+                "CurrentTimeOfDay" => Ok(ChannelKind::CurrentTimeOfDay),
+                "RemainingTime" => Ok(ChannelKind::RemainingTime),
+                "OvenTemperature" => Ok(ChannelKind::OvenTemperature),
+                _ => Err(ParseError::unknown_constant(str, &path))
+            }
+        }
+        if source.is_object() {
+            let vendor = try!(path.push("vendor", |path| Id::take(path, source, "vendor")));
+            let adapter = try!(path.push("adapter", |path| Id::take(path, source, "adapter")));
+            let kind = try!(path.push("kind", |path| Id::take(path, source, "kind")));
+            let typ = try!(path.push("type", |path| Type::take(path, source, "type")));
+            Ok(ChannelKind::Extension {
+                vendor: vendor,
+                adapter: adapter,
+                kind: kind,
+                typ: typ
+            })
+        } else {
+            Err(ParseError::type_error("ChannelKind", &path, "string|object"))
+        }
     }
 }
 
@@ -193,7 +337,7 @@ impl ChannelKind {
             OpenClosed => Type::OpenClosed,
             CurrentTime => Type::TimeStamp,
             CurrentTimeOfDay | RemainingTime => Type::Duration,
-            Thermostat | ActualTemperature => Type::Temperature,
+            OvenTemperature => Type::Temperature,
             Extension { ref typ, ..} => typ.clone(),
         }
     }

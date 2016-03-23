@@ -7,7 +7,6 @@ use foxbox_taxonomy::fake_adapter::*;
 use foxbox_taxonomy::api::{ API, Error, InternalError, WatchEvent as Event };
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::util::*;
 use foxbox_taxonomy::values::*;
 
 use transformable_channels::mpsc::*;

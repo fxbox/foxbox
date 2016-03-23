@@ -1,9 +1,12 @@
 //!
 //! Values manipulated by services
 //!
+use parse::*;
 use util::*;
 
 use std::cmp::{ PartialOrd, Ordering };
+use std::collections::HashMap;
+use std::fmt::Debug;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{ error, fmt };
@@ -87,6 +90,29 @@ pub enum Type {
     ExtBool,
     ExtNumeric,
 }
+impl Parser<Type> for Type {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        use self::Type::*;
+        match *source {
+            JSON::String(ref string) => match &*string as &str {
+                "Unit" => Ok(Unit),
+                "OnOff" => Ok(OnOff),
+                "OpenClosed" => Ok(OpenClosed),
+                "Duration" => Ok(Duration),
+                "TimeStamp" => Ok(TimeStamp),
+                "Temperature" => Ok(Temperature),
+                "String" => Ok(String),
+                "Color" => Ok(Color),
+                "Json" => Ok(Json),
+                "Binary" => Ok(Binary),
+                "ExtBool" => Ok(ExtBool),
+                "ExtNumeric" => Ok(ExtNumeric),
+                _ => Err(ParseError::unknown_constant(string, &path))
+            },
+            _ => Err(ParseError::type_error("Type", &path, "string"))
+        }
+    }
+}
 
 impl Type {
     /// Determine whether using `Range::Eq` for this type is
@@ -114,9 +140,94 @@ impl Type {
 
 /// An on/off state.
 ///
+/// # JSON
+///
+/// This kind is represented by strings "On" | "Off".
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum OnOff {
+    /// # JSON
+    ///
+    /// Represented by "On".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = OnOff::from_str("\"On\"").unwrap();
+    /// assert_eq!(parsed, OnOff::On);
+    ///
+    /// let serialized: JSON = OnOff::On.to_json();
+    /// assert_eq!(serialized.as_string().unwrap(), "On");
+    /// ```
+    On,
+
+    /// # JSON
+    ///
+    /// Represented by "Off".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = OnOff::from_str("\"On\"").unwrap();
+    /// assert_eq!(parsed, OnOff::On);
+    ///
+    /// let serialized: JSON = OnOff::On.to_json();
+    /// assert_eq!(serialized.as_string().unwrap(), "On");
+    /// ```
+    Off,
+}
+
+impl OnOff {
+    fn as_bool(&self) -> bool {
+        match *self {
+            OnOff::On => true,
+            OnOff::Off => false,
+        }
+    }
+}
+
+impl Parser<OnOff> for OnOff {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        match source.as_string() {
+            Some("On") => Ok(OnOff::On),
+            Some("Off") => Ok(OnOff::Off),
+            Some(str) => Err(ParseError::unknown_constant(str, &path)),
+            None => Err(ParseError::type_error("OnOff", &path, "string"))
+        }
+    }
+}
+
+impl ToJSON for OnOff {
+    fn to_json(&self) -> JSON {
+        match *self {
+            OnOff::On => JSON::String("On".to_owned()),
+            OnOff::Off => JSON::String("Off".to_owned())
+        }
+    }
+}
+impl Into<Value> for OnOff {
+    fn into(self) -> Value {
+        Value::OnOff(self)
+    }
+}
+
+impl PartialOrd for OnOff {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OnOff {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_bool().cmp(&other.as_bool())
+    }
+}
+
+///
 /// # (De)serialization
 ///
-/// Values of this state are represented by strings "On"|"Off".
+/// Values of this type are represented by strings "On" | "Off".
 ///
 /// ```
 /// extern crate serde;
@@ -135,33 +246,6 @@ impl Type {
 /// let off : foxbox_taxonomy::values::OnOff = serde_json::from_str("\"Off\"").unwrap();
 /// assert_eq!(off, foxbox_taxonomy::values::OnOff::Off);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum OnOff {
-    On,
-    Off,
-}
-
-impl OnOff {
-    fn as_bool(&self) -> bool {
-        match *self {
-            OnOff::On => true,
-            OnOff::Off => false,
-        }
-    }
-}
-
-impl PartialOrd for OnOff {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for OnOff {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.as_bool().cmp(&other.as_bool())
-    }
-}
-
 impl Serialize for OnOff {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error> where S: Serializer {
         match *self {
@@ -184,6 +268,91 @@ impl Deserialize for OnOff {
 
 /// An open/closed state.
 ///
+/// # JSON
+///
+/// Values of this type are represented by strings "Open" | "Closed".
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum OpenClosed {
+    /// # JSON
+    ///
+    /// Represented by "Open".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = OpenClosed::from_str("\"Open\"").unwrap();
+    /// assert_eq!(parsed, OpenClosed::Open);
+    ///
+    /// let serialized: JSON = OpenClosed::Open.to_json();
+    /// assert_eq!(serialized.as_string().unwrap(), "Open");
+    /// ```
+    Open,
+
+    /// # JSON
+    ///
+    /// Represented by "Closed".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = OpenClosed::from_str("\"Closed\"").unwrap();
+    /// assert_eq!(parsed, OpenClosed::Closed);
+    ///
+    /// let serialized: JSON = OpenClosed::Closed.to_json();
+    /// assert_eq!(serialized.as_string().unwrap(), "Closed");
+    /// ```
+    Closed,
+}
+
+impl OpenClosed {
+    fn as_bool(&self) -> bool {
+        match *self {
+            OpenClosed::Open => true,
+            OpenClosed::Closed => false,
+        }
+    }
+}
+
+impl Parser<OpenClosed> for OpenClosed {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        match source.as_string() {
+            Some("Open") => Ok(OpenClosed::Open),
+            Some("Closed") => Ok(OpenClosed::Closed),
+            Some(str) => Err(ParseError::unknown_constant(str, &path)),
+            None => Err(ParseError::type_error("OpenClosed", &path, "string"))
+        }
+    }
+}
+
+impl ToJSON for OpenClosed {
+    fn to_json(&self) -> JSON {
+        match *self {
+            OpenClosed::Open => JSON::String("Open".to_owned()),
+            OpenClosed::Closed => JSON::String("Closed".to_owned())
+        }
+    }
+}
+impl Into<Value> for OpenClosed {
+    fn into(self) -> Value {
+        Value::OpenClosed(self)
+    }
+}
+
+impl PartialOrd for OpenClosed {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OpenClosed {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_bool().cmp(&other.as_bool())
+    }
+}
+
+///
 /// # (De)serialization
 ///
 /// Values of this state are represented by strings "Open"|"Closed".
@@ -205,33 +374,6 @@ impl Deserialize for OnOff {
 /// let closed : foxbox_taxonomy::values::OpenClosed = serde_json::from_str("\"Closed\"").unwrap();
 /// assert_eq!(closed, foxbox_taxonomy::values::OpenClosed::Closed);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum OpenClosed {
-    Open,
-    Closed,
-}
-
-impl OpenClosed {
-    fn as_bool(&self) -> bool {
-        match *self {
-            OpenClosed::Open => true,
-            OpenClosed::Closed => false,
-        }
-    }
-}
-
-impl PartialOrd for OpenClosed {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for OpenClosed {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.as_bool().cmp(&other.as_bool())
-    }
-}
-
 impl Serialize for OpenClosed {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error> where S: Serializer {
         match *self {
@@ -255,11 +397,58 @@ impl Deserialize for OpenClosed {
 /// A temperature. Internal representation may be either Fahrenheit or
 /// Celcius. The FoxBox adapters are expected to perform conversions
 /// to the format requested by their devices.
+///
+/// # JSON
+///
+/// Values of this type are represented by objects `{F; float}` or `{C: float}`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Temperature {
     /// Fahrenheit
+    ///
+    /// # JSON
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let source = "{
+    ///   \"F\": 100
+    /// }";
+    /// let parsed = Temperature::from_str(source).unwrap();
+    /// if let Temperature::F(100.) = parsed {
+    ///    // As expected
+    /// } else {
+    ///    panic!()
+    /// }
+    ///
+    /// let serialized : JSON = parsed.to_json();
+    /// let val = serialized.find("F").unwrap().as_f64().unwrap();
+    /// assert_eq!(val, 100.)
+    /// ```
     F(f64),
+
     /// Celcius
+    ///
+    /// # JSON
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let source = "{
+    ///   \"C\": 100
+    /// }";
+    /// let parsed = Temperature::from_str(source).unwrap();
+    /// if let Temperature::C(100.) = parsed {
+    ///    // As expected
+    /// } else {
+    ///    panic!()
+    /// }
+    ///
+    /// let serialized : JSON = parsed.to_json();
+    /// let val = serialized.find("C").unwrap().as_f64().unwrap();
+    /// assert_eq!(val, 100.)
+    /// ```
     C(f64),
 }
 
@@ -275,6 +464,32 @@ impl Temperature {
     }
 }
 
+impl Parser<Temperature> for Temperature {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        if !source.is_object() {
+            return Err(ParseError::type_error("Temperature", &path, "object"));
+        }
+        if let Some(result) = path.push("F", |path| f64::take_opt(path, source, "F")) {
+            return result.map(Temperature::F);
+        }
+        if let Some(result) = path.push("C", |path| f64::take_opt(path, source, "C")) {
+            return result.map(Temperature::C);
+        }
+        Err(ParseError::missing_field("C|F", &path))
+    }
+}
+impl ToJSON for Temperature {
+    fn to_json(&self) -> JSON {
+        match *self {
+            Temperature::C(val) => {
+                JSON::Object(vec![("C".to_owned(), JSON::F64(val))].iter().cloned().collect())
+            }
+            Temperature::F(val) => {
+                JSON::Object(vec![("F".to_owned(), JSON::F64(val))].iter().cloned().collect())
+            }
+        }
+    }
+}
 impl PartialOrd for Temperature {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.as_c().partial_cmp(&other.as_c())
@@ -286,7 +501,115 @@ impl PartialOrd for Temperature {
 /// device.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Color {
-    RGBA(f64, f64, f64, f64, f64)
+    /// # JSON
+    ///
+    /// Values are represented as an object {r: float, f: float, b: float, a: float},
+    /// where each color is between 0 and 1. Field `a` may be omitted, in which case
+    /// it is taken to be 0.
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// println!("Testing parsing");
+    /// let source = "{
+    ///   \"r\": 0.1,
+    ///   \"g\": 0.2,
+    ///   \"b\": 0.4,
+    ///   \"a\": 0.8
+    /// }";
+    ///
+    /// let parsed = Color::from_str(source).unwrap();
+    /// let Color::RGBA(r, g, b, a) = parsed;
+    /// assert_eq!(r, 0.1);
+    /// assert_eq!(g, 0.2);
+    /// assert_eq!(b, 0.4);
+    /// assert_eq!(a, 0.8);
+    ///
+    /// println!("Testing serialization");
+    /// let serialized : JSON = parsed.to_json();
+    /// let r = serialized.find("r").unwrap().as_f64().unwrap();
+    /// assert_eq!(r, 0.1);
+    /// let g = serialized.find("g").unwrap().as_f64().unwrap();
+    /// assert_eq!(g, 0.2);
+    /// let b = serialized.find("b").unwrap().as_f64().unwrap();
+    /// assert_eq!(b, 0.4);
+    /// let a = serialized.find("a").unwrap().as_f64().unwrap();
+    /// assert_eq!(a, 0.8);
+    ///
+    ///
+    /// println!("Testing parsing error (value not in [0, 1])");
+    /// // This source will not parse.
+    /// let source_2 = "{
+    ///   \"r\": 100,
+    ///   \"g\": 0.2,
+    ///   \"b\": 0.4,
+    ///   \"a\": 0.9
+    /// }";
+    ///
+    /// match Color::from_str(source_2) {
+    ///   Err(ParseError::TypeError{..}) => {},
+    ///   other => panic!("Unexpected result {:?}", other)
+    /// }
+    ///
+    ///
+    /// println!("Testing auto-added alpha");
+    /// // This source does not specify alpha, so alpha is 0.
+    /// let source_3 = "{
+    ///   \"r\": 0.1,
+    ///   \"g\": 0.2,
+    ///   \"b\": 0.4
+    /// }";
+    ///
+    /// let parsed = Color::from_str(source_3).unwrap();
+    /// let Color::RGBA(r, g, b, a) = parsed;
+    /// assert_eq!(r, 0.1);
+    /// assert_eq!(g, 0.2);
+    /// assert_eq!(b, 0.4);
+    /// assert_eq!(a, 0.);
+    ///
+    ///
+    /// println!("Testing parsing error (missing field)");
+    /// // This source does not specify b, so it will not parse.
+    /// let source_4 = "{
+    ///   \"r\": 0.1,
+    ///   \"g\": 0.2
+    /// }";
+    ///
+    /// match Color::from_str(source_4) {
+    ///   Err(ParseError::MissingField{ref name, ..}) if &name as &str == "b" => {},
+    ///   other => panic!("Unexpected result {:?}", other)
+    /// }
+    /// ```
+    RGBA(f64, f64, f64, f64)
+}
+impl Parser<Color> for Color {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let r = try!(path.push("r", |path| f64::take(path, source, "r")));
+        let g = try!(path.push("g", |path| f64::take(path, source, "g")));
+        let b = try!(path.push("b", |path| f64::take(path, source, "b")));
+        let a = try!(match path.push("a", |path| f64::take_opt(path, source, "a")) {
+            None => Ok(0.),
+            Some(a) => a
+        });
+        for &(val, ref name) in &vec![(&r, "r"), (&g, "g"), (&b, "b"), (&a, "a")] {
+            if *val < 0. || *val > 1. {
+                return Err(ParseError::type_error(name, &path, "a number in [0, 1]"));
+            }
+        }
+        Ok(Color::RGBA(r, g, b, a))
+    }
+}
+
+impl ToJSON for Color {
+    fn to_json(&self) -> JSON {
+        let Color::RGBA(ref r, ref g, ref b, ref a) = *self;
+        let mut vec = vec![("r", r), ("g", g), ("b", b), ("a", a)];
+        let map = vec.drain(..)
+            .map(|(name, value)| (name.to_owned(), JSON::F64(*value)))
+            .collect();
+        JSON::Object(map)
+    }
 }
 
 /// Representation of an object in JSON. It is often (albeit not
@@ -295,6 +618,17 @@ pub enum Color {
 /// adapters should rather pick such more precise data structure.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Json(pub serde_json::value::Value);
+
+impl Parser<Json> for Json {
+    fn parse(_: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        Ok(Json(source.clone()))
+    }
+}
+impl ToJSON for Json {
+    fn to_json(&self) -> JSON {
+        self.0.clone()
+    }
+}
 
 impl PartialOrd for Json {
     /// Two Json objects are never comparable to each other.
@@ -305,60 +639,76 @@ impl PartialOrd for Json {
 
 /// A data structure holding a boolean value of a type that has not
 /// been standardized yet.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ExtBool {
-    pub value: bool,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtValue<T> where T: Debug + Clone + PartialEq + PartialOrd + Serialize + Deserialize {
+    pub value: T,
 
     /// The vendor. Used for namespacing purposes, to avoid
     /// confusing two incompatible extensions with similar
     /// names. For instance, "foxlink@mozilla.com".
-    pub vendor: String,
+    pub vendor: Id<VendorId>,
 
     /// Identification of the adapter introducing this value.
     /// Designed to aid with tracing and debugging.
-    pub adapter: String,
+    pub adapter: Id<AdapterId>,
 
     /// A string describing the nature of the value, designed to
     /// aid with type-checking.
     ///
     /// Examples: `"PresenceDetected"`.
-    pub kind: String,
+    pub kind: Id<KindId>,
 }
 
-impl PartialOrd for ExtBool {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+impl<T> Parser<ExtValue<T>> for ExtValue<T>
+    where T: Debug + Clone + PartialEq + PartialOrd + Serialize + Deserialize + Parser<T>
+{
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let vendor = try!(path.push("vendor", |path| Id::take(path, source, "vendor")));
+        let adapter = try!(path.push("adapter", |path| Id::take(path, source, "adapter")));
+        let kind = try!(path.push("kind", |path| Id::take(path, source, "kind")));
+        let value = try!(path.push("value", |path| T::take(path, source, "value")));
+        Ok(ExtValue {
+            vendor: vendor,
+            adapter: adapter,
+            kind: kind,
+            value: value
+        })
+    }
+}
+
+impl<T> ToJSON for ExtValue<T>
+    where T: Debug + Clone + PartialEq + PartialOrd + Serialize + Deserialize + ToJSON
+{
+    fn to_json(&self) -> JSON {
+        let mut source = vec![
+            ("value", self.value.to_json()),
+            ("vendor", JSON::String(self.vendor.to_string())),
+            ("adapter", JSON::String(self.adapter.to_string())),
+            ("kind", JSON::String(self.kind.to_string())),
+        ];
+        let map = source.drain(..)
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect();
+        JSON::Object(map)
+    }
+}
+
+impl<T> PartialEq<ExtValue<T>> for ExtValue<T>
+    where T: Debug + Clone + PartialEq + PartialOrd + Serialize + Deserialize
+{
+    fn eq(&self, other: &Self) -> bool {
         if self.vendor != other.vendor
         || self.kind != other.kind {
-            None
+            false
         } else {
-            self.value.partial_cmp(&other.value)
+            self.value.eq(&other.value)
         }
     }
 }
 
-/// A data structure holding a numeric value of a type that has not
-/// been standardized yet.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExtNumeric {
-    pub value: f64,
-
-    /// The vendor. Used for namespacing purposes, to avoid
-    /// confusing two incompatible extensions with similar
-    /// names. For instance, "foxlink@mozilla.com".
-    pub vendor: String,
-
-    /// Identification of the adapter introducing this value.
-    /// Designed to aid with tracing and debugging.
-    pub adapter: String,
-
-    /// A string describing the nature of the value, designed to
-    /// aid with type-checking.
-    ///
-    /// Examples: `"GroundHumidity"`.
-    pub kind: String,
-}
-
-impl PartialOrd for ExtNumeric {
+impl<T> PartialOrd<ExtValue<T>> for ExtValue<T>
+    where T: Debug + Clone + PartialEq + PartialOrd + Serialize + Deserialize
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.vendor != other.vendor
         || self.kind != other.kind {
@@ -373,21 +723,48 @@ impl PartialOrd for ExtNumeric {
 pub struct Binary {
    /// The actual data. We put it behind an `Arc` to make sure
    /// that cloning remains inexpensive.
-   data: Arc<Vec<u8>>,
+   pub data: Arc<Vec<u8>>,
 
    /// The mime type. Should probably be an Id<MimeTypeId>.
-   mimetype: Id<MimeTypeId>,
+   pub mimetype: Id<MimeTypeId>,
 }
-#[derive(Clone, Debug)]
-struct MimeTypeId;
+
+impl Parser<Binary> for Binary {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let data = try!(path.push("data", |path| Vec::<u8>::take(path, source, "data")));
+        let mimetype = try!(path.push("mimetype", |path| Id::take(path, source, "mimetype")));
+        Ok(Binary {
+            data: Arc::new(data),
+            mimetype: mimetype
+        })
+    }
+}
+
+impl ToJSON for Binary {
+    fn to_json(&self) -> JSON {
+        let mut source = vec![
+            ("data", JSON::Array(self.data.iter().map(|x| JSON::U64(*x as u64)).collect())),
+            ("mimetype", JSON::String(self.mimetype.to_string()))
+        ];
+        let map = source.drain(..)
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect();
+        JSON::Object(map)
+    }
+}
 
 /// Representation of an actual value that can be sent to/received
 /// from a service.
 ///
-/// # (De)serialization
+/// # JSON
 ///
 /// Values of this state are represented by an object `{ key: value }`, where key is one of
-/// `Unit`, `OnOff`, `OpenClosed`, ... Note that the `value` for `Unit` is `[]`.
+/// `Unit`, `OnOff`, `OpenClosed`, ... The `value` for `Unit` is ignored.
+///
+/// # Other forms of (de)serialization
+///
+/// Values of this state are represented by an object `{ key: value }`, where key is one of
+/// `Unit`, `OnOff`, `OpenClosed`, ... The `value` for `Unit` is ignored.
 ///
 /// ```
 /// extern crate serde;
@@ -420,32 +797,482 @@ struct MimeTypeId;
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
+    /// An absolute time and date.
+    ///
+    /// # JSON
+    ///
+    /// Represented as `{"TimeStamp": string}`, where `string` is formatted as RFC 3339 such as
+    /// `"2014-11-28T21:45:59.324310806+09:00"`.
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"Unit\": []
+    /// }";
+    ///
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::Unit = parsed {
+    ///   // ok
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// if let JSON::Object(ref obj) = serialized {
+    ///   let serialized = obj.get("Unit").unwrap();
+    ///   assert!(serialized.is_null());
+    /// }
+    /// # }
+    /// ```
     Unit,
+
+    /// An on/off value.
+    ///
+    /// # JSON
+    ///
+    /// Represented as `{"OnOff": string}`, where `string` is "On" or "Off".
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"OnOff\": \"On\"
+    /// }";
+    ///
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::OnOff(OnOff::On) = parsed {
+    ///   // ok
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// if let JSON::Object(ref obj) = serialized {
+    ///   let serialized = obj.get("OnOff").unwrap();
+    ///   assert_eq!(serialized.as_string().unwrap(), "On");
+    /// }
+    /// # }
+    /// ```
     OnOff(OnOff),
+
+    /// An open/closed value.
+    ///
+    /// # JSON
+    ///
+    /// Represented as `{"OpenClosed": string}`, where `string` is "Open" or "Closed".
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"OpenClosed\": \"Open\"
+    /// }";
+    ///
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::OpenClosed(OpenClosed::Open) = parsed {
+    ///   // ok
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// if let JSON::Object(ref obj) = serialized {
+    ///   let serialized = obj.get("OpenClosed").unwrap();
+    ///   assert_eq!(serialized.as_string().unwrap(), "Open");
+    /// }
+    /// # }
+    /// ```
     OpenClosed(OpenClosed),
-    Duration(Duration),
+
+    /// An absolute time and date.
+    ///
+    /// # JSON
+    ///
+    /// Represented as `{"TimeStamp": string}`, where `string` is formatted as RFC 3339 such as
+    /// `"2014-11-28T21:45:59.324310806+09:00"`.
+    ///
+    /// ```
+    /// extern crate chrono;
+    /// extern crate foxbox_taxonomy;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    /// use chrono::Datelike;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"TimeStamp\": \"2014-11-28T21:45:59.324310806+09:00\"
+    /// }";
+    ///
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::TimeStamp(ref ts) = parsed {
+    ///   let date_time = ts.as_datetime();
+    ///   assert_eq!(date_time.year(), 2014);
+    ///   assert_eq!(date_time.month(), 11);
+    ///   assert_eq!(date_time.day(), 28);
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// if let JSON::Object(ref obj) = serialized {
+    ///   let serialized = obj.get("TimeStamp").unwrap();
+    ///   assert!(serialized.as_string().unwrap().starts_with("2014-11-28"));
+    /// } else {
+    ///   panic!();
+    /// }
+    /// # }
+    /// ```
     TimeStamp(TimeStamp),
+
+    /// A duration, also used to represent a time of day.
+    ///
+    /// # JSON
+    ///
+    /// Represented by `{Duration: float}`, where the number, is a (floating-point)
+    /// number of seconds. If this value use used for time of day, the duration is
+    /// since the start of the day, in local time.
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    /// extern crate chrono;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    /// use chrono::Duration as ChronoDuration;
+    ///
+    /// # fn main() {
+    ///
+    /// let parsed = Value::from_str("{\"Duration\": 60.01}").unwrap();
+    /// if let Value::Duration(d) = parsed.clone() {
+    ///   let duration : ChronoDuration = d.into();
+    ///   assert_eq!(duration.num_seconds(), 60);
+    ///   assert_eq!(duration.num_milliseconds(), 60010);
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// if let JSON::Object(ref obj) = serialized {
+    ///   let serialized = obj.get("Duration").unwrap();
+    ///   assert!(serialized.as_f64().unwrap() >= 60. && serialized.as_f64().unwrap() < 61.);
+    /// } else {
+    ///   panic!();
+    /// }
+    /// # }
+    /// ```
+    Duration(Duration),
+
+    /// A temperature.
+    ///
+    /// # JSON
+    ///
+    /// Represented by `{Temperature: {C: float}}` or `{Temperature: {F: float}}`.
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    /// extern crate chrono;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"Temperature\": {
+    ///     \"C\": 2.0
+    ///   }
+    /// }";
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::Temperature(Temperature::C(ref val)) = parsed {
+    ///   assert_eq!(*val, 2.0);
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// let val = serialized.find_path(&["Temperature", "C"]).unwrap().as_f64().unwrap();
+    /// assert_eq!(val, 2.0);
+    /// # }
+    /// ```
     Temperature(Temperature),
+
+    /// A color.
+    ///
+    /// # JSON
+    ///
+    /// Represented by `{Color: {r: float, g: float, b: float, a: float}}` where each
+    /// of `r`, `g`, `b`, `a` is in [0, 1]. Value `a` can be omitted, in which case it
+    /// is assumed to be 0.
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    /// extern crate chrono;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"Color\": {
+    ///     \"r\": 0.1,
+    ///     \"g\": 0.2,
+    ///     \"b\": 0.4
+    ///   }
+    /// }";
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::Color(Color::RGBA(0.1, 0.2, 0.4, 0.0)) = parsed {
+    ///   // Ok.
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// let val = serialized.find_path(&["Color", "g"]).unwrap().as_f64().unwrap();
+    /// assert_eq!(val, 0.2);
+    /// # }
+    /// ```
     Color(Color),
+
+    /// A string.
+    ///
+    /// # JSON
+    ///
+    /// Represented by `{String: string}`.
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    /// extern crate chrono;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"String\": \"foobar\"
+    /// }";
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::String(ref str) = parsed {
+    ///   assert_eq!(&*str as &str, "foobar");
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// let val = serialized.find_path(&["String"]).unwrap().as_string().unwrap();
+    /// assert_eq!(&val as &str, "foobar");
+    /// # }
+    /// ```
     String(Arc<String>),
 
     // FIXME: Add more as we identify needs
 
     /// A boolean value representing a unit that has not been
     /// standardized yet into the API.
-    ExtBool(ExtBool),
+    ExtBool(ExtValue<bool>),
 
     /// A numeric value representing a unit that has not been
     /// standardized yet into the API.
-    ExtNumeric(ExtNumeric),
+    ExtNumeric(ExtValue<f64>),
 
     /// A Json value. We put it behind an `Arc` to make sure that
     /// cloning remains inexpensive.
+    ///
+    /// # JSON
+    ///
+    /// Represented by `{Json: JSON}` where `JSON` is a JSON object.
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    /// extern crate chrono;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"Json\": { \"foo\": \"bar\" }
+    /// }";
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::Json(ref obj) = parsed {
+    ///   assert_eq!(obj.0.find_path(&["foo"]).unwrap().as_string().unwrap(), "bar")
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// let val = serialized.find_path(&["Json", "foo"]).unwrap().as_string().unwrap();
+    /// assert_eq!(val, "bar");
+    /// # }
+    /// ```
     Json(Arc<Json>),
 
     /// Binary data.
+    ///
+    /// # JSON
+    ///
+    /// Represented by `{Binary: {data: array, mimetype: string}}`.
+    ///
+    /// **This representation is likely to change in the future.**
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    /// extern crate chrono;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"Binary\": { \"data\": [0, 1, 2], \"mimetype\": \"binary/raw\" }
+    /// }";
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::Binary(ref obj) = parsed {
+    ///   assert_eq!(obj.mimetype.to_string(), "binary/raw".to_owned());
+    ///   assert_eq!(*obj.data, vec![0, 1, 2]);
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// let val = serialized.find_path(&["Binary", "mimetype"]).unwrap().as_string().unwrap();
+    /// assert_eq!(val, "binary/raw");
+    /// # }
+    /// ```
     Binary(Binary),
 }
+
+
+lazy_static! {
+    static ref VALUE_PARSER:
+        HashMap<&'static str, Box<Fn(Path, &mut JSON) -> Result<Value, ParseError> + Sync>> =
+    {
+        use self::Value::*;
+        use std::string::String as StdString;
+        let mut map : HashMap<&'static str, Box<Fn(Path, &mut JSON) -> Result<Value, ParseError> + Sync>> = HashMap::new();
+        map.insert("Unit", Box::new(|_, _| Ok(Unit)));
+        map.insert("OnOff", Box::new(|path, v| {
+            let value = try!(path.push("OnOff", |path| self::OnOff::parse(path, v)));
+            Ok(OnOff(value))
+        }));
+        map.insert("OpenClosed", Box::new(|path, v| {
+            let value = try!(path.push("OpenClosed", |path| self::OpenClosed::parse(path, v)));
+            Ok(OpenClosed(value))
+        }));
+        map.insert("Duration", Box::new(|path, v| {
+            let value = try!(path.push("Duration", |path| self::Duration::parse(path, v)));
+            Ok(Duration(value))
+        }));
+        map.insert("TimeStamp", Box::new(|path, v| {
+            let value = try!(path.push("TimeStamp", |path| self::TimeStamp::parse(path, v)));
+            Ok(TimeStamp(value))
+        }));
+        map.insert("Temperature", Box::new(|path, v| {
+            let value = try!(path.push("Temperature", |path| self::Temperature::parse(path, v)));
+            Ok(Temperature(value))
+        }));
+        map.insert("Color", Box::new(|path, v| {
+            let value = try!(path.push("Color", |path| self::Color::parse(path, v)));
+            Ok(Color(value))
+        }));
+        map.insert("String", Box::new(|path, v| {
+            let value = try!(path.push("String", |path| Arc::<StdString>::parse(path, v)));
+            Ok(String(value))
+        }));
+        map.insert("Json", Box::new(|path, v| {
+            let value = try!(path.push("Json", |path| Arc::<self::Json>::parse(path, v)));
+            Ok(Json(value))
+        }));
+        map.insert("ExtBool", Box::new(|path, v| {
+            let value = try!(path.push("ExtBool", |path| self::ExtValue::<bool>::parse(path, v)));
+            Ok(ExtBool(value))
+        }));
+        map.insert("ExtNumeric", Box::new(|path, v| {
+            let value = try!(path.push("ExtNumeric", |path| self::ExtValue::<f64>::parse(path, v)));
+            Ok(ExtNumeric(value))
+        }));
+        map.insert("Binary", Box::new(|path, v| {
+            let value = try!(path.push("Binary", |path| self::Binary::parse(path, v)));
+            Ok(Binary(value))
+        }));
+        map
+    };
+    static ref VALUE_KEYS: String = {
+        let vec : Vec<_> = VALUE_PARSER.keys().cloned().collect();
+        format!("{:?}", vec)
+    };
+}
+
+impl Parser<Value> for Value {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        match *source {
+            JSON::Null => Ok(Value::Unit),
+            JSON::Object(ref mut obj) if obj.len() == 1 => {
+                let mut vec : Vec<_> = obj.iter_mut().collect();
+                let (k, v) = vec.pop().unwrap(); // We checked the length just above.
+                match VALUE_PARSER.get(&k as &str) {
+                    None => Err(ParseError::type_error("Value", &path, &&*self::VALUE_KEYS)),
+                    Some(parser) => path.push(k, |path| parser(path, v))
+                }
+            }
+            _ => Err(ParseError::type_error("Value", &path, "object with a single field"))
+        }
+    }
+}
+
+impl ToJSON for Value {
+    fn to_json(&self) -> JSON {
+        use self::Value::*;
+        let (key, value) = match *self {
+            Unit => ("Unit", JSON::Null),
+            OnOff(ref val) => ("OnOff", val.to_json()),
+            OpenClosed(ref val) => ("OpenClosed", val.to_json()),
+            Duration(ref val) => ("Duration", val.to_json()),
+            TimeStamp(ref val) => ("TimeStamp", val.to_json()),
+            Color(ref val) => ("Color", val.to_json()),
+            String(ref val) => ("String", val.to_json()),
+            Json(ref val) => ("Json", val.to_json()),
+            Binary(ref val) => ("Binary", val.to_json()),
+            Temperature(ref val) => ("Temperature", val.to_json()),
+            ExtBool(ref val) => ("ExtBool", val.to_json()),
+            ExtNumeric(ref val) => ("ExtNumeric", val.to_json()),
+        };
+        let source = vec![(key.to_owned(), value)];
+        JSON::Object(source.iter().cloned().collect())
+    }
+}
+
 
 impl Value {
     pub fn get_type(&self) -> Type {
@@ -528,7 +1355,35 @@ impl PartialOrd for Value {
     }
 }
 
-
+/// An absolute time and date.
+///
+/// # JSON
+///
+/// Represented by a string. This data structure accepts string formatted as RFC 3339 such as
+/// `"2014-11-28T21:45:59.324310806+09:00"`.
+///
+/// ```
+/// extern crate chrono;
+/// extern crate foxbox_taxonomy;
+///
+/// use foxbox_taxonomy::values::*;
+/// use foxbox_taxonomy::parse::*;
+/// use chrono::Datelike;
+///
+/// # fn main() {
+///
+/// let parsed = TimeStamp::from_str("\"2014-11-28T21:45:59.324310806+09:00\"").unwrap();
+/// let date_time = parsed.as_datetime().clone();
+/// assert_eq!(date_time.year(), 2014);
+/// assert_eq!(date_time.month(), 11);
+/// assert_eq!(date_time.day(), 28);
+///
+///
+/// let serialized: JSON = parsed.to_json();
+/// assert!(serialized.as_string().unwrap().starts_with("2014-11-28"));
+///
+/// # }
+/// ```
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub struct TimeStamp(DateTime<UTC>);
 impl TimeStamp {
@@ -543,6 +1398,21 @@ impl TimeStamp {
         let naive = chrono::naive::datetime::NaiveDateTime::from_timestamp(s, 0);
         let date = DateTime::<UTC>::from_utc(naive, UTC);
         TimeStamp(date)
+    }
+}
+impl Parser<TimeStamp> for TimeStamp {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        if let JSON::String(ref str) = *source {
+            if let Ok(dt) = DateTime::<UTC>::from_str(str) {
+                return Ok(TimeStamp(dt));
+            }
+        }
+        Err(ParseError::type_error("TimeStamp", &path, "date string"))
+    }
+}
+impl ToJSON for TimeStamp {
+    fn to_json(&self) -> JSON {
+        JSON::String(self.0.to_rfc3339())
     }
 }
 impl Into<DateTime<UTC>> for TimeStamp  {
@@ -579,11 +1449,44 @@ impl Deserialize for TimeStamp {
     }
 }
 
-
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 /// A comparison between two values.
+///
+/// # JSON
+///
+/// A range is an object with one field `{key: value}`.
+///
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub enum Range {
     /// Leq(x) accepts any value v such that v <= x.
+    ///
+    /// # JSON
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    /// extern crate serde_json;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"Leq\": { \"OnOff\": \"On\" }
+    /// }";
+    ///
+    /// let parsed = Range::from_str(source).unwrap();
+    /// if let Range::Leq(ref leq) = parsed {
+    ///   assert_eq!(*leq, Value::OnOff(OnOff::On));
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    /// let as_json = parsed.to_json();
+    /// let as_string = serde_json::to_string(&as_json).unwrap();
+    /// assert_eq!(as_string, "{\"Leq\":{\"OnOff\":\"On\"}}");
+    ///
+    /// # }
+    /// ```
     Leq(Value),
 
     /// Geq(x) accepts any value v such that v >= x.
@@ -600,6 +1503,69 @@ pub enum Range {
 
     /// Eq(x) accespts any value v such that v == x
     Eq(Value),
+}
+
+impl Parser<Range> for Range {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        use self::Range::*;
+        if let JSON::Object(ref mut obj) = *source {
+            if obj.len() != 1 {
+                return Err(ParseError::type_error("Range", &path, "exactly one field"));
+            }
+            if let Some(leq) = obj.get_mut("Leq") {
+                return Ok(Leq(try!(path.push("Leq", |path| Value::parse(path, leq)))))
+            }
+            if let Some(geq) = obj.get_mut("Geq") {
+                return Ok(Geq(try!(path.push("Geq", |path| Value::parse(path, geq)))))
+            }
+            if let Some(eq) = obj.get_mut("Eq") {
+                return Ok(Eq(try!(path.push("eq", |path| Value::parse(path, eq)))))
+            }
+            if let Some(between) = obj.get_mut("BetweenEq") {
+                let mut bounds = try!(path.push("BetweenEq", |path| Vec::<Value>::parse(path, between)));
+                if bounds.len() == 2 {
+                    let max = bounds.pop().unwrap();
+                    let min = bounds.pop().unwrap();
+                    return Ok(BetweenEq {
+                        min: min,
+                        max: max
+                    });
+                } else {
+                    return Err(ParseError::type_error("BetweenEq", &path, "an array of two values"));
+                }
+            }
+            if let Some(outof) = obj.get_mut("OutOfStrict") {
+                let mut bounds = try!(path.push("OutOfStrict", |path| Vec::<Value>::parse(path, outof)));
+                if bounds.len() == 2 {
+                    let max = bounds.pop().unwrap();
+                    let min = bounds.pop().unwrap();
+                    return Ok(OutOfStrict {
+                        min: min,
+                        max: max
+                    });
+                } else {
+                    return Err(ParseError::type_error("OutOfStrict", &path, "an array of two values"));
+                }
+            }
+            return Err(ParseError::type_error("Range", &path, "a field Eq, Leq, Geq, BetweenEq or OutOfStrict"));
+        } else {
+            return Err(ParseError::type_error("Range", &path, "object"));
+        }
+    }
+}
+
+impl ToJSON for Range {
+    fn to_json(&self) -> JSON {
+        let (key, value) = match *self {
+            Range::Eq(ref val) => ("Eq", val.to_json()),
+            Range::Geq(ref val) => ("Geq", val.to_json()),
+            Range::Leq(ref val) => ("Leq", val.to_json()),
+            Range::BetweenEq { ref min, ref max } => ("BetweenEq", JSON::Array(vec![min.to_json(), max.to_json()])),
+            Range::OutOfStrict { ref min, ref max } => ("OutOfStrict", JSON::Array(vec![min.to_json(), max.to_json()]))
+        };
+        let source = vec![(key.to_owned(), value.clone())];
+        JSON::Object(source.iter().cloned().collect())
+    }
 }
 
 impl Range {
@@ -640,7 +1606,56 @@ impl Range {
 }
 
 
-/// A serializable wrapper around chrono::Duration.
+/// A duration, also used to represent a time of day.
+///
+/// # JSON
+///
+/// Represented by a (floating-point) number of seconds.
+///
+/// ```
+/// extern crate foxbox_taxonomy;
+/// extern crate chrono;
+///
+/// use foxbox_taxonomy::values::*;
+/// use foxbox_taxonomy::parse::*;
+/// use chrono::Duration as ChronoDuration;
+///
+/// # fn main() {
+///
+/// let parsed = Duration::from_str("60.01").unwrap();
+/// let duration : ChronoDuration = parsed.clone().into();
+/// assert_eq!(duration.num_seconds(), 60);
+/// assert_eq!(duration.num_milliseconds(), 60010);
+///
+///
+/// let serialized: JSON = parsed.to_json();
+/// assert_eq!(serialized.as_f64().unwrap(), 60.01);
+///
+/// # }
+/// ```
+#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq)]
+pub struct Duration(ChronoDuration);
+
+impl Parser<Duration> for Duration {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let val = try!(f64::parse(path, source));
+        Ok(Duration(ChronoDuration::milliseconds((val * 1000.) as i64)))
+    }
+}
+
+impl ToJSON for Duration {
+    fn to_json(&self) -> JSON {
+        let val = self.0.num_milliseconds() as f64 / 1000 as f64;
+        JSON::F64(val)
+    }
+}
+
+impl Into<Value> for Duration {
+    fn into(self) -> Value {
+        Value::Duration(self)
+    }
+}
+
 ///
 /// # Serialization
 ///
@@ -664,9 +1679,6 @@ impl Range {
 /// assert_eq!(duration, duration_back);
 /// # }
 /// ```
-#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Duration(ChronoDuration);
-
 impl Serialize for Duration {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer
@@ -714,3 +1726,4 @@ impl Deserialize for Duration {
             .or_else(|_| deserializer.visit_i64(DurationVisitor))
     }
 }
+

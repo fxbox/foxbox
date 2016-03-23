@@ -35,6 +35,8 @@
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
 #![plugin(clippy)]
+#[macro_use]
+extern crate lazy_static;
 
 extern crate chrono;
 extern crate serde;
@@ -47,6 +49,9 @@ pub mod services;
 
 /// Public-facing API
 pub mod api;
+
+/// Tools for parsing from JSON.
+pub mod parse;
 
 /// Selecting one or more devices. Exposed through the API.
 pub mod selector;
