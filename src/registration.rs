@@ -15,12 +15,15 @@ use self::hyper::status::StatusCode;
 use self::get_if_addrs::{ IfAddr, Interface };
 use serde_json;
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::io::Read;
 use std::time::Duration;
 use std::thread;
+use tls::CertificateManager;
 use tunnel_controller:: { Tunnel };
 
 const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
+const DEFAULT_BOX_NAME: &'static str = "foxbox.local";
 
 pub struct Registrar;
 
@@ -29,8 +32,11 @@ impl Registrar {
         Registrar
     }
 
-    pub fn start(&self, endpoint_url: String, iface: Option<String>,
-                 tunnel: &Option<Tunnel>) {
+    pub fn start(&self, endpoint_url: String,
+                 iface: Option<String>,
+                 domain: String,
+                 tunnel: &Option<Tunnel>,
+                 certificate_manager: CertificateManager) {
         info!("Starting registration with {}", endpoint_url);
         let endpoint_url = format!("{}/register", endpoint_url);
 
@@ -44,10 +50,30 @@ impl Registrar {
         info!("Got ip address: {}", ip_addr.clone().unwrap());
 
         let mut map = BTreeMap::new();
-        map.insert("local_ip".to_owned(), ip_addr);
-        if let Some(ref tunnel) = *tunnel {
-            map.insert("tunnel_url".to_owned(), tunnel.get_remote_hostname());
+
+        let certificate_record_result = certificate_manager
+                                            .get_or_generate_self_signed_certificate(
+                                                DEFAULT_BOX_NAME.to_owned()
+                                            );
+
+        if let Ok(certificate_record) = certificate_record_result {
+            let self_signed_cert_fingerprint = certificate_record.get_certificate_fingerprint();
+            let fingerprint_domain = format!("{}.{}", self_signed_cert_fingerprint, domain);
+
+            info!("Using {}", fingerprint_domain);
+            map.insert("domain".to_owned(), fingerprint_domain);
+        } else {
+            error!("Could not generate self signed certificate: {}", certificate_record_result.err().unwrap().description());
         }
+
+        map.insert("local_ip".to_owned(), ip_addr.unwrap());
+
+        if let Some(ref tunnel) = *tunnel {
+            if let Some(remote) = tunnel.get_remote_hostname() {
+                map.insert("tunnel_url".to_owned(), remote);
+            }
+        }
+
         let body = match serde_json::to_string(&map) {
             Ok(body) => body,
             Err(_) => {

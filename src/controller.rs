@@ -58,8 +58,13 @@ impl FoxBox {
                profile_path: ProfilePath) -> Self {
 
         let profile_service = ProfileService::new(profile_path);
+        let config = Arc::new(ConfigService::new(&profile_service.path_for("foxbox.conf")));
+
+        let certificate_directory = PathBuf::from(
+            config.get_or_set_default("foxbox", "certificate_directory", "certs/"));
+
         FoxBox {
-            certificate_manager: CertificateManager::new(),
+            certificate_manager: CertificateManager::new(certificate_directory),
             tls_option: tls_option,
             services: Arc::new(Mutex::new(HashMap::new())),
             websockets: Arc::new(Mutex::new(HashMap::new())),
@@ -69,7 +74,7 @@ impl FoxBox {
             }),
             http_port: http_port,
             ws_port: ws_port,
-            config: Arc::new(ConfigService::new(&profile_service.path_for("foxbox.conf"))),
+            config: config,
             upnp: Arc::new(UpnpManager::new()),
             users_manager: Arc::new(UsersManager::new(&profile_service.path_for("users_db.sqlite"))),
             profile_service: Arc::new(profile_service)
@@ -89,15 +94,10 @@ impl Controller for FoxBox {
         }
 
         if self.get_tls_enabled() {
-            let certificate_directory = PathBuf::from(
-                self.config.get_or_set_default("foxbox", "certificate_directory", "certs/"));
-
             // If this fails, it just means that no certificates will be configured, which
             // shouldn't cause a crash.
-            if let Err(error) = self.certificate_manager.reload_from_directory(certificate_directory) {
+            if let Err(error) = self.certificate_manager.reload() {
                 error!("{}", error);
-            } else {
-                // Configure
             }
         }
 
