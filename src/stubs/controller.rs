@@ -15,6 +15,7 @@ use service::{ Service, ServiceProperties };
 use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tls::CertificateManager;
@@ -90,6 +91,6 @@ impl Controller for ControllerStub {
     }
 
     fn get_certificate_manager(&self) -> CertificateManager {
-       CertificateManager::new()
+       CertificateManager::new(PathBuf::from(current_dir!()))
     }
 }
