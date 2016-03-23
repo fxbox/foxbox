@@ -70,6 +70,10 @@ pub struct Service {
     /// An id unique to this service.
     pub id: Id<ServiceId>,
 
+    /// Service properties that are set at creation time.
+    /// For instance, these can be device manufacturer, model, etc.
+    pub properties: HashMap<String, String>,
+
     /// Getter channels connected directly to this service.
     pub getters: HashMap<Id<Getter>, Channel<Getter>>,
 
@@ -87,6 +91,7 @@ impl Service {
             tags: HashSet::new(),
             getters: HashMap::new(),
             setters: HashMap::new(),
+            properties: HashMap::new(),
             id: id,
             adapter: adapter,
         }
