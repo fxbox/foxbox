@@ -188,7 +188,7 @@ pub fn create<T, A>(controller: T, adapter_api: A) -> Chain
 
     let auth_endpoints = if cfg!(feature = "authentication") && !cfg!(test) {
         // Keep this list in sync with all the (url path, http method) from
-        // the handle() method.
+        // the handle() method and with the CORS chain in http_server.rs
         vec![
             AuthEndpoint(vec![Method::Get, Method::Post], "services".to_owned()),
             AuthEndpoint(vec![Method::Post, Method::Delete], "services/tags".to_owned()),
