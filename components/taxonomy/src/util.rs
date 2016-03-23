@@ -2,7 +2,7 @@ use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::hash::{ Hash, Hasher };
 use std::marker::PhantomData;
-use std::string::ToString;
+use std::fmt;
 
 use string_cache::Atom;
 
@@ -153,9 +153,9 @@ impl<T> Id<T> {
     }
 }
 
-impl<T> ToString for Id<T> {
-    fn to_string(&self) -> String {
-        String::from(self.id.as_ref())
+impl<T> fmt::Display for Id<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.id.as_ref())
     }
 }
 

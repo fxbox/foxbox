@@ -6,6 +6,7 @@ use util::*;
 use std::cmp::{ PartialOrd, Ordering };
 use std::str::FromStr;
 use std::sync::Arc;
+use std::{ error, fmt };
 
 use chrono::{ Duration as ChronoDuration, DateTime, Local, TimeZone, UTC };
 
@@ -21,6 +22,22 @@ pub struct TypeError {
 
     /// The type we actually got.
     pub got: Type,
+}
+
+impl fmt::Display for TypeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Expected {:?} but got {:?}", self.expected, self.got)
+    }
+}
+
+impl error::Error for TypeError {
+    fn description(&self) -> &str {
+        "Expected a type but got another type"
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        None
+    }
 }
 
 ///

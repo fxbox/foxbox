@@ -22,6 +22,9 @@ use transformable_channels::mpsc::*;
 
 use std::collections::HashMap;
 
+use std::{ error, fmt };
+use std::error::Error as std_error;
+
 /// An error that arose during interaction with either a device, an adapter or the
 /// adapter manager
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -50,6 +53,41 @@ pub enum Error {
     /// An error internal to the foxbox or an adapter. Normally, these errors should never
     /// arise from the high-level API.
     InternalError(InternalError),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::GetterDoesNotSupportPolling(ref getter) |
+            Error::GetterDoesNotSupportWatching(ref getter) |
+            Error::GetterRequiresThresholdForWatching(ref getter) => write!(f, "{}: {}", self.description(), getter),
+            Error::TypeError(ref err) => write!(f, "{}: {}", self.description(), err),
+            Error::RangeError(ref range) => write!(f, "{}: {:?}", self.description(), range),
+            Error::InvalidValue(ref value) => write!(f, "{}: {:?}",self.description(), value),
+            Error::InternalError(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for InternalError as well
+        }
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::GetterDoesNotSupportPolling(_) => "Attempting to fetch a value from a Channel<Getter> that doesn't support this operation",
+            Error::GetterDoesNotSupportWatching(_) => "Attempting to watch a value from a Channel<Getter> that doesn't support this operation",
+            Error::GetterRequiresThresholdForWatching(_) => "Attempting to watch all value from a Channel<Getter> that requires a filter",
+            Error::TypeError(_) => "Attempting to send a value with a wrong type",
+            Error::RangeError(_) => "Attempting to use an inconsistent range",
+            Error::InvalidValue(_) => "Attempting to send an invalid value",
+            Error::InternalError(_) => "Internal Error" // TODO implement Error for InternalError as well
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            Error::TypeError(ref err) => Some(err),
+            _ => None
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
