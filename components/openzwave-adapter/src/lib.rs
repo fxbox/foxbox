@@ -1,5 +1,4 @@
-extern crate openzwave;
-extern crate foxbox_adapters as adapters;
+extern crate openzwave_stateful as openzwave;
 extern crate foxbox_taxonomy as taxonomy;
 extern crate transformable_channels;
 
@@ -7,10 +6,60 @@ use taxonomy::util::Id as TaxId;
 use taxonomy::services::{ AdapterId, Getter, Setter };
 use taxonomy::values::{ Value, Range };
 use taxonomy::api::{ ResultMap, Error as TaxError };
-use adapters::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
+use taxonomy::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
 use transformable_channels::mpsc::ExtSender;
 
-struct OpenzwaveAdapter {
+use openzwave::InitOptions;
+use openzwave::{ ValueGenre, ValueID };
+
+use std::error;
+use std::fmt;
+use std::collections::HashMap;
+
+#[derive(Debug)]
+pub enum OpenzwaveError {
+    RegisteringError(TaxError),
+    UnknownError
+}
+
+impl From<TaxError> for OpenzwaveError {
+    fn from(err: TaxError) -> Self {
+        OpenzwaveError::RegisteringError(err)
+    }
+}
+
+impl From<()> for OpenzwaveError {
+    fn from(_: ()) -> Self {
+        OpenzwaveError::UnknownError
+    }
+}
+
+impl fmt::Display for OpenzwaveError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            OpenzwaveError::RegisteringError(ref err) => write!(f, "IO error: {}", err),
+            OpenzwaveError::UnknownError => write!(f, "Unknown error"),
+        }
+    }
+}
+
+impl error::Error for OpenzwaveError {
+    fn description(&self) -> &str {
+        match *self {
+            OpenzwaveError::RegisteringError(ref err) => err.description(),
+            OpenzwaveError::UnknownError => "Unknown error",
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            OpenzwaveError::RegisteringError(ref err) => Some(err),
+            OpenzwaveError::UnknownError => None,
+        }
+    }
+}
+
+pub struct OpenzwaveAdapter {
     id: TaxId<AdapterId>,
     name: String,
     vendor: String,
@@ -19,10 +68,10 @@ struct OpenzwaveAdapter {
 }
 
 impl OpenzwaveAdapter {
-    fn init<T: AdapterManagerHandle + Clone + Send + 'static> (manager: &T) -> Result<(), TaxError> {
+    pub fn init<T: AdapterManagerHandle + Clone + Send + 'static> (manager: &T) -> Result<(), OpenzwaveError> {
         let name = String::from("OpenZwave Adapter");
         let adapter = Box::new(OpenzwaveAdapter {
-            id: TaxId::new(name.clone()), // replace with &name once we update to latest taxonomy
+            id: TaxId::new(&name),
             name: name,
             vendor: String::from("Mozilla"),
             version: [1, 0, 0, 0],
@@ -31,11 +80,17 @@ impl OpenzwaveAdapter {
 
         try!(manager.add_adapter(adapter));
 
+        let options = InitOptions {
+            device: None // TODO we should expose this as a Value
+        };
+
+        let ozw = try!(openzwave::init(&options));
+
         Ok(())
     }
 }
 
-impl adapters::adapter::Adapter for OpenzwaveAdapter {
+impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
     fn id(&self) -> TaxId<AdapterId> {
         self.id.clone()
     }
@@ -56,7 +111,7 @@ impl adapters::adapter::Adapter for OpenzwaveAdapter {
         unimplemented!()
     }
 
-    fn send_values(&self, values: Vec<(TaxId<Setter>, Value)>) -> ResultMap<TaxId<Setter>, (), TaxError> {
+    fn send_values(&self, values: HashMap<TaxId<Setter>, Value>) -> ResultMap<TaxId<Setter>, (), TaxError> {
         unimplemented!()
     }
 
