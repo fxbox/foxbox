@@ -4,7 +4,6 @@
 
 extern crate hyper;
 extern crate serde;
-extern crate serde_json;
 extern crate time;
 extern crate url;
 
@@ -12,6 +11,7 @@ use iron::{ Request, Response, IronResult };
 use iron::headers::{ ContentType, AccessControlAllowOrigin };
 use iron::status::Status;
 use router::Router;
+use serde_json;
 use service::{ Service, ServiceAdapter, ServiceProperties };
 use std::collections::BTreeMap;
 use std::fs;

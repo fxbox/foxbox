@@ -4,7 +4,7 @@
 
 use adapters::philips_hue::http;
 use adapters::philips_hue::hub_api::HubApi;
-use adapters::philips_hue::serde_json;
+use serde_json;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct NupnpEntry {

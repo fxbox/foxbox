@@ -96,11 +96,10 @@ describe! service_router {
 
     describe! services {
         before_each {
-            extern crate serde_json;
-
             use foxbox_users::UserBuilder;
             use iron::headers::{ Authorization, Basic, Bearer };
             use iron_test::response;
+            use serde_json;
 
             let db = manager.get_db();
             db.clear().ok();

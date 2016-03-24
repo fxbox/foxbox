@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-extern crate serde_json;
-
 use std::collections::HashMap;
 use std::io::Read;
 use xml::reader::{ EventReader, XmlEvent };
@@ -80,7 +78,7 @@ macro_rules! current_dir {
 #[macro_use]
 describe! json {
     before_each {
-        extern crate serde_json;
+        use serde_json;
     }
 
     describe! objects {
@@ -237,4 +235,3 @@ describe! string_escaping {
         assert_eq!(split_escaped(r#"foo\;foo;bar;"#, ';'), vec!["foo;foo", "bar", ""]);
     }
 }
-

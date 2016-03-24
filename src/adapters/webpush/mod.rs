@@ -12,8 +12,6 @@
 //! missing the necessary APIs to support the implementation.
 //!
 
-extern crate serde_json;
-
 #[cfg(feature = "webpush")]
 mod crypto;
 mod db;
@@ -30,6 +28,7 @@ use hyper::Client;
 #[cfg(feature = "webpush")]
 use hyper::client::Body;
 use rusqlite::{ self };
+use serde_json;
 use std::collections::{ HashMap, HashSet };
 use std::sync::Arc;
 use std::thread;
@@ -188,7 +187,7 @@ impl<C: Controller> Adapter for WebPush<C> {
                             Err(_) => return (id, Err(Error::InternalError(InternalError::InvalidInitialService)))
                         };
                     }
-                ) 
+                )
             }
 
             getter_api!(get_subscriptions, getter_subscription_id, SubscriptionGetter);
@@ -219,7 +218,7 @@ impl<C: Controller> Adapter for WebPush<C> {
                             Err(_) => return (id, Err(Error::InternalError(InternalError::InvalidInitialService)))
                         }
                     }
-                ) 
+                )
             }
 
             setter_api!(set_resources, setter_resource_id, ResourceGetter);

@@ -6,7 +6,7 @@ pub mod structs;
 
 use adapters::philips_hue::light::Light;
 use adapters::philips_hue::http;
-use adapters::philips_hue::serde_json;
+use serde_json;
 use std;
 use std::collections::BTreeMap;
 use std::error::Error;
