@@ -95,6 +95,8 @@ impl<Env, T> ScriptManager<Env, T>
                 result_map.insert(
                     id.clone(),
                     self.start_script(&id, &source).map(|_| ()));
+            } else {
+                result_map.insert(id.clone(), Ok(()));
             }
         }
         Ok(result_map)
@@ -182,7 +184,7 @@ impl<Env, T> ScriptManager<Env, T>
     }
 
     /// Get the source for a script with the given id.
-    fn get_source(&self, id: &Id<ScriptId>) -> Result<String, Error> {
+    pub fn get_source(&self, id: &Id<ScriptId>) -> Result<String, Error> {
         let connection = try!(rusqlite::Connection::open(&self.path));
         let mut stmt = try!(connection.prepare("SELECT source FROM scripts WHERE id = $1"));
         let mut rows = try!(stmt.query(&[&id.to_string()]));
