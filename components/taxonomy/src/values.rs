@@ -103,6 +103,7 @@ impl Parser<Type> for Type {
                 "Duration" => Ok(Duration),
                 "TimeStamp" => Ok(TimeStamp),
                 "Temperature" => Ok(Temperature),
+                "ThinkerbellRule" => Ok(ThinkerbellRule),
                 "String" => Ok(String),
                 "Color" => Ok(Color),
                 "Json" => Ok(Json),
@@ -636,19 +637,19 @@ impl ToJSON for Color {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ThinkerbellRuleSource {
+pub struct ThinkerbellRule {
     pub name: String,
     pub source: String,
 }
 
-impl Parser<ThinkerbellRuleSource> for ThinkerbellRuleSource {
+impl Parser<ThinkerbellRule> for ThinkerbellRule {
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let name = try!(path.push("name", |path| String::take(path, source, "name")));
         let script_source = try!(path.push("source", |path| String::take(path, source, "source")));
-        Ok(ThinkerbellRuleSource { name: name, source: script_source })
+        Ok(ThinkerbellRule { name: name, source: script_source })
     }
 }
-impl ToJSON for ThinkerbellRuleSource {
+impl ToJSON for ThinkerbellRule {
     fn to_json(&self) -> JSON {
         vec![
             ("name", &self.name),
@@ -1139,7 +1140,7 @@ pub enum Value {
 
     // FIXME: Add more as we identify needs
 
-    ThinkerbellRule(ThinkerbellRuleSource),
+    ThinkerbellRule(ThinkerbellRule),
 
     /// A boolean value representing a unit that has not been
     /// standardized yet into the API.
@@ -1248,6 +1249,10 @@ lazy_static! {
         map.insert("Temperature", Box::new(|path, v| {
             let value = try!(path.push("Temperature", |path| self::Temperature::parse(path, v)));
             Ok(Temperature(value))
+        }));
+        map.insert("ThinkerbellRule", Box::new(|path, v| {
+            let value = try!(path.push("ThinkerbellRule", |path| self::ThinkerbellRule::parse(path, v)));
+            Ok(ThinkerbellRule(value))
         }));
         map.insert("Color", Box::new(|path, v| {
             let value = try!(path.push("Color", |path| self::Color::parse(path, v)));
