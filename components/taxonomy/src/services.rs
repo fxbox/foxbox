@@ -269,6 +269,7 @@ pub enum ChannelKind {
 
     AddThinkerbellRule,
     RemoveThinkerbellRule,
+    ThinkerbellRuleSource,
 
     // TODO: Add more
 
@@ -343,6 +344,7 @@ impl Parser<ChannelKind> for ChannelKind {
                 "CurrentTimeOfDay" => Ok(ChannelKind::CurrentTimeOfDay),
                 "AddThinkerbellRule" => Ok(ChannelKind::AddThinkerbellRule),
                 "RemoveThinkerbellRule" => Ok(ChannelKind::RemoveThinkerbellRule),
+                "ThinkerbellRuleSource" => Ok(ChannelKind::ThinkerbellRuleSource),
                 "RemainingTime" => Ok(ChannelKind::RemainingTime),
                 "OvenTemperature" => Ok(ChannelKind::OvenTemperature),
                 _ => Err(ParseError::unknown_constant(str, &path))
@@ -383,6 +385,7 @@ impl ToJSON for ChannelKind {
             OvenTemperature => JSON::String("OvenTemperature".to_owned()),
             AddThinkerbellRule => JSON::String("AddThinkerbellRule".to_owned()),
             RemoveThinkerbellRule => JSON::String("RemoveThinkerbellRule".to_owned()),
+            ThinkerbellRuleSource => JSON::String("ThinkerbellRuleSource".to_owned()),
             Extension { ref vendor, ref adapter, ref kind, ref typ } => {
                 let mut source = vec![
                     ("vendor", vendor.to_json()),
@@ -413,6 +416,7 @@ impl ChannelKind {
             OvenTemperature => Type::Temperature,
             AddThinkerbellRule => Type::ThinkerbellRule,
             RemoveThinkerbellRule => Type::Unit,
+            ThinkerbellRuleSource => Type::String,
             Extension { ref typ, ..} => typ.clone(),
         }
     }
