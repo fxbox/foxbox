@@ -12,7 +12,6 @@ use adapter::{ Adapter, AdapterManagerHandle };
 use api::{ API, Error, ResultMap, WatchEvent };
 use selector::*;
 use services::*;
-use util::*;
 use values::{ Range, Value };
 
 use transformable_channels::mpsc::*;

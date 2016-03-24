@@ -1,6 +1,5 @@
 use api::Error;
 use services::*;
-use util::*;
 use values::*;
 
 use transformable_channels::mpsc::*;

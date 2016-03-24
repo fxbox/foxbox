@@ -5,7 +5,6 @@ use adapter::*;
 use api::Error;
 use selector::*;
 use services::*;
-use util::*;
 use values::*;
 
 use transformable_channels::mpsc::*;

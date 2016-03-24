@@ -6,7 +6,6 @@ use transact::InsertInMap;
 use api::{ API, Error, InternalError, WatchEvent };
 use selector::*;
 use services::*;
-use util::*;
 use values::*;
 
 use transformable_channels::mpsc::*;

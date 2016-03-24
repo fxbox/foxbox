@@ -6,6 +6,7 @@ authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 [dependencies]
 chrono = "0.2.19"
 clippy = "0.0.48"
+lazy_static = "^0.1"
 serde = "0.6.13"
 serde_json = "0.6.0"
 serde_macros = "0.6.14"

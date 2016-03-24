@@ -1,3 +1,5 @@
+use parse::*;
+
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::hash::{ Hash, Hasher };
@@ -10,7 +12,7 @@ use serde::ser::{ Serialize, Serializer };
 use serde::de::{ Deserialize, Deserializer, Error as DeserializationError, Type as DeserializationType };
 
 /// A marker for a request that a expects a specific value.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Exactly<T> {
     /// No constraint.
     Always,
@@ -21,6 +23,17 @@ pub enum Exactly<T> {
     /// Never accept a constraint. This can happen, for instance, we have have
     /// attempted to `and` two conflicting `Exactly`
     Never,
+}
+
+impl<T> Parser<Exactly<T>> for Exactly<T> where T: Parser<T> {
+    /// Parse a single value from JSON, consuming as much as necessary from JSON.
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        if let JSON::Null = *source {
+            Ok(Exactly::Always)
+        } else {
+            T::parse(path, source).map(Exactly::Exactly)
+        }
+    }
 }
 
 impl<T> Exactly<T> where T: PartialEq {
@@ -181,6 +194,17 @@ impl<T> Serialize for Id<T> {
     }
 }
 
+impl<T> Parser<Id<T>> for Id<T> {
+    /// Parse a single value from JSON, consuming as much as necessary from JSON.
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        if let JSON::String(ref string) = *source {
+            Ok(Id::new(string))
+        } else {
+            Err(ParseError::type_error("id", &path, "string"))
+        }
+    }
+}
+
 impl<T> Deserialize for Id<T> {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer {
@@ -283,3 +307,28 @@ impl<T> Visitor for TrivialEnumVisitor<T> where T: Deserialize {
         }
     }
 }
+
+/// A marker for Id.
+/// Only useful for writing `Id<ServiceId>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
+pub struct ServiceId;
+
+/// A marker for Id.
+/// Only useful for writing `Id<AdapterId>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
+pub struct AdapterId;
+
+// A marker for Id.
+/// Only useful for writing `Id<TagId>`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
+pub struct TagId;
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
+pub struct KindId;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
+pub struct VendorId;
+
+#[derive(Clone, Debug)]
+pub struct MimeTypeId;
