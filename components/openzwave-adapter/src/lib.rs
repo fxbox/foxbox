@@ -3,18 +3,22 @@ extern crate foxbox_taxonomy as taxonomy;
 extern crate transformable_channels;
 
 use taxonomy::util::Id as TaxId;
-use taxonomy::services::{ AdapterId, Getter, Setter };
+use taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
 use taxonomy::values::{ Value, Range };
 use taxonomy::api::{ ResultMap, Error as TaxError };
 use taxonomy::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
 use transformable_channels::mpsc::ExtSender;
 
-use openzwave::InitOptions;
+use openzwave::{ InitOptions, ZWaveManager, ZWaveNotification };
 use openzwave::{ ValueGenre, ValueID };
+use openzwave::{ Controller };
 
 use std::error;
 use std::fmt;
-use std::collections::HashMap;
+use std::thread;
+use std::sync::mpsc;
+use std::sync::RwLock;
+use std::collections::{ HashMap, HashSet };
 
 #[derive(Debug)]
 pub enum OpenzwaveError {
@@ -64,29 +68,77 @@ pub struct OpenzwaveAdapter {
     name: String,
     vendor: String,
     version: [u32; 4],
-    manager: Box<AdapterManagerHandle + Send>
+    ozw: ZWaveManager,
 }
 
 impl OpenzwaveAdapter {
-    pub fn init<T: AdapterManagerHandle + Clone + Send + 'static> (manager: &T) -> Result<(), OpenzwaveError> {
+    pub fn init<T: AdapterManagerHandle + Clone + Send + 'static> (box_manager: &T) -> Result<(), OpenzwaveError> {
+        let options = InitOptions {
+            device: None // TODO we should expose this as a Value
+        };
+
+        let (ozw, rx) = try!(openzwave::init(&options));
+
         let name = String::from("OpenZwave Adapter");
         let adapter = Box::new(OpenzwaveAdapter {
             id: TaxId::new(&name),
             name: name,
             vendor: String::from("Mozilla"),
             version: [1, 0, 0, 0],
-            manager: Box::new(manager.clone())
+            ozw: ozw,
         });
 
-        try!(manager.add_adapter(adapter));
-
-        let options = InitOptions {
-            device: None // TODO we should expose this as a Value
-        };
-
-        let ozw = try!(openzwave::init(&options));
+        adapter.spawn_notification_thread(rx, box_manager);
+        try!(box_manager.add_adapter(adapter));
 
         Ok(())
+    }
+
+    fn spawn_notification_thread<T: AdapterManagerHandle + Clone + Send + 'static>(&self, rx: mpsc::Receiver<ZWaveNotification>, box_manager: &T) {
+        let adapter_id = self.id.clone();
+        let box_manager = box_manager.clone();
+
+        thread::spawn(move || {
+            let mut controller_map: Vec<(TaxId<ServiceId>, Controller)> = Vec::new();
+
+            for notification in rx {
+                match notification {
+                    ZWaveNotification::ControllerReady(controller) => {
+                        let service = format!("OpenZWave/{}", controller.get_home_id());
+                        let service_id = TaxId::new(&service);
+                        controller_map.push((service_id.clone(), controller));
+
+                        box_manager.add_service(Service::empty(service_id.clone(), adapter_id.clone()));
+                    }
+                    ZWaveNotification::NodeNew(node)               => {}
+                    ZWaveNotification::NodeAdded(node)             => {}
+                    ZWaveNotification::NodeRemoved(node)           => {}
+                    ZWaveNotification::ValueAdded(value)           => {
+                        let value_id = format!("OpenZWave/{}", value.get_id());
+                        let controller_pair = controller_map.iter().find(|&&(_, controller)| controller == value.get_controller());
+                        if controller_pair.is_none() { continue; }
+                        let ref controller_id = controller_pair.unwrap().0;
+
+                        if value.is_read_only() {
+                            box_manager.add_getter(Channel {
+                                id: TaxId::new(&value_id),
+                                service: controller_id.clone(),
+                                adapter: adapter_id.clone(),
+                                last_seen: None,
+                                tags: HashSet::new(),
+                                mechanism: Getter {
+                                    kind: ChannelKind::Ready,
+                                    updated: None
+                                }
+                            });
+                        }
+                    }
+                    ZWaveNotification::ValueChanged(value)         => {}
+                    ZWaveNotification::ValueRemoved(value)         => {}
+                    ZWaveNotification::Generic(string)             => {}
+                }
+            }
+        });
     }
 }
 
@@ -108,6 +160,8 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
     }
 
     fn fetch_values(&self, set: Vec<TaxId<Getter>>) -> ResultMap<TaxId<Getter>, Option<Value>, TaxError> {
+        let state = self.ozw.get_state();
+
         unimplemented!()
     }
 
