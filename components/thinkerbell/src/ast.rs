@@ -30,6 +30,41 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
 
 /// A single rule, i.e. "when some condition becomes true, do
 /// something".
+///
+/// # JSON
+///
+/// A single rule is represented as an object with the following fields:
+///
+/// - conditions (array of Match): the conditions in which to execute
+///   the code – *all* conditions must be met;
+/// - execute (array of Statement): the code to execute once all conditions
+///   are met.
+///
+/// ```
+/// extern crate foxbox_thinkerbell;
+/// extern crate foxbox_taxonomy;
+///
+/// use foxbox_thinkerbell::ast::*;
+/// use foxbox_taxonomy::parse::*;
+///
+/// # fn main() {
+/// let source = r#"{
+///   "conditions": [{
+///     "source": [{"id": "my getter"}],
+///     "kind": "OvenTemperature",
+///     "range": {"Geq": {"Temperature": {"C": 300}}},
+///     "duration": 3600
+///   }],
+///   "execute": [{
+///     "destination": [{"id": "my setter"}],
+///     "value": {"OnOff": "Off"},
+///     "kind": "OnOff"
+///   }]
+/// }"#;
+///
+/// Rule::<UncheckedCtx>::from_str(&source).unwrap();
+/// # }
+/// ```
 pub struct Rule<Ctx> where Ctx: Context {
     /// The condition in which to execute the trigger. The condition
     /// is matched once *all* the `Match` branches are true. Whenever
@@ -56,13 +91,48 @@ impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
         })
     }
 }
+
 /// An individual match.
 ///
 /// Matchs always take the form: "data received from getter channel
-/// is in given range".
+/// enters given range".
 ///
 /// A condition is true if *any* of the corresponding getter channels
-/// yielded a value that is in the given range.
+/// yielded a value that enters the given range.
+///
+/// # JSON
+///
+/// A match is represented as an object with the following fields:
+///
+/// - source (array of GetterSelector) - the selector for getters that will
+///   provide the data;
+/// - kind (ChannelKind) - the kind of getters;
+/// - range (Range) - the condition in whih the match is considered met –
+///   a match becomes met when any of the sources *enters* the range;
+/// - duration (Duration, optional) - if provided, the match is only considered
+///   met if any of the sources *enters* and *remains* in the range
+///   for `duration`
+///
+/// ```
+/// extern crate foxbox_thinkerbell;
+/// extern crate foxbox_taxonomy;
+///
+/// use foxbox_thinkerbell::ast::*;
+/// use foxbox_taxonomy::services::*;
+/// use foxbox_taxonomy::parse::*;
+///
+/// # fn main() {
+/// let source = r#"{
+///   "source": [{"id": "my getter"}],
+///   "kind": "OvenTemperature",
+///   "range": {"Geq": {"Temperature": {"C": 300}}},
+///   "duration": 3600
+/// }"#;
+///
+/// let match_ = Match::<UncheckedCtx>::from_str(&source).unwrap();
+/// assert_eq!(match_.kind, ChannelKind::OvenTemperature);
+/// # }
+/// ```
 pub struct Match<Ctx> where Ctx: Context {
     /// The set of getters to watch. Note that the set of getters may
     /// change (e.g. when devices are added/removed) without rebooting
@@ -117,6 +187,35 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
 }
 
 /// Stuff to actually do. In practice, this means placing calls to devices.
+///
+/// # JSON
+///
+/// A statement is represented as an object with the following fields:
+/// - destination (array of SetterSelector);
+/// - value (Value);
+/// - kind (ChannelKind);
+///
+/// ```
+/// extern crate foxbox_thinkerbell;
+/// extern crate foxbox_taxonomy;
+///
+/// use foxbox_thinkerbell::ast::*;
+/// use foxbox_taxonomy::values::*;
+/// use foxbox_taxonomy::services::*;
+/// use foxbox_taxonomy::parse::*;
+///
+/// # fn main() {
+/// let source = r#"{
+///   "destination": [{"id": "my setter"}],
+///   "value": {"OnOff": "Off"},
+///   "kind": "OnOff"
+/// }"#;
+///
+/// let statement = Statement::<UncheckedCtx>::from_str(&source).unwrap();
+/// assert_eq!(statement.value, Value::OnOff(OnOff::Off));
+/// assert_eq!(statement.kind, ChannelKind::OnOff);
+/// # }
+/// ```
 pub struct Statement<Ctx> where Ctx: Context {
     /// The set of setters to which to send a command. Note that the
     /// set of setters may change (e.g. when devices are
