@@ -329,6 +329,9 @@ pub enum ChannelKind {
 }
 
 impl Parser<ChannelKind> for ChannelKind {
+    fn description() -> String {
+        "ChannelKind".to_owned()
+    }
     /// Parse a single value from JSON, consuming as much as necessary from JSON.
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         if let Some(str) = source.as_string() {

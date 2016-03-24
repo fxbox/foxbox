@@ -133,6 +133,9 @@ pub struct ServiceSelector {
 }
 
 impl Parser<ServiceSelector> for ServiceSelector {
+    fn description() -> String {
+        "ServiceSelector".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let mut is_empty = true;
         let id = try!(match path.push("id", |path| Exactly::take_opt(path, source, "id")) {
@@ -342,6 +345,9 @@ pub struct GetterSelector {
 }
 
 impl Parser<GetterSelector> for GetterSelector {
+    fn description() -> String {
+        "GetterSelector".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let mut is_empty = true;
         let id = try!(match path.push("id", |path| Exactly::take_opt(path, source, "id")) {
@@ -534,6 +540,9 @@ pub struct SetterSelector {
 }
 
 impl Parser<SetterSelector> for SetterSelector {
+    fn description() -> String {
+        "SetterSelector".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let mut is_empty = true;
         let id = try!(match path.push("id", |path| Exactly::take_opt(path, source, "id")) {

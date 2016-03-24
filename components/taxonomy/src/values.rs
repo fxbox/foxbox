@@ -93,6 +93,9 @@ pub enum Type {
     ExtNumeric,
 }
 impl Parser<Type> for Type {
+    fn description() -> String {
+        "Type".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         use self::Type::*;
         match *source {
@@ -212,6 +215,9 @@ impl OnOff {
 }
 
 impl Parser<OnOff> for OnOff {
+    fn description() -> String {
+        "OnOff".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match source.as_string() {
             Some("On") => Ok(OnOff::On),
@@ -340,6 +346,9 @@ impl OpenClosed {
 }
 
 impl Parser<OpenClosed> for OpenClosed {
+    fn description() -> String {
+        "OpenClosed".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match source.as_string() {
             Some("Open") => Ok(OpenClosed::Open),
@@ -489,6 +498,9 @@ impl Temperature {
 }
 
 impl Parser<Temperature> for Temperature {
+    fn description() -> String {
+        "Temperature".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         if !source.is_object() {
             return Err(ParseError::type_error("Temperature", &path, "object"));
@@ -608,6 +620,9 @@ pub enum Color {
     RGBA(f64, f64, f64, f64)
 }
 impl Parser<Color> for Color {
+    fn description() -> String {
+        "Color".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let r = try!(path.push("r", |path| f64::take(path, source, "r")));
         let g = try!(path.push("g", |path| f64::take(path, source, "g")));
@@ -643,6 +658,9 @@ pub struct ThinkerbellRule {
 }
 
 impl Parser<ThinkerbellRule> for ThinkerbellRule {
+    fn description() -> String {
+        "ThinkerbellRuleSource".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let name = try!(path.push("name", |path| String::take(path, source, "name")));
         let script_source = try!(path.push("source", |path| String::take(path, source, "source")));
@@ -666,6 +684,9 @@ impl ToJSON for ThinkerbellRule {
 pub struct Json(pub serde_json::value::Value);
 
 impl Parser<Json> for Json {
+    fn description() -> String {
+        "Json value".to_owned()
+    }
     fn parse(_: Path, source: &mut JSON) -> Result<Self, ParseError> {
         Ok(Json(source.clone()))
     }
@@ -708,6 +729,9 @@ pub struct ExtValue<T> where T: Debug + Clone + PartialEq + PartialOrd + Seriali
 impl<T> Parser<ExtValue<T>> for ExtValue<T>
     where T: Debug + Clone + PartialEq + PartialOrd + Serialize + Deserialize + Parser<T>
 {
+    fn description() -> String {
+        format!("ExtValue<{}>", T::description())
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let vendor = try!(path.push("vendor", |path| Id::take(path, source, "vendor")));
         let adapter = try!(path.push("adapter", |path| Id::take(path, source, "adapter")));
@@ -776,6 +800,9 @@ pub struct Binary {
 }
 
 impl Parser<Binary> for Binary {
+    fn description() -> String {
+        "Binary".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let data = try!(path.push("data", |path| Vec::<u8>::take(path, source, "data")));
         let mimetype = try!(path.push("mimetype", |path| Id::take(path, source, "mimetype")));
@@ -1287,6 +1314,9 @@ lazy_static! {
 }
 
 impl Parser<Value> for Value {
+    fn description() -> String {
+        "Value".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match *source {
             JSON::Null => Ok(Value::Unit),
@@ -1459,6 +1489,9 @@ impl TimeStamp {
     }
 }
 impl Parser<TimeStamp> for TimeStamp {
+    fn description() -> String {
+        "TimeStamp".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         if let JSON::String(ref str) = *source {
             if let Ok(dt) = DateTime::<UTC>::from_str(str) {
@@ -1564,6 +1597,9 @@ pub enum Range {
 }
 
 impl Parser<Range> for Range {
+    fn description() -> String {
+        "Range".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         use self::Range::*;
         if let JSON::Object(ref mut obj) = *source {
@@ -1695,6 +1731,9 @@ impl Range {
 pub struct Duration(ChronoDuration);
 
 impl Parser<Duration> for Duration {
+    fn description() -> String {
+        "Duration".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let val = try!(f64::parse(path, source));
         Ok(Duration(ChronoDuration::milliseconds((val * 1000.) as i64)))
