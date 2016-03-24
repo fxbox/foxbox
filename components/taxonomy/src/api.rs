@@ -518,14 +518,14 @@ pub trait API: Send {
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/channels/value`
+    /// `GET /api/v1/channels/get`
     fn fetch_values(&self, Vec<GetterSelector>) -> ResultMap<Id<Getter>, Option<Value>, Error>;
 
     /// Send a bunch of values to a set of channels
     ///
     /// # REST API
     ///
-    /// `POST /api/v1/channels/value`
+    /// `POST /api/v1/channels/set`
     fn send_values(&self, TargetMap<SetterSelector, Value>) -> ResultMap<Id<Setter>, (), Error>;
 
     /// Watch for changes from channels.

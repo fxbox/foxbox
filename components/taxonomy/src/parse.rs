@@ -45,14 +45,13 @@ impl Path {
     }
 
     /// Push a suffix after a path.
-    pub fn push<F, T>(&self, suffix: &str, cb: F) -> T
+    fn push_str<F, T>(&self, suffix: &str, cb: F) -> T
         where F: FnOnce(Path) -> T
     {
         let buf = self.buf.clone();
         let len;
         {
             let mut str = buf.borrow_mut();
-            str.push_str(" > ");
             str.push_str(suffix);
             len = str.len();
         }
@@ -67,6 +66,19 @@ impl Path {
         }
         result
     }
+
+    pub fn push_index<F, T>(&self, index: usize, cb: F) -> T
+        where F: FnOnce(Path) -> T
+    {
+        self.push_str(&format!("[{}]", index), cb)
+    }
+
+    pub fn push<F, T>(&self, suffix: &str, cb: F) -> T
+        where F: FnOnce(Path) -> T
+    {
+        self.push_str(&format!(".{}", suffix), cb)
+    }
+
     pub fn to_string(&self) -> String {
         let mut str = self.buf.borrow().clone();
         str.truncate(self.len);
@@ -163,6 +175,7 @@ impl Serialize for JSONError {
 /// The JSON object is expected to be consumed along the way. A successful parse will
 /// typically leave an empty JSON object.
 pub trait Parser<T: Sized> {
+    fn description() -> String;
     fn from_str(source: &str) -> Result<T, ParseError> {
         match serde_json::from_str(source) {
             Err(err) => Err(ParseError::json(err)),
@@ -230,6 +243,9 @@ pub trait Parser<T: Sized> {
 }
 
 impl Parser<f64> for f64 {
+    fn description() -> String {
+        "Number".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match *source {
             JSON::I64(val) => Ok(val as f64),
@@ -241,6 +257,9 @@ impl Parser<f64> for f64 {
 }
 
 impl Parser<bool> for bool {
+    fn description() -> String {
+        "bool".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match *source {
             JSON::Bool(ref b) => Ok(*b),
@@ -254,6 +273,9 @@ impl Parser<bool> for bool {
 }
 
 impl Parser<u8> for u8 {
+    fn description() -> String {
+        "byte".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match source.as_u64() {
             None => Err(ParseError::type_error("as byte", &path, "positive integer")),
@@ -265,29 +287,35 @@ impl Parser<u8> for u8 {
 }
 
 impl<T> Parser<Vec<T>> for Vec<T> where T: Parser<T> {
+    fn description() -> String {
+        format!("An array of {}", T::description())
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match *source {
             JSON::Array(ref mut array) => {
                 let mut result = Vec::with_capacity(array.len());
-                for source in array { // FIXME: Should handle path better.
-                    let value = try!(path.push("", |path| T::parse(path, source)));
+                for (source, i) in array.iter_mut ().zip(0..) {
+                    let value = try!(path.push_index(i, |path| T::parse(path, source)));
                     result.push(value)
                 }
                 Ok(result)
             }
-            _ => Err(ParseError::type_error("as array", &path, "array"))
+            _ => Err(ParseError::type_error(&Self::description() as &str, &path, "array"))
         }
     }
 }
 
 impl<T, U> Parser<(T, U)> for (T, U) where T: Parser<T>, U: Parser<U> {
+    fn description() -> String {
+        format!("({}, {})", T::description(), U::description())
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match *source {
             JSON::Array(ref mut array) if array.len() == 2 => {
                 let mut right = array.pop().unwrap(); // We just checked that length == 2
                 let mut left = array.pop().unwrap(); // We just checked that length == 2
-                let left_parsed = try!(path.push("0", |path| {T::parse(path, &mut left)}));
-                let right_parsed = try!(path.push("1", |path| {U::parse(path, &mut right)}));
+                let left_parsed = try!(path.push(&T::description() as &str, |path| {T::parse(path, &mut left)}));
+                let right_parsed = try!(path.push(&U::description() as &str, |path| {U::parse(path, &mut right)}));
                 Ok((left_parsed, right_parsed))
             }
             _ => Err(ParseError::type_error("pair of values", &path, "array"))
@@ -296,6 +324,9 @@ impl<T, U> Parser<(T, U)> for (T, U) where T: Parser<T>, U: Parser<U> {
 }
 
 impl Parser<String> for String {
+    fn description() -> String {
+        "String".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match source.as_string() {
             Some(str) => Ok(str.to_owned()),
@@ -306,6 +337,9 @@ impl Parser<String> for String {
 
 
 impl<T> Parser<Arc<T>> for Arc<T> where T: Parser<T> {
+    fn description() -> String {
+        T::description()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         Ok(Arc::new(try!(T::parse(path, source))))
     }

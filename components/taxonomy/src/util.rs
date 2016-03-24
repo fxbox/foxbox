@@ -26,6 +26,9 @@ pub enum Exactly<T> {
 }
 
 impl<T> Parser<Exactly<T>> for Exactly<T> where T: Parser<T> {
+    fn description() -> String {
+        T::description()
+    }
     /// Parse a single value from JSON, consuming as much as necessary from JSON.
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         if let JSON::Null = *source {
@@ -195,6 +198,9 @@ impl<T> Serialize for Id<T> {
 }
 
 impl<T> Parser<Id<T>> for Id<T> {
+    fn description() -> String {
+        "Id".to_owned()
+    }
     /// Parse a single value from JSON, consuming as much as necessary from JSON.
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         if let JSON::String(ref string) = *source {
