@@ -136,6 +136,12 @@ impl<A> Handler for TaxonomyRouter<A>
 
     #[allow(cyclomatic_complexity)]
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
+        // The CORS middleware will take care of adding the CORS headers
+        // if they are allowed.
+        if req.method == Method::Options {
+            return Ok(Response::with(Status::Ok));
+        }
+
         // We are handled urls relative to the mounter set up in http_server.rs
         // That means that for a full url like http://localhost/api/v1/services
         // the req.url.path will only contain ["services"]
