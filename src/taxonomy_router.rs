@@ -4,7 +4,7 @@
 
 extern crate serde_json;
 
-use foxbox_adapters::manager::WatchGuard;
+use foxbox_taxonomy::manager::WatchGuard;
 use foxbox_taxonomy::api::{ API, TargetMap };
 use foxbox_taxonomy::values::Value;
 use foxbox_taxonomy::selector::{ GetterSelector, ServiceSelector, SetterSelector };
@@ -215,7 +215,7 @@ describe! taxonomy_router {
         extern crate serde_json;
 
         use adapters::clock;
-        use foxbox_adapters::manager::AdapterManager;
+        use foxbox_taxonomy::manager::AdapterManager;
         use foxbox_taxonomy::services::Service;
         use iron::Headers;
         use iron_test::{ request, response };

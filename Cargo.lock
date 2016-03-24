@@ -7,7 +7,6 @@ dependencies = [
  "docopt 0.6.78 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt_macros 0.6.81 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_adapters 0.1.0 (git+https://github.com/fxbox/adapters.git?rev=fd051bc)",
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
  "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=73e8943)",
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -188,22 +187,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "foxbox_adapters"
-version = "0.1.0"
-source = "git+https://github.com/fxbox/adapters.git?rev=fd051bc#fd051bc45c8292d4ccc24f7315d07aa87d561198"
-dependencies = [
- "clippy 0.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
- "serde 0.6.15 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_macros 0.6.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "transformable_channels 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git#9daae4800d271b8ceef7a2e834a1cb2b59bb8339"
+source = "git+https://github.com/fxbox/taxonomy.git#0b5bb2e806a31ecee4e3c785f3703bf2edbebcea"
 dependencies = [
  "chrono 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.48 (registry+https://github.com/rust-lang/crates.io-index)",

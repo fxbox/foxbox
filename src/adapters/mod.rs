@@ -13,7 +13,7 @@ pub mod clock;
 /// An adapter providing WebPush services.
 pub mod webpush;
 
-use foxbox_adapters::adapter::AdapterManagerHandle;
+use foxbox_taxonomy::adapter::AdapterManagerHandle;
 use self::ip_camera_adapter::IpCameraAdapter;
 use self::philips_hue::PhilipsHueAdapter;
 use service::ServiceAdapter;
