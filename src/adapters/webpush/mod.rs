@@ -18,7 +18,7 @@ extern crate serde_json;
 mod crypto;
 mod db;
 
-use foxbox_adapters::adapter::*;
+use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::api::{ Error, InternalError };
 use foxbox_taxonomy::values::{ Range, Type, Value, Json };
 use foxbox_taxonomy::services::*;
@@ -188,7 +188,7 @@ impl<C: Controller> Adapter for WebPush<C> {
                             Err(_) => return (id, Err(Error::InternalError(InternalError::InvalidInitialService)))
                         };
                     }
-                ) 
+                )
             }
 
             getter_api!(get_subscriptions, getter_subscription_id, SubscriptionGetter);
@@ -219,7 +219,7 @@ impl<C: Controller> Adapter for WebPush<C> {
                             Err(_) => return (id, Err(Error::InternalError(InternalError::InvalidInitialService)))
                         }
                     }
-                ) 
+                )
             }
 
             setter_api!(set_resources, setter_resource_id, ResourceGetter);

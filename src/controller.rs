@@ -7,7 +7,7 @@ extern crate mio;
 
 use adapters::AdapterManager;
 use config_store::ConfigService;
-use foxbox_adapters::manager::AdapterManager as AdapterManager2;
+use foxbox_taxonomy::manager::AdapterManager as AdapterManager2;
 use foxbox_users::UsersManager;
 use http_server::HttpServer;
 use iron::{Request, Response, IronResult};

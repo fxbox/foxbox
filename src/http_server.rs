@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use foxbox_adapters::manager::WatchGuard;
+use foxbox_taxonomy::manager::WatchGuard;
 use foxbox_taxonomy::api::API;
 use hyper::net::{ NetworkListener };
 use iron::{ AfterMiddleware, Chain, Handler,
@@ -151,7 +151,7 @@ describe! cors {
     before_each {
         extern crate hyper;
 
-        use foxbox_adapters::manager::AdapterManager;
+        use foxbox_taxonomy::manager::AdapterManager;
         use iron::headers;
         use iron::method::Method;
         use std::thread;

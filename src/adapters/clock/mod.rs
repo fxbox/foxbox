@@ -1,7 +1,7 @@
 //! An adapter providing time-related services, such as the current
 //! timestamp or the current time of day.
 
-use foxbox_adapters::adapter::*;
+use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::api::{ Error, InternalError };
 use foxbox_taxonomy::values::{ Duration as ValDuration, Range, TimeStamp, Type, Value };
 use foxbox_taxonomy::services::*;
