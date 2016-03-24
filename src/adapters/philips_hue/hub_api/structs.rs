@@ -2,11 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use adapters::philips_hue::serde_json;
-
-use std::collections::BTreeMap;
-use serde::de::Deserialize;
 use core::fmt::Debug;
+use serde::de::Deserialize;
+use serde_json;
+use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {

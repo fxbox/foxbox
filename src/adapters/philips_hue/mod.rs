@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-extern crate serde_json;
-
 mod http;
 mod hub_api;
 mod light;
@@ -16,6 +14,7 @@ use iron::status::Status;
 use router::Router;
 use self::hub_api::structs::*;
 use self::light::Light;
+use serde_json;
 use service::{ Service, ServiceAdapter, ServiceProperties };
 use std::collections::BTreeMap;
 use std::io::Read;
