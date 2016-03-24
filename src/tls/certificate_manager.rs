@@ -6,11 +6,18 @@ use hyper::client::{ Body, Client };
 use hyper::net::{ HttpsConnector, Openssl };
 use hyper::status::StatusCode;
 
+use openssl::crypto::hash::Type;
+use openssl::crypto::pkey::PKey;
+use openssl::ssl::error::SslError;
+use openssl::x509::{ X509, X509Generator };
+
 use serde_json;
 
 use std::collections::{ BTreeMap, HashMap };
+use std::error::Error;
 use std::fs::{ self };
-use std::io::{ Error, ErrorKind };
+use std::io;
+use std::io::{ Error as IoError, ErrorKind };
 use std::path::PathBuf;
 use std::sync::{ Arc, Mutex, RwLock };
 
@@ -19,42 +26,55 @@ use tls::ssl_context::SslContextProvider;
 
 #[derive(Clone)]
 pub struct CertificateManager {
+    directory: PathBuf,
     ssl_hosts: Arc<RwLock<HashMap<String, CertificateRecord>>>,
 
     // Observer
     context_provider: Option<Arc<Mutex<Box<SslContextProvider>>>>
 }
 
-fn create_records_from_directory(path: &PathBuf) -> Result<HashMap<String, CertificateRecord>, Error> {
+fn create_records_from_directory(path: &PathBuf) -> Result<HashMap<String, CertificateRecord>, IoError> {
     let mut records = HashMap::new();
 
+    // Ensure the directory exists.
+    fs::create_dir_all(path).unwrap_or_else(|err| {
+        if err.kind() != ErrorKind::AlreadyExists {
+            panic!("Unable to create directory: {:?}: {}", path, err);
+        }
+    });
+
+    // Ensure the directory really is a directory.
     if try!(fs::metadata(path)).is_dir() {
         for entry in try!(fs::read_dir(path)) {
             let entry = try!(entry);
 
-            let hostname = entry.file_name().into_string().unwrap();
-            info!("Using certificate for host {}", hostname);
+            // Won't support symlinks
+            if try!(entry.file_type()).is_dir() {
 
-            let mut host_path = path.clone();
-            host_path.push(hostname.clone());
+                let hostname = entry.file_name().into_string().unwrap();
+                info!("Using certificate for host {}", hostname);
 
-            let mut cert_path = host_path.clone();
-            cert_path.push("crt.pem");
+                let mut host_path = path.clone();
+                host_path.push(hostname.clone());
 
-            let mut private_key_file = host_path.clone();
-            private_key_file.push("private_key.pem");
+                let mut cert_path = host_path.clone();
+                cert_path.push("crt.pem");
 
-            records.insert(hostname.clone(),
-                           try!(CertificateRecord::new(hostname,
-                                                  cert_path,
-                                                  private_key_file)));
+                let mut private_key_file = host_path.clone();
+                private_key_file.push("private_key.pem");
+
+                records.insert(hostname.clone(),
+                               try!(CertificateRecord::new(hostname,
+                                                      cert_path,
+                                                      private_key_file)));
+            }
         }
 
         info!("Loaded certificates from directory: {:?}", path);
 
         Ok(records)
     } else {
-        Err(Error::new(
+        Err(IoError::new(
             ErrorKind::InvalidInput,
             "The configured SSL certificate directory is not recognised as a directory."
         ))
@@ -62,8 +82,9 @@ fn create_records_from_directory(path: &PathBuf) -> Result<HashMap<String, Certi
 }
 
 impl CertificateManager {
-    pub fn new() -> CertificateManager {
+    pub fn new(directory: PathBuf) -> CertificateManager {
         CertificateManager {
+            directory: directory,
             ssl_hosts: Arc::new(RwLock::new(HashMap::new())),
             context_provider: None,
         }
@@ -78,8 +99,79 @@ impl CertificateManager {
         }
     }
 
-    pub fn reload_from_directory(&mut self, directory: PathBuf) -> Result<(), Error> {
-        let certificates =  try!(create_records_from_directory(&directory));
+    pub fn get_or_generate_self_signed_certificate(&self, hostname: String) -> io::Result<CertificateRecord> {
+
+        // Reload before this operation to ensure we don't overwrite any existing certificates
+        try!(self.reload());
+
+        // This is blocking - because we generate the result and write off thread - and at the end
+        // of that operation we know whether it succeeded, we can't borrow self to add the
+        // CertificateRecord for it in the other thread easily.  This kind of needs to be blocking
+        // anyway, we can't proceed without the resulting value anyway in most uses.
+
+        if let Some(certificate_record) = self.get_certificate(hostname.clone()) {
+            info!("Using existing self-signed cert for {}", hostname);
+            return Ok(certificate_record);
+        }
+
+        let mut directory = self.directory.clone();
+        directory.push(hostname.clone());
+
+        info!("Generating new self-signed cert for {}", hostname);
+        let generator = X509Generator::new()
+            .set_bitlength(2048)
+            .set_valid_period(365 * 2)
+            .add_name("CN".to_owned(), hostname.clone())
+            .set_sign_hash(Type::SHA256);
+
+        let gen_result = generator.generate();
+        if let Ok((cert, pkey)) = gen_result {
+
+            // Write the cert and pkey PEM files
+
+            // Ensure the directory exists
+            fs::create_dir_all(directory.clone()).unwrap_or_else(|err| {
+                if err.kind() != ErrorKind::AlreadyExists {
+                    panic!("Unable to create directory {:?}: {}", directory, err);
+                }
+            });
+
+            let mut cert_path = directory.clone();
+            cert_path.push("crt.pem");
+
+            let mut pkey_path = directory.clone();
+            pkey_path.push("private_key.pem");
+
+            let write_result = write_pem(&pkey, &pkey_path);
+            if write_result.is_err() {
+                return Err(write_result.unwrap_err());
+            }
+
+            let write_result = write_pem(&cert, &cert_path);
+            if write_result.is_err() {
+                return Err(write_result.unwrap_err());
+            }
+
+            let certificate_record_result = CertificateRecord::new(hostname, cert_path, pkey_path);
+
+            if let Ok(certificate_record) = certificate_record_result {
+                self.add_certificate(certificate_record.clone());
+                Ok(certificate_record)
+            } else {
+                certificate_record_result
+            }
+        } else {
+            let e = gen_result.err().unwrap();
+            Err(
+                IoError::new(
+                    ErrorKind::InvalidData,
+                    format!("Failed to generate self signed certificate: {}", e.description())
+                ))
+        }
+    }
+
+    pub fn reload(&self) -> Result<(), IoError> {
+        let certificates =  try!(create_records_from_directory(&self.directory.clone()));
         {
             let mut current_hosts = checklock!(self.ssl_hosts.write());
             current_hosts.clear();
@@ -90,8 +182,7 @@ impl CertificateManager {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn add_certificate(&mut self, certificate_record: CertificateRecord) {
+    pub fn add_certificate(&self, certificate_record: CertificateRecord) {
         {
             checklock!(self.ssl_hosts.write())
                 .insert(certificate_record.hostname.clone(), certificate_record);
@@ -100,7 +191,6 @@ impl CertificateManager {
         self.notify_provider();
     }
 
-    #[allow(dead_code)]
     pub fn get_certificate(&self, hostname: String) -> Option<CertificateRecord> {
         let ssl_hosts = checklock!(self.ssl_hosts.read());
         let cert_record = ssl_hosts.get(&hostname);
@@ -113,7 +203,7 @@ impl CertificateManager {
     }
 
     #[allow(dead_code)]
-    pub fn remove_certificate(&mut self, hostname: String) {
+    pub fn remove_certificate(&self, hostname: String) {
         {
             checklock!(self.ssl_hosts.write()).remove(&hostname);
         }
@@ -122,7 +212,7 @@ impl CertificateManager {
     }
 
     fn create_https_client_with_crt_for(&self, hostname: String) -> Option<(Client, CertificateRecord)> {
-        if let Some(certificate_record) = self.get_certificate(hostname.clone()) {
+        if let Some(certificate_record) = self.get_certificate(hostname) {
             let ssl_ctx = Openssl::with_cert_and_key(
                                 &certificate_record.cert_file,
                                 &certificate_record.private_key_file);
@@ -158,8 +248,6 @@ impl CertificateManager {
                         .body(Body::BufBody(&payload[..], payload.len()))
                         .send()
                         .or_else(|error| {
-                            // import Error trait for description
-                            use std::error::Error;
                             Err(error.description().to_owned())
                         })
                         .map(|response| {
@@ -171,15 +259,45 @@ impl CertificateManager {
         }
     }
 
-    fn notify_provider(&mut self) {
+    fn notify_provider(&self) {
         let ssl_hosts = checklock!(self.ssl_hosts.read()).clone();
 
-        if let Some(ref mut context_provider) = self.context_provider {
+        if let Some(ref context_provider) = self.context_provider {
             context_provider.lock().unwrap().update(ssl_hosts);
         }
     }
 }
 
+fn write_pem<T: PemWriter>(pem_writer: &T, path: &PathBuf) -> io::Result<()> {
+    debug!("Writing: {:?}", path);
+    let file_create_result = fs::File::create(path.clone());
+    if let Ok(mut file_handle) = file_create_result {
+        pem_writer.write(&mut file_handle).map_err(|e| {
+            IoError::new(
+                ErrorKind::InvalidData,
+                format!("Failed to write PEM {:?}: {}", path, e.description())
+                )
+        })
+    } else {
+        Err(file_create_result.unwrap_err())
+    }
+}
+
+pub trait PemWriter {
+    fn write<W: io::Write>(&self, writer: &mut W) -> Result<(), SslError>;
+}
+
+impl<'a> PemWriter for X509<'a> {
+    fn write<W: io::Write>(&self, writer: &mut W) -> Result<(), SslError> {
+        self.write_pem(writer)
+    }
+}
+
+impl PemWriter for PKey {
+    fn write<W: io::Write>(&self, writer: &mut W) -> Result<(), SslError> {
+        self.write_pem(writer)
+    }
+}
 
 #[cfg(test)]
 mod certificate_manager {
@@ -229,7 +347,7 @@ mod certificate_manager {
     #[test]
     fn should_allow_certificates_to_be_added() {
         let cert_record = test_cert_record();
-        let mut cert_manager = CertificateManager::new();
+        let cert_manager = CertificateManager::new(PathBuf::from(current_dir!()));
 
         cert_manager.add_certificate(cert_record.clone());
 
@@ -243,7 +361,7 @@ mod certificate_manager {
     #[test]
     fn should_allow_certificates_to_be_removed() {
         let cert_record = test_cert_record();
-        let mut cert_manager = CertificateManager::new();
+        let cert_manager = CertificateManager::new(PathBuf::from(current_dir!()));
 
         cert_manager.add_certificate(cert_record);
 
@@ -256,7 +374,7 @@ mod certificate_manager {
     fn should_update_configured_providers_when_cert_added() {
         let cert_record = test_cert_record();
         let (tx_update_called, rx_update_called) = channel();
-        let mut cert_manager = CertificateManager::new();
+        let mut cert_manager = CertificateManager::new(PathBuf::from(current_dir!()));
 
         let provider_one = Box::new(TestSslContextProvider::new(tx_update_called));
 
@@ -271,7 +389,7 @@ mod certificate_manager {
     fn should_update_configured_providers_when_cert_removed() {
         let cert_record = test_cert_record();
         let (tx_update_called, rx_update_called) = channel();
-        let mut cert_manager = CertificateManager::new();
+        let mut cert_manager = CertificateManager::new(PathBuf::from(current_dir!()));
 
         let provider_one = Box::new(TestSslContextProvider::new(tx_update_called));
 

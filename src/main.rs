@@ -106,7 +106,7 @@ use tls::TlsOption;
 use traits::Controller;
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-d <profile_path>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--remote-name <hostname>] [-c <namespace;key;value>]...
+Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-d <profile_path>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--remote-name <hostname>] [--dns-domain <domain>] [-c <namespace;key;value>]...
 
 Options:
     -v, --verbose            Toggle verbose output.
@@ -114,11 +114,12 @@ Options:
     -p, --port <port>        Set port to listen on for http connections. [default: 3000]
     -w, --wsport <wsport>    Set port to listen on for websocket. [default: 4000]
     -d, --profile <path>     Set profile path to store user data.
-    -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242/register]
+    -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242]
     -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
     -s, --tunnel-secret <secret>    Set the tunnel shared secret. [default: secret]
         --disable-tls               Run as a plain HTTP server, disabling encryption.
+        --dns-domain <domain>       Set the top level domain for public DNS [default: box.knilxof.org]
         --remote-name <hostname>    Set remote hostname. This the URL to access the box through the bridge. If omitted, the tunnel is disabled
     -c, --config <namespace;key;value>  Set configuration override
     -h, --help               Print this help menu.
@@ -132,6 +133,7 @@ Options:
         flag_tunnel: Option<String>,
         flag_tunnel_secret: String,
         flag_disable_tls: bool,
+        flag_dns_domain: String,
         flag_remote_name: Option<String>,
         flag_config: Option<Vec<String>>);
 
@@ -204,6 +206,8 @@ fn main() {
 
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
+    let domain = args.flag_dns_domain;
+
     // Start the tunnel.
     let mut tunnel: Option<Tunnel> = None;
     if let Some(tunnel_url) = args.flag_tunnel {
@@ -217,9 +221,6 @@ fn main() {
         }
     }
 
-    // Register with the nUPNP server.
-    let registrar = registration::Registrar::new();
-    registrar.start(args.flag_register, args.flag_iface, &tunnel);
 
     let mut controller = FoxBox::new(
         args.flag_verbose, args.flag_local_name.map_or(None, update_hostname), args.flag_port,
@@ -248,6 +249,10 @@ fn main() {
         }
     }
 
+    // Register with the nUPNP server.
+    let registrar = registration::Registrar::new();
+    registrar.start(args.flag_register, args.flag_iface, domain, &tunnel, controller.get_certificate_manager());
+
     controller.run(&SHUTDOWN_FLAG);
 
     if let Some(mut tunnel) = tunnel {
@@ -267,7 +272,8 @@ describe! main {
             assert_eq!(args.flag_local_name, None);
             assert_eq!(args.flag_port, 3000);
             assert_eq!(args.flag_wsport, 4000);
-            assert_eq!(args.flag_register, "http://localhost:4242/register");
+            assert_eq!(args.flag_register, "http://localhost:4242");
+            assert_eq!(args.flag_dns_domain, "box.knilxof.org");
             assert_eq!(args.flag_iface, None);
             assert_eq!(args.flag_tunnel, None);
             assert_eq!(args.flag_config, None);

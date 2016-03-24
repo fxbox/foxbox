@@ -14,23 +14,38 @@ use self::hyper::header::Connection;
 use self::hyper::status::StatusCode;
 use self::get_if_addrs::{ IfAddr, Interface };
 use serde_json;
-use std::collections::BTreeMap;
+use std::error::Error;
 use std::io::Read;
 use std::time::Duration;
 use std::thread;
+use tls::CertificateManager;
 use tunnel_controller:: { Tunnel };
 
 const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
+const DEFAULT_BOX_NAME: &'static str = "foxbox.local";
 
 pub struct Registrar;
+
+#[derive(Serialize, Debug)]
+struct RegistrationRequest {
+    message: String,
+    client: String,
+
+    // Included for backwards compat, to be removed
+    local_ip: String,
+    tunnel_url: Option<String>,
+}
 
 impl Registrar {
     pub fn new() -> Registrar {
         Registrar
     }
 
-    pub fn start(&self, endpoint_url: String, iface: Option<String>,
-                 tunnel: &Option<Tunnel>) {
+    pub fn start(&self, endpoint_url: String,
+                 iface: Option<String>,
+                 domain: String,
+                 tunnel: &Option<Tunnel>,
+                 certificate_manager: CertificateManager) {
         info!("Starting registration with {}", endpoint_url);
         let endpoint_url = format!("{}/register", endpoint_url);
 
@@ -43,12 +58,39 @@ impl Registrar {
 
         info!("Got ip address: {}", ip_addr.clone().unwrap());
 
-        let mut map = BTreeMap::new();
-        map.insert("local_ip".to_owned(), ip_addr);
-        if let Some(ref tunnel) = *tunnel {
-            map.insert("tunnel_url".to_owned(), tunnel.get_remote_hostname());
-        }
-        let body = match serde_json::to_string(&map) {
+        let certificate_record_result = certificate_manager
+                                            .get_or_generate_self_signed_certificate(
+                                                DEFAULT_BOX_NAME.to_owned()
+                                            );
+
+        let (domain, client_fingerprint) = if let Ok(certificate_record) = certificate_record_result {
+            let self_signed_cert_fingerprint = certificate_record.get_certificate_fingerprint();
+            let fingerprint_domain = format!("{}.{}", self_signed_cert_fingerprint, domain);
+
+            info!("Using {}", fingerprint_domain);
+            (fingerprint_domain, self_signed_cert_fingerprint)
+        } else {
+            panic!("Could not get or generate self signed certificate - registration will always fail: {}", certificate_record_result.err().unwrap().description());
+        };
+
+        let tunnel_url = if let Some(ref tunnel) = *tunnel {
+            tunnel.get_remote_hostname()
+        } else {
+            None
+        };
+
+        let message = json!({
+            domain: domain,
+            tunnel_configured: tunnel_url.is_some()
+        });
+
+
+        let body = match serde_json::to_string(&RegistrationRequest {
+            message: message,
+            client: client_fingerprint,
+            local_ip: ip_addr.unwrap(),
+            tunnel_url: tunnel_url,
+        }) {
             Ok(body) => body,
             Err(_) => {
                 error!("Serialization error");
