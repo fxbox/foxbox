@@ -78,6 +78,8 @@ pub enum Type {
     /// event has taken place.
     TimeStamp,
 
+    ThinkerbellRule,
+
     Temperature,
     String,
     ///
@@ -123,6 +125,7 @@ impl ToJSON for Type {
             Duration => "Duration",
             TimeStamp => "TimeStamp",
             Temperature => "Temperature",
+            ThinkerbellRule => "ThinkerbellRule",
             String => "String",
             Color => "Color",
             Json => "Json",
@@ -141,7 +144,7 @@ impl Type {
     pub fn supports_eq(&self) -> bool {
         use self::Type::*;
         match *self {
-            Duration | TimeStamp | Temperature | ExtNumeric | Color => false,
+            Duration | TimeStamp | Temperature | ExtNumeric | Color | ThinkerbellRule => false,
             Unit | String | Json | Binary | OnOff | OpenClosed | ExtBool => true,
         }
     }
@@ -632,6 +635,28 @@ impl ToJSON for Color {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThinkerbellRuleSource {
+    pub name: String,
+    pub source: String,
+}
+
+impl Parser<ThinkerbellRuleSource> for ThinkerbellRuleSource {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let name = try!(path.push("name", |path| String::take(path, source, "name")));
+        let script_source = try!(path.push("source", |path| String::take(path, source, "source")));
+        Ok(ThinkerbellRuleSource { name: name, source: script_source })
+    }
+}
+impl ToJSON for ThinkerbellRuleSource {
+    fn to_json(&self) -> JSON {
+        vec![
+            ("name", &self.name),
+            ("source", &self.source),
+        ].to_json()
+    }
+}
+
 /// Representation of an object in JSON. It is often (albeit not
 /// always) possible to choose a more precise data structure for
 /// representing values send/accepted by a service. If possible,
@@ -1114,6 +1139,8 @@ pub enum Value {
 
     // FIXME: Add more as we identify needs
 
+    ThinkerbellRule(ThinkerbellRuleSource),
+
     /// A boolean value representing a unit that has not been
     /// standardized yet into the API.
     ExtBool(ExtValue<bool>),
@@ -1286,6 +1313,7 @@ impl ToJSON for Value {
             Json(ref val) => ("Json", val.to_json()),
             Binary(ref val) => ("Binary", val.to_json()),
             Temperature(ref val) => ("Temperature", val.to_json()),
+            ThinkerbellRule(ref val) => ("ThinkerbellRule", val.to_json()),
             ExtBool(ref val) => ("ExtBool", val.to_json()),
             ExtNumeric(ref val) => ("ExtNumeric", val.to_json()),
         };
@@ -1310,6 +1338,7 @@ impl Value {
             Value::Binary(_) => Type::Binary,
             Value::ExtBool(_) => Type::ExtBool,
             Value::ExtNumeric(_) => Type::ExtNumeric,
+            Value::ThinkerbellRule(_) => Type::ThinkerbellRule,
         }
     }
 
@@ -1368,6 +1397,9 @@ impl PartialOrd for Value {
 
             (&Json(ref a), &Json(ref b)) => a.partial_cmp(b),
             (&Json(_), _) => None,
+
+            (&ThinkerbellRule(ref a), &ThinkerbellRule(ref b)) => a.name.partial_cmp(&b.name),
+            (&ThinkerbellRule(_), _) => None,
 
             (&Binary(self::Binary {mimetype: ref a_mimetype, data: ref a_data}),
              &Binary(self::Binary {mimetype: ref b_mimetype, data: ref b_data})) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
@@ -1747,4 +1779,3 @@ impl Deserialize for Duration {
             .or_else(|_| deserializer.visit_i64(DurationVisitor))
     }
 }
-
