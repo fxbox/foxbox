@@ -209,7 +209,6 @@ pub fn create<T, A>(controller: T, adapter_api: A) -> Chain
     chain
 }
 
-/* // FIXME: Deactivated while we change the JSON format. Need to reactivate this later.
 #[cfg(test)]
 describe! taxonomy_router {
     before_each {
@@ -217,23 +216,10 @@ describe! taxonomy_router {
 
         use adapters::clock;
         use foxbox_taxonomy::manager::AdapterManager;
-        use foxbox_taxonomy::services::Service;
         use iron::Headers;
         use iron_test::{ request, response };
         use mount::Mount;
         use stubs::controller::ControllerStub;
-
-        // Custom comparison function for services, since the json serialization
-        // is not stable, and we don't want to expose PartialEq on Service in
-        // general.
-        fn service_equals(service1: &Service, service2: &Service) -> bool {
-            service1.id == service2.id &&
-            service1.adapter == service2.adapter &&
-            service1.tags == service2.tags &&
-            service1.properties == service2.properties &&
-            service1.getters == service2.getters &&
-            service1.setters == service2.setters
-        }
 
         let taxo_manager = AdapterManager::new();
         clock::Clock::init(&taxo_manager).unwrap();
@@ -247,14 +233,9 @@ describe! taxonomy_router {
                                     Headers::new(),
                                     &mount).unwrap();
         let body = response::extract_body_to_string(response);
-        let observed: Vec<Service> = serde_json::from_str(&body).unwrap();
+        let s = r#"[{"adapter":"clock@link.mozilla.org","getters":{"getter:timeofday.clock@link.mozilla.org":{"adapter":"clock@link.mozilla.org","id":"getter:timeofday.clock@link.mozilla.org","kind":"CurrentTimeOfDay","mechanism":"getter","service":"service:clock@link.mozilla.org","tags":[]},"getter:timestamp.clock@link.mozilla.org":{"adapter":"clock@link.mozilla.org","id":"getter:timestamp.clock@link.mozilla.org","kind":"CurrentTime","mechanism":"getter","service":"service:clock@link.mozilla.org","tags":[]}},"id":"service:clock@link.mozilla.org","properties":{"model":"Mozilla clock v1"},"setters":{},"tags":[]}]"#;
 
-        let s = r#"[{"tags":[],"properties":{"model":"Mozilla clock v1"},"id":"service:clock@link.mozilla.org","getters":{"getter:timestamp.clock@link.mozilla.org":{"tags":[],"id":"getter:timestamp.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTime":[]},"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null},"getter:timeofday.clock@link.mozilla.org":{"tags":[],"id":"getter:timeofday.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTimeOfDay":[]},"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null}},"setters":{},"adapter":"clock@link.mozilla.org"}]"#;
-        let expected: Vec<Service> = serde_json::from_str(&s).unwrap();
-
-        // We only registered the clock service.
-        assert_eq!(observed.len(), 1);
-        assert!(service_equals(&observed[0], &expected[0]));
+        assert_eq!(body, s);
     }
 
     it "should return the list of services from a POST request" {
@@ -263,14 +244,8 @@ describe! taxonomy_router {
                                     r#"[{"id":"service:clock@link.mozilla.org"}]"#,
                                     &mount).unwrap();
         let body = response::extract_body_to_string(response);
-        let observed: Vec<Service> = serde_json::from_str(&body).unwrap();
+        let s = r#"[{"adapter":"clock@link.mozilla.org","getters":{"getter:timeofday.clock@link.mozilla.org":{"adapter":"clock@link.mozilla.org","id":"getter:timeofday.clock@link.mozilla.org","kind":"CurrentTimeOfDay","mechanism":"getter","service":"service:clock@link.mozilla.org","tags":[]},"getter:timestamp.clock@link.mozilla.org":{"adapter":"clock@link.mozilla.org","id":"getter:timestamp.clock@link.mozilla.org","kind":"CurrentTime","mechanism":"getter","service":"service:clock@link.mozilla.org","tags":[]}},"id":"service:clock@link.mozilla.org","properties":{"model":"Mozilla clock v1"},"setters":{},"tags":[]}]"#;
 
-        let s = r#"[{"tags":[],"properties":{"model":"Mozilla clock v1"},"id":"service:clock@link.mozilla.org","getters":{"getter:timestamp.clock@link.mozilla.org":{"tags":[],"id":"getter:timestamp.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTime":[]},"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null},"getter:timeofday.clock@link.mozilla.org":{"tags":[],"id":"getter:timeofday.clock@link.mozilla.org","service":"service:clock@link.mozilla.org","mechanism":{"kind":{"CurrentTimeOfDay":[]},"updated":null},"adapter":"clock@link.mozilla.org","last_seen":null}},"setters":{},"adapter":"clock@link.mozilla.org"}]"#;
-        let expected: Vec<Service> = serde_json::from_str(&s).unwrap();
-
-        // We only registered the clock service.
-        assert_eq!(observed.len(), 1);
-        assert!(service_equals(&observed[0], &expected[0]));
+        assert_eq!(body, s);
     }
 }
-*/
