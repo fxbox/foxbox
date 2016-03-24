@@ -19,6 +19,9 @@ pub struct Script<Ctx> where Ctx: Context {
 }
 
 impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
+    fn description() -> String {
+        "Script".to_owned()
+    }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let rules = try!(path.push("", |path| Rule::take_vec(path, source, "rules")));
         Ok(Script {
@@ -42,6 +45,10 @@ pub struct Rule<Ctx> where Ctx: Context {
     pub phantom: PhantomData<Ctx>,
 }
 impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
+    fn description() -> String {
+        "Rule".to_owned()
+    }
+
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let conditions = try!(path.push("conditions",
             |path| Match::take_vec(path, source, "conditions"))
@@ -89,6 +96,10 @@ pub struct Match<Ctx> where Ctx: Context {
     pub phantom: PhantomData<Ctx>,
 }
 impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
+    fn description() -> String {
+        "Match".to_owned()
+    }
+
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let sources = try!(path.push("source",
             |path| GetterSelector::take_vec(path, source, "source"))
@@ -137,6 +148,10 @@ pub struct Statement<Ctx> where Ctx: Context {
     pub phantom: PhantomData<Ctx>,
 }
 impl Parser<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
+    fn description() -> String {
+        "Parser".to_owned()
+    }
+
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let destination = try!(path.push("destination",
             |path| SetterSelector::take_vec(path, source, "destination"))
