@@ -20,7 +20,7 @@ use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::api::{ Error, InternalError };
 use foxbox_taxonomy::values::{ Range, Type, Value, Json };
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::util::Id;
+
 #[cfg(feature = "webpush")]
 use hyper::header::{ ContentEncoding, Encoding };
 #[cfg(feature = "webpush")]
@@ -264,9 +264,9 @@ impl<C: Controller> WebPush<C> {
                     service: service_id.clone(),
                     mechanism: Getter {
                         kind: ChannelKind::Extension {
-                            vendor: ADAPTER_VENDOR.to_owned(),
-                            adapter: ADAPTER_NAME.to_owned(),
-                            kind: $kind_id.to_owned(),
+                            vendor: Id::new(ADAPTER_VENDOR),
+                            adapter: Id::new(ADAPTER_NAME),
+                            kind: Id::new($kind_id),
                             typ: Type::Json,
                         },
                         updated: None
@@ -285,9 +285,9 @@ impl<C: Controller> WebPush<C> {
                     service: service_id.clone(),
                     mechanism: Setter {
                         kind: ChannelKind::Extension {
-                            vendor: ADAPTER_VENDOR.to_owned(),
-                            adapter: ADAPTER_NAME.to_owned(),
-                            kind: $kind_id.to_owned(),
+                            vendor: Id::new(ADAPTER_VENDOR),
+                            adapter: Id::new(ADAPTER_NAME),
+                            kind: Id::new($kind_id),
                             typ: Type::Json,
                         },
                         updated: None
