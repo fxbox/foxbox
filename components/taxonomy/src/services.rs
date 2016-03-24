@@ -338,6 +338,8 @@ impl Parser<ChannelKind> for ChannelKind {
                 "OpenClosed" => Ok(ChannelKind::OpenClosed),
                 "CurrentTime" => Ok(ChannelKind::CurrentTime),
                 "CurrentTimeOfDay" => Ok(ChannelKind::CurrentTimeOfDay),
+                "AddThinkerbellRule" => Ok(ChannelKind::AddThinkerbellRule),
+                "RemoveThinkerbellRule" => Ok(ChannelKind::RemoveThinkerbellRule),
                 "RemainingTime" => Ok(ChannelKind::RemainingTime),
                 "OvenTemperature" => Ok(ChannelKind::OvenTemperature),
                 _ => Err(ParseError::unknown_constant(str, &path))
