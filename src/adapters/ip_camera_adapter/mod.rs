@@ -23,7 +23,7 @@ use upnp::{ UpnpListener, UpnpService };
 use traits::Controller;
 
 use self::hyper::header::{ Authorization, Basic, Connection };
-use self::url::{ Host, Url };
+use self::url::Url;
 
 // TODO: The camera username and password need to be persisted per-camera
 static CAMERA_USERNAME: &'static str = "admin";
@@ -104,13 +104,13 @@ fn get_bytes(url: String) -> Result<Vec<u8>, Error> {
 struct IpCameraService<T> {
     controller: T,
     properties: ServiceProperties,
-    ip: String,
+    url: String,
     snapshot_dir: String,
     name: String,
 }
 
 impl<T: Controller> IpCameraService<T> {
-    fn new(controller: T, id: &str, ip: &str, name: &str, properties: BTreeMap<String, String>)
+    fn new(controller: T, id: &str, url: &str, name: &str, properties: BTreeMap<String, String>)
            -> Self {
         debug!("Creating IpCameraService");
         IpCameraService {
@@ -123,7 +123,7 @@ impl<T: Controller> IpCameraService<T> {
                 ws_url: controller.get_ws_root_for_service(id.to_owned()),
                 custom_properties: properties,
             },
-            ip: ip.to_owned(),
+            url: url.to_owned(),
             snapshot_dir: format!("{}/{}", controller.get_profile().path_for(SNAPSHOT_DIR), id),
             name: name.to_owned(),
         }
@@ -172,12 +172,12 @@ impl<T: Controller> IpCameraService<T> {
 
     fn cmd_snapshot(&self) -> IronResult<Response> {
         let image_url = "image/jpeg.cgi";
-        let url = format!("http://{}/{}", self.ip, image_url);
+        let url = format!("{}/{}", self.url, image_url);
 
         let image = match get_bytes(url) {
             Ok(image) => image,
             Err(err) => {
-                return error_response!("Error '{:?}' retrieving image from camera ip {}", err, self.ip);
+                return error_response!("Error '{:?}' retrieving image from camera @ {}", err, self.url);
             }
         };
 
@@ -256,7 +256,7 @@ impl<T: Controller> Service for IpCameraService<T> {
     // Processes a http request.
     fn process_request(&self, req: &mut Request) -> IronResult<Response> {
         let cmd = req.extensions.get::<Router>().unwrap().find("command").unwrap_or("");
-        info!("IpCameraAdapter {:?} received command {} for camera ip {}", req, cmd, self.ip);
+        info!("IpCameraAdapter {:?} received command {} for camera @ {}", req, cmd, self.url);
 
         match cmd {
             "snapshot" => self.cmd_snapshot(),
@@ -313,7 +313,8 @@ impl<T: Controller> UpnpListener for IpCameraUpnpListener<T> {
 
         let model_name = try_get!(service.description, "/root/device/modelName");
         let known_models = [
-            "DCS-5010L", "DCS-5020L", "DCS-5025L"
+            "DCS-5010L", "DCS-5020L", "DCS-5025L",
+            "Link-IpCamera"
         ];
         let model_name_str: &str = &model_name;
         if !known_models.contains(&model_name_str) {
@@ -321,18 +322,6 @@ impl<T: Controller> UpnpListener for IpCameraUpnpListener<T> {
         }
 
         let url = try_get!(service.description, "/root/device/presentationURL");
-        // Extract the IP address from the presentation URL, which will look
-        // something like: http://192.168.1.123:80
-        let ip;
-        if let Ok(parsed_url) = Url::parse(url) {
-            if let Some(&Host::Ipv4(host_ip)) = parsed_url.host() {
-                ip = host_ip.to_string();
-            } else {
-                return false;
-            }
-        } else {
-            return false
-        }
 
         let mut udn = try_get!(service.description, "/root/device/UDN").clone();
         // The UDN is typically of the for uuid:SOME-UID-HERE, but some devices
@@ -349,7 +338,7 @@ impl<T: Controller> UpnpListener for IpCameraUpnpListener<T> {
         //       it changed. I'll add this once we start persisting the camera
         //       information in a database.
         if let Some(_) = self.controller.get_service_properties(udn.clone()) {
-            debug!("Found {} @ {} UDN {} (ignoring since it already exists)", model_name, ip, udn);
+            debug!("Found {} @ {} UDN {} (ignoring since it already exists)", model_name, url, udn);
             return true;
         }
 
@@ -365,7 +354,7 @@ impl<T: Controller> UpnpListener for IpCameraUpnpListener<T> {
         custom_properties.insert(CUSTOM_PROPERTY_MODEL.to_owned(), model_name.to_owned());
 
         // Create the IpCameraService.
-        let service = IpCameraService::new(self.controller.clone(), &udn, &ip, &name,
+        let service = IpCameraService::new(self.controller.clone(), &udn, &url, &name,
                                            custom_properties);
         service.start();
         self.controller.add_service(Box::new(service));

@@ -169,7 +169,10 @@ def main():
                     snapshot_url = '{}/services/{}/snapshot'.format(server_url, service_id)
                     snapshot_req = requests.get(snapshot_url, headers=auth_header)
                     j_resp = snapshot_req.json()
-                    print(j_resp['success'])
+                    if 'success' in j_resp:
+                        print(j_resp['success'])
+                    else:
+                        print(j_resp['error'])
                 if args.list_snaps:
                     list_snaps_url = '{}/services/{}/list'.format(server_url, service_id)
                     snaps_req = requests.get(list_snaps_url, headers=auth_header)
