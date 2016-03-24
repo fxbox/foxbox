@@ -5,16 +5,10 @@
         {
           "source": [
             {
-              "kind": {
-                "Exactly": {
-                  "CurrentTimeOfDay": []
-                }
-              }
+              "kind": "CurrentTimeOfDay"
             }
           ],
-          "kind": {
-            "CurrentTimeOfDay": []
-          },
+          "kind": "CurrentTimeOfDay",
           "range": {
             "Geq": {
               "Duration": 5
@@ -24,16 +18,10 @@
         {
           "source": [
             {
-              "kind": {
-                "Exactly": {
-                  "CurrentTimeOfDay": []
-                }
-              }
+              "kind": "CurrentTimeOfDay"
             }
           ],
-          "kind": {
-            "CurrentTimeOfDay": []
-          },
+          "kind": "CurrentTimeOfDay",
           "range": {
             "Leq": {
               "Duration": 2
@@ -45,19 +33,13 @@
         {
           "destination": [
             {
-              "kind": {
-                "Exactly": {
-                  "Ready": []
-                }
-              }
+              "kind": "Ready"
             }
           ],
           "value": {
             "Unit": []
           },
-          "kind": {
-            "Ready": []
-          }
+          "kind": "Ready"
         }
       ]
     }

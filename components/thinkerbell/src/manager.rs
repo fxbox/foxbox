@@ -1,13 +1,14 @@
-use std::collections::HashMap;
-use std::path::{ Path, PathBuf };
-
 use ast::Script;
 use compile::ExecutableDevEnv;
-use parse::ParseError;
 use run::{ Execution, ExecutionEvent, Error as RunError, StartStopError };
 
-use foxbox_taxonomy::util::{ Id };
+use std::collections::HashMap;
+use std::path::{ Path as FilePath, PathBuf as FilePathBuf };
+
 use foxbox_taxonomy::api::ResultMap;
+use foxbox_taxonomy::parse::*;
+use foxbox_taxonomy::util::{ Id };
+
 use rusqlite;
 use transformable_channels::mpsc::{ channel, ExtSender, TransformableSender };
 
@@ -39,7 +40,7 @@ pub struct ScriptManager<Env, T> where Env: ExecutableDevEnv + Clone + 'static {
     env: Env,
 
     /// The path to the SQLite file to store, e.g. "./database.sqlite"
-    path: PathBuf,
+    path: FilePathBuf,
 
     /// A map to track currently-executing scripts.
     runners: HashMap<Id<ScriptId>, Execution<Env>>,
@@ -59,7 +60,7 @@ impl<Env, T> ScriptManager<Env, T>
     ///
     /// The database stores the raw script source, but only after the source has been parsed
     /// to ensure validity.
-    pub fn new(env: Env, path: &Path, tx: Box<T>) -> Result<Self, Error> {
+    pub fn new(env: Env, path: &FilePath, tx: Box<T>) -> Result<Self, Error> {
 
         let connection = try!(rusqlite::Connection::open(&path));
         try!(connection.execute("CREATE TABLE IF NOT EXISTS scripts (
@@ -200,7 +201,7 @@ impl<Env, T> ScriptManager<Env, T>
         let tx = self.tx.map(move |event| {
             (tx_id.clone(), event)
         });
-        let parsed_source = try!(Script::parse(source));
+        let parsed_source = try!(Script::from_str(source));
         try!(runner.start(self.env.clone(), parsed_source, tx));
         self.runners.insert(id.clone(), runner);
         Ok(())

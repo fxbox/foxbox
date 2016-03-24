@@ -11,7 +11,6 @@
 //!
 //! See module `ast` for more details on the grammar of scripts.
 
-extern crate foxbox_adapters;
 extern crate foxbox_taxonomy;
 
 extern crate transformable_channels;
@@ -24,9 +23,6 @@ extern crate serde_json;
 
 /// Definition of the AST.
 pub mod ast;
-
-/// Parsing JSON into an AST.
-pub mod parse;
 
 /// Compiling an AST into something runnable.
 pub mod compile;

@@ -1,6 +1,7 @@
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
 
+extern crate foxbox_taxonomy;
 extern crate foxbox_thinkerbell;
 
 extern crate transformable_channels;
@@ -12,6 +13,8 @@ extern crate serde_json;
 use foxbox_thinkerbell::run::Execution;
 use foxbox_thinkerbell::ast::Script;
 use foxbox_thinkerbell::fake_env::*;
+
+use foxbox_taxonomy::parse::Parser;
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -61,7 +64,7 @@ fn main () {
             if vec.is_empty() || vec[0].is_empty() {
                 StdDuration::new(0, 0)
             } else {
-                let s = f64::from_str(vec[0]).unwrap();
+                let s : f64 = FromStr::from_str(vec[0]).unwrap();
                 StdDuration::new(s as u64, (s.fract() * 1_000_000.0) as u32)
             }
         }
@@ -75,7 +78,7 @@ fn main () {
         let mut file = File::open(path).unwrap();
         let mut source = String::new();
         file.read_to_string(&mut source).unwrap();
-        let script = Script::parse(&source).unwrap();
+        let script = Script::from_str(&source).unwrap();
         print!("Ruleset loaded, launching... ");
 
         let mut runner = Execution::<FakeEnv>::new();

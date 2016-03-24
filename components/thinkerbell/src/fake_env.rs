@@ -1,12 +1,10 @@
 use compile::ExecutableDevEnv;
 
-use foxbox_adapters::adapter::*;
-use foxbox_adapters::manager::*;
-
+use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::api::{ API, Error };
+use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
-use foxbox_taxonomy::util::Id;
 
 use std::cmp::{ Ord, PartialOrd, Ordering as OrdOrdering };
 use std::collections::{ BinaryHeap, HashMap };
