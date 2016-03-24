@@ -23,6 +23,7 @@ extern crate chrono;
 extern crate core;
 extern crate docopt;
 extern crate env_logger;
+#[macro_use]
 extern crate foxbox_taxonomy;
 extern crate foxbox_users;
 #[macro_use]
