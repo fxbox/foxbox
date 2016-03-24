@@ -49,6 +49,13 @@ impl<A> TaxonomyRouter<A>
         Ok(response)
     }
 
+    fn build_parse_error(&self, obj: &ParseError) -> IronResult<Response> {
+        let mut response = Response::with(format!("{}", obj));
+        response.status = Some(Status::BadRequest);
+        response.headers.set(ContentType::plaintext()); // FIXME: Should be JSON
+        Ok(response)
+    }
+
     fn read_body_to_string<'a, 'b : 'a>(body: &mut Body<'a, 'b>) -> Result<String, IOError> {
         let mut s = String::new();
         try!(body.read_to_string(&mut s));
@@ -83,17 +90,18 @@ impl<A> Handler for TaxonomyRouter<A>
                                                   format!("Bad method: {}", req.method))));
                     }
 
-                    let result = if req.method == Method::Get {
+                    if req.method == Method::Get {
                         // On a GET, just send the full taxonomy content for
                         // this kind of selector.
-                        api.$call(vec![$sel::new()])
+                        let result = api.$call(vec![$sel::new()]);
+                        self.build_response(&result)
                     } else {
                         let source = itry!(Self::read_body_to_string(&mut req.body));
-                        let selectors = itry!(Vec::<$sel>::from_str(&source));
-                        api.$call(selectors)
-                    };
-
-                    self.build_response(&result)
+                        match Vec::<$sel>::from_str(&source as &str) {
+                            Ok(arg) => self.build_response(&api.$call(arg)),
+                            Err(err) => self.build_parse_error(&err)
+                        }
+                    }
                 }
             })
         }
@@ -106,9 +114,10 @@ impl<A> Handler for TaxonomyRouter<A>
                     return {
                         let api = self.api.lock().unwrap();
                         let source = itry!(Self::read_body_to_string(&mut req.body));
-                        let selectors = itry!(Selectors::from_str(&source));
-                        let result = api.$call(selectors);
-                        return self.build_response(&result);
+                        match Selectors::from_str(&source as &str) {
+                            Ok(arg) => self.build_response(&api.$call(arg)),
+                            Err(err) => self.build_parse_error(&err)
+                        }
                     }
                 }
             )
@@ -125,12 +134,19 @@ impl<A> Handler for TaxonomyRouter<A>
                         let api = self.api.lock().unwrap();
 
                         let source = itry!(Self::read_body_to_string(&mut req.body));
-                        let mut args: JSON = itry!(serde_json::de::from_str(&source));
-                        let arg_1 = itry!(Param1::take(Path::new(), &mut args, stringify!($name1)));
-                        let arg_2 = itry!(Param2::take(Path::new(), &mut args, stringify!($name2)));
-
-                        let result = api.$call(arg_1, arg_2);
-                        return self.build_response(&result);
+                        let mut json = match serde_json::de::from_str(&source as &str) {
+                            Err(err) => return self.build_parse_error(&ParseError::json(err)),
+                            Ok(args) => args
+                        };
+                        let arg_1 = match Param1::take(Path::new(), &mut json, stringify!($name1)) {
+                            Err(err) => return self.build_parse_error(&err),
+                            Ok(val) => val
+                        };
+                        let arg_2 = match Param2::take(Path::new(), &mut json, stringify!($name2)) {
+                            Err(err) => return self.build_parse_error(&err),
+                            Ok(val) => val
+                        };
+                        self.build_response(&api.$call(arg_1, arg_2))
                     }
                 }
             )
@@ -214,6 +230,7 @@ describe! taxonomy_router {
     before_each {
         extern crate serde_json;
 
+        use serde_json::value::Value as JSON;
         use adapters::clock;
         use foxbox_taxonomy::manager::AdapterManager;
         use iron::Headers;
