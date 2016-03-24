@@ -113,6 +113,26 @@ impl Parser<Type> for Type {
         }
     }
 }
+impl ToJSON for Type {
+    fn to_json(&self) -> JSON {
+        use self::Type::*;
+        let key = match *self {
+            Unit => "Unit",
+            OnOff => "OnOff",
+            OpenClosed => "OpenClosed",
+            Duration => "Duration",
+            TimeStamp => "TimeStamp",
+            Temperature => "Temperature",
+            String => "String",
+            Color => "Color",
+            Json => "Json",
+            Binary => "Binary",
+            ExtBool => "ExtBool",
+            ExtNumeric => "ExtNumeric",
+        };
+        JSON::String(key.to_owned())
+    }
+}
 
 impl Type {
     /// Determine whether using `Range::Eq` for this type is

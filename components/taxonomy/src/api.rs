@@ -24,6 +24,9 @@ use std::collections::HashMap;
 use std::{ error, fmt };
 use std::error::Error as std_error;
 
+use serde::ser::Serialize;
+use serde_json::value::Serializer;
+
 /// An error that arose during interaction with either a device, an adapter or the
 /// adapter manager
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -52,6 +55,19 @@ pub enum Error {
     /// An error internal to the foxbox or an adapter. Normally, these errors should never
     /// arise from the high-level API.
     InternalError(InternalError),
+}
+
+impl ToJSON for Error {
+    fn to_json(&self) -> JSON {
+        let mut serializer = Serializer::new();
+        match self.serialize(&mut serializer) {
+            // FIXME: I don't think that this can explode, but there doesn't seem to
+            // be any way to check :/
+            Ok(()) => serializer.unwrap(),
+            Err(_) =>
+                vec![("Internal error while serializing", "")].to_json()
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -178,29 +194,27 @@ pub trait API: Send {
     ///
     /// `GET /api/v1/services`
     ///
-    /// ## Requests
+    /// ### JSON
     ///
-    /// Any JSON that can be deserialized to a `Vec<ServiceSelector>`. See
-    /// the implementation of `ServiceSelector` for details.
+    /// This call accepts as JSON argument a vector of `ServiceSelector`. See the documentation
+    /// of `ServiceSelector` for more details.
     ///
-    /// ### Example
+    /// Example: Select all doors in the entrance (tags `door`, `entrance`)
+    /// that support setter channel `OpenClosed`
     ///
-    /// Selector all doors in the entrance (tags `door`, `entrance`)
-    /// that support setter channel `OpenClose`
+    /// ```
+    /// # use foxbox_taxonomy::selector::*;
     ///
-    /// ```json
-    /// [{
+    /// let source = r#"[{
     ///   "tags": ["entrance", "door"],
     ///   "getters": [
     ///     {
-    ///       "kind": {
-    ///         "Exactly": {
-    ///           "OpenClose": []
-    ///         }
-    ///       }
+    ///       "kind": "OpenClosed"
     ///     }
     ///   ]
-    /// }]
+    /// }]"#;
+    ///
+    /// # Vec::<ServiceSelector>::from_str(&source).unwrap();
     /// ```
     ///
     ///
@@ -216,27 +230,21 @@ pub trait API: Send {
     ///
     /// ### Example
     ///
-    /// ```json
-    /// [{
+    /// ```
+    /// # let source =
+    /// r#"[{
     ///   "tags": ["entrance", "door", "somevendor"],
     ///   "id: "some-service-id",
     ///   "getters": [],
     ///   "setters": [
-    ///     "tags": [...],
+    ///     "tags": ["tag 1", "tag 2"],
     ///     "id": "some-channel-id",
     ///     "service": "some-service-id",
-    ///     "last_seen": "some-date",
-    ///     "mechanism": {
-    ///       "Setter":  {
-    ///         "kind": {
-    ///           "OnOff": []
-    ///         },
-    ///         "push": [5000],
-    ///         "updated": "some-date",
-    ///       }
-    ///     }
+    ///     "updated": "2014-11-28T12:00:09+00:00",
+    ///     "mechanism": "setter",
+    ///     "kind": "OnOff"
     ///   ]
-    /// }]
+    /// }]"#;
     /// ```
     fn get_services(&self, Vec<ServiceSelector>) -> Vec<Service>;
 
@@ -258,15 +266,31 @@ pub trait API: Send {
     ///
     /// `POST /api/v1/services/tag`
     ///
-    /// ## Getters
+    /// ## JSON
     ///
-    /// Any JSON that can be deserialized to
+    /// A JSON object with the following fields:
+    /// - services: array - an array of ServiceSelector;
+    /// - tags: array - an array of string
     ///
-    /// ```ignore
-    /// {
-    ///   set: Vec<ServiceSelector>,
-    ///   tags: Vec<Id<TagId>>,
-    /// }
+    /// ```
+    /// # extern crate serde;
+    /// # extern crate serde_json;
+    /// # extern crate foxbox_taxonomy;
+    /// # use foxbox_taxonomy::services::*;
+    /// # use foxbox_taxonomy::selector::*;
+    ///
+    /// # fn main() {
+    ///  # let source =
+    /// r#"{
+    ///   "services": [{"id": "id 1"}, {"id": "id 2"}],
+    ///   "tags": ["tag 1", "tag 2"]
+    /// }"#;
+    ///
+    /// # let mut json: JSON = serde_json::from_str(&source).unwrap();
+    /// # Vec::<ServiceSelector>::take(Path::new(), &mut json, "services").unwrap();
+    /// # Vec::<Id<String>>::take(Path::new(), &mut json, "tags").unwrap();
+    ///
+    /// # }
     /// ```
     ///
     /// ## Errors
@@ -297,15 +321,31 @@ pub trait API: Send {
     ///
     /// `DELETE /api/v1/services/tag`
     ///
-    /// ## Getters
+    /// ## JSON
     ///
-    /// Any JSON that can be deserialized to
+    /// A JSON object with the following fields:
+    /// - services: array - an array of ServiceSelector;
+    /// - tags: array - an array of string
     ///
-    /// ```ignore
-    /// {
-    ///   set: Vec<ServiceSelector>,
-    ///   tags: Vec<Id<TagId>>,
-    /// }
+    /// ```
+    /// # extern crate serde;
+    /// # extern crate serde_json;
+    /// # extern crate foxbox_taxonomy;
+    /// # use foxbox_taxonomy::services::*;
+    /// # use foxbox_taxonomy::selector::*;
+    ///
+    /// # fn main() {
+    ///
+    ///  # let source =
+    /// r#"{
+    ///   "services": [{"id": "id 1"}, {"id": "id 2"}],
+    ///   "tags": ["tag 1", "tag 2"]
+    /// }"#;
+    ///
+    /// # let mut json: JSON = serde_json::from_str(&source).unwrap();
+    /// # Vec::<ServiceSelector>::take(Path::new(), &mut json, "services").unwrap();
+    /// # Vec::<Id<String>>::take(Path::new(), &mut json, "tags").unwrap();
+    /// # }
     /// ```
     ///
     /// ## Errors
@@ -315,15 +355,65 @@ pub trait API: Send {
     ///
     /// ## Success
     ///
-    /// A JSON representing a number.
+    /// A JSON string representing a number.
     fn remove_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Get a list of getters matching some conditions
     ///
     /// # REST API
     ///
-    /// `GET /api/v1/channels`
+    /// `GET /api/v1/channels/getters`
+    ///
+    /// ### JSON
+    ///
+    /// This call accepts as JSON argument a vector of `GetterSelector`. See the documentation
+    /// of `GetterSelector` for more details.
+    ///
+    /// Example: Select all doors in the entrance (tags `door`, `entrance`)
+    /// that support setter channel `OpenClosed`
+    ///
+    /// ```
+    /// # use foxbox_taxonomy::selector::*;
+    ///
+    /// let source = r#"[{
+    ///   "tags": ["entrance", "door"],
+    ///   "kind": "OpenClosed"
+    /// }]"#;
+    ///
+    /// # Vec::<GetterSelector>::from_str(&source).unwrap();
+    /// ```
+    ///
+    ///
+    /// ## Errors
+    ///
+    /// In case of syntax error, Error 400, accompanied with a
+    /// somewhat human-readable JSON string detailing the error.
+    ///
+    /// ## Success
+    ///
+    /// A JSON representing an array of `Service`. See the implementation
+    /// of `Service` for details.
+    ///
+    /// ### Example
+    ///
+    /// ```
+    /// # let source =
+    /// r#"[{
+    ///   "tags": ["entrance", "door", "somevendor"],
+    ///   "id: "some-getter-id",
+    ///   "service": "some-service-id",
+    ///   "updated": "2014-11-28T12:00:09+00:00",
+    ///   "mechanism": "getter",
+    ///   "kind": "OnOff"
+    /// }]"#;
+    /// ```
     fn get_getter_channels(&self, selectors: Vec<GetterSelector>) -> Vec<Channel<Getter>>;
+
+    /// Get a list of getters matching some conditions
+    ///
+    /// # REST API
+    ///
+    /// `GET /api/v1/channels`
     fn get_setter_channels(&self, selectors: Vec<SetterSelector>) -> Vec<Channel<Setter>>;
 
     /// Label a set of channels with a set of tags.

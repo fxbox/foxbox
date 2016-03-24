@@ -205,6 +205,12 @@ impl<T> Parser<Id<T>> for Id<T> {
     }
 }
 
+impl<T> ToJSON for Id<T> {
+    fn to_json(&self) -> JSON {
+        JSON::String(self.to_string())
+    }
+}
+
 impl<T> Deserialize for Id<T> {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer {
@@ -216,6 +222,13 @@ impl<T> Deserialize for Id<T> {
         })
     }
 }
+
+impl<T, U> ToJSON for HashMap<Id<U>, T> where T: ToJSON {
+    fn to_json(&self) -> JSON {
+        JSON::Object(self.iter().map(|(k, v)| (k.to_string(), T::to_json(v))).collect())
+    }
+}
+
 
 /// A bunch of results grouped in an array of (key, result).
 pub type ResultSet<I, T, E> = HashMap<I, Result<T, E>>;
