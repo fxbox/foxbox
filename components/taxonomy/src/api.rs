@@ -251,8 +251,8 @@ pub trait API: Send {
     ///
     /// ### JSON
     ///
-    /// This call accepts as JSON argument either a single `ServiceSelector` or an array
-    /// of ServiceSelectors.
+    /// This call accepts as JSON argument a vector of `ServiceSelector`. See the documentation
+    /// of `ServiceSelector` for more details.
     ///
     /// Example: Select all doors in the entrance (tags `door`, `entrance`)
     /// that support setter channel `OpenClosed`

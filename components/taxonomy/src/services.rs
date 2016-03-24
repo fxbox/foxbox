@@ -385,18 +385,14 @@ impl ToJSON for ChannelKind {
             OvenTemperature => JSON::String("OvenTemperature".to_owned()),
             AddThinkerbellRule => JSON::String("AddThinkerbellRule".to_owned()),
             RemoveThinkerbellRule => JSON::String("RemoveThinkerbellRule".to_owned()),
-            ThinkerbellRuleSource => JSON::String("ThinkerbellRuleSource".to_owned()),
+            ThinkerbellRuleSource => JSON::String("ThinkerbellRuleSource".to_owned()), 
             Extension { ref vendor, ref adapter, ref kind, ref typ } => {
-                let mut source = vec![
+                vec![
                     ("vendor", vendor.to_json()),
                     ("adapter", adapter.to_json()),
                     ("kind", kind.to_json()),
                     ("typ", typ.to_json()),
-                ];
-                let map = source.drain(..)
-                    .map(|(key, value)| (key.to_owned(), value))
-                    .collect();
-                JSON::Object(map)
+                ].to_json()
             }
         }
     }
