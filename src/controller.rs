@@ -108,7 +108,7 @@ impl Controller for FoxBox {
         adapter_manager.start(&taxo_manager);
 
         HttpServer::new(self.clone()).start(taxo_manager);
-        WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
+        WsServer::start(self.clone());
 
         self.upnp.search(None).unwrap();
 
@@ -192,6 +192,10 @@ impl Controller for FoxBox {
 
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
         (self.hostname.as_str(), self.http_port).to_socket_addrs()
+    }
+
+    fn ws_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
+        (self.hostname.as_str(), self.ws_port).to_socket_addrs()
     }
 
     fn add_websocket(&mut self, socket: ws::Sender) {

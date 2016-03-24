@@ -19,9 +19,11 @@ pub struct WsHandler<T> {
 
 impl WsServer {
 
-    pub fn start<T: Controller>(controller: T, hostname: String, port: u16) {
+    pub fn start<T: Controller>(controller: T) {
+        let addrs: Vec<_> = controller.ws_as_addrs().unwrap().collect();
         thread::Builder::new().name("WsServer".to_owned()).spawn(move || {
-            listen((&hostname as &str, port), |out| {
+
+            listen(addrs[0], |out| {
                 WsHandler {
                     out: out,
                     controller: controller.clone(),

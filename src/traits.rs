@@ -31,6 +31,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn get_http_root_for_service(&self, service_id: String) -> String;
     fn get_ws_root_for_service(&self, service_id: String) -> String;
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error>;
+    fn ws_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error>;
 
     fn get_tls_enabled(&self) -> bool;
     fn get_certificate_manager(&self) -> CertificateManager;

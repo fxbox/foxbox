@@ -70,6 +70,11 @@ impl Controller for ControllerStub {
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
         ("localhost", 3000).to_socket_addrs()
     }
+
+    fn ws_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
+        ("localhost", 4000).to_socket_addrs()
+    }
+
     fn add_websocket(&mut self, socket: ws::Sender) {}
     fn remove_websocket(&mut self, socket: ws::Sender) {}
     fn broadcast_to_websockets(&self, data: serde_json::value::Value) {}
