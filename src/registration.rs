@@ -61,17 +61,9 @@ impl Registrar {
             let fingerprint_domain = format!("{}.{}", self_signed_cert_fingerprint, domain);
 
             info!("Using {}", fingerprint_domain);
-            map.insert("domain".to_owned(), fingerprint_domain);
+            map.insert("message".to_owned(), fingerprint_domain);
         } else {
             error!("Could not generate self signed certificate: {}", certificate_record_result.err().unwrap().description());
-        }
-
-        map.insert("local_ip".to_owned(), ip_addr.unwrap());
-
-        if let Some(ref tunnel) = *tunnel {
-            if let Some(remote) = tunnel.get_remote_hostname() {
-                map.insert("tunnel_url".to_owned(), remote);
-            }
         }
 
         let body = match serde_json::to_string(&map) {
