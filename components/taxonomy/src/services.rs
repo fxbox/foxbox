@@ -38,6 +38,18 @@ macro_rules! tag_id {
 /// that may offer services. The FoxBox itself is a service offering
 /// services such as a clock, communicating with the user through her
 /// smart devices, etc.
+///
+/// # JSON
+///
+/// A service is represented by an object with the following fields:
+///
+/// - id: string - an id unique to this service;
+/// - adapter: string;
+/// - tags: array of strings;
+/// - properties: object;
+/// - getters: object (keys are string identifiers, for more details on values see Channel<Getter>);
+/// - setters: object (keys are string identifiers, for more details on values see Channel<Setter>);
+///
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Service {
     /// Tags describing the service.
@@ -84,18 +96,37 @@ impl Service {
     }
 }
 
-/// The kind of the service, i.e. a strongly-typed description of
-/// _what_ the service can do. Used both for locating services
+impl ToJSON for Service {
+    fn to_json(&self) -> JSON {
+        let mut source = vec![
+            ("id", self.id.to_json()),
+            ("adapter", self.adapter.to_json()),
+            ("tags", self.tags.to_json()),
+            ("properties", self.properties.to_json()),
+            ("getters", self.getters.to_json()),
+            ("setters", self.setters.to_json()),
+        ];
+
+        let map = source.drain(..)
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect();
+        JSON::Object(map)
+    }
+}
+
+
+/// The kind of the channel, i.e. a strongly-typed description of
+/// _what_ the channel can do. Used both for locating channels
 /// (e.g. "I need a clock" or "I need something that can provide
 /// pictures") and for determining the data structure that these
-/// services can provide or consume.
+/// channel can provide or consume.
 ///
-/// A number of service kinds are standardized, and provided as a set
+/// A number of channel kinds are standardized, and provided as a set
 /// of strongly-typed enum constructors. It is clear, however, that
-/// many devices will offer services that cannot be described by
+/// many devices will offer channels that cannot be described by
 /// pre-existing constructors. For this purpose, this enumeration
 /// offers a constructor `Extension`, designed to describe novel
-/// services.
+/// channels.
 ///
 /// # JSON
 ///
@@ -331,6 +362,33 @@ impl Parser<ChannelKind> for ChannelKind {
     }
 }
 
+impl ToJSON for ChannelKind {
+    fn to_json(&self) -> JSON {
+        use self::ChannelKind::*;
+        match *self {
+            Ready => JSON::String("Ready".to_owned()),
+            OnOff => JSON::String("OnOff".to_owned()),
+            OpenClosed => JSON::String("OpenClosed".to_owned()),
+            CurrentTime => JSON::String("CurrentTime".to_owned()),
+            CurrentTimeOfDay => JSON::String("CurrentTimeOfDay".to_owned()),
+            RemainingTime => JSON::String("RemainingTime".to_owned()),
+            OvenTemperature => JSON::String("OvenTemperature".to_owned()),
+            Extension { ref vendor, ref adapter, ref kind, ref typ } => {
+                let mut source = vec![
+                    ("vendor", vendor.to_json()),
+                    ("adapter", adapter.to_json()),
+                    ("kind", kind.to_json()),
+                    ("typ", typ.to_json()),
+                ];
+                let map = source.drain(..)
+                    .map(|(key, value)| (key.to_owned(), value))
+                    .collect();
+                JSON::Object(map)
+            }
+        }
+    }
+}
+
 impl ChannelKind {
     /// Get the type of values used to communicate with this service.
     pub fn get_type(&self) -> Type {
@@ -408,6 +466,55 @@ pub struct Channel<IO> where IO: IOMechanism {
     /// The last time the device was seen.
     #[serde(default)]
     pub last_seen: Option<TimeStamp>,
+}
+
+impl ToJSON for Channel<Getter> {
+    fn to_json(&self) -> JSON {
+        let mut source = vec![
+            ("id", self.id.to_json()),
+            ("adapter", self.adapter.to_json()),
+            ("tags", self.tags.to_json()),
+            ("service", self.service.to_json()),
+            ("mechanism", JSON::String("getter".to_owned())),
+            ("kind", self.mechanism.kind.to_json()),
+        ];
+        if let Some(ref ts) = self.last_seen {
+            source.push(("last_seen", ts.to_json()))
+        }
+        if let Some(ref ts) = self.mechanism.updated {
+            source.push(("updated", ts.to_json()));
+        }
+
+        let map = source.drain(..)
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect();
+        JSON::Object(map)
+    }
+}
+
+
+impl ToJSON for Channel<Setter> {
+    fn to_json(&self) -> JSON {
+        let mut source = vec![
+            ("id", self.id.to_json()),
+            ("adapter", self.adapter.to_json()),
+            ("tags", self.tags.to_json()),
+            ("service", self.service.to_json()),
+            ("mechanism", JSON::String("setter".to_owned())),
+            ("kind", self.mechanism.kind.to_json()),
+        ];
+        if let Some(ref ts) = self.last_seen {
+            source.push(("last_seen", ts.to_json()))
+        }
+        if let Some(ref ts) = self.mechanism.updated {
+            source.push(("updated", ts.to_json()));
+        }
+
+        let map = source.drain(..)
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect();
+        JSON::Object(map)
+    }
 }
 
 impl<IO> Eq for Channel<IO> where IO: IOMechanism {
