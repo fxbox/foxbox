@@ -4,16 +4,11 @@
 //! objects. Rather, they will use module `parse` to parse a script
 //! and module `run` to execute it.
 
-use parse::*;
-
-use foxbox_taxonomy::values::*;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
+use foxbox_taxonomy::values::*;
 
 use std::marker::PhantomData;
-
-use serde_json::value::Value as JSON;
-use serde_json;
 
 /// A thinkerbell script.
 pub struct Script<Ctx> where Ctx: Context {
@@ -23,20 +18,9 @@ pub struct Script<Ctx> where Ctx: Context {
     pub phantom: PhantomData<Ctx>,
 }
 
-impl Script<UncheckedCtx> {
-    pub fn parse(s: &str) -> Result<Self, ParseError> {
-        let path = Path::new();
-        match serde_json::from_str(s) {
-            Err(err) => Err(ParseError::json(err)),
-            Ok(source) => <Self as Parse<Script<UncheckedCtx>>>::parse(path, source)
-        }
-    }
-}
-
-impl Parse<Script<UncheckedCtx>> for Script<UncheckedCtx> {
-    fn parse(path: Path, mut source: JSON) -> Result<Self, ParseError> {
-        let rules = try!(path.push("", |path| Rule::take_vec(path, &mut source, "rules")));
-        try!(check_no_more_fields(path, source));
+impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let rules = try!(path.push("", |path| Rule::take_vec(path, source, "rules")));
         Ok(Script {
             rules: rules,
             phantom: PhantomData
@@ -57,15 +41,14 @@ pub struct Rule<Ctx> where Ctx: Context {
 
     pub phantom: PhantomData<Ctx>,
 }
-impl Parse<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
-    fn parse(path: Path, mut source: JSON) -> Result<Self, ParseError> {
+impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let conditions = try!(path.push("conditions",
-            |path| Match::take_vec(path, &mut source, "conditions"))
+            |path| Match::take_vec(path, source, "conditions"))
         );
         let execute = try!(path.push("execute",
-            |path| Statement::take_vec(path, &mut source, "execute"))
+            |path| Statement::take_vec(path, source, "execute"))
         );
-        try!(check_no_more_fields(path, source));
         Ok(Rule {
             conditions: conditions,
             execute: execute,
@@ -105,25 +88,24 @@ pub struct Match<Ctx> where Ctx: Context {
 
     pub phantom: PhantomData<Ctx>,
 }
-impl Parse<Match<UncheckedCtx>> for Match<UncheckedCtx> {
-    fn parse(path: Path, mut source: JSON) -> Result<Self, ParseError> {
+impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let sources = try!(path.push("source",
-            |path| GetterSelector::take_vec(path, &mut source, "source"))
+            |path| GetterSelector::take_vec(path, source, "source"))
         );
         let kind = try!(path.push("kind",
-            |path| ChannelKind::take(path, &mut source, "kind"))
+            |path| ChannelKind::take(path, source, "kind"))
         );
         let range = try!(path.push("range",
-            |path| Range::take(path, &mut source, "range"))
+            |path| Range::take(path, source, "range"))
         );
         let duration = match path.push("range",
-            |path| Duration::take(path, &mut source, "duration"))
+            |path| Duration::take(path, source, "duration"))
         {
             Err(ParseError::MissingField {..}) => None,
             Err(err) => return Err(err),
             Ok(ok) => Some(ok)
         };
-        try!(check_no_more_fields(path, source));
         Ok(Match {
             source: sources,
             kind: kind,
@@ -154,18 +136,17 @@ pub struct Statement<Ctx> where Ctx: Context {
 
     pub phantom: PhantomData<Ctx>,
 }
-impl Parse<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
-    fn parse(path: Path, mut source: JSON) -> Result<Self, ParseError> {
+impl Parser<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let destination = try!(path.push("destination",
-            |path| SetterSelector::take_vec(path, &mut source, "destination"))
+            |path| SetterSelector::take_vec(path, source, "destination"))
         );
         let kind = try!(path.push("kind",
-            |path| ChannelKind::take(path, &mut source, "kind"))
+            |path| ChannelKind::take(path, source, "kind"))
         );
         let value = try!(path.push("value",
-            |path| Value::take(path, &mut source, "value"))
+            |path| Value::take(path, source, "value"))
         );
-        try!(check_no_more_fields(path, source));
         Ok(Statement {
             destination: destination,
             value: value,

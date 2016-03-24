@@ -6,12 +6,10 @@ extern crate transformable_channels;
 extern crate chrono;
 
 use foxbox_thinkerbell::fake_env::*;
-use foxbox_thinkerbell::parse::*;
 use foxbox_thinkerbell::run::*;
 use foxbox_thinkerbell::ast::*;
 
 use foxbox_taxonomy::api::{ Error as APIError };
-use foxbox_taxonomy::util::Id;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Duration, OnOff, Range, TimeStamp, Type, TypeError as APITypeError , Value };
@@ -48,7 +46,7 @@ fn test_compile() {
     });
 
     println!("* Attempting to parse an run an empty script will raise an error.");
-    let script = Script::parse("{\"rules\": []}").unwrap();
+    let script = Script::from_str("{\"rules\": []}").unwrap();
     match exec.start(env, script, tx_run) {
         Err(Error::CompileError(CompileError::SourceError(SourceError::NoRule))) => {},
         other => panic!("Unexpected result {:?}", other)
@@ -141,6 +139,7 @@ fn test_run() {
             getters: HashMap::new(),
             setters: HashMap::new(),
             tags: HashSet::new(),
+            properties: HashMap::new(),
         }
     ]));
     rx_done.recv().unwrap();
@@ -561,6 +560,7 @@ fn test_run_with_delay() {
             getters: HashMap::new(),
             setters: HashMap::new(),
             tags: HashSet::new(),
+            properties: HashMap::new(),
         }
     ]));
     rx_done.recv().unwrap();
