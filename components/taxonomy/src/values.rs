@@ -1238,6 +1238,7 @@ impl Parser<Value> for Value {
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         match *source {
             JSON::Null => Ok(Value::Unit),
+            JSON::String(ref str) if &*str == "Unit" => Ok(Value::Unit),
             JSON::Object(ref mut obj) if obj.len() == 1 => {
                 let mut vec : Vec<_> = obj.iter_mut().collect();
                 let (k, v) = vec.pop().unwrap(); // We checked the length just above.

@@ -310,6 +310,11 @@ impl Parser<ChannelKind> for ChannelKind {
             }
         }
         if source.is_object() {
+            for key in vec!["vendor", "adapter", "kind", "type"] {
+                if source.find(key).is_none() {
+                    return Err(ParseError::type_error("ChannelKind", &path, "string|object {vendor, adapter, kind, type}"))
+                }
+            }
             let vendor = try!(path.push("vendor", |path| Id::take(path, source, "vendor")));
             let adapter = try!(path.push("adapter", |path| Id::take(path, source, "adapter")));
             let kind = try!(path.push("kind", |path| Id::take(path, source, "kind")));
@@ -321,7 +326,7 @@ impl Parser<ChannelKind> for ChannelKind {
                 typ: typ
             })
         } else {
-            Err(ParseError::type_error("ChannelKind", &path, "string|object"))
+            Err(ParseError::type_error("ChannelKind", &path, "string|object {vendor, adapter, kind, type}"))
         }
     }
 }
