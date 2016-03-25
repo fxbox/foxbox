@@ -13,10 +13,14 @@ pub mod webpush;
 
 mod ip_camera;
 
-use foxbox_taxonomy::adapter::AdapterManagerHandle;
+/// An adapter providing access to Thinkerbell.
+mod thinkerbell;
+
 use foxbox_taxonomy::api::API;
+use foxbox_taxonomy::adapter::AdapterManagerHandle;
 
 use self::philips_hue::PhilipsHueAdapter;
+use self::thinkerbell::ThinkerbellAdapter;
 use service::ServiceAdapter;
 use traits::Controller;
 
@@ -42,6 +46,7 @@ impl<T: Controller> AdapterManager<T> {
         clock::Clock::init(&adapter_manager).unwrap(); // FIXME: We should have a way to report errors
         webpush::WebPush::init(c, &adapter_manager).unwrap();
         ip_camera::IPCameraAdapter::init(adapter_manager.clone(), self.controller.clone()).unwrap();
+        ThinkerbellAdapter::init(adapter_manager.clone()).unwrap(); // FIXME: no unwrap!
     }
 
     fn start_adapter(&mut self, adapter: Box<ServiceAdapter>) {

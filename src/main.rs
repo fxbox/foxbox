@@ -25,6 +25,7 @@ extern crate docopt;
 extern crate env_logger;
 #[macro_use]
 extern crate foxbox_taxonomy;
+extern crate foxbox_thinkerbell;
 extern crate foxbox_users;
 #[macro_use]
 extern crate hyper;
