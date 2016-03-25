@@ -24,7 +24,9 @@ use hyper::header::{ ContentEncoding, Encoding };
 use hyper::Client;
 use hyper::client::Body;
 use rusqlite::{ self };
+use self::crypto::CryptoContext;
 use serde_json;
+use std::cmp::min;
 use std::collections::{ HashMap, HashSet };
 use std::sync::Arc;
 use std::thread;
@@ -33,6 +35,8 @@ use transformable_channels::mpsc::*;
 
 header! { (Encryption, "Encryption") => [String] }
 header! { (EncryptionKey, "Encryption-Key") => [String] }
+header! { (CryptoKey, "Crypto-Key") => [String] }
+header! { (Ttl, "TTL") => [u32] }
 
 static ADAPTER_NAME: &'static str = "WebPush adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
@@ -43,7 +47,8 @@ static NO_AUTH_USER_ID: i32 = -1;
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Subscription {
     pub push_uri: String,
-    pub public_key: String
+    pub public_key: String,
+    pub auth: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -73,8 +78,26 @@ impl ResourceGetter {
 }
 
 impl Subscription {
-    fn notify(&self, message: &str) {
-        let enc = match self::crypto::encrypt(&self.public_key, message.to_owned()) {
+    fn notify(&self, crypto: &CryptoContext, message: &str) {
+        // Make the record size at least the size of the encrypted message. We must
+        // add 16 bytes for the encryption tag, 1 byte for padding and 1 byte to
+        // ensure we don't end on a record boundary.
+        //
+        // https://tools.ietf.org/html/draft-ietf-webpush-encryption-02#section-3.2
+        //
+        // "An application server MUST encrypt a push message with a single record.
+        //  This allows for a minimal receiver implementation that handles a single
+        //  record. If the message is 4096 octets or longer, the "rs" parameter MUST
+        //  be set to a value that is longer than the encrypted push message length."
+        //
+        // The push service is not obligated to accept larger records however.
+        //
+        // "Note that a push service is not required to support more than 4096 octets
+        // of payload body, which equates to 4080 octets of cleartext, so the "rs"
+        // parameter can be omitted for messages that fit within this limit."
+        //
+        let record_size = min(4096, message.len() + 18);
+        let enc = match crypto.encrypt(&self.public_key, message.to_owned(), &self.auth, record_size) {
             Some(x) => x,
             None => {
                 warn!("notity subscription {} failed for {}", self.push_uri, message);
@@ -82,23 +105,52 @@ impl Subscription {
             }
         };
 
+        let has_auth = self.auth.is_some();
+        let public_key = crypto.get_public_key(has_auth);
         let client = Client::new();
-        let res = match client.post(&self.push_uri)
-            .header(ContentEncoding(vec![Encoding::EncodingExt(String::from("aesgcm128"))]))
-            .header(EncryptionKey(format!("keyid=p256dh;dh={}", enc.public_key)))
-            .header(Encryption(format!("keyid=p256dh;salt={}", enc.salt)))
-            .body(Body::BufBody(&enc.output, enc.output.len()))
-            .send() {
-                Ok(x) => x,
-                Err(e) => { warn!("notify subscription {} failed: {:?}", self.push_uri, e); return; }
-            };
+        let mut req = client.post(&self.push_uri)
+            .header(Encryption(format!("keyid=p256dh;salt={};rs={}", enc.salt, record_size)))
+            .body(Body::BufBody(&enc.output, enc.output.len()));
 
-        info!("notified subscription {} (status {:?})", self.push_uri, res.status);
+        req = if has_auth {
+            req.header(ContentEncoding(vec![Encoding::EncodingExt(String::from("aesgcm"))]))
+                .header(CryptoKey(format!("keyid=p256dh;dh={}", public_key)))
+
+                // Set the TTL which controls how long the push service will wait before giving
+                // up on delivery of the notification
+                //
+                // https://tools.ietf.org/html/draft-ietf-webpush-protocol-04#section-6.2
+                //
+                // "An application server MUST include the TTL (Time-To-Live) header
+                //  field in its request for push message delivery.  The TTL header field
+                //  contains a value in seconds that suggests how long a push message is
+                //  retained by the push service.
+                //
+                //      TTL = 1*DIGIT
+                //
+                //  A push service MUST return a 400 (Bad Request) status code in
+                //  response to requests that omit the TTL header field."
+                //
+                //  TODO: allow the notifier to control this; right now we default to 24 hours
+                .header(Ttl(86400))
+        } else {
+            req.header(ContentEncoding(vec![Encoding::EncodingExt(String::from("aesgcm128"))]))
+                .header(EncryptionKey(format!("keyid=p256dh;dh={}", public_key)))
+        };
+
+        // TODO: Add a retry mechanism if 429 Too Many Requests returned by push service
+        let rsp = match req.send() {
+            Ok(x) => x,
+            Err(e) => { warn!("notify subscription {} failed: {:?}", self.push_uri, e); return; }
+        };
+
+        info!("notified subscription {} (status {:?})", self.push_uri, rsp.status);
     }
 }
 
 pub struct WebPush<C> {
     controller: C,
+    crypto: CryptoContext,
     getter_resource_id: Id<Getter>,
     getter_subscription_id: Id<Getter>,
     setter_resource_id: Id<Setter>,
@@ -335,6 +387,7 @@ impl<C: Controller> WebPush<C> {
     {
         WebPush {
             controller: controller,
+            crypto: CryptoContext::new().unwrap(),
             getter_resource_id: Self::getter_resource_id(),
             getter_subscription_id: Self::getter_subscription_id(),
             setter_resource_id: Self::setter_resource_id(),
@@ -384,14 +437,15 @@ impl<C: Controller> WebPush<C> {
     fn set_notify(&self, _: i32, setter: &WebPushNotify) -> rusqlite::Result<()> {
         info!("notify on resource {}: {}", setter.resource, setter.message);
 
-        let json = json!({resource: setter.resource, message: setter.message});
         let subscriptions = try!(self.get_resource_subscriptions(&setter.resource));
         if subscriptions.is_empty() {
             debug!("no users listening on push resource");
         } else {
+            let json = json!({resource: setter.resource, message: setter.message});
+            let crypto = self.crypto.clone();
             thread::spawn(move || {
                 for sub in subscriptions {
-                    sub.notify(&json);
+                    sub.notify(&crypto, &json);
                 }
             });
         }

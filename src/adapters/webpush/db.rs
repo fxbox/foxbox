@@ -27,6 +27,13 @@ fn escape(string: &str) -> String {
     string.replace("'", "''")
 }
 
+fn escape_option(opt: &Option<String>) -> Option<String> {
+    match *opt {
+        Some(ref x) => { return Some(escape(x)); },
+        None => { return None; },
+    };
+}
+
 pub struct WebPushDb {
     db: Connection,
 }
@@ -38,7 +45,8 @@ impl WebPushDb {
         db.execute("CREATE TABLE IF NOT EXISTS subscriptions (
                     user_id     INTEGER,
                     push_uri    TEXT NOT NULL UNIQUE,
-                    public_key  TEXT NOT NULL
+                    public_key  TEXT NOT NULL,
+                    auth        TEXT
             )", &[]).unwrap();
 
         db.execute("CREATE TABLE IF NOT EXISTS resources (
@@ -53,8 +61,8 @@ impl WebPushDb {
 
     /// Adds a new push subscription `sub` bound to the user `user_id`.
     pub fn subscribe(&self, user_id: i32, sub: &Subscription) -> rusqlite::Result<c_int> {
-        self.db.execute("INSERT INTO subscriptions VALUES ($1, $2, $3)",
-                        &[&user_id, &escape(&sub.push_uri), &escape(&sub.public_key)]
+        self.db.execute("INSERT INTO subscriptions VALUES ($1, $2, $3, $4)",
+                        &[&user_id, &escape(&sub.push_uri), &escape(&sub.public_key), &escape_option(&sub.auth)]
         )
     }
 
@@ -93,7 +101,7 @@ impl WebPushDb {
     /// Gets the push subscriptions for the user `user_id`.
     pub fn get_subscriptions(&self, user_id: i32) -> rusqlite::Result<Vec<Subscription>> {
         let mut subs = Vec::new();
-        let mut stmt = try!(self.db.prepare("SELECT push_uri, public_key FROM subscriptions WHERE user_id=$1"));
+        let mut stmt = try!(self.db.prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE user_id=$1"));
         let rows = try!(stmt.query(&[&user_id]));
         let (count, _) = rows.size_hint();
         subs.reserve_exact(count);
@@ -101,7 +109,8 @@ impl WebPushDb {
             let row = try!(result_row);
             subs.push(Subscription {
                 push_uri: row.get(0),
-                public_key: row.get(1)
+                public_key: row.get(1),
+                auth: row.get(2)
             });
         }
         Ok(subs)
@@ -110,7 +119,7 @@ impl WebPushDb {
     /// Gets the push subscriptions for users who are subscribed to `resource` notifications.
     pub fn get_resource_subscriptions(&self, resource: &str) -> rusqlite::Result<Vec<Subscription>> {
         let mut subs = Vec::new();
-        let mut stmt = try!(self.db.prepare("SELECT push_uri, public_key FROM subscriptions WHERE
+        let mut stmt = try!(self.db.prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE
                                              user_id IN (SELECT user_id FROM resources WHERE resource=$1)"));
         let rows = try!(stmt.query(&[&escape(resource)]));
         let (count, _) = rows.size_hint();
@@ -119,7 +128,8 @@ impl WebPushDb {
             let row = try!(result_row);
             subs.push(Subscription {
                 push_uri: row.get(0),
-                public_key: row.get(1)
+                public_key: row.get(1),
+                auth: row.get(2)
             });
         }
         Ok(subs)
@@ -160,7 +170,8 @@ describe! tests {
 
         let sub = Subscription {
             push_uri: "test_push_uri".to_owned(),
-            public_key: "test_public_key".to_owned()
+            public_key: "test_public_key".to_owned(),
+            auth: Some("test_auth".to_owned())
         };
         db.subscribe(1, &sub).unwrap();
 
@@ -197,19 +208,23 @@ describe! tests {
 
         db.subscribe(1, &Subscription {
             push_uri: "u1_sub0_puri".to_owned(),
-            public_key: "u1_sub0_pkey".to_owned()
+            public_key: "u1_sub0_pkey".to_owned(),
+            auth: Some("u1_sub0_auth".to_owned())
         }).unwrap();
         db.subscribe(1, &Subscription {
             push_uri: "u1_sub1_puri".to_owned(),
-            public_key: "u1_sub1_pkey".to_owned()
+            public_key: "u1_sub1_pkey".to_owned(),
+            auth: None
         }).unwrap();
         db.subscribe(2, &Subscription {
             push_uri: "u2_sub0_puri".to_owned(),
-            public_key: "u2_sub0_pkey".to_owned()
+            public_key: "u2_sub0_pkey".to_owned(),
+            auth: Some("u2_sub0_auth".to_owned())
         }).unwrap();
         let u3_sub0 = Subscription {
             push_uri: "u3_sub0_puri".to_owned(),
-            public_key: "u3_sub0_pkey".to_owned()
+            public_key: "u3_sub0_pkey".to_owned(),
+            auth: Some("u3_sub0_auth".to_owned())
         };
         db.subscribe(3, &u3_sub0).unwrap();
 
