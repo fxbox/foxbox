@@ -7,7 +7,7 @@ dependencies = [
  "docopt 0.6.78 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt_macros 0.6.81 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=d91bf85)",
+ "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=32e99a1)",
  "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=73e8943)",
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -189,7 +189,7 @@ dependencies = [
 [[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git?rev=d91bf85#d91bf8524309cdfe52a816b43ff97fb99600ee3d"
+source = "git+https://github.com/fxbox/taxonomy.git?rev=32e99a1#32e99a14d553a216b5fe29726d213dd7eba9900f"
 dependencies = [
  "chrono 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
