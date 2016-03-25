@@ -20,7 +20,7 @@ use iron::request::Body;
 use iron::status::Status;
 
 use std::io::{ Error as IOError, Read };
-use std::sync::{ Arc, Mutex };
+use std::sync::Mutex;
 use traits::Controller;
 
 /// This is a specialized Router for the taxonomy API.
@@ -42,33 +42,9 @@ impl<A> TaxonomyRouter<A>
         }
     }
 
-    fn build_binary_response(&self, map: &GetterResultMap) -> IronResult<Response> {
+    fn build_binary_response(&self, payload: &Binary) -> IronResult<Response> {
         use core::ops::Deref;
         use hyper::mime::Mime;
-
-        let mut payload: Binary =
-            Binary { data: Arc::new(vec![]),
-                     mimetype: Id::new("application/octet-stream")
-                   };
-
-        for map_value in map.values() {
-            match *map_value {
-                Err(_) => {},
-                Ok(ref opt_res) => {
-                    match *opt_res {
-                        None => {},
-                        Some(ref value) => {
-                            if let Value::Binary(ref data) = *value {
-                                payload = Binary {
-                                    mimetype: (*data).mimetype.clone(),
-                                    data: (*data).data.clone()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        };
 
         let mime : Mime = format!("{}", payload.mimetype).parse().unwrap();
         // TODO: stop copying the array here.
@@ -103,31 +79,27 @@ impl<A> TaxonomyRouter<A>
     }
 
     // Checks if a getter result map is a binary payload.
-    fn is_binary(&self, map: &GetterResultMap) -> bool {
+    fn get_binary(&self, map: &GetterResultMap) -> Option<Binary> {
         // For now, consider as binary a result map with a single element that
         // holds a binary value.
         if map.len() != 1 {
-            return false;
+            return None;
         }
 
         for map_value in map.values() {
-            match *map_value {
-                Err(_) => { return false; },
-                Ok(ref opt_res) => {
-                    match *opt_res {
-                        None => { return false; },
-                        Some(ref value) => {
-                            return match *value {
-                                Value::Binary(_) => true,
-                                _ => false
-                            };
-                        }
+            if let Ok(ref opt_res) = *map_value  {
+                if let  Some(ref value) = *opt_res {
+                    if let Value::Binary(ref data) = *value {
+                        return Some(Binary {
+                            mimetype: (*data).mimetype.clone(),
+                            data: (*data).data.clone()
+                        });
                     }
                 }
             }
         }
 
-        false
+        None
     }
 }
 
@@ -180,42 +152,31 @@ impl<A> Handler for TaxonomyRouter<A>
             })
         }
 
-        // Generates the code to process a given HTTP call with a json body.
-        macro_rules! payload_api {
-            ($call:ident, $param:ty, $path:expr, $method:expr) => (
-                if path == $path && req.method == $method {
-                    type Selectors = $param;
-                    return {
-                        let api = self.api.lock().unwrap();
-                        let source = itry!(Self::read_body_to_string(&mut req.body));
-                        match Selectors::from_str(&source as &str) {
-                            Ok(arg) => self.build_response(&api.$call(arg)),
-                            Err(err) => self.build_parse_error(&err)
+        macro_rules! simple {
+            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg)))
+        }
+
+        macro_rules! binary {
+            ($api:ident, $arg:ident, $call:ident) => ({
+                        let res = $api.$call($arg);
+                        if let Some(payload) = self.get_binary(&res) {
+                            self.build_binary_response(&payload)
+                        } else {
+                            self.build_response(&res)
                         }
-                    }
-                }
-            )
+                    })
         }
 
         // Generates the code to process a given HTTP call with a json body.
-        // Checks if we can send back a binary response.
-        // TODO: share code with the payload_api
-        macro_rules! payload_api_binary {
-            ($call:ident, $param:ty, $path:expr, $method:expr) => (
+        macro_rules! payload_api {
+            ($call:ident, $param:ty, $path:expr, $method:expr, $action:ident) => (
                 if path == $path && req.method == $method {
                     type Selectors = $param;
                     return {
                         let api = self.api.lock().unwrap();
                         let source = itry!(Self::read_body_to_string(&mut req.body));
                         match Selectors::from_str(&source as &str) {
-                            Ok(arg) => {
-                                let res = api.$call(arg);
-                                if self.is_binary(&res) {
-                                    self.build_binary_response(&res)
-                                } else {
-                                    self.build_response(&res)
-                                }
-                            }
+                            Ok(arg) => $action!(api, arg, $call),
                             Err(err) => self.build_parse_error(&err)
                         }
                     }
@@ -262,8 +223,8 @@ impl<A> Handler for TaxonomyRouter<A>
         // Fetching and getting values.
         // We can't use a GET http method here because the Fetch() DOM api
         // doesn't allow bodies with GET and HEAD requests.
-        payload_api_binary!(fetch_values, Vec<GetterSelector>, ["channels", "get"], Method::Put);
-        payload_api!(send_values, TargetMap<SetterSelector, Value>, ["channels", "set"], Method::Put);
+        payload_api!(fetch_values, Vec<GetterSelector>, ["channels", "get"], Method::Put, binary);
+        payload_api!(send_values, TargetMap<SetterSelector, Value>, ["channels", "set"], Method::Put, simple);
 
         // Adding tags.
         payload_api2!(add_service_tags,
