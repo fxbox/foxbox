@@ -112,6 +112,35 @@ impl<T> Deserialize for Phantom<T> {
     }
 }
 
+
+/// A bunch of results coming from different sources.
+pub type ResultMap<K, T, E> = HashMap<K, Result<T, E>>;
+
+/// A bunch of instructions, going to different targets.
+pub type TargetMap<K, T> = Vec<Targetted<K, T>>;
+
+#[derive(Clone)]
+pub struct Targetted<K, T> where K: Clone, T: Clone {
+    pub select: Vec<K>,
+    pub payload: T
+}
+impl<K, T> Default for Targetted<K, T> where T: Default + Clone, K: Clone {
+    fn default() -> Self {
+        Targetted {
+            select: vec![],
+            payload: T::default()
+        }
+    }
+}
+impl<K, T> Targetted<K, T> where K: Clone, T: Clone {
+    pub fn new(select: Vec<K>, payload: T) -> Self {
+        Targetted {
+            select: select,
+            payload: payload
+        }
+    }
+}
+
 /// A unique id for values of a given kind.
 ///
 /// # Performance
@@ -235,9 +264,6 @@ impl<T, U> ToJSON for HashMap<Id<U>, T> where T: ToJSON {
     }
 }
 
-
-/// A bunch of results grouped in an array of (key, result).
-pub type ResultSet<I, T, E> = HashMap<I, Result<T, E>>;
 
 /// By default, the (de)serialization of trivial enums by Serde is surprising, e.g.
 /// in JSON,  `enum Foo {A, B, C}` will produce `{"\"A\": []"}` for `A`, where `"\"A\""`

@@ -3,7 +3,7 @@
 use adapter::{ Adapter, AdapterWatchGuard, ResultMap, WatchEvent as AdapterWatchEvent };
 use transact::InsertInMap;
 
-use api::{ API, Error, InternalError, WatchEvent };
+use api::{ API, Error, InternalError, TargetMap, Targetted, WatchEvent };
 use selector::*;
 use services::*;
 use values::*;
@@ -220,7 +220,7 @@ impl Deref for SetterData {
 /// All the information on a currently registered watch.
 struct WatcherData {
     /// The criteria for watching.
-    watch: Vec<(Vec<GetterSelector>, Exactly<Range>)>,
+    watch: TargetMap<GetterSelector, Exactly<Range>>,
 
     /// The listener for this watch.
     on_event: Box<ExtSender<WatchEvent>>,
@@ -251,7 +251,7 @@ impl PartialEq for WatcherData {
 }
 
 impl WatcherData {
-    fn new(key: WatchKey, watch: Vec<(Vec<GetterSelector>, Exactly<Range>)>, on_event: Box<ExtSender<WatchEvent>>) -> Self {
+    fn new(key: WatchKey, watch:TargetMap<GetterSelector, Exactly<Range>>, on_event: Box<ExtSender<WatchEvent>>) -> Self {
         WatcherData {
             key: key,
             on_event: on_event,
@@ -286,7 +286,7 @@ impl WatchMap {
             watchers: HashMap::new()
         }
     }
-    fn create(&mut self, watch: Vec<(Vec<GetterSelector>, Exactly<Range>)>, on_event: Box<ExtSender<WatchEvent>>) -> Arc<WatcherData> {
+    fn create(&mut self, watch:TargetMap<GetterSelector, Exactly<Range>>, on_event: Box<ExtSender<WatchEvent>>) -> Arc<WatcherData> {
         let id = WatchKey(self.counter);
         self.counter += 1;
         let watcher = Arc::new(WatcherData::new(id, watch, on_event));
@@ -488,8 +488,8 @@ impl AdapterManagerState {
                 // or it doesn't match anymore any of the selectors for the watchers
                 // that were watching it.
                 let should_disconnect = is_being_removed
-                    || watcher.watch.iter().find(|&&(ref selectors, _)| {
-                        selectors.iter().find(|selector| {
+                    || watcher.watch.iter().find(|&targetted| {
+                        targetted.select.iter().find(|selector| {
                             !getter_data.matches(selector)
                         }).is_some()
                     }).is_some();
@@ -529,8 +529,8 @@ impl AdapterManagerState {
                             // The watcher already matches this getter.
                             continue;
                         }
-                        for &(ref selectors, ref filter) in &watcher.watch {
-                            let matches = selectors.iter().find(|selector| {
+                        for targetted in &watcher.watch {
+                            let matches = targetted.select.iter().find(|selector| {
                                 getter_data.matches(selector)
                             }).is_some();
                             if !matches {
@@ -543,7 +543,8 @@ impl AdapterManagerState {
                             let _ = on_event.send(WatchEvent::GetterAdded(id.clone()));
 
                             // Register to be informed of future changes.
-                            Self::aux_channel_watch_per_chan(&mut watcher.clone(), &mut *getter_data, filter, &mut per_adapter)
+                            Self::aux_channel_watch_per_chan(&mut watcher.clone(),
+                                &mut *getter_data, &targetted.payload, &mut per_adapter)
                         }
                     }
                 }
@@ -651,14 +652,14 @@ pub enum Op {
     },
     FetchValues {
         selectors: Vec<GetterSelector>,
-        tx: RawSender<ResultSet<Id<Getter>, Option<Value>, Error>>,
+        tx: RawSender<ResultMap<Id<Getter>, Option<Value>, Error>>,
     },
     SendValues {
-        keyvalues: Vec<(Vec<SetterSelector>, Value)>,
+        keyvalues: TargetMap<SetterSelector, Value>,
         tx: RawSender<ResultMap<Id<Setter>, (), Error>>,
     },
     RegisterChannelWatch {
-        watch: Vec<(Vec<GetterSelector>, Exactly<Range>)>,
+        watch: TargetMap<GetterSelector, Exactly<Range>>,
         on_event: Box<ExtSender<WatchEvent>>,
         tx: RawSender<(WatchKey, Arc<AtomicBool>)>
     },
@@ -1092,7 +1093,7 @@ impl AdapterManagerState {
     }
 
     /// Read the latest value from a set of channels
-    fn fetch_values(&mut self, selectors: Vec<GetterSelector>) -> ResultSet<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&mut self, selectors: Vec<GetterSelector>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         // First group per adapter, so as to let adapters optimize fetches.
         let mut per_adapter = HashMap::new();
         Self::with_channels(selectors, &self.getter_by_id, |data| {
@@ -1145,10 +1146,10 @@ impl AdapterManagerState {
     }
 
     /// Send values to a set of channels
-    fn send_values(&self, mut keyvalues: Vec<(Vec<SetterSelector>, Value)>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut keyvalues: TargetMap<SetterSelector, Value>) -> ResultMap<Id<Setter>, (), Error> {
         // First determine the channels and group them by adapter.
         let mut per_adapter = HashMap::new();
-        for (selectors, value) in keyvalues.drain(..) {
+        for Targetted {select: selectors, payload: value} in keyvalues.drain(..) {
             Self::with_channels(selectors, &self.setter_by_id, |data| {
                 use std::collections::hash_map::Entry::*;
                 let id = data.channel.id.clone();
@@ -1229,7 +1230,9 @@ impl AdapterManagerState {
         }
     }
 
-    fn register_channel_watch(&mut self, mut watch: Vec<(Vec<GetterSelector>, Exactly<Range>)>, on_event: Box<ExtSender<WatchEvent>>) -> (WatchKey, Arc<AtomicBool>) {
+    fn register_channel_watch(&mut self, mut watch: TargetMap<GetterSelector, Exactly<Range>>,
+            on_event: Box<ExtSender<WatchEvent>>) -> (WatchKey, Arc<AtomicBool>)
+    {
         // Store the watcher. This will serve when we new channels are added, to hook them up
         // to this watcher.
         let mut watcher = self.watchers.lock().unwrap().create(watch.clone(), on_event.clone());
@@ -1238,7 +1241,7 @@ impl AdapterManagerState {
         // Regroup per adapter.
         let mut per_adapter = HashMap::new();
 
-        for (selectors, filter) in watch.drain(..) {
+        for Targetted { select: selectors, payload: filter } in watch.drain(..) {
             // Find out which channels already match the selectors and attach
             // the watcher immediately.
             let filter = &filter;

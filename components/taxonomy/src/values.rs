@@ -1591,7 +1591,6 @@ pub enum Range {
     /// or `max < v`
     OutOfStrict { min:Value, max:Value },
 
-
     /// Eq(x) accespts any value v such that v == x
     Eq(Value),
 }
@@ -1602,48 +1601,46 @@ impl Parser<Range> for Range {
     }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         use self::Range::*;
-        if let JSON::Object(ref mut obj) = *source {
-            if obj.len() != 1 {
-                return Err(ParseError::type_error("Range", &path, "exactly one field"));
-            }
-            if let Some(leq) = obj.get_mut("Leq") {
-                return Ok(Leq(try!(path.push("Leq", |path| Value::parse(path, leq)))))
-            }
-            if let Some(geq) = obj.get_mut("Geq") {
-                return Ok(Geq(try!(path.push("Geq", |path| Value::parse(path, geq)))))
-            }
-            if let Some(eq) = obj.get_mut("Eq") {
-                return Ok(Eq(try!(path.push("eq", |path| Value::parse(path, eq)))))
-            }
-            if let Some(between) = obj.get_mut("BetweenEq") {
-                let mut bounds = try!(path.push("BetweenEq", |path| Vec::<Value>::parse(path, between)));
-                if bounds.len() == 2 {
-                    let max = bounds.pop().unwrap();
-                    let min = bounds.pop().unwrap();
-                    return Ok(BetweenEq {
-                        min: min,
-                        max: max
-                    });
-                } else {
-                    return Err(ParseError::type_error("BetweenEq", &path, "an array of two values"));
+        match *source {
+            JSON::Object(ref mut obj) if obj.len() == 1 => {
+                if let Some(leq) = obj.get_mut("Leq") {
+                    return Ok(Leq(try!(path.push("Leq", |path| Value::parse(path, leq)))))
                 }
-            }
-            if let Some(outof) = obj.get_mut("OutOfStrict") {
-                let mut bounds = try!(path.push("OutOfStrict", |path| Vec::<Value>::parse(path, outof)));
-                if bounds.len() == 2 {
-                    let max = bounds.pop().unwrap();
-                    let min = bounds.pop().unwrap();
-                    return Ok(OutOfStrict {
-                        min: min,
-                        max: max
-                    });
-                } else {
-                    return Err(ParseError::type_error("OutOfStrict", &path, "an array of two values"));
+                if let Some(geq) = obj.get_mut("Geq") {
+                    return Ok(Geq(try!(path.push("Geq", |path| Value::parse(path, geq)))))
                 }
+                if let Some(eq) = obj.get_mut("Eq") {
+                    return Ok(Eq(try!(path.push("eq", |path| Value::parse(path, eq)))))
+                }
+                if let Some(between) = obj.get_mut("BetweenEq") {
+                    let mut bounds = try!(path.push("BetweenEq", |path| Vec::<Value>::parse(path, between)));
+                    if bounds.len() == 2 {
+                        let max = bounds.pop().unwrap();
+                        let min = bounds.pop().unwrap();
+                        return Ok(BetweenEq {
+                            min: min,
+                            max: max
+                        })
+                    } else {
+                        return Err(ParseError::type_error("BetweenEq", &path, "an array of two values"))
+                    }
+                }
+                if let Some(outof) = obj.get_mut("OutOfStrict") {
+                    let mut bounds = try!(path.push("OutOfStrict", |path| Vec::<Value>::parse(path, outof)));
+                    if bounds.len() == 2 {
+                        let max = bounds.pop().unwrap();
+                        let min = bounds.pop().unwrap();
+                        return Ok(OutOfStrict {
+                            min: min,
+                            max: max
+                        })
+                    } else {
+                        return Err(ParseError::type_error("OutOfStrict", &path, "an array of two values"))
+                    }
+                }
+                Err(ParseError::type_error("Range", &path, "a field Eq, Leq, Geq, BetweenEq or OutOfStrict"))
             }
-            return Err(ParseError::type_error("Range", &path, "a field Eq, Leq, Geq, BetweenEq or OutOfStrict"));
-        } else {
-            return Err(ParseError::type_error("Range", &path, "object"));
+            _ => Err(ParseError::type_error("Range", &path, "object"))
         }
     }
 }
@@ -1655,10 +1652,9 @@ impl ToJSON for Range {
             Range::Geq(ref val) => ("Geq", val.to_json()),
             Range::Leq(ref val) => ("Leq", val.to_json()),
             Range::BetweenEq { ref min, ref max } => ("BetweenEq", JSON::Array(vec![min.to_json(), max.to_json()])),
-            Range::OutOfStrict { ref min, ref max } => ("OutOfStrict", JSON::Array(vec![min.to_json(), max.to_json()]))
+            Range::OutOfStrict { ref min, ref max } => ("OutOfStrict", JSON::Array(vec![min.to_json(), max.to_json()])),
         };
-        let source = vec![(key.to_owned(), value.clone())];
-        JSON::Object(source.iter().cloned().collect())
+        vec![(key, value)].to_json()
     }
 }
 
