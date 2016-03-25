@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #
 # Simple client for connecting with the IpCameraService.
+#
 
 import argparse
 import getpass
@@ -8,6 +9,35 @@ import requests
 import json
 import os
 import sys
+
+class Service:
+
+    def __init__(self, service):
+        self.service = service
+
+    def is_adapter(self, adapter_name):
+        return self.service['adapter'].startswith(adapter_name)
+
+    def getter(self, kind):
+        for key, value in self.service['getters'].items():
+            if 'kind' in value:
+                setter_kind = value['kind']
+                if 'kind' in setter_kind:
+                    if setter_kind['kind'] == kind:
+                        return key
+
+    def setter(self, kind):
+        for key, value in self.service['setters'].items():
+            if 'kind' in value:
+                setter_kind = value['kind']
+                if 'kind' in setter_kind:
+                    if setter_kind['kind'] == kind:
+                        return key
+
+    def property(self, name):
+        if name in self.service['properties']:
+            return self.service['properties'][name]
+
 
 def main():
     default_server = 'localhost'
@@ -32,8 +62,8 @@ def main():
     parser.add_argument(
         '--get',
         dest='get',
-        action='store',
-        help='Retrive a snapshot from the server.',
+        action='store_true',
+        help='Retrieve the latest snapshot from the server.',
     )
     parser.add_argument(
         '--snapshot',
@@ -86,7 +116,9 @@ def main():
     args = parser.parse_args(sys.argv[1:])
 
     server_url = 'http://{}:{}'.format(args.server, args.port)
-    services_url = '{}/services/list'.format(server_url)
+    services_url = '{}/api/v1/services'.format(server_url)
+    get_url = '{}/api/v1/channels/get'.format(server_url)
+    set_url = '{}/api/v1/channels/set'.format(server_url)
 
     username = args.username
     password = args.password
@@ -157,48 +189,51 @@ def main():
 
     camera_found = False
     for service in services:
-        #print(service)
-        if service['name'] == 'IpCameraService':
-            service_id = service['id']
-            service_descr = service['description']
-            if args.name is None or args.name in service_descr:
+        svc = Service(service)
+        if svc.is_adapter('ip-camera'):
+            service_id = service['id'].replace('service:', '')
+            if args.verbose: print('service_id =', service_id)
+            camera_name = svc.property('name')
+            if args.name is None or args.name in camera_name:
                 camera_found = True
                 if args.list_cams or args.list_snaps:
-                    print('id: {} description: {}'.format(service_id, service_descr))
+                    print('id: {} name: {}'.format(service_id, camera_name))
                 if args.snapshot:
-                    snapshot_url = '{}/services/{}/snapshot'.format(server_url, service_id)
-                    snapshot_req = requests.get(snapshot_url, headers=auth_header)
-                    j_resp = snapshot_req.json()
-                    print(j_resp['success'])
+                    snapshot_get = bytes(json.dumps({'select': {'id': svc.setter('snapshot')}, 'value': {'Json': {}}}), encoding='utf-8')
+                    if args.verbose: print(snapshot_get)
+                    snapshot_req = requests.put(set_url, headers=auth_header, data=snapshot_get)
+                    print("Took a snapshot")
                 if args.list_snaps:
-                    list_snaps_url = '{}/services/{}/list'.format(server_url, service_id)
-                    snaps_req = requests.get(list_snaps_url, headers=auth_header)
-                    snaps = json.loads(str(snaps_req.content, 'utf-8'))
+                    getter = svc.getter('image_list')
+                    list_snaps_get = bytes(json.dumps({'id': getter}), encoding='utf-8')
+                    if args.verbose: print(list_snaps_get)
+                    list_snaps_req = requests.put(get_url, headers=auth_header, data=list_snaps_get)
+                    if args.verbose: print(list_snaps_req.text)
+                    snaps_json = list_snaps_req.json()
+                    snaps = snaps_json[getter]['Json']
                     if snaps:
                         for snap in sorted(snaps):
                             print('    {}'.format(snap))
                     else:
                         print('    No snapshots available')
                 if args.get:
-                    filename = args.get
-                    #print('get filename =', filename)
-                    get_snap_url = '{}/services/{}/get?filename={}'.format(server_url, service_id, filename)
-                    get_req = requests.get(get_snap_url, headers=auth_header)
-                    if get_req.status_code == 200 and get_req.headers['content-type'] == 'image/jpeg':
+                    getter = svc.getter('image_newest')
+                    get_snap_get = bytes(json.dumps({'id': getter}), encoding='utf-8')
+                    if args.verbose: print(get_snap_get)
+                    get_snap_req = requests.put(get_url, headers=auth_header, data=get_snap_get)
+                    if get_snap_req.status_code == 200 and get_snap_req.headers['content-type'] == 'image/jpeg':
+                        filename = 'image.jpg'
                         with open(filename, 'wb') as f:
-                            f.write(get_req.content)
+                            f.write(get_snap_req.content)
                         print('Wrote image to {}'.format(filename))
                     else:
-                        j_resp = get_req.json()
+                        j_resp = get_snap_req.json()
                         print(j_resp['error'])
-
-
     if not camera_found:
         if args.name is None:
             print('No IP Cameras found')
         else:
             print('No IP Cameras found with a description containing \'{}\''.format(args.name))
-
 
 
 if __name__ == "__main__":

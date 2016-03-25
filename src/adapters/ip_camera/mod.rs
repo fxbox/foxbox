@@ -126,11 +126,11 @@ impl IPCameraAdapter {
             panic!(error);
         }
 
-        debug!("Adding IpCamera {} Manufacturer: {} Model: {} Name: {}",
-               udn,
-               manufacturer,
-               model_name,
-               name);
+        info!("Adding IpCamera {} Manufacturer: {} Model: {} Name: {}",
+              udn,
+              manufacturer,
+              model_name,
+              name);
 
         let getter_image_list_id = Self::create_getter_id("image_list", udn);
         try!(adapt.add_getter(Channel {
