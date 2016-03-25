@@ -188,7 +188,7 @@ impl IPCameraAdapter {
         }));
 
         let mut serv = services.lock().unwrap();
-        let camera = IpCamera::new(udn, url, &serv.snapshot_root);
+        let camera = try!(IpCamera::new(udn, url, &serv.snapshot_root));
         serv.getters.insert(getter_image_list_id, camera.clone());
         serv.getters.insert(getter_image_newest_id, camera.clone());
         serv.setters.insert(setter_snapshot_id, camera);
