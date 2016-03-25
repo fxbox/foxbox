@@ -4,20 +4,20 @@ extern crate transformable_channels;
 
 use taxonomy::util::Id as TaxId;
 use taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
-use taxonomy::values::{ Value, Range };
-use taxonomy::api::{ ResultMap, Error as TaxError };
+use taxonomy::values::*;
+use taxonomy::api::{ ResultMap, Error as TaxError, InternalError };
 use taxonomy::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
 use transformable_channels::mpsc::ExtSender;
 
 use openzwave::{ InitOptions, ZWaveManager, ZWaveNotification };
-use openzwave::{ CommandClass, ValueGenre, ValueID };
+use openzwave::{ CommandClass, ValueGenre, ValueType, ValueID };
 use openzwave::{ Controller };
 
 use std::error;
 use std::fmt;
 use std::thread;
 use std::sync::mpsc;
-use std::sync::RwLock;
+use std::sync::{ Arc, RwLock };
 use std::collections::{ HashMap, HashSet };
 
 #[derive(Debug)]
@@ -63,24 +63,34 @@ impl error::Error for OpenzwaveError {
     }
 }
 
+#[derive(Debug, Clone)]
 struct IdMap<Kind, Type> {
-    map: Vec<(TaxId<Kind>, Type)>
+    map: Arc<RwLock<Vec<(TaxId<Kind>, Type)>>>
 }
 
-impl<Kind, Type> IdMap<Kind, Type> where Type: Eq {
+impl<Kind, Type> IdMap<Kind, Type> where Type: Eq + Clone, Kind: Clone {
     fn new() -> Self {
         IdMap {
-            map: Vec::new()
+            map: Arc::new(RwLock::new(Vec::new()))
         }
     }
 
-    fn push(&mut self, id: TaxId<Kind>, ozw_object: Type) {
-        self.map.push((id, ozw_object))
+    fn push(&mut self, id: TaxId<Kind>, ozw_object: Type) -> Result<(), ()> {
+        let mut guard = try!(self.map.write().or(Err(())));
+        guard.push((id, ozw_object));
+        Ok(())
     }
 
-    fn find_tax_id(&mut self, ozw_object: Type) -> Option<&TaxId<Kind>> {
-        let find_result = self.map.iter().find(|&&(_, ref controller)| controller == &ozw_object);
-        find_result.map(|&(ref id, _)| id)
+    fn find_tax_id_from_ozw(&self, needle: &Type) -> Result<Option<TaxId<Kind>>, ()> {
+        let guard = try!(self.map.read().or(Err(())));
+        let find_result = guard.iter().find(|&&(_, ref controller)| controller == needle);
+        Ok(find_result.map(|&(ref id, _)| id.clone()))
+    }
+
+    fn find_ozw_from_tax_id(&self, needle: &TaxId<Kind>) -> Result<Option<Type>, ()> {
+        let guard = try!(self.map.read().or(Err(())));
+        let find_result = guard.iter().find(|&&(ref id, _)| id == needle);
+        Ok(find_result.map(|&(_, ref ozw_object)| ozw_object.clone()))
     }
 }
 
@@ -97,6 +107,9 @@ pub struct OpenzwaveAdapter {
     vendor: String,
     version: [u32; 4],
     ozw: ZWaveManager,
+    controller_map: IdMap<ServiceId, Controller>,
+    getter_map: IdMap<Getter, ValueID>,
+    setter_map: IdMap<Setter, ValueID>,
 }
 
 impl OpenzwaveAdapter {
@@ -114,6 +127,9 @@ impl OpenzwaveAdapter {
             vendor: String::from("Mozilla"),
             version: [1, 0, 0, 0],
             ozw: ozw,
+            controller_map: IdMap::new(),
+            getter_map: IdMap::new(),
+            setter_map: IdMap::new(),
         });
 
         adapter.spawn_notification_thread(rx, box_manager);
@@ -125,12 +141,11 @@ impl OpenzwaveAdapter {
     fn spawn_notification_thread<T: AdapterManagerHandle + Clone + Send + 'static>(&self, rx: mpsc::Receiver<ZWaveNotification>, box_manager: &T) {
         let adapter_id = self.id.clone();
         let box_manager = box_manager.clone();
+        let mut controller_map = self.controller_map.clone();
+        let mut getter_map = self.getter_map.clone();
+        let mut setter_map = self.setter_map.clone();
 
         thread::spawn(move || {
-            let mut controller_map: IdMap<ServiceId, Controller> = IdMap::new();
-            let mut getter_map: IdMap<Getter, ValueID> = IdMap::new();
-            let mut setter_map: IdMap<Setter, ValueID> = IdMap::new();
-
             for notification in rx {
                 match notification {
                     ZWaveNotification::ControllerReady(controller) => {
@@ -148,7 +163,7 @@ impl OpenzwaveAdapter {
 
                         let value_id = format!("OpenZWave/{}", value.get_id());
 
-                        let controller_id = controller_map.find_tax_id(value.get_controller());
+                        let controller_id = controller_map.find_tax_id_from_ozw(&value.get_controller()).unwrap();
                         if controller_id.is_none() { continue }
                         let controller_id = controller_id.unwrap();
 
@@ -161,6 +176,7 @@ impl OpenzwaveAdapter {
 
                         if has_getter {
                             let getter_id = TaxId::new(&value_id);
+                            getter_map.push(getter_id.clone(), value);
                             box_manager.add_getter(Channel {
                                 id: getter_id.clone(),
                                 service: controller_id.clone(),
@@ -176,6 +192,7 @@ impl OpenzwaveAdapter {
 
                         if has_setter {
                             let setter_id = TaxId::new(&value_id);
+                            setter_map.push(setter_id.clone(), value);
                             box_manager.add_setter(Channel {
                                 id: setter_id.clone(),
                                 service: controller_id.clone(),
@@ -216,9 +233,23 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
     }
 
     fn fetch_values(&self, set: Vec<TaxId<Getter>>) -> ResultMap<TaxId<Getter>, Option<Value>, TaxError> {
-        let state = self.ozw.get_state();
+        set.iter().map(|id| {
+            let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_tax_id(id).unwrap();
 
-        unimplemented!()
+            let ozw_value: Option<Option<Value>> = ozw_value.map(|ozw_value: ValueID| {
+                let result: Option<Value> = match ozw_value.get_type() {
+                    ValueType::ValueType_Bool => ozw_value.as_bool().map(
+                        |bool| Value::OpenClosed(
+                            if bool { OpenClosed::Open } else { OpenClosed::Closed }
+                        )
+                    ).ok(),
+                    _ => Some(Value::Unit)
+                };
+                result
+            });
+            let value_result: Result<Option<Value>, TaxError> = ozw_value.ok_or(TaxError::InternalError(InternalError::NoSuchGetter(id.clone())));
+            (id.clone(), value_result)
+        }).collect()
     }
 
     fn send_values(&self, values: HashMap<TaxId<Setter>, Value>) -> ResultMap<TaxId<Setter>, (), TaxError> {
