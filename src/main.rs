@@ -121,6 +121,7 @@ Options:
     -s, --tunnel-secret <secret>    Set the tunnel shared secret. [default: secret]
         --disable-tls               Run as a plain HTTP server, disabling encryption.
         --dns-domain <domain>       Set the top level domain for public DNS [default: box.knilxof.org]
+        --dns-api <url>             Set the DNS API endpoint [default: https://knilxof.org:5300]
         --remote-name <hostname>    Set remote hostname. This the URL to access the box through the bridge. If omitted, the tunnel is disabled
     -c, --config <namespace;key;value>  Set configuration override
     -h, --help               Print this help menu.
@@ -135,6 +136,7 @@ Options:
         flag_tunnel_secret: String,
         flag_disable_tls: bool,
         flag_dns_domain: String,
+        flag_dns_api: String,
         flag_remote_name: Option<String>,
         flag_config: Option<Vec<String>>);
 
@@ -247,9 +249,10 @@ fn main() {
         }
     }
 
+    let local_name = args.flag_local_name.map_or(None, update_hostname);
 
     let mut controller = FoxBox::new(
-        args.flag_verbose, args.flag_local_name.map_or(None, update_hostname), args.flag_port,
+        args.flag_verbose, local_name.clone(), args.flag_port,
         args.flag_wsport,
         if args.flag_disable_tls { TlsOption::Disabled } else { TlsOption::Enabled },
         match args.flag_profile {
@@ -276,8 +279,10 @@ fn main() {
     }
 
     // Register with the nUPNP server.
-    let registrar = registration::Registrar::new();
-    registrar.start(args.flag_register, args.flag_iface, domain, &tunnel, controller.get_certificate_manager());
+    let registrar = registration::Registrar::new(controller.get_hostname());
+    registrar.start(args.flag_register, args.flag_iface,
+                    domain, &tunnel, args.flag_port,
+                    args.flag_dns_api, controller.get_certificate_manager());
 
     controller.run(&SHUTDOWN_FLAG);
 
@@ -300,6 +305,7 @@ describe! main {
             assert_eq!(args.flag_wsport, 4000);
             assert_eq!(args.flag_register, "http://localhost:4242");
             assert_eq!(args.flag_dns_domain, "box.knilxof.org");
+            assert_eq!(args.flag_dns_api, "https://knilxof.org:5300");
             assert_eq!(args.flag_iface, None);
             assert_eq!(args.flag_tunnel, None);
             assert_eq!(args.flag_config, None);

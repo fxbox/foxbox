@@ -99,7 +99,7 @@ impl CertificateManager {
         }
     }
 
-    pub fn get_or_generate_self_signed_certificate(&self, hostname: String) -> io::Result<CertificateRecord> {
+    pub fn get_or_generate_self_signed_certificate(&self, hostname: &str) -> io::Result<CertificateRecord> {
 
         // Reload before this operation to ensure we don't overwrite any existing certificates
         try!(self.reload());
@@ -109,19 +109,19 @@ impl CertificateManager {
         // CertificateRecord for it in the other thread easily.  This kind of needs to be blocking
         // anyway, we can't proceed without the resulting value anyway in most uses.
 
-        if let Some(certificate_record) = self.get_certificate(hostname.clone()) {
+        if let Some(certificate_record) = self.get_certificate(hostname) {
             info!("Using existing self-signed cert for {}", hostname);
             return Ok(certificate_record);
         }
 
         let mut directory = self.directory.clone();
-        directory.push(hostname.clone());
+        directory.push(hostname);
 
         info!("Generating new self-signed cert for {}", hostname);
         let generator = X509Generator::new()
             .set_bitlength(2048)
             .set_valid_period(365 * 2)
-            .add_name("CN".to_owned(), hostname.clone())
+            .add_name("CN".to_owned(), String::from(hostname))
             .set_sign_hash(Type::SHA256);
 
         let gen_result = generator.generate();
@@ -152,7 +152,7 @@ impl CertificateManager {
                 return Err(write_result.unwrap_err());
             }
 
-            let certificate_record_result = CertificateRecord::new(hostname, cert_path, pkey_path);
+            let certificate_record_result = CertificateRecord::new(String::from(hostname), cert_path, pkey_path);
 
             if let Ok(certificate_record) = certificate_record_result {
                 self.add_certificate(certificate_record.clone());
@@ -191,9 +191,9 @@ impl CertificateManager {
         self.notify_provider();
     }
 
-    pub fn get_certificate(&self, hostname: String) -> Option<CertificateRecord> {
+    pub fn get_certificate(&self, hostname: &str) -> Option<CertificateRecord> {
         let ssl_hosts = checklock!(self.ssl_hosts.read());
-        let cert_record = ssl_hosts.get(&hostname);
+        let cert_record = ssl_hosts.get(hostname);
 
         if let Some(record) = cert_record {
             Some(record.clone())
@@ -203,15 +203,15 @@ impl CertificateManager {
     }
 
     #[allow(dead_code)]
-    pub fn remove_certificate(&self, hostname: String) {
+    pub fn remove_certificate(&self, hostname: &str) {
         {
-            checklock!(self.ssl_hosts.write()).remove(&hostname);
+            checklock!(self.ssl_hosts.write()).remove(hostname);
         }
 
         self.notify_provider();
     }
 
-    fn create_https_client_with_crt_for(&self, hostname: String) -> Option<(Client, CertificateRecord)> {
+    fn create_https_client_with_crt_for(&self, hostname: &str) -> Option<(Client, CertificateRecord)> {
         if let Some(certificate_record) = self.get_certificate(hostname) {
             let ssl_ctx = Openssl::with_cert_and_key(
                                 &certificate_record.cert_file,
@@ -227,19 +227,19 @@ impl CertificateManager {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn register_for_dns_challenge(&mut self, hostname: String, dns_endpoint: String, ip_address: String) -> Result<bool, String> {
-        if let Some((https_client, cert_record)) = self.create_https_client_with_crt_for(hostname.clone()) {
+    pub fn register_dns_record(&self,
+                               record_type: &str, hostname: &str,
+                               ip_address: &str, dns_endpoint: &str,
+                               certificate: &str) -> Result<bool, String> {
+        if let Some((https_client, _)) = self.create_https_client_with_crt_for(certificate) {
 
-            let hash = cert_record.get_certificate_fingerprint();
-
-            let request_url = format!("{}/v1/dns/{}/{}", dns_endpoint,  hostname.rsplit(".").fold("".to_owned(), |url, component| {
+            let request_url = format!("{}/v1/dns{}", dns_endpoint, hostname.rsplit(".").fold("".to_owned(), |url, component| {
                 format!("{}/{}", url, component)
-            }), hash);
+            }));
 
             let mut map = BTreeMap::new();
-            map.insert("type".to_owned(), "A".to_owned());
-            map.insert("value".to_owned(), ip_address.clone());
+            map.insert("type".to_owned(), record_type);
+            map.insert("value".to_owned(), ip_address);
 
             let payload = serde_json::to_vec(&map).unwrap();
 
@@ -351,11 +351,11 @@ mod certificate_manager {
 
         cert_manager.add_certificate(cert_record.clone());
 
-        assert!(cert_manager.get_certificate("test.example.com".to_owned()).unwrap() == cert_record);
+        assert!(cert_manager.get_certificate("test.example.com").unwrap() == cert_record);
 
-        cert_manager.remove_certificate("test.example.com".to_owned());
+        cert_manager.remove_certificate("test.example.com");
 
-        assert!(cert_manager.get_certificate("test.example.com".to_owned()).is_none());
+        assert!(cert_manager.get_certificate("test.example.com").is_none());
     }
 
     #[test]
@@ -365,9 +365,9 @@ mod certificate_manager {
 
         cert_manager.add_certificate(cert_record);
 
-        cert_manager.remove_certificate("test.example.com".to_owned());
+        cert_manager.remove_certificate("test.example.com");
 
-        assert!(cert_manager.get_certificate("test.example.com".to_owned()).is_none());
+        assert!(cert_manager.get_certificate("test.example.com").is_none());
     }
 
     #[test]
@@ -399,7 +399,7 @@ mod certificate_manager {
 
         assert!(rx_update_called.recv().unwrap(), "Did not receive notification from handler after add");
 
-        cert_manager.remove_certificate(test_cert_record().hostname);
+        cert_manager.remove_certificate(&test_cert_record().hostname);
 
         assert!(rx_update_called.recv().unwrap(), "Did not receive notification from handler after remove");
     }

@@ -22,9 +22,10 @@ use tls::CertificateManager;
 use tunnel_controller:: { Tunnel };
 
 const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
-const DEFAULT_BOX_NAME: &'static str = "foxbox.local";
 
-pub struct Registrar;
+pub struct Registrar {
+    box_name: String,
+}
 
 #[derive(Serialize, Debug)]
 struct RegistrationRequest {
@@ -37,14 +38,18 @@ struct RegistrationRequest {
 }
 
 impl Registrar {
-    pub fn new() -> Registrar {
-        Registrar
+    pub fn new(box_name: String) -> Registrar {
+        Registrar {
+            box_name: box_name
+        }
     }
 
     pub fn start(&self, endpoint_url: String,
                  iface: Option<String>,
                  domain: String,
                  tunnel: &Option<Tunnel>,
+                 box_port: u16,
+                 dns_api_endpoint: String,
                  certificate_manager: CertificateManager) {
         info!("Starting registration with {}", endpoint_url);
         let endpoint_url = format!("{}/register", endpoint_url);
@@ -59,9 +64,7 @@ impl Registrar {
         info!("Got ip address: {}", ip_addr.clone().unwrap());
 
         let certificate_record_result = certificate_manager
-                                            .get_or_generate_self_signed_certificate(
-                                                DEFAULT_BOX_NAME.to_owned()
-                                            );
+                                            .get_or_generate_self_signed_certificate(&self.box_name);
 
         let (domain, client_fingerprint) = if let Ok(certificate_record) = certificate_record_result {
             let self_signed_cert_fingerprint = certificate_record.get_certificate_fingerprint();
@@ -80,15 +83,14 @@ impl Registrar {
         };
 
         let message = json!({
-            domain: domain,
-            tunnel_configured: tunnel_url.is_some()
+            local_address: format!("local.{}:{}", domain, box_port),
+            tunnel_url: tunnel_url
         });
-
 
         let body = match serde_json::to_string(&RegistrationRequest {
             message: message,
             client: client_fingerprint,
-            local_ip: ip_addr.unwrap(),
+            local_ip: ip_addr.clone().unwrap(),
             tunnel_url: tunnel_url,
         }) {
             Ok(body) => body,
@@ -97,6 +99,8 @@ impl Registrar {
                 return;
             }
         };
+
+        let box_hostname = self.box_name.clone();
 
         // Spawn a thread to register every REGISTRATION_INTERVAL_IN_MINUTES.
         thread::Builder::new().name("Registrar".to_owned())
@@ -122,6 +126,15 @@ impl Registrar {
                 } else {
                     info!("Unable to send request to {}", endpoint_url);
                 }
+
+                // Create entry for local DNS
+                certificate_manager.register_dns_record(
+                    "A",
+                    &format!("local.{}", domain),
+                    &ip_addr.clone().unwrap(),
+                    &dns_api_endpoint.clone(),
+                    &box_hostname
+                ).unwrap();
 
                 // Go to sleep.
                 thread::sleep(Duration::from_secs(REGISTRATION_INTERVAL_IN_MINUTES as u64 * 60))
@@ -197,7 +210,7 @@ impl Registrar {
 describe! registrar {
 
     before_each {
-        let registrar = Registrar::new();
+        let registrar = Registrar::new("foxbox.local".to_owned());
     }
 
     it "should return an IP address when a machine has network interfaces" {

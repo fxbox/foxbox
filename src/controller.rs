@@ -240,6 +240,10 @@ impl Controller for FoxBox {
     fn get_tls_enabled(&self) -> bool {
         self.tls_option == TlsOption::Enabled
     }
+
+    fn get_hostname(&self) -> String  {
+        self.hostname.clone()
+    }
 }
 
 #[allow(dead_code)]
@@ -298,7 +302,7 @@ describe! controller {
             }
         }
 
-        it "should create https root if tls enabled and http root id disabled" {
+        it "should create https root if tls enabled and http root if disabled" {
             controller.add_service(Box::new(service));
             assert_eq!(controller.get_http_root_for_service("1".to_string()),
                        "http://foxbox.local:1234/services/1/");
