@@ -18,7 +18,7 @@ use std::error::Error;
 use std::io::Read;
 use std::time::Duration;
 use std::thread;
-use tls::CertificateManager;
+use traits::Controller;
 use tunnel_controller:: { Tunnel };
 
 const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
@@ -44,13 +44,13 @@ impl Registrar {
         }
     }
 
-    pub fn start(&self, endpoint_url: String,
+    pub fn start<T: Controller>(&self, endpoint_url: String,
                  iface: Option<String>,
                  domain: String,
                  tunnel: &Option<Tunnel>,
                  box_port: u16,
                  dns_api_endpoint: String,
-                 certificate_manager: CertificateManager) {
+                 controller: &T) {
         info!("Starting registration with {}", endpoint_url);
         let endpoint_url = format!("{}/register", endpoint_url);
 
@@ -62,6 +62,7 @@ impl Registrar {
         }
 
         info!("Got ip address: {}", ip_addr.clone().unwrap());
+        let certificate_manager = controller.get_certificate_manager();
 
         let certificate_record_result = certificate_manager
                                             .get_or_generate_self_signed_certificate(&self.box_name);
@@ -82,8 +83,14 @@ impl Registrar {
             None
         };
 
+        let scheme = if controller.get_tls_enabled() {
+            "https"
+        } else {
+            "http"
+        };
+
         let message = json!({
-            local_address: format!("local.{}:{}", domain, box_port),
+            local_address: format!("{}://local.{}:{}", scheme, domain, box_port),
             tunnel_url: tunnel_url
         });
 

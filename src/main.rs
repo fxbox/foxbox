@@ -282,7 +282,7 @@ fn main() {
     let registrar = registration::Registrar::new(controller.get_hostname());
     registrar.start(args.flag_register, args.flag_iface,
                     domain, &tunnel, args.flag_port,
-                    args.flag_dns_api, controller.get_certificate_manager());
+                    args.flag_dns_api, &controller);
 
     controller.run(&SHUTDOWN_FLAG);
 
