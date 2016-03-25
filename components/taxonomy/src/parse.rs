@@ -45,7 +45,7 @@ impl Path {
     }
 
     /// Push a suffix after a path.
-    fn push_str<F, T>(&self, suffix: &str, cb: F) -> T
+    pub fn push_str<F, T>(&self, suffix: &str, cb: F) -> T
         where F: FnOnce(Path) -> T
     {
         let buf = self.buf.clone();
@@ -288,9 +288,10 @@ impl Parser<u8> for u8 {
 
 impl<T> Parser<Vec<T>> for Vec<T> where T: Parser<T> {
     fn description() -> String {
-        format!("An array of {}", T::description())
+        format!("Array<{}>", T::description())
     }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        // Otherwise, parse as an actual array.
         match *source {
             JSON::Array(ref mut array) => {
                 let mut result = Vec::with_capacity(array.len());
@@ -300,11 +301,20 @@ impl<T> Parser<Vec<T>> for Vec<T> where T: Parser<T> {
                 }
                 Ok(result)
             }
-            _ => Err(ParseError::type_error(&Self::description() as &str, &path, "array"))
+            JSON::Null => {
+                // Accept `null` as an empty array.
+                Ok(vec![])
+            }
+            _ => {
+                // Attempt to promote the value to an array.
+                let single = try!(path.push_str("", |path| T::parse(path, source)));
+                Ok(vec![single])
+            }
         }
     }
 }
 
+/*
 impl<T, U> Parser<(T, U)> for (T, U) where T: Parser<T>, U: Parser<U> {
     fn description() -> String {
         format!("({}, {})", T::description(), U::description())
@@ -322,7 +332,7 @@ impl<T, U> Parser<(T, U)> for (T, U) where T: Parser<T>, U: Parser<U> {
         }
     }
 }
-
+*/
 impl Parser<String> for String {
     fn description() -> String {
         "String".to_owned()
@@ -370,6 +380,12 @@ impl ToJSON for f64 {
 impl ToJSON for usize {
     fn to_json(&self) -> JSON {
         JSON::U64(*self as u64)
+    }
+}
+
+impl ToJSON for JSON {
+    fn to_json(&self) -> JSON {
+        self.clone()
     }
 }
 

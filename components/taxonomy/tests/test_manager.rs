@@ -4,7 +4,7 @@ extern crate transformable_channels;
 use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::fake_adapter::*;
-use foxbox_taxonomy::api::{ API, Error, InternalError, WatchEvent as Event };
+use foxbox_taxonomy::api::{ API, Error, InternalError, TargetMap, Targetted, WatchEvent as Event };
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
@@ -14,6 +14,11 @@ use transformable_channels::mpsc::*;
 use std::collections::{ HashMap, HashSet };
 use std::thread;
 
+// Trivial utility function to convert the old TargetMap format to the newer one, to avoid
+// having to rewrite the tests.
+fn target_map<K, T>(mut source: Vec<(Vec<K>, T)>) -> TargetMap<K, T> where K: Clone, T: Clone {
+    source.drain(..).map(|(v, t)| Targetted::new(v, t)).collect()
+}
 
 #[test]
 fn test_add_remove_adapter() {
@@ -973,7 +978,8 @@ fn test_send() {
     let rx_adapter_2 = adapter_2.take_rx();
 
     println!("* Without adapters, sending values to a selector that has no channels returns an empty vector.");
-    let data = manager.send_values(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]);
+    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
+
     assert_eq!(data.len(), 0);
 
     println!("* With adapters, sending values to a selector that has no channels returns an empty vector.");
@@ -981,7 +987,7 @@ fn test_send() {
     manager.add_adapter(Box::new(adapter_2)).unwrap();
     manager.add_service(service_1.clone()).unwrap();
     manager.add_service(service_2.clone()).unwrap();
-    let data = manager.send_values(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]);
+    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
     assert_eq!(data.len(), 0);
 
     println!("* Sending well-typed values to channels succeeds if the adapter succeeds.");
@@ -990,7 +996,7 @@ fn test_send() {
     manager.add_setter(setter_1_3.clone()).unwrap();
     manager.add_setter(setter_2.clone()).unwrap();
 
-    let data = manager.send_values(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]);
+    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
     assert_eq!(data.len(), 4);
     for result in data.values() {
         if let Ok(()) = *result {
@@ -1020,7 +1026,7 @@ fn test_send() {
     assert!(rx_adapter_2.try_recv().is_err());
 
     println!("* Sending ill-typed values to channels will cause type errors.");
-    let data = manager.send_values(vec![
+    let data = manager.send_values(target_map(vec![
         (vec![
             SetterSelector::new().with_id(setter_id_1_1.clone()),
             SetterSelector::new().with_id(setter_id_1_2.clone()),
@@ -1029,7 +1035,7 @@ fn test_send() {
         (vec![
             SetterSelector::new().with_id(setter_id_1_3.clone()).clone()
         ], Value::OnOff(OnOff::On))
-    ]);
+    ]));
     assert_eq!(data.len(), 4);
     for id in vec![&setter_id_1_1, &setter_id_1_2, &setter_id_2] {
         match data.get(id) {
@@ -1058,7 +1064,7 @@ fn test_send() {
     println!("* Sending values that cause channel errors will propagate the errors.");
     tweak_1(Tweak::InjectSetterError(setter_id_1_1.clone(), Some(Error::InternalError(InternalError::InvalidInitialService))));
 
-    let data = manager.send_values(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]);
+    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
     assert_eq!(data.len(), 4);
     for id in vec![&setter_id_2, &setter_id_1_2, &setter_id_2] {
         match data.get(id) {
@@ -1206,10 +1212,10 @@ fn test_watch() {
             panic!("We should not have received any message {:?}", msg);
         }
     });
-    guards.push(manager.watch_values(vec![(
+    guards.push(manager.watch_values(target_map(vec![(
         vec![GetterSelector::new().with_id(Id::new("No such getter"))],
         Exactly::Always
-    )], Box::new(tx_watch_1)));
+    )]), Box::new(tx_watch_1)));
 
     println!("* With adapters, watching values from a selector that has no channels does nothing.");
     manager.add_adapter(Box::new(adapter_1)).unwrap();
@@ -1222,17 +1228,17 @@ fn test_watch() {
             panic!("We should not have received any message {:?}", msg);
         }
     });
-    guards.push(manager.watch_values(vec![(
+    guards.push(manager.watch_values(target_map(vec![(
         vec![GetterSelector::new().with_id(Id::new("No such getter"))],
         Exactly::Always
-    )], Box::new(tx_watch)));
+    )]), Box::new(tx_watch)));
 
     println!("* We can observe channels being added.");
     let (tx_watch, rx_watch) = channel();
-    let guard = manager.watch_values(vec![(
+    let guard = manager.watch_values(target_map(vec![(
         vec![GetterSelector::new()],
         Exactly::Always
-    )], Box::new(tx_watch)); // We keep `guard` out of `guards` to drop it manually later.
+    )]), Box::new(tx_watch)); // We keep `guard` out of `guards` to drop it manually later.
 
     manager.add_getter(getter_1_1.clone()).unwrap();
     manager.add_getter(getter_1_2.clone()).unwrap();
@@ -1285,13 +1291,13 @@ fn test_watch() {
     ], vec![tag_1.clone()]), 2);
 
     let (tx_watch_2, rx_watch_2) = channel();
-    guards.push(manager.watch_values(vec![(
+    guards.push(manager.watch_values(target_map(vec![(
         vec![
             GetterSelector::new()
                 .with_tags(vec![tag_1.clone()])
         ],
         Exactly::Exactly(Range::Eq(Value::OnOff(OnOff::On)))
-    )], Box::new(tx_watch_2)));
+    )]), Box::new(tx_watch_2)));
 
     println!("* Value changes are observed on both watchers");
     tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));

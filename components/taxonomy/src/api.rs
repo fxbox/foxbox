@@ -15,11 +15,10 @@
 
 use services::*;
 use selector::*;
+pub use util::{ ResultMap, TargetMap, Targetted };
 use values::{ Value, Range, TypeError };
 
 use transformable_channels::mpsc::*;
-
-use std::collections::HashMap;
 
 use std::{ error, fmt };
 use std::error::Error as std_error;
@@ -180,11 +179,63 @@ pub enum WatchEvent {
     },
 }
 
-/// A bunch of results coming from different sources.
-pub type ResultMap<K, T, E> = HashMap<K, Result<T, E>>;
 
-/// A bunch of instructions, going to different targets.
-pub type TargetMap<K, T> = Vec<(Vec<K>, T)>;
+impl<K> Parser<Targetted<K, Value>> for Targetted<K, Value> where K: Parser<K> + Clone {
+    fn description() -> String {
+        format!("Targetted<{}, Value>", K::description())
+    }
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        if source.is_object() {
+            // Default format: an object {select, value}.
+            let select = try!(path.push("select", |path| Vec::<K>::take(path, source, "select")));
+            let payload = try!(path.push("value", |path| Value::take(path, source, "value")));
+            Ok(Targetted {
+                select: select,
+                payload: payload
+            })
+        } else if let JSON::Array(ref mut array) = *source {
+            // Fallback format: an array of two values.
+            if array.len() != 2 {
+                return Err(ParseError::type_error(&Self::description() as &str, &path, "an array of length 2"))
+            }
+            let mut right = array.pop().unwrap(); // We just checked that length == 2
+            let mut left = array.pop().unwrap(); // We just checked that length == 2
+            let select = try!(path.push_index(0, |path| Vec::<K>::parse(path, &mut left)));
+            let payload = try!(path.push_index(1, |path| Value::parse(path, &mut right)));
+            Ok(Targetted {
+                select: select,
+                payload: payload
+            })
+        } else {
+            Err(ParseError::type_error(&Self::description() as &str, &path, "an object {select, value}"))
+        }
+    }
+}
+
+impl<K> Parser<Targetted<K, Exactly<Range>>> for Targetted<K, Exactly<Range>> where K: Parser<K> + Clone {
+    fn description() -> String {
+        format!("Targetted<{}, Value>", K::description())
+    }
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let select = try!(path.push("select", |path| Vec::<K>::take(path, source, "select")));
+        if let Some(&JSON::String(ref str)) = source.find("range") {
+            if &str as &str == "Never" {
+                return Ok(Targetted {
+                    select: select,
+                    payload: Exactly::Never
+                })
+            }
+        }
+        let payload = match path.push("range", |path| Exactly::<Range>::take_opt(path, source, "range")) {
+            Some(result) => try!(result),
+            None => Exactly::Always
+        };
+        Ok(Targetted {
+            select: select,
+            payload: payload
+        })
+    }
+}
 
 /// A handle to the public API.
 pub trait API: Send {
@@ -200,8 +251,8 @@ pub trait API: Send {
     ///
     /// ### JSON
     ///
-    /// This call accepts as JSON argument a vector of `ServiceSelector`. See the documentation
-    /// of `ServiceSelector` for more details.
+    /// This call accepts as JSON argument either a single `ServiceSelector` or an array
+    /// of ServiceSelectors.
     ///
     /// Example: Select all doors in the entrance (tags `door`, `entrance`)
     /// that support setter channel `OpenClosed`
@@ -519,13 +570,96 @@ pub trait API: Send {
     /// # REST API
     ///
     /// `GET /api/v1/channels/get`
+    ///
+    /// This call supports one or more GetterSelector.
+    ///
+    /// ```
+    /// # extern crate serde;
+    /// # extern crate serde_json;
+    /// # extern crate foxbox_taxonomy;
+    /// # use foxbox_taxonomy::selector::*;
+    /// # use foxbox_taxonomy::api::*;
+    /// # use foxbox_taxonomy::values::*;
+    ///
+    /// # fn main() {
+    ///
+    /// // The following argument will fetch a value from to a single getter:
+    /// # let source =
+    /// r#"{"id": "my-getter"}"#;
+    ///
+    /// # GetterSelector::from_str(&source).unwrap();
+    ///
+    /// # }
+    /// ```
+    ///
+    /// ## Errors
+    ///
+    /// In case of syntax error, Error 400, accompanied with a
+    /// somewhat human-readable JSON string detailing the error.
+    ///
+    /// ## Success
+    ///
+    /// The results, per getter.
     fn fetch_values(&self, Vec<GetterSelector>) -> ResultMap<Id<Getter>, Option<Value>, Error>;
 
-    /// Send a bunch of values to a set of channels
+    /// Send a bunch of values to a set of channels.
+    ///
+    /// Sending values to several setters of the same service in a single call will generally
+    /// be much faster than calling this method several times.
     ///
     /// # REST API
     ///
-    /// `POST /api/v1/channels/set`
+    /// `PUT /api/v1/channels/set`
+    ///
+    /// ## JSON
+    ///
+    /// This call supports one or more objects with the following fields:
+    /// - select (Service Selector | array of ServiceSelector) - the setters to which the value must be sent
+    /// - value (Value) - the value to send
+    ///
+    /// ```
+    /// # extern crate serde;
+    /// # extern crate serde_json;
+    /// # extern crate foxbox_taxonomy;
+    /// # use foxbox_taxonomy::selector::*;
+    /// # use foxbox_taxonomy::api::*;
+    /// # use foxbox_taxonomy::values::*;
+    ///
+    /// # fn main() {
+    ///
+    /// // The following argument will send `On` to a single setter:
+    /// # let source =
+    /// r#"{
+    ///   "select": {"id": "my-setter"},
+    ///   "value": {"OnOff": "On"}
+    /// }"#;
+    ///
+    /// # TargetMap::<SetterSelector, Value>::from_str(&source).unwrap();
+    ///
+    /// // The following argument will send `On` to two setters and `Unit` to everything
+    /// // that supports `Ready`.
+    /// # let source =
+    /// r#"[{
+    ///   "select": [{"id": "my-setter 1"}, {"id": "my-setter 2"}],
+    ///   "value": {"OnOff": "On"}
+    /// }, {
+    ///   "select": {"kind": "Ready"},
+    ///   "value": {"Unit": null}
+    /// }]"#;
+    ///
+    /// # TargetMap::<SetterSelector, Value>::from_str(&source).unwrap();
+    ///
+    /// # }
+    /// ```
+    ///
+    /// ## Errors
+    ///
+    /// In case of syntax error, Error 400, accompanied with a
+    /// somewhat human-readable JSON string detailing the error.
+    ///
+    /// ## Success
+    ///
+    /// The results, per setter.
     fn send_values(&self, TargetMap<SetterSelector, Value>) -> ResultMap<Id<Setter>, (), Error>;
 
     /// Watch for changes from channels.

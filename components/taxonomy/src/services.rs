@@ -8,7 +8,7 @@
 
 use parse::*;
 use values::*;
-pub use util::*;
+pub use util::{ Exactly, Id, AdapterId, ServiceId, KindId, TagId, VendorId };
 
 use serde::ser::{ Serialize, Serializer };
 use serde::de::{ Deserialize, Deserializer, Error };

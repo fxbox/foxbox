@@ -9,7 +9,7 @@ pub use backend::WatchGuard;
 use backend::{ Op, AdapterManagerState };
 use adapter::{ Adapter, AdapterManagerHandle };
 
-use api::{ API, Error, ResultMap, WatchEvent };
+use api::{ API, Error, ResultMap, TargetMap, WatchEvent };
 use selector::*;
 use services::*;
 use values::{ Range, Value };
@@ -350,7 +350,7 @@ impl API for AdapterManager {
     }
 
     /// Send a bunch of values to a set of channels
-    fn send_values(&self, keyvalues: Vec<(Vec<SetterSelector>, Value)>) ->
+    fn send_values(&self, keyvalues: TargetMap<SetterSelector, Value>) ->
         ResultMap<Id<Setter>, (), Error>
     {
         let (tx, rx) = channel();
@@ -361,7 +361,7 @@ impl API for AdapterManager {
     }
 
     /// Watch for any change
-    fn watch_values(&self, watch: Vec<(Vec<GetterSelector>, Exactly<Range>)>,
+    fn watch_values(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
         on_event: Box<ExtSender<WatchEvent>>) -> Self::WatchGuard
     {
         let (tx, rx) = channel();
