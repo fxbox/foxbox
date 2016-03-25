@@ -12,7 +12,7 @@
 //! missing the necessary APIs to support the implementation.
 //!
 
-#[cfg(feature = "webpush")]
+#[cfg(not(target_os = "macos"))]
 mod crypto;
 mod db;
 
@@ -21,11 +21,11 @@ use foxbox_taxonomy::api::{ Error, InternalError };
 use foxbox_taxonomy::values::{ Range, Type, Value, Json };
 use foxbox_taxonomy::services::*;
 
-#[cfg(feature = "webpush")]
+#[cfg(not(target_os = "macos"))]
 use hyper::header::{ ContentEncoding, Encoding };
-#[cfg(feature = "webpush")]
+#[cfg(not(target_os = "macos"))]
 use hyper::Client;
-#[cfg(feature = "webpush")]
+#[cfg(not(target_os = "macos"))]
 use hyper::client::Body;
 use rusqlite::{ self };
 use serde_json;
@@ -81,7 +81,7 @@ pub struct NotifySetter {
 }
 
 impl Subscription {
-    #[cfg(feature = "webpush")]
+    #[cfg(not(target_os = "macos"))]
     fn notify(&self, message: &str) {
         let enc = match self::crypto::encrypt(&self.public_key, message.to_owned()) {
             Some(x) => x,
@@ -105,7 +105,7 @@ impl Subscription {
         info!("notified subscription {} (status {:?})", self.push_uri, res.status);
     }
 
-    #[cfg(not(feature = "webpush"))]
+    #[cfg(target_os = "macos")]
     fn notify(&self, _: &str) {
         warn!("discard notification for subscription {}, webpush disabled at build time", self.push_uri);
     }
