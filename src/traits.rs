@@ -35,6 +35,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
 
     fn get_tls_enabled(&self) -> bool;
     fn get_certificate_manager(&self) -> CertificateManager;
+    fn get_hostname(&self) -> String;
 
     fn add_websocket(&mut self, socket: ws::Sender);
     fn remove_websocket(&mut self, socket: ws::Sender);

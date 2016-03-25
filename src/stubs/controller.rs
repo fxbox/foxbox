@@ -95,6 +95,10 @@ impl Controller for ControllerStub {
         false
     }
 
+    fn get_hostname(&self) -> String {
+        String::from("localhost")
+    }
+
     fn get_certificate_manager(&self) -> CertificateManager {
        CertificateManager::new(PathBuf::from(current_dir!()))
     }
