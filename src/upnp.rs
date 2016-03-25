@@ -80,11 +80,11 @@ pub struct UpnpService {
     pub description_data: String
 }
 
-pub trait UpnpListener : Send + Sync {
+pub trait UpnpListener : Send {
     fn upnp_discover(&self, service: &UpnpService) -> bool;
 }
 
-type UpnpListeners = Arc<Mutex<HashMap<String, Arc<UpnpListener>>>>;
+type UpnpListeners = Arc<Mutex<HashMap<String, Box<UpnpListener>>>>;
 
 struct UpnpHandle {
     client: ClientHandle,
@@ -233,7 +233,7 @@ impl UpnpManager {
         }
     }
 
-    pub fn add_listener(&self, id: String, listener: Arc<UpnpListener>) {
+    pub fn add_listener(&self, id: String, listener: Box<UpnpListener>) {
         let mut listeners = self.listeners.lock().unwrap();
         listeners.insert(id, listener);
     }

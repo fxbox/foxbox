@@ -105,7 +105,7 @@ impl Controller for FoxBox {
         let taxo_manager = AdapterManager2::new();
 
         let mut adapter_manager = AdapterManager::new(self.clone());
-        adapter_manager.start(&taxo_manager);
+        adapter_manager.start(taxo_manager.clone());
 
         HttpServer::new(self.clone()).start(taxo_manager);
         WsServer::start(self.clone(), self.hostname.to_owned(), self.ws_port);
