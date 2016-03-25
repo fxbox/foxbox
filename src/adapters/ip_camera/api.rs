@@ -10,7 +10,7 @@ use foxbox_taxonomy::api::{ Error, InternalError };
 use self::hyper::header::{ Authorization, Basic, Connection };
 use std::fs;
 use std::os::unix::fs::MetadataExt;
-use std::io::BufWriter;
+use std::io::{ BufWriter, ErrorKind };
 use std::io::prelude::*;
 use std::path::Path;
 
@@ -62,12 +62,20 @@ pub struct IpCamera {
 }
 
 impl IpCamera {
-    pub fn new(udn: &str, url: &str, root_snapshot_dir: &str) -> Self {
-        IpCamera {
+    pub fn new(udn: &str, url: &str, root_snapshot_dir: &str) -> Result<Self, Error> {
+        let camera = IpCamera {
             udn: udn.to_owned(),
             url: url.to_owned(),
             snapshot_dir: format!("{}/{}", root_snapshot_dir, udn)
+        };
+        // Create a directory to store snapshots for this camera.
+        if let Err(err) = fs::create_dir_all(&camera.snapshot_dir) {
+            if err.kind() != ErrorKind::AlreadyExists {
+                error!("Unable to create directory {}: {}", camera.snapshot_dir, err);
+                return Err(Error::InternalError(InternalError::GenericError(format!("cannot create {}", camera.snapshot_dir))));
+            }
         }
+        Ok(camera)
     }
 
     pub fn get_image_list(&self) -> Vec<String> {
