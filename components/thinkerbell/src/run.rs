@@ -6,7 +6,7 @@ pub use compile::{ Error as CompileError, SourceError, TypeError };
 use compile;
 
 use foxbox_taxonomy::api;
-use foxbox_taxonomy::api::{ API, Error as APIError, WatchEvent };
+use foxbox_taxonomy::api::{ API, Error as APIError, Targetted, WatchEvent };
 use foxbox_taxonomy::services::{ Getter, Setter };
 use foxbox_taxonomy::util::{ Exactly, Id };
 use foxbox_taxonomy::values::Duration;
@@ -241,7 +241,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                 let condition_index = condition_index.clone();
                 witnesses.push(
                     api.watch_values(
-                        vec![(condition.source.clone(), Exactly::Exactly(condition.range.clone())) ],
+                        vec![Targetted::new(condition.source.clone(), Exactly::Exactly(condition.range.clone())) ],
                         Box::new(self.tx.map(move |event| {
                             ExecutionOp::Update {
                                 event: event,
@@ -430,7 +430,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
 impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
     fn eval(&self, api: &Env::API) ->  Vec<(Id<Setter>, Result<(), Error>)> {
-        api.send_values(vec![(self.destination.clone(), self.value.clone())])
+        api.send_values(vec![Targetted::new(self.destination.clone(), self.value.clone())])
             .into_iter()
             .map(|(id, result)|
                  (id, result.map_err(|err| Error::APIError(err))))
