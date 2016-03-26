@@ -5,22 +5,25 @@ use values::*;
 use transformable_channels::mpsc::*;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub type ResultMap<K, T, E> = HashMap<K, Result<T, E>>;
 
 /// A witness that we are currently watching for a value.
 /// Watching stops when the guard is dropped.
-pub trait AdapterWatchGuard {
+pub trait AdapterWatchGuard : Send + Sync {
 }
 
 /// An API that adapter managers must implement
-pub trait AdapterManagerHandle {
+pub trait AdapterManagerHandle: Send {
     /// Add an adapter to the system.
+    ///
+    /// This version is optimized for Adapters that already implement Sync.
     ///
     /// # Errors
     ///
     /// Returns an error if an adapter with the same id is already present.
-    fn add_adapter(&self, adapter: Box<Adapter>) -> Result<(), Error>;
+    fn add_adapter(& self, adapter: Arc<Adapter>) -> Result<(), Error>;
 
     /// Remove an adapter from the system, including all its services and channels.
     ///
@@ -29,7 +32,7 @@ pub trait AdapterManagerHandle {
     /// Returns an error if no adapter with this identifier exists. Otherwise, attempts
     /// to cleanup as much as possible, even if for some reason the system is in an
     /// inconsistent state.
-    fn remove_adapter(&self, id: &Id<AdapterId>) -> Result<(), Error>;
+    fn remove_adapter(& self, id: &Id<AdapterId>) -> Result<(), Error>;
 
     /// Add a service to the system. Called by the adapter when a new
     /// service (typically a new device) has been detected/configured.
@@ -43,8 +46,8 @@ pub trait AdapterManagerHandle {
     /// Returns an error if any of:
     /// - `service` has channels;
     /// - a service with id `service.id` is already installed on the system;
-    /// - there is no adapter with id `service.adapter`.
-    fn add_service(&self, service: Service) -> Result<(), Error>;
+    /// - there is no adapter with id `service.lock`.
+    fn add_service(& self, service: Service) -> Result<(), Error>;
 
     /// Remove a service previously registered on the system. Typically, called by
     /// an adapter when a service (e.g. a device) is disconnected.
@@ -55,7 +58,7 @@ pub trait AdapterManagerHandle {
     /// - there is no such service;
     /// - there is an internal inconsistency, in which case this method will still attempt to
     /// cleanup before returning an error.
-    fn remove_service(&self, service_id: &Id<ServiceId>) -> Result<(), Error>;
+    fn remove_service(& self, service_id: &Id<ServiceId>) -> Result<(), Error>;
 
     /// Add a setter to the system. Typically, this is called by the adapter when a new
     /// service has been detected/configured. Some services may gain/lose getters at
@@ -70,7 +73,7 @@ pub trait AdapterManagerHandle {
     /// Returns an error if the adapter is not registered, the parent service is not
     /// registered, or a channel with the same identifier is already registered.
     /// In either cases, this method reverts all its changes.
-    fn add_getter(&self, setter: Channel<Getter>) -> Result<(), Error>;
+    fn add_getter(& self, setter: Channel<Getter>) -> Result<(), Error>;
 
     /// Remove a setter previously registered on the system. Typically, called by
     /// an adapter when a service is reconfigured to remove one of its getters.
@@ -80,7 +83,7 @@ pub trait AdapterManagerHandle {
     /// This method returns an error if the setter is not registered or if the service
     /// is not registered. In either case, it attemps to clean as much as possible, even
     /// if the state is inconsistent.
-    fn remove_getter(&self, id: &Id<Getter>) -> Result<(), Error>;
+    fn remove_getter(& self, id: &Id<Getter>) -> Result<(), Error>;
 
     /// Add a setter to the system. Typically, this is called by the adapter when a new
     /// service has been detected/configured. Some services may gain/lose setters at
@@ -95,7 +98,7 @@ pub trait AdapterManagerHandle {
     /// Returns an error if the adapter is not registered, the parent service is not
     /// registered, or a channel with the same identifier is already registered.
     /// In either cases, this method reverts all its changes.
-    fn add_setter(&self, setter: Channel<Setter>) -> Result<(), Error>;
+    fn add_setter(& self, setter: Channel<Setter>) -> Result<(), Error>;
 
     /// Remove a setter previously registered on the system. Typically, called by
     /// an adapter when a service is reconfigured to remove one of its setters.
@@ -105,7 +108,7 @@ pub trait AdapterManagerHandle {
     /// This method returns an error if the setter is not registered or if the service
     /// is not registered. In either case, it attemps to clean as much as possible, even
     /// if the state is inconsistent.
-    fn remove_setter(&self, id: &Id<Setter>) -> Result<(), Error>;
+    fn remove_setter(& self, id: &Id<Setter>) -> Result<(), Error>;
 }
 
 pub enum WatchEvent {
@@ -133,7 +136,7 @@ pub enum WatchEvent {
 ///
 /// Note that all methods are blocking. However, the underlying implementatino of adapters is
 /// expected to either return quickly or be able to handle several requests concurrently.
-pub trait Adapter: Send {
+pub trait Adapter: Send + Sync {
     /// An id unique to this adapter. This id must persist between
     /// reboots/reconnections.
     fn id(&self) -> Id<AdapterId>;

@@ -377,3 +377,6 @@ pub struct VendorId;
 
 #[derive(Clone, Debug)]
 pub struct MimeTypeId;
+
+/// Helper function, to check that a type implements Sync.
+pub fn is_sync<T: Sync>() {}

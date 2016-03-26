@@ -4,50 +4,51 @@
 //! - adapters use it to (un)register themselves, as well as services and channels;
 //! - it exposes an implementation of the taxonomy API.
 
-pub use backend::WatchGuard;
-
-use backend::{ Op, AdapterManagerState };
 use adapter::{ Adapter, AdapterManagerHandle };
-
 use api::{ API, Error, ResultMap, TargetMap, WatchEvent };
+use backend::*;
 use selector::*;
 use services::*;
-use values::{ Range, Value };
+use util::is_sync;
+use values::{ Range, TypeError, Value };
 
-use transformable_channels::mpsc::*;
-
+use std::collections::HashMap;
+use std::sync::{ Arc, Mutex, Weak };
+use std::sync::atomic::{ AtomicBool, Ordering };
 use std::thread;
 
+use sublock::atomlock::*;
+use transformable_channels::mpsc::*;
+
 /// An implementation of the AdapterManager.
-#[derive(Clone)]
+///
+/// This implementation is `Sync` and supports any number of concurrent
+/// readers *or* a single writer.
 pub struct AdapterManager {
-    tx: RawSender<Op>
+    /// The in-memory database is protected by a read-write lock.
+    ///
+    /// Each method is responsible for determining whether it needs read() or write()
+    /// and releasing the lock as soon as possible.
+    ///
+    /// The Arc is necessary to let WatchGuard release watches upon Drop.
+    back_end: Arc<MainLock<State>>,
+
+    tx_watch: Arc<Mutex<RawSender<WatchOp>>>,
 }
 
 impl AdapterManager {
     /// Create an empty AdapterManager.
     /// This function does not attempt to load any state from the disk.
     pub fn new() -> Self {
-        let (tx, rx) = channel();
-        thread::spawn(move || {
-            let mut back_end = AdapterManagerState::new();
-            for msg in rx {
-                back_end.execute(msg);
-            }
-            // The loop will exit once self.tx is dropped.
-        });
-        AdapterManager {
-            tx: tx
-        }
-    }
+        // The code should build only if AdapterManager implements Sync.
+        is_sync::<AdapterManager>();
 
-    fn dispatch<T>(&self, op: Op, rx_back: Receiver<T>) -> T {
-        // Send to the back-end thread. This will panic iff the back-end thread has
-        // already panicked, i.e. probably if one of the adapters has panicked. At
-        // this stage, we probably want to relaunch the foxbox.
-        self.tx.send(op).unwrap();
-        // Again, this will panic iff the back-end thread has already panicked.
-        rx_back.recv().unwrap()
+        let state = Arc::new(MainLock::new(|liveness| State::new(liveness)));
+        let tx_watch = Arc::new(Mutex::new(Self::handle_watches(Arc::downgrade(&state))));
+        AdapterManager {
+            back_end: state,
+            tx_watch: tx_watch,
+        }
     }
 }
 
@@ -63,12 +64,8 @@ impl AdapterManagerHandle for AdapterManager {
     /// # Errors
     ///
     /// Returns an error if an adapter with the same id is already present.
-    fn add_adapter(&self, adapter: Box<Adapter>) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::AddAdapter {
-            adapter: adapter,
-            tx: tx
-        }, rx)
+    fn add_adapter(&self, adapter: Arc<Adapter>) -> Result<(), Error> {
+        self.back_end.write().unwrap().add_adapter(adapter)
     }
 
     /// Remove an adapter from the system, including all its services and channels.
@@ -79,11 +76,7 @@ impl AdapterManagerHandle for AdapterManager {
     /// to cleanup as much as possible, even if for some reason the system is in an
     /// inconsistent state.
     fn remove_adapter(&self, id: &Id<AdapterId>) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::RemoveAdapter {
-            id: id.clone(),
-            tx: tx
-        }, rx)
+        self.back_end.write().unwrap().remove_adapter(id)
     }
 
     /// Add a service to the system. Called by the adapter when a new
@@ -103,11 +96,7 @@ impl AdapterManagerHandle for AdapterManager {
     /// - a service with id `service.id` is already installed on the system;
     /// - there is no adapter with id `service.adapter`.
     fn add_service(&self, service: Service) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::AddService {
-            service: service,
-            tx: tx
-        }, rx)
+        self.back_end.write().unwrap().add_service(service)
     }
 
     /// Remove a service previously registered on the system. Typically, called by
@@ -120,11 +109,7 @@ impl AdapterManagerHandle for AdapterManager {
     /// - there is an internal inconsistency, in which case this method will still attempt to
     /// cleanup before returning an error.
     fn remove_service(&self, id: &Id<ServiceId>) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::RemoveService {
-            id: id.clone(),
-            tx: tx
-        }, rx)
+        self.back_end.write().unwrap().remove_service(id)
     }
 
     /// Add a setter to the system. Typically, this is called by the adapter when a new
@@ -141,11 +126,12 @@ impl AdapterManagerHandle for AdapterManager {
     /// registered, or a channel with the same identifier is already registered.
     /// In either cases, this method reverts all its changes.
     fn add_getter(&self, getter: Channel<Getter>) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::AddGetter {
-            getter: getter,
-            tx: tx,
-        }, rx)
+        let request = {
+            // Acquire and release lock asap.
+            try!(self.back_end.write().unwrap().add_getter(getter))
+        };
+        self.register_watches(request);
+        Ok(())
     }
 
     /// Remove a setter previously registered on the system. Typically, called by
@@ -157,11 +143,7 @@ impl AdapterManagerHandle for AdapterManager {
     /// is not registered. In either case, it attemps to clean as much as possible, even
     /// if the state is inconsistent.
     fn remove_getter(&self, id: &Id<Getter>) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::RemoveGetter {
-            id: id.clone(),
-            tx: tx,
-        }, rx)
+        self.back_end.write().unwrap().remove_getter(id)
     }
 
     /// Add a setter to the system. Typically, this is called by the adapter when a new
@@ -178,11 +160,7 @@ impl AdapterManagerHandle for AdapterManager {
     /// registered, or a channel with the same identifier is already registered.
     /// In either cases, this method reverts all its changes.
     fn add_setter(&self, setter: Channel<Setter>) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::AddSetter {
-            setter: setter,
-            tx: tx,
-        }, rx)
+        self.back_end.write().unwrap().add_setter(setter)
     }
 
     /// Remove a setter previously registered on the system. Typically, called by
@@ -194,11 +172,7 @@ impl AdapterManagerHandle for AdapterManager {
     /// is not registered. In either case, it attemps to clean as much as possible, even
     /// if the state is inconsistent.
     fn remove_setter(&self, id: &Id<Setter>) -> Result<(), Error> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::RemoveSetter {
-            id: id.clone(),
-            tx: tx
-        }, rx)
+        self.back_end.write().unwrap().remove_setter(id)
     }
 }
 
@@ -210,11 +184,7 @@ impl API for AdapterManager {
     /// the metadata on all services matching _either_ `req1` or `req2`
     /// or ...
     fn get_services(&self, selectors: Vec<ServiceSelector>) -> Vec<Service> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::GetServices {
-            selectors: selectors,
-            tx: tx
-        }, rx)
+        self.back_end.read().unwrap().get_services(selectors)
     }
 
     /// Label a set of services with a set of tags.
@@ -231,12 +201,8 @@ impl API for AdapterManager {
     /// Note that this call is _not live_. In other words, if services
     /// are added after the call, they will not be affected.
     fn add_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize {
-        let (tx, rx) = channel();
-        self.dispatch(Op::AddServiceTags {
-            selectors: selectors,
-            tags: tags,
-            tx: tx
-        }, rx)
+        self.back_end.write().unwrap().add_service_tags(selectors, tags)
+        // FIXME: This can cause watcher registrations
     }
 
     /// Remove a set of tags from a set of services.
@@ -250,31 +216,18 @@ impl API for AdapterManager {
     /// ... They will not change state. They are counted in the
     /// resulting `usize` nevertheless.
     ///
-    /// Note that this call is _not live_. In other words, if services
+    /// Note that this call is _not live_. In okther words, if services
     /// are added after the call, they will not be affected.
     fn remove_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize {
-        let (tx, rx) = channel();
-        self.dispatch(Op::RemoveServiceTags {
-            selectors: selectors,
-            tags: tags,
-            tx: tx,
-        }, rx)
+        self.back_end.write().unwrap().remove_service_tags(selectors, tags)
     }
 
     /// Get a list of channels matching some conditions
     fn get_getter_channels(&self, selectors: Vec<GetterSelector>) -> Vec<Channel<Getter>> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::GetGetterChannels {
-            selectors: selectors,
-            tx: tx,
-        }, rx)
+        self.back_end.read().unwrap().get_getter_channels(selectors)
     }
     fn get_setter_channels(&self, selectors: Vec<SetterSelector>) -> Vec<Channel<Setter>> {
-        let (tx, rx) = channel();
-        self.dispatch(Op::GetSetterChannels {
-            selectors: selectors,
-            tx: tx,
-        }, rx)
+        self.back_end.read().unwrap().get_setter_channels(selectors)
     }
 
     /// Label a set of channels with a set of tags.
@@ -291,21 +244,15 @@ impl API for AdapterManager {
     /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
     fn add_getter_tags(&self, selectors: Vec<GetterSelector>, tags: Vec<Id<TagId>>) -> usize {
-        let (tx, rx) = channel();
-        self.dispatch(Op::AddGetterTags {
-            selectors: selectors,
-            tags: tags,
-            tx: tx,
-        }, rx)
-
+        let (request, result) = {
+            // Acquire and release the write lock.
+            self.back_end.write().unwrap().add_getter_tags(selectors, tags)
+        };
+        self.register_watches(request);
+        result
     }
     fn add_setter_tags(&self, selectors: Vec<SetterSelector>, tags: Vec<Id<TagId>>) -> usize {
-        let (tx, rx) = channel();
-        self.dispatch(Op::AddSetterTags {
-            selectors: selectors,
-            tags: tags,
-            tx: tx,
-        }, rx)
+        self.back_end.write().unwrap().add_setter_tags(selectors, tags)
     }
 
     /// Remove a set of tags from a set of channels.
@@ -322,57 +269,183 @@ impl API for AdapterManager {
     /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
     fn remove_getter_tags(&self, selectors: Vec<GetterSelector>, tags: Vec<Id<TagId>>) -> usize {
-        let (tx, rx) = channel();
-        self.dispatch(Op::RemoveGetterTags {
-            selectors: selectors,
-            tags: tags,
-            tx: tx,
-        }, rx)
+        self.back_end.write().unwrap().remove_getter_tags(selectors, tags)
     }
     fn remove_setter_tags(&self, selectors: Vec<SetterSelector>, tags: Vec<Id<TagId>>) -> usize {
-        let (tx, rx) = channel();
-        self.dispatch(Op::RemoveSetterTags {
-            selectors: selectors,
-            tags: tags,
-            tx: tx,
-        }, rx)
+        self.back_end.write().unwrap().remove_setter_tags(selectors, tags)
     }
 
     /// Read the latest value from a set of channels
     fn fetch_values(&self, selectors: Vec<GetterSelector>) ->
         ResultMap<Id<Getter>, Option<Value>, Error>
     {
-        let (tx, rx) = channel();
-        self.dispatch(Op::FetchValues {
-            selectors: selectors,
-            tx: tx,
-        }, rx)
+        // First, prepare the request.
+        let mut request;
+        {
+            // Make sure that the lock is released asap.
+            request = self.back_end.read().unwrap().prepare_fetch_values(selectors);
+        }
+        // Now fetch the values
+        let mut results = HashMap::new();
+        for (_, (adapter, mut getters)) in request.drain() {
+            let (getters, mut types) : (Vec<_>, Vec<_>) = getters.drain(..).unzip();
+            let mut got = adapter
+                .fetch_values(getters);
+
+            let checked = got.drain()
+                .zip(types.drain(..))
+                .map(|(result, typ)| {
+                    if let (id, Ok(Some(value))) = result {
+                        if value.get_type() == typ {
+                            (id, Ok(Some(value)))
+                        } else {
+                            (id, Err(Error::TypeError(TypeError {
+                                expected: typ,
+                                got: value.get_type()
+                            })))
+                        }
+                    } else {
+                        result
+                    }
+                });
+
+            results.extend(checked);
+        }
+        results
     }
 
     /// Send a bunch of values to a set of channels
     fn send_values(&self, keyvalues: TargetMap<SetterSelector, Value>) ->
         ResultMap<Id<Setter>, (), Error>
     {
-        let (tx, rx) = channel();
-        self.dispatch(Op::SendValues {
-            keyvalues: keyvalues,
-            tx: tx,
-        }, rx)
+        // First, prepare the request.
+        let mut prepared;
+        {
+            // Make sure that the lock is released asap.
+            prepared = self.back_end.read().unwrap().prepare_send_values(keyvalues);
+        }
+
+        // Dispatch to adapter
+        let mut results = HashMap::new();
+        for (_, (adapter, (request, failures))) in prepared.drain() {
+            let got = adapter.send_values(request);
+            results.extend(got);
+            results.extend(failures);
+        }
+
+        results
     }
 
     /// Watch for any change
+    ///
+    /// # Performance
+    ///
+    /// This call retains the write lock until all adapters involved have returned.
+    ///
+    /// It is there important that all adapters involved return quickly.
     fn watch_values(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
         on_event: Box<ExtSender<WatchEvent>>) -> Self::WatchGuard
     {
-        let (tx, rx) = channel();
-        let (key, is_dropped) = self.dispatch(Op::RegisterChannelWatch {
-            watch: watch,
-            on_event: on_event,
-            tx: tx
-        }, rx);
-        WatchGuard::new(Box::new(self.tx.clone()), key, is_dropped)
+        let (request, watch_key, is_dropped) =
+        {
+            // Acquire and release write lock.
+            self.back_end.write()
+                .unwrap()
+                .prepare_channel_watch(watch, on_event)
+        };
+
+        self.register_watches(request);
+        WatchGuard::new(self.tx_watch.lock().unwrap().internal_clone(), watch_key, is_dropped)
     }
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard = WatchGuard;
+}
+
+/// Operations related to watching.
+///
+/// As the adapter side of operations can be slow, we want to keep them out of the MainLock. On the
+/// other hand, we want to make sure that they take place in a predictable order, to avoid race
+/// conditions. So we delegate them to a specialized background thread.
+enum WatchOp {
+    /// Start watching a bunch of channels, then register them as being watched.
+    Start(WatchRequest, RawSender<()>),
+
+    /// Release a watch, after the corresponding WatchGuard has been dropped.
+    Release(WatchKey)
+}
+
+impl AdapterManager {
+    /// Register watches on the dedicated background thread. This must be done outside of any
+    /// lock!
+    fn register_watches(&self, request: WatchRequest) {
+        {
+            debug_assert!(self.back_end.try_write().is_ok(),
+                "For performance reason, callers should release the lock before calling register_watches.");
+        }
+        if !request.is_empty() {
+            let (tx, rx) = channel();
+            let _ = self.tx_watch.lock().unwrap().send(WatchOp::Start(request, tx));
+            let _ = rx.recv();
+        }
+    }
+
+    /// Start the background thread .
+    fn handle_watches(state: Weak<MainLock<State>>) -> RawSender<WatchOp> {
+        let (tx, rx) = channel();
+        let state = state.clone();
+        thread::spawn(move || {
+            for msg in rx {
+                match state.upgrade() {
+                    None => return, // The manager has been dropped.
+                    Some(backend) =>
+                        match msg {
+                            WatchOp::Start(request, tx) => {
+                                let add = State::start_watch(request);
+                                backend.write().unwrap().register_ongoing_watch(add);
+                                let _ = tx.send(());
+                            }
+                            WatchOp::Release(request) => {
+                                backend.write().unwrap().stop_watch(request)
+                            }
+                        }
+                }
+            }
+        });
+        tx
+    }
+}
+
+
+/// A data structure that causes cancellation of a watch when dropped.
+pub struct WatchGuard {
+    tx_owner: Box<ExtSender<WatchOp>>,
+
+    /// The cancellation key.
+    key: WatchKey,
+
+    /// Once dropped, the watch callbacks will stopped being called. Note
+    /// that dropping this value is not sufficient to cancel the watch, as
+    /// the adapters will continue sending updates.
+    is_dropped: Arc<AtomicBool>,
+}
+impl WatchGuard {
+    fn new(tx_owner: Box<ExtSender<WatchOp>>, key: WatchKey, is_dropped: Arc<AtomicBool>) -> Self
+    {
+        WatchGuard {
+            tx_owner: tx_owner,
+            key: key,
+            is_dropped: is_dropped
+        }
+    }
+}
+impl Drop for WatchGuard {
+    fn drop(&mut self) {
+        self.is_dropped.store(true, Ordering::Relaxed);
+
+        // Attempt to release the watch. In the unlikely case that we can't (perhaps if we're
+        // dropping during shutdown), don't insist.
+        // Note that we background this to avoid any risk of deadlock during the drop.
+        let _ = self.tx_owner.send(WatchOp::Release(self.key));
+    }
 }
