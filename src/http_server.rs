@@ -147,13 +147,11 @@ describe! ping {
 }
 
 #[cfg(test)]
-describe! cors {
+describe! http_server {
     before_each {
         extern crate hyper;
 
         use foxbox_taxonomy::manager::AdapterManager;
-        use iron::headers;
-        use iron::method::Method;
         use std::thread;
         use std::time::Duration;
         use stubs::controller::ControllerStub;
@@ -162,16 +160,19 @@ describe! cors {
 
         let mut http_server = HttpServer::new(ControllerStub::new());
         http_server.start(taxo_manager);
+        // HACK: Let some time for the http server to start.
+        thread::sleep(Duration::new(3, 0));
     }
 
     it "should get the appropriate CORS headers" {
+        use iron::headers;
+        use iron::method::Method;
+
         let endpoints = vec![
             (vec![Method::Get, Method::Post, Method::Put],
              "services/:service/:command".to_owned()),
             (vec![Method::Get], "services/list".to_owned())
         ];
-        // HACK: Let some time for the http server to start.
-        thread::sleep(Duration::new(3, 0));
         let client = hyper::Client::new();
         for endpoint in endpoints {
             let (_, path) = endpoint;
@@ -183,6 +184,20 @@ describe! cors {
             assert!(headers.has::<headers::AccessControlAllowHeaders>());
             assert!(headers.has::<headers::AccessControlAllowMethods>());
         };
+    }
+
+    it "should respond with 404" {
+        use iron::status::Status;
+        use std::io::Read;
+
+        let client = hyper::Client::new();
+        let path = "http://localhost:3000/foo/bar".to_owned();
+        let mut res = client.get(&path).send().unwrap();
+        assert_eq!(res.status, Status::NotFound);
+        let mut body = String::new();
+        res.read_to_string(&mut body).unwrap();
+        assert_eq!(body, "Unknown resource: No such file or \
+                   directory (os error 2)".to_owned());
     }
 }
 
