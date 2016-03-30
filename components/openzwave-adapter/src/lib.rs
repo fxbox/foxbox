@@ -148,6 +148,12 @@ fn kind_from_value(value: ValueID) -> Option<ChannelKind> {
     })
 }
 
+fn to_open_closed(val: bool) -> Value {
+    Value::OpenClosed(
+        if val { OpenClosed::Open } else { OpenClosed::Closed }
+    )
+}
+
 struct WatcherGuard {
     key: usize,
     map: Arc<Mutex<WatchersMap>>,
@@ -207,6 +213,7 @@ impl OpenzwaveAdapter {
         let mut controller_map = self.controller_map.clone();
         let mut getter_map = self.getter_map.clone();
         let mut setter_map = self.setter_map.clone();
+        let watchers = self.watchers.clone();
 
         thread::spawn(move || {
             for notification in rx {
@@ -269,7 +276,31 @@ impl OpenzwaveAdapter {
                             });
                         }
                     }
-                    ZWaveNotification::ValueChanged(value)         => {}
+                    ZWaveNotification::ValueChanged(value)         => {
+                        match value.get_type() {
+                            ValueType::ValueType_Bool => {},
+                            _ => continue // ignore non-bool vals for now
+                        };
+
+                        let tax_id = match getter_map.find_tax_id_from_ozw(&value) {
+                            Ok(Some(tax_id)) => tax_id,
+                            _ => continue
+                        };
+
+                        let watchers = watchers.lock().unwrap();
+
+                        let watchers = match watchers.get_from_tax_id(&tax_id) {
+                            Some(watchers) => watchers,
+                            _ => continue
+                        };
+
+                        for sender in &watchers {
+                            let sender = sender.lock().unwrap();
+                            sender.send(
+                                WatchEvent::Enter { id: tax_id.clone(), value: to_open_closed(value.as_bool().unwrap()) }
+                            );
+                        }
+                    }
                     ZWaveNotification::ValueRemoved(value)         => {}
                     ZWaveNotification::Generic(string)             => {}
                 }
@@ -301,11 +332,7 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
 
             let ozw_value: Option<Option<Value>> = ozw_value.map(|ozw_value: ValueID| {
                 let result: Option<Value> = match ozw_value.get_type() {
-                    ValueType::ValueType_Bool => ozw_value.as_bool().map(
-                        |bool| Value::OpenClosed(
-                            if bool { OpenClosed::Open } else { OpenClosed::Closed }
-                        )
-                    ).ok(),
+                    ValueType::ValueType_Bool => ozw_value.as_bool().map(to_open_closed).ok(),
                     _ => Some(Value::Unit)
                 };
                 result
@@ -338,3 +365,4 @@ mod tests {
     fn it_works() {
     }
 }
+
