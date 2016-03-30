@@ -94,10 +94,12 @@ impl<Kind, Type> IdMap<Kind, Type> where Type: Eq + Clone, Kind: Clone {
     }
 }
 
-type WatchersMap = HashMap<usize, Arc<Box<ExtSender<WatchEvent>>>>;
+type SyncExtSender = Mutex<Box<ExtSender<WatchEvent>>>;
+type WatchersMap = HashMap<usize, Arc<SyncExtSender>>;
 struct Watchers {
     current_index: usize,
-    map: Arc<Mutex<WatchersMap>>
+    map: Arc<Mutex<WatchersMap>>,
+    getter_map: HashMap<TaxId<Getter>, Vec<Weak<SyncExtSender>>>,
 }
 
 impl Watchers {
@@ -105,24 +107,37 @@ impl Watchers {
         Watchers {
             current_index: 0,
             map: Arc::new(Mutex::new(HashMap::new())),
+            getter_map: HashMap::new(),
         }
     }
 
-    fn push(&mut self, watcher: Arc<Box<ExtSender<Watchers>>>) -> WatcherGuard {
+    fn push(&mut self, tax_id: TaxId<Getter>, watcher: Arc<SyncExtSender>) -> WatcherGuard {
         let index = self.current_index;
         self.current_index += 1;
         {
-            let mut map = self.map.lock();
-            map.push(index, watcher);
+            let mut map = self.map.lock().unwrap();
+            map.insert(index, watcher.clone());
         }
+
+        let entry = self.getter_map.entry(tax_id).or_insert(Vec::new());
+        entry.push(Arc::downgrade(&watcher));
+
         WatcherGuard {
             key: index,
-            map: self.map.clone().downgrade()
+            map: self.map.clone()
         }
     }
 
-    fn get(&self, index: usize) -> Option<&ExtSender<WatchEvent>> {
-        self.map.borrow().get(index)
+    fn get(&self, index: usize) -> Option<Arc<SyncExtSender>> {
+        let map = self.map.lock().unwrap();
+        map.get(&index).cloned()
+    }
+
+    fn get_from_tax_id(&self, tax_id: &TaxId<Getter>) -> Option<Vec<Arc<SyncExtSender>>> {
+        self.getter_map.get(tax_id).and_then(|vec| {
+            let vec: Vec<_> = vec.iter().filter_map(|weak_sender| weak_sender.upgrade()).collect();
+            if vec.len() == 0 { None } else { Some(vec) }
+        })
     }
 }
 
@@ -135,15 +150,13 @@ fn kind_from_value(value: ValueID) -> Option<ChannelKind> {
 
 struct WatcherGuard {
     key: usize,
-    map: Weak<Mutex<WatchersMap>>,
+    map: Arc<Mutex<WatchersMap>>,
 }
 
 impl Drop for WatcherGuard {
     fn drop(&mut self) {
-        let map = self.map.upgrade();
-        if map.is_none() { return }
-        let map = map.unwrap().lock();
-        map.remove(self.key);
+        let mut map = self.map.lock().unwrap();
+        map.remove(&self.key);
     }
 }
 
@@ -170,7 +183,7 @@ impl OpenzwaveAdapter {
         let (ozw, rx) = try!(openzwave::init(&options));
 
         let name = String::from("OpenZwave Adapter");
-        let adapter = Box::new(OpenzwaveAdapter {
+        let adapter = Arc::new(OpenzwaveAdapter {
             id: TaxId::new(&name),
             name: name,
             vendor: String::from("Mozilla"),
@@ -307,13 +320,13 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
     }
 
     fn register_watch(&self, values: Vec<(TaxId<Getter>, Option<Range>)>, cb: Box<ExtSender<WatchEvent>>) -> ResultMap<TaxId<Getter>, Box<AdapterWatchGuard>, TaxError> {
-        let cb = Arc::new(cb);
-        values.iter().map(|id| {
+        let cb = Arc::new(Mutex::new(cb)); // Mutex is necessary because cb is not Sync.
+        values.iter().map(|&(ref id, _)| {
             let watch_guard = {
-                let mut watchers = self.watchers.lock();
-                watchers.push(cb.clone())
+                let mut watchers = self.watchers.lock().unwrap();
+                watchers.push(id.clone(), cb.clone())
             };
-            let value_result: Result<Box<AdapterWatchGuard>, TaxError> = Ok(watch_guard);
+            let value_result: Result<Box<AdapterWatchGuard>, TaxError> = Ok(Box::new(watch_guard));
             (id.clone(), value_result)
         }).collect()
     }
