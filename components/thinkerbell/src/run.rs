@@ -241,7 +241,10 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
                 let condition_index = condition_index.clone();
                 witnesses.push(
                     api.watch_values(
-                        vec![Targetted::new(condition.source.clone(), Exactly::Exactly(condition.range.clone())) ],
+                        vec![Targetted {
+                            select: condition.source.clone(),
+                            payload: Exactly::Exactly(condition.range.clone())
+                        }],
                         Box::new(self.tx.map(move |event| {
                             ExecutionOp::Update {
                                 event: event,
@@ -430,7 +433,10 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
 
 impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
     fn eval(&self, api: &Env::API) ->  Vec<(Id<Setter>, Result<(), Error>)> {
-        api.send_values(vec![Targetted::new(self.destination.clone(), self.value.clone())])
+        api.send_values(vec![Targetted {
+            select: self.destination.clone(),
+            payload: self.value.clone()
+        }])
             .into_iter()
             .map(|(id, result)|
                  (id, result.map_err(|err| Error::APIError(err))))
