@@ -58,6 +58,9 @@ extern crate ws;
 extern crate multicast_dns;
 extern crate xml;
 
+// adapters
+extern crate openzwave_adapter as openzwave;
+
 #[cfg(test)]
 extern crate regex;
 #[cfg(test)]

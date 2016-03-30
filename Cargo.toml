@@ -3,6 +3,7 @@ name = "foxbox"
 version = "0.1.0"
 authors = ["fabrice <fabrice@desre.org>"]
 build = "build.rs"
+exclude = [ "config/**" ]
 
 [features]
 default = ["authentication"]
@@ -28,6 +29,7 @@ mount = "0.0.10"
 nix = { git = "https://github.com/nix-rust/nix.git", rev = "138080" } # Until 0.5.1 is released
 openssl = "0.7.6"
 openssl-sys = "0.7.6"
+openzwave-adapter = { git = "https://github.com/fxbox/openzwave-adapter" }
 rand = "0.3"
 router = "0.1.0"
 rust-crypto = "0.2.34"

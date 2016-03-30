@@ -28,6 +28,8 @@ use self::thinkerbell::ThinkerbellAdapter;
 use service::ServiceAdapter;
 use traits::Controller;
 
+use openzwave::Adapter as OpenzwaveAdapter;
+
 use std::sync::Arc;
 
 pub struct AdapterManager<T> {
@@ -62,6 +64,8 @@ impl<T: Controller> AdapterManager<T> {
         webpush::WebPush::init(c, manager).unwrap();
         ip_camera::IPCameraAdapter::init(manager, self.controller.clone()).unwrap();
         ThinkerbellAdapter::init(manager).unwrap(); // FIXME: no unwrap!
+        OpenzwaveAdapter::init(manager).unwrap();
+
         self.start_tts(manager);
     }
 
