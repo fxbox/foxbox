@@ -23,6 +23,9 @@ node_modules
 .vscode
 .idea
 
+# vim swap files
+.*.sw?
+
 # Shared copied assets
 /static/**/shared
 
