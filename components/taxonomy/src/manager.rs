@@ -4,8 +4,9 @@
 //! - adapters use it to (un)register themselves, as well as services and channels;
 //! - it exposes an implementation of the taxonomy API.
 
-use adapter::{ Adapter, AdapterManagerHandle };
-use api::{ API, Error, ResultMap, TargetMap, WatchEvent };
+pub use adapter::*;
+use api;
+use api::{ API, Error, TargetMap };
 use backend::*;
 use selector::*;
 use services::*;
@@ -337,14 +338,8 @@ impl API for AdapterManager {
     }
 
     /// Watch for any change
-    ///
-    /// # Performance
-    ///
-    /// This call retains the write lock until all adapters involved have returned.
-    ///
-    /// It is there important that all adapters involved return quickly.
     fn watch_values(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
-        on_event: Box<ExtSender<WatchEvent>>) -> Self::WatchGuard
+        on_event: Box<ExtSender<api::WatchEvent>>) -> Self::WatchGuard
     {
         let (request, watch_key, is_dropped) =
         {
