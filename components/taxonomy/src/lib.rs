@@ -40,6 +40,9 @@ pub mod manager;
 /// The API for defining Adapters.
 pub mod adapter;
 
+/// Utilities for writing Adapters.
+pub mod adapter_utils;
+
 /// Utility module for inserting values in maps and keeping the insertion reversible in case of
 /// any error.
 pub mod transact;
