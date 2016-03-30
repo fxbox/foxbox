@@ -1,7 +1,6 @@
 extern crate foxbox_taxonomy;
 extern crate transformable_channels;
 
-use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::fake_adapter::*;
 use foxbox_taxonomy::api::{ API, Error, InternalError, TargetMap, Targetted, WatchEvent as Event };
