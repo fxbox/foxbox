@@ -4,8 +4,8 @@
 
 extern crate serde_json;
 
-use foxbox_taxonomy::manager::WatchGuard;
-use foxbox_taxonomy::api::{ API, Error, TargetMap, ResultMap };
+use foxbox_taxonomy::manager::*;
+use foxbox_taxonomy::api::{ API, Error, TargetMap };
 use foxbox_taxonomy::values::{ Binary, Value };
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
@@ -20,25 +20,21 @@ use iron::request::Body;
 use iron::status::Status;
 
 use std::io::{ Error as IOError, Read };
-use std::sync::Mutex;
+use std::sync::Arc;
 use traits::Controller;
 
 /// This is a specialized Router for the taxonomy API.
 /// It handles all the calls under the api/v1/ url space.
-pub struct TaxonomyRouter<A> {
-    api: Mutex<A>
+pub struct TaxonomyRouter {
+    api: Arc<AdapterManager>
 }
 
 type GetterResultMap = ResultMap<Id<Getter>, Option<Value>, Error>;
 
-impl<A> TaxonomyRouter<A>
-    where A: API<WatchGuard=WatchGuard> + 'static {
-    pub fn new(adapter_api: A) -> Self {
+impl TaxonomyRouter {
+    pub fn new(adapter_api: &Arc<AdapterManager>) -> Self {
         TaxonomyRouter {
-            // This locks the full api access when dealing with a http request,
-            // which basically kills http concurrency.
-            // TODO: make it concurrent again.
-            api: Mutex::new(adapter_api)
+            api: adapter_api.clone()
         }
     }
 
@@ -103,8 +99,7 @@ impl<A> TaxonomyRouter<A>
     }
 }
 
-impl<A> Handler for TaxonomyRouter<A>
-    where A: API<WatchGuard=WatchGuard> + 'static {
+impl Handler for TaxonomyRouter {
 
     #[allow(cyclomatic_complexity)]
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
@@ -128,8 +123,6 @@ impl<A> Handler for TaxonomyRouter<A>
             ($call:ident, $sel:ident, $path:expr) => (
             if path == $path {
                 return {
-                    let api = self.api.lock().unwrap();
-
                     if req.method != Method::Get && req.method != Method::Post {
                         // Wrong method, return a 405 error.
                         return Ok(Response::with((Status::MethodNotAllowed,
@@ -139,12 +132,12 @@ impl<A> Handler for TaxonomyRouter<A>
                     if req.method == Method::Get {
                         // On a GET, just send the full taxonomy content for
                         // this kind of selector.
-                        let result = api.$call(vec![$sel::new()]);
+                        let result = self.api.$call(vec![$sel::new()]);
                         self.build_response(&result)
                     } else {
                         let source = itry!(Self::read_body_to_string(&mut req.body));
                         match Vec::<$sel>::from_str(&source as &str) {
-                            Ok(arg) => self.build_response(&api.$call(arg)),
+                            Ok(arg) => self.build_response(&self.api.$call(arg)),
                             Err(err) => self.build_parse_error(&err)
                         }
                     }
@@ -173,7 +166,7 @@ impl<A> Handler for TaxonomyRouter<A>
                 if path == $path && req.method == $method {
                     type Selectors = $param;
                     return {
-                        let api = self.api.lock().unwrap();
+                        let api = &self.api;
                         let source = itry!(Self::read_body_to_string(&mut req.body));
                         match Selectors::from_str(&source as &str) {
                             Ok(arg) => $action!(api, arg, $call),
@@ -192,8 +185,6 @@ impl<A> Handler for TaxonomyRouter<A>
                     type Param1 = $param1;
                     type Param2 = $param2;
                     return {
-                        let api = self.api.lock().unwrap();
-
                         let source = itry!(Self::read_body_to_string(&mut req.body));
                         let mut json = match serde_json::de::from_str(&source as &str) {
                             Err(err) => return self.build_parse_error(&ParseError::json(err)),
@@ -207,7 +198,7 @@ impl<A> Handler for TaxonomyRouter<A>
                             Err(err) => return self.build_parse_error(&err),
                             Ok(val) => val
                         };
-                        self.build_response(&api.$call(arg_1, arg_2))
+                        self.build_response(&self.api.$call(arg_1, arg_2))
                     }
                 }
             )
@@ -260,9 +251,8 @@ impl<A> Handler for TaxonomyRouter<A>
     }
 }
 
-pub fn create<T, A>(controller: T, adapter_api: A) -> Chain
-    where A: API<WatchGuard=WatchGuard> + 'static,
-          T: Controller {
+pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
+    where T: Controller {
     let router = TaxonomyRouter::new(adapter_api);
 
     let auth_endpoints = if cfg!(feature = "authentication") && !cfg!(test) {
@@ -299,12 +289,13 @@ describe! taxonomy_router {
         use iron_test::{ request, response };
         use mount::Mount;
         use stubs::controller::ControllerStub;
+        use std::sync::Arc;
 
-        let taxo_manager = AdapterManager::new();
+        let taxo_manager = Arc::new(AdapterManager::new());
         clock::Clock::init(&taxo_manager).unwrap();
 
         let mut mount = Mount::new();
-        mount.mount("/api/v1", create(ControllerStub::new(), taxo_manager));
+        mount.mount("/api/v1", create(ControllerStub::new(), &taxo_manager));
     }
 
     it "should return the list of services from a GET request" {
@@ -348,7 +339,7 @@ describe! binary_getter {
         use stubs::controller::ControllerStub;
         use transformable_channels::mpsc::*;
 
-        let taxo_manager = AdapterManager::new();
+        let taxo_manager = Arc::new(AdapterManager::new());
 
         // Create a basic adpater and service with a getter returning binary data.
 
@@ -407,8 +398,8 @@ describe! binary_getter {
         }
 
         impl BinaryAdapter {
-            fn init<A: AdapterManagerHandle>(adapt: &A) -> Result<(), Error> {
-                try!(adapt.add_adapter(Box::new(BinaryAdapter { })));
+            fn init(adapt: &Arc<AdapterManager>) -> Result<(), Error> {
+                try!(adapt.add_adapter(Arc::new(BinaryAdapter { })));
                 let service_id = service_id!("service@test");
                 let adapter_id = adapter_id!("adapter@test");
                 try!(adapt.add_service(Service::empty(service_id.clone(), adapter_id.clone())));
@@ -436,7 +427,7 @@ describe! binary_getter {
         BinaryAdapter::init(&taxo_manager).unwrap();
 
         let mut mount = Mount::new();
-        mount.mount("/api/v1", create(ControllerStub::new(), taxo_manager));
+        mount.mount("/api/v1", create(ControllerStub::new(), &taxo_manager));
 
         let response = request::put("http://localhost:3000/api/v1/channels/get",
                                     Headers::new(),

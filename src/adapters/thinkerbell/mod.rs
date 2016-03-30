@@ -1,10 +1,11 @@
 //! An adapter providing access to the Thinkerbell rules engine.
 
-use foxbox_taxonomy::adapter::{ AdapterManagerHandle, Adapter, WatchEvent, AdapterWatchGuard };
-use foxbox_taxonomy::api::{ API, Error, InternalError, ResultMap };
+use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
 use foxbox_taxonomy::util::Id;
 use foxbox_taxonomy::values::{ Range, Duration, Type, Value, TypeError, OnOff };
+
 use foxbox_thinkerbell::compile::ExecutableDevEnv;
 use foxbox_thinkerbell::manager::{ ScriptManager, ScriptId, Error as ScriptManagerError };
 use foxbox_thinkerbell::run::ExecutionEvent;
@@ -33,13 +34,13 @@ static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 ///
 /// This adapter performs most actions by delegating channel messages to its main thread.
 #[derive(Clone)]
-pub struct ThinkerbellAdapter<T> where T: API + Clone + Send + 'static {
+pub struct ThinkerbellAdapter {
 
     /// The sending end of the channel for sending messages to ThinkerbellAdapter's main loop.
-    tx: RawSender<ThinkAction>,
+    tx: Arc<Mutex<RawSender<ThinkAction>>>,
 
     /// A reference to the AdapterManager.
-    adapter_manager: T,
+    adapter_manager: Arc<AdapterManager>,
 
     /// The ID of this adapter (permanently fixed)
     adapter_id: Id<AdapterId>,
@@ -50,20 +51,20 @@ pub struct ThinkerbellAdapter<T> where T: API + Clone + Send + 'static {
 
 /// Thinkerbell requires an execution environment following this API.
 #[derive(Clone)]
-struct ThinkerbellExecutionEnv<T> {
-    adapter_manager: T,
+struct ThinkerbellExecutionEnv {
+    adapter_manager: Arc<AdapterManager>,
+
     // FIXME: Timer's not clonable, so we should only use one, right? Does this have to be mutexed?
     timer: Arc<Mutex<timer::Timer>>
 }
 
-impl<T> ExecutableDevEnv for ThinkerbellExecutionEnv<T>
-    where T: API + Clone + Send + 'static {
-    // Don't bother stopping watches.
-    type WatchGuard = T::WatchGuard;
-    type API = T;
+impl ExecutableDevEnv for ThinkerbellExecutionEnv {
+    // We don't support watches, so we don't care about the type of WatchGuard.
+    type WatchGuard = WatchGuard;
+    type API = AdapterManager;
 
-    fn api(&self) -> Self::API {
-        self.adapter_manager.clone()
+    fn api(&self) -> &Self::API {
+        &*self.adapter_manager
     }
 
     type TimerGuard = timer::Guard;
@@ -81,7 +82,7 @@ fn sm_error(e: ScriptManagerError) -> Error {
     Error::InternalError(InternalError::GenericError(format!("{:?}", e)))
 }
 
-impl<T> Adapter for ThinkerbellAdapter<T> where T: AdapterManagerHandle + API + Clone + Send + 'static {
+impl Adapter for ThinkerbellAdapter {
     fn id(&self) -> Id<AdapterId> {
         self.adapter_id.clone()
     }
@@ -101,7 +102,7 @@ impl<T> Adapter for ThinkerbellAdapter<T> where T: AdapterManagerHandle + API + 
     fn fetch_values(&self, set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.iter().map(|id| {
             let (tx, rx) = channel();
-            let _ = self.tx.send(ThinkAction::RespondToGetter(tx, id.clone()));
+            let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToGetter(tx, id.clone()));
             match rx.recv() {
                 Ok(result) => (id.clone(), result),
                 // If an error occurs, the channel/thread died!
@@ -115,7 +116,7 @@ impl<T> Adapter for ThinkerbellAdapter<T> where T: AdapterManagerHandle + API + 
         values.iter()
             .map(|(id, value)| {
                 let (tx, rx) = channel();
-                let _ = self.tx.send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone()));
+                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone()));
                 match rx.recv() {
                     Ok(result) => (id.clone(), result),
                     // If an error occurs, the channel died!
@@ -153,12 +154,12 @@ struct ThinkerbellRule {
     setter_remove_id: Id<Setter>,
 }
 
-impl<T> ThinkerbellAdapter<T> where T: AdapterManagerHandle + API + Clone + 'static {
+impl ThinkerbellAdapter {
 
     fn main(
         &self,
         rx: Receiver<ThinkAction>,
-        mut script_manager: ScriptManager<ThinkerbellExecutionEnv<T>, RawSender<(Id<ScriptId>, ExecutionEvent)>>
+        mut script_manager: ScriptManager<ThinkerbellExecutionEnv, RawSender<(Id<ScriptId>, ExecutionEvent)>>
     ) {
         // Store an in-memory list of all of the rules (their getters, setters, etc.).
         // We need to track these to respond to getter/setter requests.
@@ -224,7 +225,7 @@ impl<T> ThinkerbellAdapter<T> where T: AdapterManagerHandle + API + Clone + 'sta
                             Value::ThinkerbellRule(ref rule_source) => {
                                 let script_id = Id::new(&rule_source.name);
                                 let _ = tx.send(script_manager.put(&script_id, &rule_source.source).map_err(sm_error));
-                                let _ = self.tx.send(ThinkAction::AddRuleService(script_id.clone()));
+                                let _ = self.tx.lock().unwrap().send(ThinkAction::AddRuleService(script_id.clone()));
                             },
                             _ => {
                                 let _ = tx.send(Err(Error::TypeError(TypeError {
@@ -257,7 +258,7 @@ impl<T> ThinkerbellAdapter<T> where T: AdapterManagerHandle + API + Clone + 'sta
                                 continue 'recv;
                             } else if setter_id == rule.setter_remove_id {
                                 let _ = tx.send(script_manager.remove(&rule.script_id).map_err(sm_error));
-                                let _ = self.tx.send(ThinkAction::RemoveRuleService(rule.script_id.clone()));
+                                let _ = self.tx.lock().unwrap().send(ThinkAction::RemoveRuleService(rule.script_id.clone()));
                                 continue 'recv;
                             }
                         }
@@ -347,7 +348,7 @@ impl<T> ThinkerbellAdapter<T> where T: AdapterManagerHandle + API + Clone + 'sta
     }
 
     /// Everything is initialized here, but the real work happens in the main() loop.
-    pub fn init(manager: T) -> Result<(), Error> {
+    pub fn init(manager: &Arc<AdapterManager>) -> Result<(), Error> {
         let adapter_id = Id::new("thinkerbell-adapter");
         let setter_add_rule_id = Id::new("thinkerbell-add-rule");
         let root_service_id = Id::new("thinkerbell-root-service");
@@ -371,14 +372,14 @@ impl<T> ThinkerbellAdapter<T> where T: AdapterManagerHandle + API + Clone + 'sta
         }
 
         let adapter = ThinkerbellAdapter {
-            tx: tx,
+            tx: Arc::new(Mutex::new(tx)),
             adapter_manager: manager.clone(),
             adapter_id: adapter_id.clone(),
             setter_add_rule_id: setter_add_rule_id.clone(),
         };
 
         // Add the adapter and the root service (the one that exposes AddThinkerbellRule for adding new rules).
-        try!(manager.add_adapter(Box::new(adapter.clone())));
+        try!(manager.add_adapter(Arc::new(adapter.clone())));
         try!(manager.add_service(Service::empty(root_service_id.clone(), adapter_id.clone())));
         try!(manager.add_setter(Channel {
             id: setter_add_rule_id.clone(),

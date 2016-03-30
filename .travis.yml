@@ -30,7 +30,7 @@ before_script:
 
 script:
     - cargo build # Linter is also executed here
-    - cargo test
+    - RUST_BACKTRACE=1 cargo test
     - jshint static/main/js/*.js static/setup/js/*.js test/selenium/*.js test/integration/lib/*.js test/integration/test/*.js
     - npm run test-integration
     - npm run test-selenium

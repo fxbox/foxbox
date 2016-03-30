@@ -16,13 +16,14 @@ mod ip_camera;
 /// An adapter providing access to Thinkerbell.
 mod thinkerbell;
 
-use foxbox_taxonomy::api::API;
-use foxbox_taxonomy::adapter::AdapterManagerHandle;
+use foxbox_taxonomy::manager::AdapterManager as TaxoManager;
 
 use self::philips_hue::PhilipsHueAdapter;
 use self::thinkerbell::ThinkerbellAdapter;
 use service::ServiceAdapter;
 use traits::Controller;
+
+use std::sync::Arc;
 
 pub struct AdapterManager<T> {
     controller: T,
@@ -39,14 +40,13 @@ impl<T: Controller> AdapterManager<T> {
     }
 
     /// Start all the adapters.
-    pub fn start<A>(&mut self, adapter_manager: A)
-        where A: AdapterManagerHandle + API + Clone + 'static {
+    pub fn start(&mut self, manager: &Arc<TaxoManager>) {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
         self.start_adapter(Box::new(PhilipsHueAdapter::new(c.clone())));
-        clock::Clock::init(&adapter_manager).unwrap(); // FIXME: We should have a way to report errors
-        webpush::WebPush::init(c, &adapter_manager).unwrap();
-        ip_camera::IPCameraAdapter::init(adapter_manager.clone(), self.controller.clone()).unwrap();
-        ThinkerbellAdapter::init(adapter_manager.clone()).unwrap(); // FIXME: no unwrap!
+        clock::Clock::init(manager).unwrap(); // FIXME: We should have a way to report errors
+        webpush::WebPush::init(c, manager).unwrap();
+        ip_camera::IPCameraAdapter::init(manager, self.controller.clone()).unwrap();
+        ThinkerbellAdapter::init(manager).unwrap(); // FIXME: no unwrap!
     }
 
     fn start_adapter(&mut self, adapter: Box<ServiceAdapter>) {

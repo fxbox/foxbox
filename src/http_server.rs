@@ -2,8 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use foxbox_taxonomy::manager::WatchGuard;
-use foxbox_taxonomy::api::API;
+use foxbox_taxonomy::manager::*;
 use hyper::net::{ NetworkListener };
 use iron::{ AfterMiddleware, Chain, Handler,
             HttpServerFactory, Iron, IronResult, Request,
@@ -17,6 +16,7 @@ use router::NoRoute;
 use service_router;
 use static_router;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::thread;
 use taxonomy_router;
 use tls::SniServerFactory;
@@ -65,8 +65,7 @@ impl<T: Controller> HttpServer<T> {
         HttpServer { controller: controller }
     }
 
-    pub fn start<A>(&mut self, adapter_api: A)
-        where A: API<WatchGuard=WatchGuard> + 'static {
+    pub fn start(&mut self, adapter_api: &Arc<AdapterManager>) {
 
         let router = service_router::create(self.controller.clone());
         let taxonomy_chain = taxonomy_router::create(self.controller.clone(),
@@ -153,13 +152,14 @@ describe! http_server {
 
         use foxbox_taxonomy::manager::AdapterManager;
         use std::thread;
+        use std::sync::Arc;
         use std::time::Duration;
         use stubs::controller::ControllerStub;
 
-        let taxo_manager = AdapterManager::new();
+        let taxo_manager = Arc::new(AdapterManager::new());
 
         let mut http_server = HttpServer::new(ControllerStub::new());
-        http_server.start(taxo_manager);
+        http_server.start(&taxo_manager);
         // HACK: Let some time for the http server to start.
         thread::sleep(Duration::new(3, 0));
     }
