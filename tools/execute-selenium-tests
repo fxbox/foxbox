@@ -20,7 +20,7 @@ if [ "$(uname)" == "Darwin" ]; then
     # Do not use hostname flag on Mac since it is only implemented in Linux ATM.
     "$FOXBOX_BINARY" --port ${DEBUG_PORT} --disable-tls --profile "${DEBUG_PROFILE}" &
 else
-    "$FOXBOX_BINARY" --local-name ${DEBUG_HOST} --port ${DEBUG_PORT} --disable-tls --profile "${DEBUG_PROFILE}" &
+    strace "$FOXBOX_BINARY" --local-name ${DEBUG_HOST} --port ${DEBUG_PORT} --disable-tls --profile "${DEBUG_PROFILE}" &
 fi
 FOXBOX_PID=$!
 popd

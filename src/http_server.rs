@@ -22,7 +22,7 @@ use taxonomy_router;
 use tls::SniServerFactory;
 use traits::Controller;
 
-const THREAD_COUNT: usize = 8;
+const THREAD_COUNT: usize = 64;
 
 struct Custom404;
 
