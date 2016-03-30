@@ -12,6 +12,7 @@ use foxbox_taxonomy::values::*;
 use transformable_channels::mpsc::*;
 
 use std::collections::{ HashMap, HashSet };
+use std::sync::Arc;
 use std::thread;
 
 // Trivial utility function to convert the old TargetMap format to the newer one, to avoid
@@ -27,15 +28,15 @@ fn test_add_remove_adapter() {
     let id_2 = Id::new("id 2");
 
     println!("* Adding two distinct test adapters should work.");
-    manager.add_adapter(Box::new(FakeAdapter::new(&id_1))).unwrap();
-    manager.add_adapter(Box::new(FakeAdapter::new(&id_2))).unwrap();
+    manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
+    manager.add_adapter(Arc::new(FakeAdapter::new(&id_2))).unwrap();
 
     println!("* Attempting to add yet another test adapter with id_1 or id_2 should fail.");
-    match manager.add_adapter(Box::new(FakeAdapter::new(&id_1))) {
+    match manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))) {
         Err(Error::InternalError(InternalError::DuplicateAdapter(ref id))) if *id == id_1 => {},
         other => panic!("Unexpected result {:?}", other)
     }
-    match manager.add_adapter(Box::new(FakeAdapter::new(&id_2))) {
+    match manager.add_adapter(Arc::new(FakeAdapter::new(&id_2))) {
         Err(Error::InternalError(InternalError::DuplicateAdapter(ref id))) if *id == id_2 => {},
         other => panic!("Unexpected result {:?}", other)
     }
@@ -43,11 +44,11 @@ fn test_add_remove_adapter() {
     println!("* Removing id_1 should succeed. At this stage, we still shouldn't be able to add id_2, \
               but we should be able to re-add id_1");
     manager.remove_adapter(&id_1).unwrap();
-    match manager.add_adapter(Box::new(FakeAdapter::new(&id_2))) {
+    match manager.add_adapter(Arc::new(FakeAdapter::new(&id_2))) {
         Err(Error::InternalError(InternalError::DuplicateAdapter(ref id))) if *id == id_2 => {},
         other => panic!("Unexpected result {:?}", other)
     }
-    manager.add_adapter(Box::new(FakeAdapter::new(&id_1))).unwrap();
+    manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
 
     println!("* Removing id_1 twice should fail the second time.");
     manager.remove_adapter(&id_1).unwrap();
@@ -191,7 +192,7 @@ fn test_add_remove_services() {
     }
 
     println!("* Adding a service should fail if the adapter doesn't exist.");
-    manager.add_adapter(Box::new(FakeAdapter::new(&id_2))).unwrap();
+    manager.add_adapter(Arc::new(FakeAdapter::new(&id_2))).unwrap();
     match manager.add_service(service_1.clone()) {
         Err(Error::InternalError(InternalError::NoSuchAdapter(ref err))) if *err == id_1 => {},
         other => panic!("Unexpected result {:?}", other)
@@ -211,7 +212,7 @@ fn test_add_remove_services() {
     assert_eq!(manager.get_services(vec![ServiceSelector::new()]).len(), 0);
 
     println!("* Adding a service can succeed.");
-    manager.add_adapter(Box::new(FakeAdapter::new(&id_1))).unwrap();
+    manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
     manager.add_service(service_1.clone()).unwrap();
     assert_eq!(manager.get_services(vec![ServiceSelector::new()]).len(), 1);
 
@@ -452,7 +453,7 @@ fn test_add_remove_tags() {
     assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
 
     println!("* After adding an adapter, service, getter, setter, still no tags.");
-    manager.add_adapter(Box::new(FakeAdapter::new(&id_1))).unwrap();
+    manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
     manager.add_service(service_1.clone()).unwrap();
     manager.add_getter(getter_1.clone()).unwrap();
     manager.add_setter(setter_1.clone()).unwrap();
@@ -500,7 +501,7 @@ fn test_add_remove_tags() {
     assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_tags(vec![tag_2.clone()])]).len(), 0);
 
     println!("* Removing non-added tags from existent services and channels doesn't hurt and returns 1.");
-    manager.add_adapter(Box::new(FakeAdapter::new(&id_2))).unwrap();
+    manager.add_adapter(Arc::new(FakeAdapter::new(&id_2))).unwrap();
     manager.add_service(service_2.clone()).unwrap();
     manager.add_getter(getter_2.clone()).unwrap();
     manager.add_setter(setter_2.clone()).unwrap();
@@ -796,8 +797,8 @@ fn test_fetch() {
     assert_eq!(manager.fetch_values(vec![GetterSelector::new()]).len(), 0);
 
     println!("* With adapters, fetching values from a selector that has no channels returns an empty vector.");
-    manager.add_adapter(Box::new(adapter_1)).unwrap();
-    manager.add_adapter(Box::new(adapter_2)).unwrap();
+    manager.add_adapter(Arc::new(adapter_1)).unwrap();
+    manager.add_adapter(Arc::new(adapter_2)).unwrap();
     manager.add_service(service_1.clone()).unwrap();
     manager.add_service(service_2.clone()).unwrap();
     assert_eq!(manager.fetch_values(vec![GetterSelector::new()]).len(), 0);
@@ -983,8 +984,8 @@ fn test_send() {
     assert_eq!(data.len(), 0);
 
     println!("* With adapters, sending values to a selector that has no channels returns an empty vector.");
-    manager.add_adapter(Box::new(adapter_1)).unwrap();
-    manager.add_adapter(Box::new(adapter_2)).unwrap();
+    manager.add_adapter(Arc::new(adapter_1)).unwrap();
+    manager.add_adapter(Arc::new(adapter_2)).unwrap();
     manager.add_service(service_1.clone()).unwrap();
     manager.add_service(service_2.clone()).unwrap();
     let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
@@ -1218,8 +1219,8 @@ fn test_watch() {
     )]), Box::new(tx_watch_1)));
 
     println!("* With adapters, watching values from a selector that has no channels does nothing.");
-    manager.add_adapter(Box::new(adapter_1)).unwrap();
-    manager.add_adapter(Box::new(adapter_2)).unwrap();
+    manager.add_adapter(Arc::new(adapter_1)).unwrap();
+    manager.add_adapter(Arc::new(adapter_2)).unwrap();
     manager.add_service(service_1.clone()).unwrap();
     manager.add_service(service_2.clone()).unwrap();
     let (tx_watch, rx_watch) = channel();

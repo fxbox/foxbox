@@ -57,8 +57,8 @@ pub struct FakeAdapter {
     id: Id<AdapterId>,
     name: String,
     tweak: Arc<Fn(Tweak) + Sync + Send>,
-    tx_effect: RawSender<Effect>,
-    rx_effect: RefCell<Option<Receiver<Effect>>>,
+    tx_effect: Mutex<Box<ExtSender<Effect>>>,
+    rx_effect: Mutex<Option<Receiver<Effect>>>,
     values: SyncMap<Id<Getter>, Result<Value, Error>>,
     senders: SyncMap<Id<Setter>, Error>,
     watchers: SyncMap<Id<Getter>, Vec<WatcherState>>
@@ -85,8 +85,8 @@ impl FakeAdapter {
             values: values_main,
             senders: senders_main,
             tweak: Arc::new(tweak),
-            tx_effect: tx_effect,
-            rx_effect: RefCell::new(Some(rx_effect)),
+            tx_effect: Mutex::new(Box::new(tx_effect)),
+            rx_effect: Mutex::new(Some(rx_effect)),
             watchers: watchers_main,
         };
 
@@ -150,7 +150,7 @@ impl FakeAdapter {
     }
 
     pub fn take_rx(&self) -> Receiver<Effect> {
-        self.rx_effect.borrow_mut().take().unwrap()
+        self.rx_effect.lock().unwrap().take().unwrap()
     }
 
     pub fn get_tweak(&self) -> Arc<Fn(Tweak) + Sync + Send> {
@@ -200,7 +200,7 @@ impl Adapter for FakeAdapter {
         values.drain().map(|(id, value)| {
             let result = match map.get(&id) {
                 None => {
-                    self.tx_effect.send(Effect::ValueSent(id.clone(), value)).unwrap();
+                    self.tx_effect.lock().unwrap().send(Effect::ValueSent(id.clone(), value)).unwrap();
                     Ok(())
                 }
                 Some(error) => Err(error.clone())
