@@ -34,6 +34,8 @@ pub type SendRequest = AdapterRequest<(HashMap<Id<Setter>, Value>, ResultMap<Id<
 /// A request to an adapter, for performing a `watch` operation.
 pub type WatchRequest = AdapterRequest<(Vec<(Id<Getter>, Option<Range>)>, Arc<WatcherData>)>;
 
+pub type WatchGuardCommit = Vec<(Arc<WatcherData>, Vec<(Id<Getter>, Box<AdapterWatchGuard>)>)>;
+
 /// Information on a service.
 ///
 /// Used to build `Service` values.
@@ -1075,7 +1077,7 @@ impl State {
         // Remove the watcher from all getters.
         for getter_id in watcher_data.guards.borrow().keys() {
             let getter = match self.getter_by_id.get_mut(getter_id) {
-                None => return, // Race condition between removing the getter and dropping the watcher.
+                None => continue, // Race condition between removing the getter and dropping the watcher.
                 Some(getter) => getter
             };
             if getter.borrow_mut().watchers.remove(&watcher_data.key).is_none() {
@@ -1091,7 +1093,7 @@ impl State {
     }
 
     /// Start watching a set of channels.
-    pub fn start_watch(mut per_adapter: WatchRequest) -> Vec<(Arc<WatcherData>, Id<Getter>, Box<AdapterWatchGuard>)> {
+    pub fn start_watch(mut per_adapter: WatchRequest) -> WatchGuardCommit {
         // In most cases, stop_watch will take place long after start_watch. It is, however,
         // possible that the WatchGuard is dropped before start_watch is processed for this
         // channel. In this case, three events take place:
@@ -1110,7 +1112,7 @@ impl State {
         //  - The call to `stop_watch` is a noop, as there is nothing to remove.
         //   by checking whether `is_dropped` is true.
 
-        let mut added = vec![];
+        let mut to_add = vec![];
         for (_, (adapter, (request, watch_data))) in per_adapter.drain() {
             let is_dropped = watch_data.is_dropped.clone();
             let on_ok = watch_data.on_event.lock().unwrap().filter_map(move |event| {
@@ -1131,6 +1133,7 @@ impl State {
                         },
                 })
             });
+            let mut guards = vec![];
             for (id, result) in adapter.register_watch(request, Box::new(on_ok)) {
                 match result {
                     Err(err) => {
@@ -1142,19 +1145,21 @@ impl State {
                     },
                     // Calling `watch_data.push((id, guard))` requires .write(), so we delay
                     // this until we have grabbed the lock again.
-                    Ok(guard) => added.push((watch_data.clone(), id, guard))
+                    Ok(guard) => guards.push((id, guard))
                 }
             }
+            to_add.push((watch_data, guards));
         }
-        added
+        to_add
     }
 
     /// Register a bunch of ongoing watches previously started by `start_watch`.
-    pub fn register_ongoing_watch(&mut self,
-        mut ongoing: Vec<(Arc<WatcherData>, Id<Getter>, Box<AdapterWatchGuard>)>)
+    pub fn register_ongoing_watch(&mut self, mut ongoing: WatchGuardCommit)
     {
-        for (watch_data, id, guard) in ongoing.drain(..) {
-            watch_data.push_guard(id, guard)
+        for (watch_data, mut guards) in ongoing.drain(..) {
+            for (id, guard) in guards.drain(..) {
+                watch_data.push_guard(id, guard)
+            }
         }
     }
 }
