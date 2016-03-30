@@ -16,10 +16,10 @@
 mod crypto;
 mod db;
 
-use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::api::{ Error, InternalError };
-use foxbox_taxonomy::values::{ Range, Type, Value, Json };
+use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
+use foxbox_taxonomy::values::{ Range, Type, Value, Json };
 
 #[cfg(not(target_os = "macos"))]
 use hyper::header::{ ContentEncoding, Encoding };
@@ -240,8 +240,8 @@ impl<C: Controller> Adapter for WebPush<C> {
 }
 
 impl<C: Controller> WebPush<C> {
-    pub fn init<A: AdapterManagerHandle>(controller: C, adapt: &A) -> Result<(), Error> {
-        let wp = Box::new(Self::new(controller));
+    pub fn init(controller: C, adapt: &Arc<AdapterManager>) -> Result<(), Error> {
+        let wp = Arc::new(Self::new(controller));
         let id = WebPush::<C>::id();
         let service_id = WebPush::<C>::service_webpush_id();
         let getter_resource_id = wp.getter_resource_id.clone();
