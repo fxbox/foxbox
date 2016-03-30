@@ -17,7 +17,7 @@ use std::error;
 use std::fmt;
 use std::thread;
 use std::sync::mpsc;
-use std::sync::{ Arc, RwLock };
+use std::sync::{ Arc, Mutex, RwLock, Weak };
 use std::collections::{ HashMap, HashSet };
 
 #[derive(Debug)]
@@ -94,12 +94,60 @@ impl<Kind, Type> IdMap<Kind, Type> where Type: Eq + Clone, Kind: Clone {
     }
 }
 
+type WatchersMap = HashMap<usize, Arc<Box<ExtSender<WatchEvent>>>>;
+struct Watchers {
+    current_index: usize,
+    map: Arc<Mutex<WatchersMap>>
+}
+
+impl Watchers {
+    fn new() -> Self {
+        Watchers {
+            current_index: 0,
+            map: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    fn push(&mut self, watcher: Arc<Box<ExtSender<Watchers>>>) -> WatcherGuard {
+        let index = self.current_index;
+        self.current_index += 1;
+        {
+            let mut map = self.map.lock();
+            map.push(index, watcher);
+        }
+        WatcherGuard {
+            key: index,
+            map: self.map.clone().downgrade()
+        }
+    }
+
+    fn get(&self, index: usize) -> Option<&ExtSender<WatchEvent>> {
+        self.map.borrow().get(index)
+    }
+}
+
 fn kind_from_value(value: ValueID) -> Option<ChannelKind> {
     value.get_command_class().map(|cc| match cc {
         CommandClass::SensorBinary => ChannelKind::OpenClosed,
         _ => ChannelKind::Ready // TODO
     })
 }
+
+struct WatcherGuard {
+    key: usize,
+    map: Weak<Mutex<WatchersMap>>,
+}
+
+impl Drop for WatcherGuard {
+    fn drop(&mut self) {
+        let map = self.map.upgrade();
+        if map.is_none() { return }
+        let map = map.unwrap().lock();
+        map.remove(self.key);
+    }
+}
+
+impl AdapterWatchGuard for WatcherGuard {}
 
 pub struct OpenzwaveAdapter {
     id: TaxId<AdapterId>,
@@ -110,6 +158,7 @@ pub struct OpenzwaveAdapter {
     controller_map: IdMap<ServiceId, Controller>,
     getter_map: IdMap<Getter, ValueID>,
     setter_map: IdMap<Setter, ValueID>,
+    watchers: Arc<Mutex<Watchers>>,
 }
 
 impl OpenzwaveAdapter {
@@ -130,6 +179,7 @@ impl OpenzwaveAdapter {
             controller_map: IdMap::new(),
             getter_map: IdMap::new(),
             setter_map: IdMap::new(),
+            watchers: Arc::new(Mutex::new(Watchers::new())),
         });
 
         adapter.spawn_notification_thread(rx, box_manager);
@@ -257,7 +307,15 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
     }
 
     fn register_watch(&self, values: Vec<(TaxId<Getter>, Option<Range>)>, cb: Box<ExtSender<WatchEvent>>) -> ResultMap<TaxId<Getter>, Box<AdapterWatchGuard>, TaxError> {
-        unimplemented!()
+        let cb = Arc::new(cb);
+        values.iter().map(|id| {
+            let watch_guard = {
+                let mut watchers = self.watchers.lock();
+                watchers.push(cb.clone())
+            };
+            let value_result: Result<Box<AdapterWatchGuard>, TaxError> = Ok(watch_guard);
+            (id.clone(), value_result)
+        }).collect()
     }
 }
 
