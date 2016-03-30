@@ -374,10 +374,6 @@ impl AdapterManager {
     /// Register watches on the dedicated background thread. This must be done outside of any
     /// lock!
     fn register_watches(&self, request: WatchRequest) {
-        {
-            debug_assert!(self.back_end.try_write().is_ok(),
-                "For performance reason, callers should release the lock before calling register_watches.");
-        }
         if !request.is_empty() {
             let (tx, rx) = channel();
             let _ = self.tx_watch.lock().unwrap().send(WatchOp::Start(request, tx));
