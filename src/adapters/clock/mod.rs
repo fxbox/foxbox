@@ -1,7 +1,7 @@
 //! An adapter providing time-related services, such as the current
 //! timestamp or the current time of day.
 
-use foxbox_taxonomy::adapter::*;
+use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::api::{ Error, InternalError };
 use foxbox_taxonomy::values::{ Duration as ValDuration, Range, TimeStamp, Type, Value };
 use foxbox_taxonomy::services::*;
@@ -9,6 +9,7 @@ use foxbox_taxonomy::services::*;
 use transformable_channels::mpsc::*;
 
 use std::collections::{ HashMap, HashSet };
+use std::sync::{ Arc, Mutex };
 
 use chrono;
 use chrono::*;
@@ -28,7 +29,7 @@ enum Movement { Enter, Exit }
 
 pub struct Clock {
     /// Timer used to dispatch `register_watch` requests.
-    timer: timer::Timer,
+    timer: Mutex<timer::Timer>,
     getter_timestamp_id: Id<Getter>,
     getter_time_of_day_id: Id<Getter>,
 }
@@ -187,7 +188,7 @@ impl Clock {
             };
             let id = id.clone();
             let tx = tx.clone();
-            let guard = self.timer.schedule(date, Some(Duration::days(1)), move || {
+            let guard = self.timer.lock().unwrap().schedule(date, Some(Duration::days(1)), move || {
                 let naive_time = chrono::Local::now().time();
                 let duration = Duration::hours(naive_time.hour() as i64)
                     + Duration::minutes(naive_time.minute() as i64)
@@ -269,7 +270,7 @@ impl Clock {
             }
             let id = id.clone();
             let tx = tx.clone();
-            let guard = self.timer.schedule_with_date(date, move || {
+            let guard = self.timer.lock().unwrap().schedule_with_date(date, move || {
                 let naive_time = chrono::Local::now().time();
                 let duration = Duration::hours(naive_time.hour() as i64)
                     + Duration::minutes(naive_time.minute() as i64)
@@ -290,14 +291,12 @@ impl Clock {
 }
 
 impl Clock {
-    pub fn init<T>(adapt: &T) -> Result<(), Error>
-        where T: AdapterManagerHandle
-    {
+    pub fn init(adapt: &Arc<AdapterManager>) -> Result<(), Error> {
         let getter_timestamp_id = Clock::getter_timestamp_id();
         let getter_time_of_day_id = Clock::getter_time_of_day_id();
         let service_clock_id = Clock::service_clock_id();
-        let clock = Box::new(Clock {
-            timer: timer::Timer::new(),
+        let clock = Arc::new(Clock {
+            timer: Mutex::new(timer::Timer::new()),
             getter_timestamp_id: getter_timestamp_id.clone(),
             getter_time_of_day_id: getter_time_of_day_id.clone(),
         });

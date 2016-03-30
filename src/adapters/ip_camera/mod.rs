@@ -11,8 +11,8 @@ extern crate serde_json;
 mod api;
 mod upnp_listener;
 
-use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::api::{Error, InternalError};
+use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{Range, Value, Json, Binary, Type};
@@ -69,15 +69,15 @@ impl IPCameraAdapter {
         Id::new(&format!("{}:{}.{}@link.mozilla.org", prefix, operation, service_id))
     }
 
-    pub fn init<T, C>(adapt: T, controller: C) -> Result<(), Error>
-        where T: AdapterManagerHandle + Send + Clone + 'static, C: Controller
+    pub fn init<C>(adapt: &Arc<AdapterManager>, controller: C) -> Result<(), Error>
+        where C: Controller
     {
         let services = Arc::new(Mutex::new(IpCameraServiceMapInternal {
             getters: HashMap::new(),
             setters: HashMap::new(),
             snapshot_root: controller.get_profile().path_for(SNAPSHOT_DIR),
         }));
-        let ip_camera_adapter = Box::new(IPCameraAdapter {
+        let ip_camera_adapter = Arc::new(IPCameraAdapter {
             services: services.clone()
         });
 
@@ -85,7 +85,7 @@ impl IPCameraAdapter {
 
         // The UPNP listener will add camera service for discovered cameras
         let upnp = controller.get_upnp_manager();
-        let listener = IpCameraUpnpListener::new(adapt.clone(), services);
+        let listener = IpCameraUpnpListener::new(adapt, services);
         upnp.add_listener("IpCameraTaxonomy".to_owned(), listener);
 
         // The UPNP service searches for ssdp:all which the D-Link cameras
@@ -95,8 +95,8 @@ impl IPCameraAdapter {
         Ok(())
     }
 
-    pub fn init_service<T>(adapt: T, services: IpCameraServiceMap, udn: &str, url: &str, name: &str, manufacturer: &str, model_name: &str) -> Result<(), Error>
-        where T: AdapterManagerHandle + Send + Clone + 'static
+    pub fn init_service(adapt: &Arc<AdapterManager>, services: IpCameraServiceMap,
+        udn: &str, url: &str, name: &str, manufacturer: &str, model_name: &str) -> Result<(), Error>
     {
         let service_id = Self::create_service_id(udn);
 
