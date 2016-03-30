@@ -14,17 +14,20 @@ use self::hyper::header::Connection;
 use self::hyper::status::StatusCode;
 use self::get_if_addrs::{ IfAddr, Interface };
 use serde_json;
-use std::error::Error;
 use std::io::Read;
 use std::time::Duration;
 use std::thread;
-use tls::CertificateManager;
+use tls::{ CertificateManager, DnsRecord, get_san_cert_for, register_dns_record };
+use traits::Controller;
 use tunnel_controller:: { Tunnel };
 
 const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
 
 pub struct Registrar {
-    box_name: String,
+    certificate_manager: CertificateManager,
+    top_level_domain: String,
+    registration_endpoint: String,
+    dns_api_endpoint: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -32,114 +35,200 @@ struct RegistrationRequest {
     message: String,
     client: String,
 
-    // Included for backwards compat, to be removed
     local_ip: String,
-    tunnel_url: Option<String>,
 }
 
 impl Registrar {
-    pub fn new(box_name: String) -> Registrar {
+    pub fn new(certificate_manager: CertificateManager,
+               top_level_domain: String,
+               registration_endpoint: String,
+               dns_api_endpoint: String) -> Registrar {
         Registrar {
-            box_name: box_name
+            certificate_manager: certificate_manager,
+            top_level_domain: top_level_domain,
+            registration_endpoint: format!("{}/register", registration_endpoint),
+            dns_api_endpoint: dns_api_endpoint,
         }
     }
 
-    pub fn start(&self, endpoint_url: String,
-                 iface: Option<String>,
-                 domain: String,
-                 tunnel: &Option<Tunnel>,
-                 box_port: u16,
-                 dns_api_endpoint: String,
-                 certificate_manager: CertificateManager) {
-        info!("Starting registration with {}", endpoint_url);
-        let endpoint_url = format!("{}/register", endpoint_url);
+    fn get_fingerprint(&self) -> String {
+        self.certificate_manager.get_box_certificate()
+                                .unwrap()
+                                .get_certificate_fingerprint()
+    }
+
+    fn get_common_name(&self) -> String {
+        format!("{}.{}", self.get_fingerprint(), self.top_level_domain)
+    }
+
+    pub fn get_local_dns_name(&self) -> String {
+        format!("local.{}", self.get_common_name())
+    }
+
+    pub fn get_remote_dns_name(&self) -> String {
+        format!("remote.{}", self.get_common_name())
+    }
+
+    fn register_with_registration_server(&self, ip_addr: String, http_scheme: &str, box_port: u16, tunnel_enabled: bool) -> () {
+        let message = json!({
+            local_origin: format!("{}://{}:{}", http_scheme, self.get_local_dns_name(), box_port),
+            tunnel_origin: if tunnel_enabled {
+                Some(format!("{}://{}", http_scheme, self.get_remote_dns_name()))
+            } else {
+                None
+            }
+        });
+
+        let body = match serde_json::to_string(&RegistrationRequest {
+            message: message,
+            client: self.get_fingerprint(),
+            local_ip: ip_addr,
+        }) {
+            Ok(body) => body,
+            Err(_) => {
+                error!("nUPNP server: Serialization error. Will not send registration request.");
+                return;
+            }
+        };
+
+        let client = Client::new();
+        let res = client.post(&self.registration_endpoint)
+            .header(Connection::close())
+            .body(&body)
+            .send();
+
+        // Sanity checks, mostly to debug errors since we don't try
+        // to recover from failures.
+        if let Ok(mut response) = res {
+            if response.status == StatusCode::Ok {
+                let mut body = String::new();
+                if let Ok(_) = response.read_to_string(&mut body) {
+                    info!("nUPNP server responded with: {}", body);
+                } else {
+                    warn!("nUPNP server: Unable to read answer from {}", self.registration_endpoint);
+                }
+            }
+        } else {
+            warn!("nUPNP server: Unable to send request to {}", self.registration_endpoint);
+        }
+    }
+
+    /// Registers the boxes local IP address as an A record with the DNS server, and
+    /// registers a CNAME record for the tunnel endpoint using the box's assigned
+    /// names (local.<fingerprint>.box.knilxof.org and
+    /// remote.<fingerprint>.box.knilxof.org).  The remote name (tunnel name), is
+    /// only configured if the tunnel_frontend option is non-None.
+    fn register_with_dns_server(&self, ip_addr: String, tunnel_frontend: Option<String>) {
+        let client_certificate = self.certificate_manager.get_box_certificate().unwrap();
+
+        let local_name = self.get_local_dns_name();
+        // Create entry for local DNS
+        info!("DNS server: Creating DNS entry for {}", local_name);
+        let result = register_dns_record(
+            client_certificate.clone(),
+            &DnsRecord {
+                record_type: "A",
+                name: &local_name,
+                value: &ip_addr,
+            },
+            &self.dns_api_endpoint.clone(),
+        );
+
+        if let Err(_) = result {
+            warn!("DNS server: Could not create DNS entry for {}", local_name);
+        }
+
+        if let Some(tunnel_frontend) = tunnel_frontend {
+            let remote_name = self.get_remote_dns_name();
+            info!("DNS server: Creating DNS entry for {}", remote_name);
+            let result = register_dns_record(
+                client_certificate.clone(),
+                &DnsRecord {
+                    record_type: "CNAME",
+                    name: &remote_name,
+                    value: &tunnel_frontend,
+                },
+                &self.dns_api_endpoint.clone(),
+            );
+
+            if let Err(_) = result {
+                warn!("DNS server: Could not create DNS entry for {}", remote_name);
+            }
+        }
+    }
+
+    fn register_certificates(&self) {
+        if self.certificate_manager.get_certificate(&self.get_local_dns_name()).is_none() {
+            let domains = vec![self.get_local_dns_name(), self.get_remote_dns_name()];
+
+            info!("Getting/renewing LetsEncrypt certificate for: {:?}", domains);
+            let rx = get_san_cert_for(
+                domains.into_iter(),
+                self.certificate_manager.clone(),
+                self.certificate_manager.get_box_certificate().unwrap(),
+                self.dns_api_endpoint.clone()
+            );
+
+            rx.recv().unwrap().unwrap();
+            self.certificate_manager.reload().unwrap();
+        }
+    }
+
+    pub fn start<T: Controller>(self,
+                                iface: Option<String>,
+                                tunnel: &Option<Tunnel>,
+                                box_port: u16,
+                                controller: &T) {
+        info!("nUPNP server: Starting registration with {}",
+                self.registration_endpoint);
 
         let ip_addr = self.get_ip_addr(&iface);
         if ip_addr == None {
             // TODO: retry later, in case we're racing with the network
-            // configuration.
+            // configuration. https://github.com/fxbox/foxbox/issues/347
             return;
         }
 
         info!("Got ip address: {}", ip_addr.clone().unwrap());
 
-        let certificate_record_result = certificate_manager
-                                            .get_or_generate_self_signed_certificate(&self.box_name);
-
-        let (domain, client_fingerprint) = if let Ok(certificate_record) = certificate_record_result {
-            let self_signed_cert_fingerprint = certificate_record.get_certificate_fingerprint();
-            let fingerprint_domain = format!("{}.{}", self_signed_cert_fingerprint, domain);
-
-            info!("Using {}", fingerprint_domain);
-            (fingerprint_domain, self_signed_cert_fingerprint)
-        } else {
-            panic!("Could not get or generate self signed certificate - registration will always fail: {}", certificate_record_result.err().unwrap().description());
-        };
-
-        let tunnel_url = if let Some(ref tunnel) = *tunnel {
-            tunnel.get_remote_hostname()
+        let tunnel_frontend = if let Some(ref tunnel) = *tunnel {
+            tunnel.get_frontend_name()
         } else {
             None
         };
+        let enabled_tls = controller.get_tls_enabled();
 
-        let message = json!({
-            local_address: format!("local.{}:{}", domain, box_port),
-            tunnel_url: tunnel_url
-        });
-
-        let body = match serde_json::to_string(&RegistrationRequest {
-            message: message,
-            client: client_fingerprint,
-            local_ip: ip_addr.clone().unwrap(),
-            tunnel_url: tunnel_url,
-        }) {
-            Ok(body) => body,
-            Err(_) => {
-                error!("Serialization error");
-                return;
-            }
+        let http_scheme = if enabled_tls {
+            "https"
+        } else {
+            "http"
         };
-
-        let box_hostname = self.box_name.clone();
 
         // Spawn a thread to register every REGISTRATION_INTERVAL_IN_MINUTES.
         thread::Builder::new().name("Registrar".to_owned())
-                              .spawn(move || {
-            loop {
-                let client = Client::new();
-                let res = client.post(&endpoint_url)
-                    .header(Connection::close())
-                    .body(&body)
-                    .send();
+            .spawn(move || {
+                let tunnel_configured = tunnel_frontend.clone().is_some();
 
-                // Sanity checks, mostly to debug errors since we don't try
-                // to recover from failures.
-                if let Ok(mut response) = res {
-                    if response.status == StatusCode::Ok {
-                        let mut body = String::new();
-                        if let Ok(_) = response.read_to_string(&mut body) {
-                            info!("Server responded with: {}", body);
-                        } else {
-                            info!("Unable to read answer from {}", endpoint_url);
-                        }
-                    }
-                } else {
-                    info!("Unable to send request to {}", endpoint_url);
+                if enabled_tls {
+                    self.register_certificates();
                 }
 
-                // Create entry for local DNS
-                certificate_manager.register_dns_record(
-                    "A",
-                    &format!("local.{}", domain),
-                    &ip_addr.clone().unwrap(),
-                    &dns_api_endpoint.clone(),
-                    &box_hostname
-                ).unwrap();
+                loop {
+                    // TODO: If the ip address changes, we need to update the dns server and
+                    // registration server with the new IP address.
+                    // https://github.com/fxbox/foxbox/issues/348
+                    self.register_with_registration_server(
+                        ip_addr.clone().unwrap(),
+                        http_scheme,
+                        box_port,
+                        tunnel_configured
+                    );
+                    self.register_with_dns_server(ip_addr.clone().unwrap(), tunnel_frontend.clone());
 
-                // Go to sleep.
-                thread::sleep(Duration::from_secs(REGISTRATION_INTERVAL_IN_MINUTES as u64 * 60))
-            }
-        }).unwrap();
+                    // Go to sleep.
+                    thread::sleep(Duration::from_secs(REGISTRATION_INTERVAL_IN_MINUTES as u64 * 60))
+                }
+            }).unwrap();
     }
 
     /// return the host IP address of the first valid interface.
@@ -171,7 +260,7 @@ impl Registrar {
         for iface in ifaces {
             match want_iface.as_ref() {
                 None =>
-                // Whitelist known good iface
+                    // Whitelist known good iface
                     if !(iface.name.starts_with("eth") ||
                          iface.name.starts_with("wlan") ||
                          iface.name.starts_with("en") ||
@@ -179,10 +268,10 @@ impl Registrar {
                          iface.name.starts_with("wlp3s")) {
                         continue;
                     },
-                Some(iface_name) =>
-                    if &iface.name != iface_name {
-                        continue;
-                    }
+                    Some(iface_name) =>
+                        if &iface.name != iface_name {
+                            continue;
+                        }
             }
             if let IfAddr::V4(ref v4) = iface.addr {
                 ip_addr = Some(format!("{}", v4.ip));
@@ -210,7 +299,13 @@ impl Registrar {
 describe! registrar {
 
     before_each {
-        let registrar = Registrar::new("foxbox.local".to_owned());
+        use tls::CertificateManager;
+        let registrar = Registrar::new(
+            CertificateManager::new_for_test(),
+            "box.knilxof.org".to_owned(),
+            "http://knilxof.org:4242/".to_owned(),
+            "https://knilxof.org:5300".to_owned()
+        );
     }
 
     it "should return an IP address when a machine has network interfaces" {

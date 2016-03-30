@@ -2,27 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use hyper::client::{ Body, Client };
-use hyper::net::{ HttpsConnector, Openssl };
-use hyper::status::StatusCode;
-
-use openssl::crypto::hash::Type;
-use openssl::crypto::pkey::PKey;
-use openssl::ssl::error::SslError;
-use openssl::x509::{ X509, X509Generator };
-
-use serde_json;
-
-use std::collections::{ BTreeMap, HashMap };
-use std::error::Error;
-use std::fs::{ self };
+use std::collections::HashMap;
 use std::io;
-use std::io::{ Error as IoError, ErrorKind };
+use std::io::{ Error as IoError };
 use std::path::PathBuf;
-use std::sync::{ Arc, Mutex, RwLock };
+use std::sync::{ Arc, RwLock };
 
 use tls::certificate_record::CertificateRecord;
 use tls::ssl_context::SslContextProvider;
+use tls::utils::*;
+
+const DEFAULT_BOX_NAME: &'static str = "foxbox.local";
 
 #[derive(Clone)]
 pub struct CertificateManager {
@@ -30,143 +20,68 @@ pub struct CertificateManager {
     ssl_hosts: Arc<RwLock<HashMap<String, CertificateRecord>>>,
 
     // Observer
-    context_provider: Option<Arc<Mutex<Box<SslContextProvider>>>>
-}
-
-fn create_records_from_directory(path: &PathBuf) -> Result<HashMap<String, CertificateRecord>, IoError> {
-    let mut records = HashMap::new();
-
-    // Ensure the directory exists.
-    fs::create_dir_all(path).unwrap_or_else(|err| {
-        if err.kind() != ErrorKind::AlreadyExists {
-            panic!("Unable to create directory: {:?}: {}", path, err);
-        }
-    });
-
-    // Ensure the directory really is a directory.
-    if try!(fs::metadata(path)).is_dir() {
-        for entry in try!(fs::read_dir(path)) {
-            let entry = try!(entry);
-
-            // Won't support symlinks
-            if try!(entry.file_type()).is_dir() {
-
-                let hostname = entry.file_name().into_string().unwrap();
-                info!("Using certificate for host {}", hostname);
-
-                let mut host_path = path.clone();
-                host_path.push(hostname.clone());
-
-                let mut cert_path = host_path.clone();
-                cert_path.push("crt.pem");
-
-                let mut private_key_file = host_path.clone();
-                private_key_file.push("private_key.pem");
-
-                records.insert(hostname.clone(),
-                               try!(CertificateRecord::new(hostname,
-                                                      cert_path,
-                                                      private_key_file)));
-            }
-        }
-
-        info!("Loaded certificates from directory: {:?}", path);
-
-        Ok(records)
-    } else {
-        Err(IoError::new(
-            ErrorKind::InvalidInput,
-            "The configured SSL certificate directory is not recognised as a directory."
-        ))
-    }
+    context_provider: Arc<Box<SslContextProvider>>
 }
 
 impl CertificateManager {
-    pub fn new(directory: PathBuf) -> CertificateManager {
+    pub fn new(directory: PathBuf, context_provider: Box<SslContextProvider>) -> Self {
         CertificateManager {
             directory: directory,
             ssl_hosts: Arc::new(RwLock::new(HashMap::new())),
-            context_provider: None,
+            context_provider: Arc::new(context_provider),
         }
     }
 
-    pub fn set_context_provider(&mut self, context_provider: Arc<Mutex<Box<SslContextProvider>>>) {
-        if self.context_provider.is_none() {
-           self.context_provider = Some(context_provider);
-           self.notify_provider();
-        } else {
-            error!("SslContextProvider was set more than once in the CertificateManager");
+    #[cfg(test)]
+    pub fn new_for_test() -> Self {
+        use tls::ssl_context::SniSslContextProvider;
+        let mut test_certs_directory = PathBuf::from(current_dir!());
+        test_certs_directory.push("test_fixtures");
+        test_certs_directory.push("certs");
+
+        CertificateManager {
+            directory: test_certs_directory,
+            ssl_hosts: Arc::new(RwLock::new(HashMap::new())),
+            context_provider: Arc::new(Box::new(SniSslContextProvider::new()))
         }
     }
 
-    pub fn get_or_generate_self_signed_certificate(&self, hostname: &str) -> io::Result<CertificateRecord> {
+    pub fn get_certs_dir(&self) -> PathBuf {
+        self.directory.clone()
+    }
 
-        // Reload before this operation to ensure we don't overwrite any existing certificates
-        try!(self.reload());
+    pub fn get_box_certificate(&self) -> io::Result<CertificateRecord> {
+        self.get_or_generate_self_signed_certificate(DEFAULT_BOX_NAME)
+    }
 
-        // This is blocking - because we generate the result and write off thread - and at the end
-        // of that operation we know whether it succeeded, we can't borrow self to add the
-        // CertificateRecord for it in the other thread easily.  This kind of needs to be blocking
-        // anyway, we can't proceed without the resulting value anyway in most uses.
+    /// Generate a self signed certificate for the given name.
+    /// This will write the self signed certificates to the filesystem that this
+    /// CertificateManager is configured for.
+    fn get_or_generate_self_signed_certificate(&self, hostname: &str)
+        -> io::Result<CertificateRecord> {
 
         if let Some(certificate_record) = self.get_certificate(hostname) {
-            info!("Using existing self-signed cert for {}", hostname);
+            debug!("Using existing self-signed cert for {}", hostname);
             return Ok(certificate_record);
         }
 
-        let mut directory = self.directory.clone();
-        directory.push(hostname);
+        // Reload before this operation so we don't
+        // overwrite any existing certificates.
+        // NOTE: This could be racy, however a race won't happen unless
+        // we're generating self signed certs for the same name.
+        try!(self.reload());
 
-        info!("Generating new self-signed cert for {}", hostname);
-        let generator = X509Generator::new()
-            .set_bitlength(2048)
-            .set_valid_period(365 * 2)
-            .add_name("CN".to_owned(), String::from(hostname))
-            .set_sign_hash(Type::SHA256);
+        if let Some(certificate_record) = self.get_certificate(hostname) {
+            debug!("Using existing self-signed cert for {}", hostname);
+            return Ok(certificate_record);
+        }
 
-        let gen_result = generator.generate();
-        if let Ok((cert, pkey)) = gen_result {
-
-            // Write the cert and pkey PEM files
-
-            // Ensure the directory exists
-            fs::create_dir_all(directory.clone()).unwrap_or_else(|err| {
-                if err.kind() != ErrorKind::AlreadyExists {
-                    panic!("Unable to create directory {:?}: {}", directory, err);
-                }
-            });
-
-            let mut cert_path = directory.clone();
-            cert_path.push("crt.pem");
-
-            let mut pkey_path = directory.clone();
-            pkey_path.push("private_key.pem");
-
-            let write_result = write_pem(&pkey, &pkey_path);
-            if write_result.is_err() {
-                return Err(write_result.unwrap_err());
-            }
-
-            let write_result = write_pem(&cert, &cert_path);
-            if write_result.is_err() {
-                return Err(write_result.unwrap_err());
-            }
-
-            let certificate_record_result = CertificateRecord::new(String::from(hostname), cert_path, pkey_path);
-
-            if let Ok(certificate_record) = certificate_record_result {
-                self.add_certificate(certificate_record.clone());
-                Ok(certificate_record)
-            } else {
-                certificate_record_result
-            }
+        let result = generate_self_signed_certificate(hostname, self.directory.clone());
+        if let Ok(certificate_record) = result {
+            self.add_certificate(certificate_record.clone());
+            Ok(certificate_record)
         } else {
-            let e = gen_result.err().unwrap();
-            Err(
-                IoError::new(
-                    ErrorKind::InvalidData,
-                    format!("Failed to generate self signed certificate: {}", e.description())
-                ))
+            result
         }
     }
 
@@ -211,91 +126,14 @@ impl CertificateManager {
         self.notify_provider();
     }
 
-    fn create_https_client_with_crt_for(&self, hostname: &str) -> Option<(Client, CertificateRecord)> {
-        if let Some(certificate_record) = self.get_certificate(hostname) {
-            let ssl_ctx = Openssl::with_cert_and_key(
-                                &certificate_record.cert_file,
-                                &certificate_record.private_key_file);
-
-            if let Ok(ssl_ctx) = ssl_ctx {
-                Some((Client::with_connector(HttpsConnector::new(ssl_ctx)), certificate_record))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    pub fn register_dns_record(&self,
-                               record_type: &str, hostname: &str,
-                               ip_address: &str, dns_endpoint: &str,
-                               certificate: &str) -> Result<bool, String> {
-        if let Some((https_client, _)) = self.create_https_client_with_crt_for(certificate) {
-
-            let request_url = format!("{}/v1/dns{}", dns_endpoint, hostname.rsplit(".").fold("".to_owned(), |url, component| {
-                format!("{}/{}", url, component)
-            }));
-
-            let mut map = BTreeMap::new();
-            map.insert("type".to_owned(), record_type);
-            map.insert("value".to_owned(), ip_address);
-
-            let payload = serde_json::to_vec(&map).unwrap();
-
-            info!("Registering ip '{}' at '{}'", &ip_address, &request_url);
-            https_client.post(&request_url)
-                        .body(Body::BufBody(&payload[..], payload.len()))
-                        .send()
-                        .or_else(|error| {
-                            Err(error.description().to_owned())
-                        })
-                        .map(|response| {
-                            response.status == StatusCode::Ok
-                        })
-        } else  {
-            error!("Could not register a DNS entry for {}", hostname);
-            Ok(false)
-        }
+    pub fn get_context_provider(&self) -> Arc<Box<SslContextProvider>> {
+        self.context_provider.clone()
     }
 
     fn notify_provider(&self) {
         let ssl_hosts = checklock!(self.ssl_hosts.read()).clone();
 
-        if let Some(ref context_provider) = self.context_provider {
-            context_provider.lock().unwrap().update(ssl_hosts);
-        }
-    }
-}
-
-fn write_pem<T: PemWriter>(pem_writer: &T, path: &PathBuf) -> io::Result<()> {
-    debug!("Writing: {:?}", path);
-    let file_create_result = fs::File::create(path.clone());
-    if let Ok(mut file_handle) = file_create_result {
-        pem_writer.write(&mut file_handle).map_err(|e| {
-            IoError::new(
-                ErrorKind::InvalidData,
-                format!("Failed to write PEM {:?}: {}", path, e.description())
-                )
-        })
-    } else {
-        Err(file_create_result.unwrap_err())
-    }
-}
-
-pub trait PemWriter {
-    fn write<W: io::Write>(&self, writer: &mut W) -> Result<(), SslError>;
-}
-
-impl<'a> PemWriter for X509<'a> {
-    fn write<W: io::Write>(&self, writer: &mut W) -> Result<(), SslError> {
-        self.write_pem(writer)
-    }
-}
-
-impl PemWriter for PKey {
-    fn write<W: io::Write>(&self, writer: &mut W) -> Result<(), SslError> {
-        self.write_pem(writer)
+        self.context_provider.update(ssl_hosts);
     }
 }
 
@@ -311,14 +149,15 @@ mod certificate_manager {
 
     use super::*;
 
+    #[derive(Clone)]
     pub struct TestSslContextProvider {
-        update_called: Sender<bool>
+        update_called: Arc<Mutex<Sender<bool>>>
     }
 
     impl TestSslContextProvider {
         fn new(update_chan: Sender<bool>) -> Self {
             TestSslContextProvider {
-                update_called: update_chan
+                update_called: Arc::new(Mutex::new(update_chan))
             }
         }
     }
@@ -330,16 +169,16 @@ mod certificate_manager {
             })
         }
 
-        fn update(&mut self, _: HashMap<String, CertificateRecord>) -> () {
-            self.update_called.send(true).unwrap();
+        fn update(&self, _: HashMap<String, CertificateRecord>) -> () {
+            self.update_called.lock().unwrap().send(true).unwrap_or(())
         }
     }
 
     fn test_cert_record() -> CertificateRecord {
         CertificateRecord::new_for_test(
             "test.example.com".to_owned(),
-            PathBuf::from("/test/key.pem"),
-            PathBuf::from("/test/crt.pem"),
+            PathBuf::from("/test/privkey.pem"),
+            PathBuf::from("/test/cert.pem"),
             "010203040506070809000a0b0c0d0e0f".to_owned()
         ).unwrap()
     }
@@ -347,21 +186,32 @@ mod certificate_manager {
     #[test]
     fn should_allow_certificates_to_be_added() {
         let cert_record = test_cert_record();
-        let cert_manager = CertificateManager::new(PathBuf::from(current_dir!()));
+        let (tx_update_called, _) = channel();
+
+        let cert_manager = CertificateManager::new(
+            PathBuf::from(current_dir!()),
+            Box::new(TestSslContextProvider::new(tx_update_called))
+        );
 
         cert_manager.add_certificate(cert_record.clone());
 
-        assert!(cert_manager.get_certificate("test.example.com").unwrap() == cert_record);
+        let certificate = cert_manager.get_certificate("test.example.com")
+                                      .unwrap();
+
+        assert!(certificate == cert_record);
 
         cert_manager.remove_certificate("test.example.com");
-
         assert!(cert_manager.get_certificate("test.example.com").is_none());
     }
 
     #[test]
     fn should_allow_certificates_to_be_removed() {
         let cert_record = test_cert_record();
-        let cert_manager = CertificateManager::new(PathBuf::from(current_dir!()));
+        let (tx_update_called, _) = channel();
+        let cert_manager = CertificateManager::new(
+            PathBuf::from(current_dir!()),
+            Box::new(TestSslContextProvider::new(tx_update_called))
+        );
 
         cert_manager.add_certificate(cert_record);
 
@@ -374,33 +224,40 @@ mod certificate_manager {
     fn should_update_configured_providers_when_cert_added() {
         let cert_record = test_cert_record();
         let (tx_update_called, rx_update_called) = channel();
-        let mut cert_manager = CertificateManager::new(PathBuf::from(current_dir!()));
-
-        let provider_one = Box::new(TestSslContextProvider::new(tx_update_called));
-
-        cert_manager.set_context_provider(Arc::new(Mutex::new(provider_one)));
+        let cert_manager = CertificateManager::new(
+            PathBuf::from(current_dir!()),
+            Box::new(TestSslContextProvider::new(tx_update_called))
+        );
 
         cert_manager.add_certificate(cert_record);
 
-        assert!(rx_update_called.recv().unwrap(), "Did not receive notification from handler after add");
+        assert!(
+            rx_update_called.recv().unwrap(),
+            "Did not receive notification from handler after add"
+        );
     }
 
     #[test]
     fn should_update_configured_providers_when_cert_removed() {
         let cert_record = test_cert_record();
         let (tx_update_called, rx_update_called) = channel();
-        let mut cert_manager = CertificateManager::new(PathBuf::from(current_dir!()));
-
-        let provider_one = Box::new(TestSslContextProvider::new(tx_update_called));
-
-        cert_manager.set_context_provider(Arc::new(Mutex::new(provider_one)));
+        let cert_manager = CertificateManager::new(
+            PathBuf::from(current_dir!()),
+            Box::new(TestSslContextProvider::new(tx_update_called))
+        );
 
         cert_manager.add_certificate(cert_record);
 
-        assert!(rx_update_called.recv().unwrap(), "Did not receive notification from handler after add");
+        assert!(
+            rx_update_called.recv().unwrap(),
+            "Did not receive notification from handler after add"
+        );
 
         cert_manager.remove_certificate(&test_cert_record().hostname);
 
-        assert!(rx_update_called.recv().unwrap(), "Did not receive notification from handler after remove");
+        assert!(
+            rx_update_called.recv().unwrap(),
+            "Did not receive notification from handler after remove"
+        );
     }
 }

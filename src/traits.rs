@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::vec::IntoIter;
-use tls::CertificateManager;
+use tls::{ CertificateRecord, CertificateManager };
 use upnp::UpnpManager;
 use ws;
 
@@ -35,6 +35,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
 
     fn get_tls_enabled(&self) -> bool;
     fn get_certificate_manager(&self) -> CertificateManager;
+    fn get_box_certificate(&self) -> io::Result<CertificateRecord>;
     fn get_hostname(&self) -> String;
 
     fn add_websocket(&mut self, socket: ws::Sender);

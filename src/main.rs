@@ -40,6 +40,7 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate mio;
+extern crate mktemp;
 extern crate mount;
 extern crate nix;
 extern crate openssl;
@@ -55,6 +56,7 @@ extern crate time;
 extern crate timer;
 extern crate transformable_channels;
 extern crate unicase;
+extern crate url;
 extern crate uuid;
 extern crate ws;
 extern crate multicast_dns;
@@ -111,26 +113,25 @@ use tls::TlsOption;
 use traits::Controller;
 
 docopt!(Args derive Debug, "
-Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-d <profile_path>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--remote-name <hostname>] [--dns-domain <domain>] [-c <namespace;key;value>]...
+Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-d <profile_path>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--dns-domain <domain>] [--dns-api <url>] [-c <namespace;key;value>]...
 
 Options:
     -v, --verbose            Toggle verbose output.
-    -l, --local-name <hostname>    Set local hostname. Linux only. Requires to be a member of the netdev group.
+    -l, --local-name <hostname>    Set local hostname. [default: foxbox]
     -p, --port <port>        Set port to listen on for http connections. [default: 3000]
     -w, --wsport <wsport>    Set port to listen on for websocket. [default: 4000]
     -d, --profile <path>     Set profile path to store user data.
-    -r, --register <url>     Change the url of the registration endpoint. [default: http://localhost:4242]
+    -r, --register <url>     Change the url of the registration endpoint. [default: http://knilxof.org:4242]
     -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
-    -s, --tunnel-secret <secret>    Set the tunnel shared secret. [default: secret]
-        --disable-tls               Run as a plain HTTP server, disabling encryption.
-        --dns-domain <domain>       Set the top level domain for public DNS [default: box.knilxof.org]
-        --dns-api <url>             Set the DNS API endpoint [default: https://knilxof.org:5300]
-        --remote-name <hostname>    Set remote hostname. This the URL to access the box through the bridge. If omitted, the tunnel is disabled
+    -s, --tunnel-secret <secret>       Set the tunnel shared secret. [default: secret]
+        --disable-tls                  Run as a plain HTTP server, disabling encryption.
+        --dns-domain <domain>          Set the top level domain for public DNS [default: box.knilxof.org]
+        --dns-api <url>                Set the DNS API endpoint [default: https://knilxof.org:5300]
     -c, --config <namespace;key;value>  Set configuration override
     -h, --help               Print this help menu.
 ",
-        flag_local_name: Option<String>,
+        flag_local_name: String,
         flag_port: u16,
         flag_wsport: u16,
         flag_profile: Option<String>,
@@ -141,7 +142,6 @@ Options:
         flag_disable_tls: bool,
         flag_dns_domain: String,
         flag_dns_api: String,
-        flag_remote_name: Option<String>,
         flag_config: Option<Vec<String>>);
 
 /// Updates local host name with the provided host name string. If requested host name
@@ -157,14 +157,14 @@ Options:
 /// # Arguments
 ///
 /// * `hostname` - host name name we'd like to set (should be a valid non-FQDN host name).
-fn update_hostname(hostname: String) -> Option<String> {
+fn update_hostname(hostname: String) -> String {
     let host_manager = HostManager::new();
 
     if !host_manager.is_valid_name(&hostname) {
         panic!("Host name `{}` is not a valid host name!", &hostname);
     }
 
-    Some(host_manager.set_name(&hostname))
+    host_manager.set_name(&hostname)
 }
 
 // Handle SIGINT (Ctrl-C) for manual shutdown.
@@ -238,22 +238,8 @@ fn main() {
 
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
-    let domain = args.flag_dns_domain;
-
-    // Start the tunnel.
-    let mut tunnel: Option<Tunnel> = None;
-    if let Some(tunnel_url) = args.flag_tunnel {
-        if let Some(remote_name) = args.flag_remote_name {
-            tunnel = Some(Tunnel::new(TunnelConfig::new(tunnel_url,
-                                                        args.flag_tunnel_secret,
-                                                        args.flag_port,
-                                                        args.flag_wsport,
-                                                        remote_name)));
-            tunnel.as_mut().unwrap().start().unwrap();
-        }
-    }
-
-    let local_name = args.flag_local_name.map_or(None, update_hostname);
+    let local_name = update_hostname(args.flag_local_name.to_owned());
+    let local_name = format!("{}.local", local_name);
 
     let mut controller = FoxBox::new(
         args.flag_verbose, local_name.clone(), args.flag_port,
@@ -282,11 +268,40 @@ fn main() {
         }
     }
 
-    // Register with the nUPNP server.
-    let registrar = registration::Registrar::new(controller.get_hostname());
-    registrar.start(args.flag_register, args.flag_iface,
-                    domain, &tunnel, args.flag_port,
-                    args.flag_dns_api, controller.get_certificate_manager());
+    // The registrar manages registration with the registration server, and DNS
+    // server.  The registration server is used to orchestrate box discovery by
+    // clients via an "nUPNP" method where the box registers itself with an
+    // externally available cloud service that a client can use to discover any
+    // boxes local to itself. See: https://github.com/fxbox/registration_server
+    //
+    // The registrar also manages the assignment of names resolvable via a public
+    // DNS server. The box registers its local ip address with a DNS server so that
+    // a name can be resolved to the _local_ ip address. It also registers a unique
+    // domain for the HTTPS tunnel. These public domain names are then verifiable
+    // by LetsEncrypt during the validation phase using a dns-01 challenge.
+    // See: https://letsencrypt.github.io/acme-spec/#dns
+    //
+    // Once the names have been created in the DNS server, a LetsEncrypt client will
+    // issue certificates for each name - the local name will be the common name of
+    // the certificate, and every other name will be a subject alternative name.
+    let registrar = registration::Registrar::new(controller.get_certificate_manager(),
+                                                 args.flag_dns_domain,
+                                                 args.flag_register,
+                                                 args.flag_dns_api);
+
+    // Start the tunnel.
+    let mut tunnel: Option<Tunnel> = None;
+    if let Some(tunnel_url) = args.flag_tunnel {
+        tunnel = Some(Tunnel::new(TunnelConfig::new(tunnel_url,
+                                                    args.flag_tunnel_secret,
+                                                    args.flag_port,
+                                                    args.flag_wsport,
+                                                    registrar.get_remote_dns_name())));
+        tunnel.as_mut().unwrap().start().unwrap();
+    }
+
+    registrar.start(args.flag_iface, &tunnel,
+                    args.flag_port,  &controller);
 
     controller.run(&SHUTDOWN_FLAG);
 
@@ -304,10 +319,10 @@ describe! main {
                 .decode().unwrap();
 
             assert_eq!(args.flag_verbose, false);
-            assert_eq!(args.flag_local_name, None);
+            assert_eq!(args.flag_local_name, "foxbox");
             assert_eq!(args.flag_port, 3000);
             assert_eq!(args.flag_wsport, 4000);
-            assert_eq!(args.flag_register, "http://localhost:4242");
+            assert_eq!(args.flag_register, "http://knilxof.org:4242");
             assert_eq!(args.flag_dns_domain, "box.knilxof.org");
             assert_eq!(args.flag_dns_api, "https://knilxof.org:5300");
             assert_eq!(args.flag_iface, None);
@@ -331,7 +346,7 @@ describe! main {
                .decode().unwrap();
 
             assert_eq!(args.flag_verbose, true);
-            assert_eq!(args.flag_local_name.unwrap(), "foobar");
+            assert_eq!(args.flag_local_name, "foobar");
             assert_eq!(args.flag_port, 1234);
             assert_eq!(args.flag_wsport, 4567);
             assert_eq!(args.flag_register, "http://foo.bar:6868/register");
@@ -355,7 +370,7 @@ describe! main {
                 .decode().unwrap();
 
             assert_eq!(args.flag_verbose, true);
-            assert_eq!(args.flag_local_name.unwrap(), "foobar");
+            assert_eq!(args.flag_local_name, "foobar");
             assert_eq!(args.flag_port, 1234);
             assert_eq!(args.flag_wsport, 4567);
             assert_eq!(args.flag_register, "http://foo.bar:6868/register");
