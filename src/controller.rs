@@ -7,7 +7,7 @@ extern crate mio;
 
 use adapters::AdapterManager;
 use config_store::ConfigService;
-use foxbox_taxonomy::manager::AdapterManager as AdapterManager2;
+use foxbox_taxonomy::manager::AdapterManager as TaxoManager;
 use foxbox_users::UsersManager;
 use http_server::HttpServer;
 use iron::{Request, Response, IronResult};
@@ -102,12 +102,12 @@ impl Controller for FoxBox {
         }
 
         // Create the taxonomy based AdapterManager
-        let taxo_manager = AdapterManager2::new();
+        let taxo_manager = Arc::new(TaxoManager::new());
 
         let mut adapter_manager = AdapterManager::new(self.clone());
-        adapter_manager.start(taxo_manager.clone());
+        adapter_manager.start(&taxo_manager);
 
-        HttpServer::new(self.clone()).start(taxo_manager);
+        HttpServer::new(self.clone()).start(&taxo_manager);
         WsServer::start(self.clone());
 
         self.upnp.search(None).unwrap();

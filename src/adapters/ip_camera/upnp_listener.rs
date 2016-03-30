@@ -7,32 +7,29 @@
 
 extern crate url;
 
-use foxbox_taxonomy::adapter::AdapterManagerHandle;
+use std::sync::Arc;
+
+use foxbox_taxonomy::manager::*;
+
 use super::IPCameraAdapter;
 use super::IpCameraServiceMap;
 use upnp::{UpnpListener, UpnpService};
 
-pub struct IpCameraUpnpListener<T>
-    where T: AdapterManagerHandle + Send + Clone + 'static
-{
-    manager: T,
+pub struct IpCameraUpnpListener {
+    manager: Arc<AdapterManager>,
     services: IpCameraServiceMap
 }
 
-impl<T> IpCameraUpnpListener<T>
-    where T: AdapterManagerHandle + Send + Clone + 'static
-{
-    pub fn new(manager: T, services: IpCameraServiceMap) -> Box<Self> {
+impl IpCameraUpnpListener {
+    pub fn new(manager: &Arc<AdapterManager>, services: IpCameraServiceMap) -> Box<Self> {
         Box::new(IpCameraUpnpListener {
-            manager: manager,
+            manager: manager.clone(),
             services: services
         })
     }
 }
 
-impl<T> UpnpListener for IpCameraUpnpListener<T>
-    where T: AdapterManagerHandle + Send + Clone + 'static
-{
+impl UpnpListener for IpCameraUpnpListener {
     // This will called each time that the device advertises itself using UPNP.
     // The D-Link cameras post an advertisement once when we do our search
     // (when the adapter is started) and 4 times in a row about once every
@@ -69,7 +66,7 @@ impl<T> UpnpListener for IpCameraUpnpListener<T>
         let name = try_get!(service.description, "/root/device/friendlyName").clone();
         let manufacturer = try_get!(service.description, "/root/device/manufacturer");
 
-        IPCameraAdapter::init_service(self.manager.clone(), self.services.clone(),
+        IPCameraAdapter::init_service(&self.manager, self.services.clone(),
                                       &udn, &url, &name, &manufacturer, &model_name).unwrap();
         true
     }
