@@ -1,6 +1,5 @@
 use compile::ExecutableDevEnv;
 
-use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::api::{ API, Error };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
@@ -8,7 +7,7 @@ use foxbox_taxonomy::values::*;
 
 use std::cmp::{ Ord, PartialOrd, Ordering as OrdOrdering };
 use std::collections::{ BinaryHeap, HashMap };
-use std::sync::Arc;
+use std::sync::{ Arc, Mutex };
 use std::sync::atomic::{ AtomicBool, Ordering as AtomicOrdering };
 use std::thread;
 
@@ -243,13 +242,13 @@ struct TestAdapter {
     id: Id<AdapterId>,
 
     /// The back-end holding the state of this adapter. Shared between all adapters.
-    back_end: Box<ExtSender<AdapterOp>>,
+    back_end: Arc<Mutex<Box<ExtSender<AdapterOp>>>>,
 }
 impl TestAdapter {
     fn new(id: Id<AdapterId>, back_end: Box<ExtSender<AdapterOp>>) -> Self {
         TestAdapter {
             id: id,
-            back_end: back_end,
+            back_end: Arc::new(Mutex::new(back_end)),
         }
     }
 }
@@ -281,7 +280,7 @@ impl Adapter for TestAdapter {
     /// The AdapterManager is in charge of keeping track of the age of values.
     fn fetch_values(&self, getters: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         let (tx, rx) = channel();
-        self.back_end.send(AdapterOp::FetchValues {
+        self.back_end.lock().unwrap().send(AdapterOp::FetchValues {
             getters: getters,
             tx: Box::new(tx),
         }).unwrap();
@@ -294,7 +293,7 @@ impl Adapter for TestAdapter {
     /// expects the adapter to attempt to minimize the connections with the actual devices.
     fn send_values(&self, values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
         let (tx, rx) = channel();
-        self.back_end.send(AdapterOp::SendValues {
+        self.back_end.lock().unwrap().send(AdapterOp::SendValues {
             values: values,
             tx: Box::new(tx),
         }).unwrap();
@@ -321,20 +320,20 @@ impl Adapter for TestAdapter {
             ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error>
     {
         let (tx, rx) = channel();
-        self.back_end.send(AdapterOp::Watch {
+        self.back_end.lock().unwrap().send(AdapterOp::Watch {
             source: source,
             cb: cb,
             tx: Box::new(tx),
         }).unwrap();
         let received = rx.recv().unwrap();
-        let tx_unregister = self.back_end.clone();
+        let tx_unregister = self.back_end.lock().unwrap().clone();
         received.iter().map(|(id, result)| {
             let tx_unregister = tx_unregister.clone();
             (id.clone(), match *result {
                 Err(ref err) => Err(err.clone()),
                 Ok(ref key) => {
                     let guard = TestAdapterWatchGuard {
-                        tx: Box::new(tx_unregister),
+                        tx: Arc::new(Mutex::new(Box::new(tx_unregister))),
                         key: key.clone()
                     };
                     Ok(Box::new(guard) as Box<AdapterWatchGuard>)
@@ -347,13 +346,13 @@ impl Adapter for TestAdapter {
 /// A watchguard for a TestAdapter
 #[derive(Clone)]
 struct TestAdapterWatchGuard {
-    tx: Box<ExtSender<AdapterOp>>,
+    tx: Arc<Mutex<Box<ExtSender<AdapterOp>>>>,
     key: usize,
 }
 impl AdapterWatchGuard for TestAdapterWatchGuard {}
 impl Drop for TestAdapterWatchGuard {
     fn drop(&mut self) {
-        let _ = self.tx.send(AdapterOp::Unwatch(self.key));
+        let _ = self.tx.lock().unwrap().send(AdapterOp::Unwatch(self.key));
     }
 }
 
@@ -399,7 +398,7 @@ impl Drop for TimerGuard {
 #[derive(Clone)]
 pub struct FakeEnv {
     /// The manager in charge of all adapters.
-    manager: AdapterManager,
+    manager: Arc<AdapterManager>,
 
     ///
     on_event: Box<ExtSender<FakeEnvEvent>>,
@@ -410,8 +409,8 @@ impl ExecutableDevEnv for FakeEnv {
     type WatchGuard = <AdapterManager as API>::WatchGuard;
     type API = AdapterManager;
 
-    fn api(&self) -> Self::API {
-        self.manager.clone()
+    fn api(&self) -> &Self::API {
+        &self.manager
     }
 
     type TimerGuard = TimerGuard;
@@ -439,7 +438,7 @@ impl FakeEnv {
 
         FakeEnv {
             on_event: on_event,
-            manager: AdapterManager::new(),
+            manager: Arc::new(AdapterManager::new()),
             back_end: Box::new(tx),
         }
     }
@@ -460,7 +459,7 @@ impl FakeEnv {
             AddAdapters(vec) => {
                 for id in vec {
                     let id = Id::new(&id);
-                    let adapter = Box::new(TestAdapter::new(id, self.back_end.clone()));
+                    let adapter = Arc::new(TestAdapter::new(id, self.back_end.clone()));
                     let result = self.manager.add_adapter(adapter);
                     self.report_error(result);
                 }

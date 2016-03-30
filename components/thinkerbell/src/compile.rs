@@ -35,7 +35,7 @@ pub trait ExecutableDevEnv: Send {
     type API: API<WatchGuard = Self::WatchGuard>;
 
     /// Return a handle to the API.
-    fn api(&self) -> Self::API;
+    fn api(&self) -> &Self::API;
 
     /// A guard returned by `start_timer`. When the guard is dropped, the timer is cancelled.
     type TimerGuard;
