@@ -2,7 +2,7 @@
 //! Used for testing.
 use adapter::*;
 
-use api::Error;
+use api::{ Error, User };
 use selector::*;
 use services::*;
 use values::*;
@@ -182,7 +182,7 @@ impl Adapter for FakeAdapter {
 
     /// Request a value from a channel. The FoxBox (not the adapter)
     /// is in charge of keeping track of the age of values.
-    fn fetch_values(&self, mut channels: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, mut channels: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         let map = self.values.lock().unwrap();
         channels.drain(..).map(|id| {
             let result = match map.get(&id) {
@@ -195,7 +195,7 @@ impl Adapter for FakeAdapter {
     }
 
     /// Request that a value be sent to a channel.
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
         let map = self.senders.lock().unwrap();
         values.drain().map(|(id, value)| {
             let result = match map.get(&id) {

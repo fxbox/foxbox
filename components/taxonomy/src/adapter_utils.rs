@@ -1,6 +1,6 @@
 //! Utilities for writing adapters.
 
-use api::Error;
+use api::{ Error, User };
 use manager::*;
 use services::{ Getter, Setter };
 use util::{ Id, AdapterId };
@@ -50,12 +50,12 @@ impl<T> Adapter for MakeSyncAdapter<T> where T: Adapter {
         &self.version
     }
 
-    fn fetch_values(&self, set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
-        self.lock.lock().unwrap().fetch_values(set)
+    fn fetch_values(&self, set: Vec<Id<Getter>>, user: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+        self.lock.lock().unwrap().fetch_values(set, user)
     }
 
-    fn send_values(&self, values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
-        self.lock.lock().unwrap().send_values(values)
+    fn send_values(&self, values: HashMap<Id<Setter>, Value>, user: User) -> ResultMap<Id<Setter>, (), Error> {
+        self.lock.lock().unwrap().send_values(values, user)
     }
 
     fn register_watch(&self, set: Vec<(Id<Getter>, Option<Range>)>,
