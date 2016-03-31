@@ -105,6 +105,34 @@ Alternatively you can build the app without running it via:
 $ cargo build
 ```
 
+Foxbox also takes a number of command line parameters:
+
+```bash
+-v, --verbose : Toggle verbose output.
+-l, --local-name <hostname> : Set local hostname. Linux only. Requires to be a member of the netdev group.
+-p, --port <port>  : Set port to listen on for http connections. [default: 3000]
+-w, --wsport <wsport> : Set port to listen on for websocket. [default: 4000]
+-d, --profile <path> : Set profile path to store user data.
+-r, --register <url> : URL of registration endpoint [default: http://localhost:4242]
+-t, --tunnel <tunnel> : Set the tunnel endpoint hostname. If omitted, the tunnel is disabled.
+-s, --tunnel-secret <secret> : Set the tunnel shared secret. [default: secret]
+-c, --config <namespace;key;value> :  Set configuration override
+-h, --help : Print this help menu.
+--disable-tls : Run as a plain HTTP server, disabling encryption.
+--dns-domain <domain> : Set the top level domain for public DNS. If omitted, the tunnel is disabled
+--dns-api <url> : Set the DNS API endpoint 
+--remote-name: external domain of foxbox
+
+```
+
+Example:
+```bash
+# To start foxbox with the IP tunneling, HTTP only:
+$ cargo run -- -r http://someserver.org:4242 -t someserver.org:443 -s secret --remote-name foxbox.someserver.org --disable-tls
+# To change the philips hue nupnp server location to http://localhost:8002
+$ cargo run -- -c "philips_hue;nupnp_url;http://localhost:8002/" 
+```
+
 ## Build time options
 ### Disable authentication
 You may want to disable endpoints authentication to ease your development process. You can do that by removing `authentication` from the `default` feature in the `Cargo.toml` file.
@@ -178,4 +206,5 @@ $ export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
 Previous versions of these instructions described setting ```OPENSSL_INCLUDE_DIR```.
 Make sure it is unset. In fact, an obsolete value may have been cached by cargo
 which is fixed by ```cargo clean```.
+
 
