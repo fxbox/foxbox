@@ -38,9 +38,6 @@ pub fn create<T: Controller>(controller: T) -> Chain {
                     .find("service").unwrap_or("").to_owned();
                 c2.dispatch_service_request(id, req)
             },
-            // CORS middleware will take care of adding the CORS headers
-            // if they are allowed.
-            Method::Options => Ok(Response::with(Status::Ok)),
             _ => Ok(Response::with(Status::NotImplemented))
         }
     });
