@@ -6,7 +6,7 @@
 
 pub use adapter::*;
 use api;
-use api::{ API, Error, TargetMap };
+use api::{ API, Error, TargetMap, User };
 use backend::*;
 use selector::*;
 use services::*;
@@ -277,7 +277,7 @@ impl API for AdapterManager {
     }
 
     /// Read the latest value from a set of channels
-    fn fetch_values(&self, selectors: Vec<GetterSelector>) ->
+    fn fetch_values(&self, selectors: Vec<GetterSelector>, user: User) ->
         ResultMap<Id<Getter>, Option<Value>, Error>
     {
         // First, prepare the request.
@@ -291,7 +291,7 @@ impl API for AdapterManager {
         for (_, (adapter, mut getters)) in request.drain() {
             let (getters, mut types) : (Vec<_>, Vec<_>) = getters.drain(..).unzip();
             let mut got = adapter
-                .fetch_values(getters);
+                .fetch_values(getters, user.clone());
 
             let checked = got.drain()
                 .zip(types.drain(..))
@@ -316,7 +316,7 @@ impl API for AdapterManager {
     }
 
     /// Send a bunch of values to a set of channels
-    fn send_values(&self, keyvalues: TargetMap<SetterSelector, Value>) ->
+    fn send_values(&self, keyvalues: TargetMap<SetterSelector, Value>, user: User) ->
         ResultMap<Id<Setter>, (), Error>
     {
         // First, prepare the request.
@@ -329,7 +329,7 @@ impl API for AdapterManager {
         // Dispatch to adapter
         let mut results = HashMap::new();
         for (_, (adapter, (request, failures))) in prepared.drain() {
-            let got = adapter.send_values(request);
+            let got = adapter.send_values(request, user.clone());
             results.extend(got);
             results.extend(failures);
         }

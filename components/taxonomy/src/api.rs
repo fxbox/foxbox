@@ -179,6 +179,11 @@ pub enum WatchEvent {
     },
 }
 
+#[derive(Debug, Clone)]
+pub enum User {
+    None,
+    Id(i32)
+}
 
 impl<K> Parser<Targetted<K, Value>> for Targetted<K, Value> where K: Parser<K> + Clone {
     fn description() -> String {
@@ -600,7 +605,7 @@ pub trait API: Send {
     /// ## Success
     ///
     /// The results, per getter.
-    fn fetch_values(&self, Vec<GetterSelector>) -> ResultMap<Id<Getter>, Option<Value>, Error>;
+    fn fetch_values(&self, Vec<GetterSelector>, user: User) -> ResultMap<Id<Getter>, Option<Value>, Error>;
 
     /// Send a bunch of values to a set of channels.
     ///
@@ -660,7 +665,7 @@ pub trait API: Send {
     /// ## Success
     ///
     /// The results, per setter.
-    fn send_values(&self, TargetMap<SetterSelector, Value>) -> ResultMap<Id<Setter>, (), Error>;
+    fn send_values(&self, TargetMap<SetterSelector, Value>, user: User) -> ResultMap<Id<Setter>, (), Error>;
 
     /// Watch for changes from channels.
     ///

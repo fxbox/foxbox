@@ -3,7 +3,7 @@ extern crate transformable_channels;
 
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::fake_adapter::*;
-use foxbox_taxonomy::api::{ API, Error, InternalError, TargetMap, Targetted, WatchEvent as Event };
+use foxbox_taxonomy::api::{ API, Error, InternalError, TargetMap, Targetted, User, WatchEvent as Event };
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
@@ -793,21 +793,21 @@ fn test_fetch() {
     let adapter_2 = FakeAdapter::new(&id_2);
     let tweak_1 = adapter_1.get_tweak();
     println!("* Without adapters, fetching values from a selector that has no channels returns an empty vector.");
-    assert_eq!(manager.fetch_values(vec![GetterSelector::new()]).len(), 0);
+    assert_eq!(manager.fetch_values(vec![GetterSelector::new()], User::None).len(), 0);
 
     println!("* With adapters, fetching values from a selector that has no channels returns an empty vector.");
     manager.add_adapter(Arc::new(adapter_1)).unwrap();
     manager.add_adapter(Arc::new(adapter_2)).unwrap();
     manager.add_service(service_1.clone()).unwrap();
     manager.add_service(service_2.clone()).unwrap();
-    assert_eq!(manager.fetch_values(vec![GetterSelector::new()]).len(), 0);
+    assert_eq!(manager.fetch_values(vec![GetterSelector::new()], User::None).len(), 0);
 
     println!("* Fetching empty values from a selector that has channels returns a vector of empty values.");
     manager.add_getter(getter_1_1.clone()).unwrap();
     manager.add_getter(getter_1_2.clone()).unwrap();
     manager.add_getter(getter_1_3.clone()).unwrap();
     manager.add_getter(getter_2.clone()).unwrap();
-    let data = manager.fetch_values(vec![GetterSelector::new()]);
+    let data = manager.fetch_values(vec![GetterSelector::new()], User::None);
     assert_eq!(data.len(), 4);
 
     for result in data.values() {
@@ -821,7 +821,7 @@ fn test_fetch() {
     println!("* Fetching values returns the right values.");
     tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
     tweak_1(Tweak::InjectGetterValue(getter_id_1_2.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));
-    let data = manager.fetch_values(vec![GetterSelector::new()]);
+    let data = manager.fetch_values(vec![GetterSelector::new()], User::None);
     assert_eq!(data.len(), 4);
     match data.get(&getter_id_1_1) {
         Some(&Ok(Some(Value::OnOff(OnOff::On)))) => {},
@@ -842,7 +842,7 @@ fn test_fetch() {
 
     println!("* Fetching values returns the right errors.");
     tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Err(Error::InternalError(InternalError::NoSuchGetter(getter_id_1_1.clone())))));
-    let data = manager.fetch_values(vec![GetterSelector::new()]);
+    let data = manager.fetch_values(vec![GetterSelector::new()], User::None);
     assert_eq!(data.len(), 4);
     match data.get(&getter_id_1_1) {
         Some(&Err(Error::InternalError(InternalError::NoSuchGetter(ref id)))) if *id == getter_id_1_1 => {},
@@ -863,7 +863,7 @@ fn test_fetch() {
 
     println!("* Fetching a value that causes an internal type error returns that error.");
     tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OpenClosed(OpenClosed::Open)))));
-    let data = manager.fetch_values(vec![GetterSelector::new()]);
+    let data = manager.fetch_values(vec![GetterSelector::new()], User::None);
     assert_eq!(data.len(), 4);
     match data.get(&getter_id_1_1) {
         Some(&Err(Error::TypeError(TypeError {
@@ -978,7 +978,7 @@ fn test_send() {
     let rx_adapter_2 = adapter_2.take_rx();
 
     println!("* Without adapters, sending values to a selector that has no channels returns an empty vector.");
-    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
+    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]), User::None);
 
     assert_eq!(data.len(), 0);
 
@@ -987,7 +987,7 @@ fn test_send() {
     manager.add_adapter(Arc::new(adapter_2)).unwrap();
     manager.add_service(service_1.clone()).unwrap();
     manager.add_service(service_2.clone()).unwrap();
-    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
+    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]), User::None);
     assert_eq!(data.len(), 0);
 
     println!("* Sending well-typed values to channels succeeds if the adapter succeeds.");
@@ -996,7 +996,7 @@ fn test_send() {
     manager.add_setter(setter_1_3.clone()).unwrap();
     manager.add_setter(setter_2.clone()).unwrap();
 
-    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
+    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]), User::None);
     assert_eq!(data.len(), 4);
     for result in data.values() {
         if let Ok(()) = *result {
@@ -1035,7 +1035,7 @@ fn test_send() {
         (vec![
             SetterSelector::new().with_id(setter_id_1_3.clone()).clone()
         ], Value::OnOff(OnOff::On))
-    ]));
+    ]), User::None);
     assert_eq!(data.len(), 4);
     for id in vec![&setter_id_1_1, &setter_id_1_2, &setter_id_2] {
         match data.get(id) {
@@ -1064,7 +1064,7 @@ fn test_send() {
     println!("* Sending values that cause channel errors will propagate the errors.");
     tweak_1(Tweak::InjectSetterError(setter_id_1_1.clone(), Some(Error::InternalError(InternalError::InvalidInitialService))));
 
-    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]));
+    let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]), User::None);
     assert_eq!(data.len(), 4);
     for id in vec![&setter_id_2, &setter_id_1_2, &setter_id_2] {
         match data.get(id) {

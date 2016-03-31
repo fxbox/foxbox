@@ -1,4 +1,4 @@
-use api::Error;
+use api::{ Error, User };
 use services::*;
 use values::*;
 
@@ -153,13 +153,13 @@ pub trait Adapter: Send + Sync {
     /// expects the adapter to attempt to minimize the connections with the actual devices.
     ///
     /// The AdapterManager is in charge of keeping track of the age of values.
-    fn fetch_values(&self, set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error>;
+    fn fetch_values(&self, set: Vec<Id<Getter>>, user: User) -> ResultMap<Id<Getter>, Option<Value>, Error>;
 
     /// Request that values be sent to channels.
     ///
     /// The AdapterManager always attempts to group calls to `send_values` by `Adapter`, and then
     /// expects the adapter to attempt to minimize the connections with the actual devices.
-    fn send_values(&self, values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error>;
+    fn send_values(&self, values: HashMap<Id<Setter>, Value>, user: User) -> ResultMap<Id<Setter>, (), Error>;
 
     /// Watch a bunch of getters as they change.
     ///
