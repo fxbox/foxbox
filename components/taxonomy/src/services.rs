@@ -267,9 +267,33 @@ pub enum ChannelKind {
     /// ```
     OvenTemperature,
 
+    //
+    // # Thinkerbell
+    //
+
     AddThinkerbellRule,
     RemoveThinkerbellRule,
     ThinkerbellRuleSource,
+
+    /// Capture a new snapshot.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "TakeSnapshot".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let source = r#""TakeSnapshot""#;
+    ///
+    /// let parsed = ChannelKind::from_str(source).unwrap();
+    /// assert_eq!(parsed, ChannelKind::TakeSnapshot);
+    ///
+    /// let serialized = parsed.to_json();
+    /// assert_eq!(serialized.as_string().unwrap(), "TakeSnapshot");
+    /// ```
+    TakeSnapshot,
 
     // TODO: Add more
 
@@ -347,6 +371,7 @@ impl Parser<ChannelKind> for ChannelKind {
                 "ThinkerbellRuleSource" => Ok(ChannelKind::ThinkerbellRuleSource),
                 "RemainingTime" => Ok(ChannelKind::RemainingTime),
                 "OvenTemperature" => Ok(ChannelKind::OvenTemperature),
+                "TakeSnapshot" => Ok(ChannelKind::TakeSnapshot),
                 _ => Err(ParseError::unknown_constant(str, &path))
             }
         }
@@ -385,7 +410,8 @@ impl ToJSON for ChannelKind {
             OvenTemperature => JSON::String("OvenTemperature".to_owned()),
             AddThinkerbellRule => JSON::String("AddThinkerbellRule".to_owned()),
             RemoveThinkerbellRule => JSON::String("RemoveThinkerbellRule".to_owned()),
-            ThinkerbellRuleSource => JSON::String("ThinkerbellRuleSource".to_owned()), 
+            ThinkerbellRuleSource => JSON::String("ThinkerbellRuleSource".to_owned()),
+            TakeSnapshot => JSON::String("TakeSnapshot".to_owned()),
             Extension { ref vendor, ref adapter, ref kind, ref typ } => {
                 vec![
                     ("vendor", vendor.to_json()),
@@ -413,6 +439,7 @@ impl ChannelKind {
             AddThinkerbellRule => Type::ThinkerbellRule,
             RemoveThinkerbellRule => Type::Unit,
             ThinkerbellRuleSource => Type::String,
+            TakeSnapshot => Type::Unit,
             Extension { ref typ, ..} => typ.clone(),
         }
     }
