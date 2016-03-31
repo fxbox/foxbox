@@ -15,7 +15,7 @@ use std::collections::{ HashMap, HashSet };
 use std::collections::hash_map::Entry;
 use std::hash::{ Hash, Hasher };
 use std::ops::{ Deref };
-use std::sync::{ Arc, Mutex };
+use std::sync::{ Arc, Mutex, Weak };
 use std::sync::atomic::{ AtomicBool, Ordering };
 
 /// A request to a bunch of adapters.
@@ -32,7 +32,7 @@ pub type FetchRequest = AdapterRequest<HashMap<Id<Getter>, Type>>;
 pub type SendRequest = AdapterRequest<(HashMap<Id<Setter>, Value>, ResultMap<Id<Setter>, (), Error>)>;
 
 /// A request to an adapter, for performing a `watch` operation.
-pub type WatchRequest = AdapterRequest<(Vec<(Id<Getter>, Option<Range>)>, Arc<WatcherData>)>;
+pub type WatchRequest = AdapterRequest<(Vec<(Id<Getter>, Option<Range>)>, Weak<WatcherData>)>;
 
 pub type WatchGuardCommit = Vec<(Arc<WatcherData>, Vec<(Id<Getter>, Box<AdapterWatchGuard>)>)>;
 
@@ -191,7 +191,7 @@ struct GetterData {
     service_tags: Arc<SubCell<HashSet<Id<TagId>>>>,
 
     /// Watchers that currently watch this channel.
-    watchers: HashMap<WatchKey, Arc<WatcherData>>,
+    watchers: HashMap<WatchKey, Weak<WatcherData>>,
 }
 impl SelectedBy<GetterSelector> for GetterData {
     fn matches(&self, selector: &GetterSelector) -> bool {
@@ -260,6 +260,9 @@ impl Deref for SetterData {
 }
 
 /// All the information on a currently registered watch.
+///
+/// A single watch may concern any number of getter channels, including channels not registered
+/// yet. The WatcherData is materialized as a WatchGuard in userland.
 pub struct WatcherData {
     /// The criteria for watching.
     watch: TargetMap<GetterSelector, Exactly<Range>>,
@@ -456,7 +459,16 @@ impl State {
         let mut keys_to_drop = vec![];
         {
             for (key, ref watcher) in &getter_data.watchers {
-                // We need to disconnect the watcher if either it is being removed
+                let watcher = match watcher.upgrade() {
+                    Some(watcher) => watcher,
+                    None => {
+                        // The watcher has already been removed.
+                        keys_to_drop.push(*key);
+                        continue;
+                    }
+                };
+
+                // We need to disconnect the watcher if either the channel is being removed
                 // or it doesn't match anymore any of the selectors for the watchers
                 // that were watching it.
                 let should_disconnect = is_being_removed
@@ -1003,7 +1015,7 @@ impl State {
         let adapter = getter_data.adapter.clone();
 
         let insert_in_getter =
-            match InsertInMap::start(&mut getter_data.watchers, vec![ ( watcher.key, watcher.clone() )] ) {
+            match InsertInMap::start(&mut getter_data.watchers, vec![ ( watcher.key, Arc::downgrade(watcher) )] ) {
             Err(_) => {
                 debug_assert!(false, "Internal inconsistency: This watcher is already watching this getter.");
                 return
@@ -1033,7 +1045,7 @@ impl State {
                         adapter_data.adapter.clone()
                     }
                 };
-                entry.insert((adapter, (vec![(id, range)], watcher.clone())));
+                entry.insert((adapter, (vec![(id, range)], Arc::downgrade(watcher))));
             },
             Occupied(mut entry) => {
                 (entry.get_mut().1).0.push((id, range));
@@ -1102,9 +1114,27 @@ impl State {
             }
         }
 
-        // Sanity check
+        // At this stage, theoretically, no getters have a strong reference to watcher_data.
+        // There may still be weak references lying around, though.
+
+        #[cfg(debug_assertions)] {
+            for (id, getter) in &self.getter_by_id {
+                let found = getter.borrow().watchers.values().find(|candidate| {
+                    match candidate.upgrade() {
+                        None => false,
+                        Some(x) => x == watcher_data
+                    }
+                }).is_some();
+                if found {
+                    panic!("At this stage, no channel should hold a reference to this watcher_data {:?}.", id)
+                }
+            }
+        }
+
+        // At this stage, an Arc<WatcherData> could still be in transit between threads.
+
         debug_assert!(Arc::get_mut(&mut watcher_data).is_some(),
-            "This watcher is being unregistered but we still have strong references to it {:?}. That's not good.", id);
+            "This watcher is being unregistered but we still have strong references to it. That's not good.");
 
         // At this stage, `watcher_data` has no reference left. All its `guards` will be dropped.
     }
@@ -1131,10 +1161,24 @@ impl State {
 
         let mut to_add = vec![];
         for (_, (adapter, (request, watch_data))) in per_adapter.drain() {
+            let watch_data = match watch_data.upgrade() {
+                None => {
+                    // The watch_data has already been dropped, nothing to do.
+                    continue
+                }
+                Some(watch_data) => watch_data
+            };
             let is_dropped = watch_data.is_dropped.clone();
+            if is_dropped.load(Ordering::Relaxed) {
+                // The WatchGuard has already been dropped.
+                continue
+            }
             let on_ok = watch_data.on_event.lock().unwrap().filter_map(move |event| {
                 if is_dropped.load(Ordering::Relaxed) {
                     // The WatchGuard has already been dropped.
+                    // We want to stop propagating messages immediately, even if unregistration
+                    // is not necessarily complete yet. Unregistration will be completed after
+                    // the call to `stop_watch`.
                     return None;
                 }
                 Some(match event {
