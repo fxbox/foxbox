@@ -7,13 +7,13 @@ dependencies = [
  "docopt 0.6.78 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt_macros 0.6.81 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=ac8ee9f)",
- "foxbox_thinkerbell 0.1.2 (git+https://github.com/fxbox/thinkerbell.git?rev=42e78df)",
+ "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=aa03b11)",
+ "foxbox_thinkerbell 0.1.2 (git+https://github.com/fxbox/thinkerbell.git?rev=98ecba4)",
  "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=73e8943)",
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=137d42f)",
+ "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=e351cac)",
  "iron-test 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -190,7 +190,7 @@ dependencies = [
 [[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git?rev=ac8ee9f#ac8ee9f222538f96ddfd428a09fd1bf5a8a5d6c0"
+source = "git+https://github.com/fxbox/taxonomy.git?rev=aa03b11#aa03b11063cdd478336c9ac1e5c691fcf4e3547a"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -206,10 +206,10 @@ dependencies = [
 [[package]]
 name = "foxbox_thinkerbell"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/thinkerbell.git?rev=42e78df#42e78df6d5bede0e911faf7f367f9826e7692230"
+source = "git+https://github.com/fxbox/thinkerbell.git?rev=98ecba4#98ecba48fe36b0428efe8e4f670f945fbe85737e"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=ac8ee9f)",
+ "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?rev=aa03b11)",
  "rusqlite 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.6.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -354,7 +354,7 @@ dependencies = [
 [[package]]
 name = "iron-cors"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/iron-cors.git?rev=137d42f#137d42f86524f1a16873eba1c308cfa2a45b0bd9"
+source = "git+https://github.com/fxbox/iron-cors.git?rev=e351cac#e351cac8bb007615490b199822ed3f6c2228d7e3"
 dependencies = [
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicase 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
