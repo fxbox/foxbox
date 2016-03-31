@@ -38,6 +38,8 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate mio;
+#[macro_use]
+extern crate mime;
 extern crate mount;
 extern crate nix;
 extern crate openssl;

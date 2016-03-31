@@ -14,8 +14,10 @@ clippy = "0.0.48"
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
-foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "8cad391" }
-foxbox_thinkerbell = { git = "https://github.com/fxbox/thinkerbell.git", rev = "ec60634" }
+foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "c8f05af" }
+foxbox_thinkerbell = { git = "https://github.com/fxbox/thinkerbell.git", rev = "84a0a30" }
+# foxbox_taxonomy = { path = "../taxonomy" }
+# foxbox_thinkerbell = { path = "../thinkerbell" }
 foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "73e8943" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
@@ -24,6 +26,7 @@ iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "96ede73" }
 libc = "0.2.7"
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
+mime = "*"
 mount = "0.0.10"
 nix = { git = "https://github.com/nix-rust/nix.git", rev = "138080" } # Until 0.5.1 is released
 openssl = "0.7.6"
@@ -51,9 +54,15 @@ version = "0.2.6"
 default-features = true
 features = ["ssl"]
 
+[dependencies.multipart]
+version = "^0.5.0"
+default-features = false
+features = ["iron"]
+
 [dev-dependencies]
 stainless = "0.1.4"
 iron-test = "0.2.0"
 regex = "0.1.55"
 rand = "0.3.14"
 tempdir = "0.3.4"
+

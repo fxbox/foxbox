@@ -2,7 +2,7 @@
 //! timestamp or the current time of day.
 
 use foxbox_taxonomy::manager::*;
-use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::values::{ Duration as ValDuration, Range, TimeStamp, Type, Value };
 use foxbox_taxonomy::services::*;
 
@@ -70,7 +70,7 @@ impl Adapter for Clock {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, mut set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, mut set: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.drain(..).map(|id| {
             if id == self.getter_timestamp_id {
                 let date = TimeStamp::from_datetime(chrono::UTC::now());
@@ -86,7 +86,7 @@ impl Adapter for Clock {
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
         values.drain()
             .map(|(id, _)| {
                 (id.clone(), Err(Error::InternalError(InternalError::NoSuchSetter(id))))

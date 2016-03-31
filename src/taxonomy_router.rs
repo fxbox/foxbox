@@ -5,8 +5,9 @@
 extern crate serde_json;
 
 use foxbox_taxonomy::manager::*;
-use foxbox_taxonomy::api::{ API, Error, TargetMap };
-use foxbox_taxonomy::values::{ Binary, Value };
+use foxbox_taxonomy::serialize::*;
+use foxbox_taxonomy::api::{ API, Error, TargetMap, User };
+use foxbox_taxonomy::values::Value;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 
@@ -38,26 +39,52 @@ impl TaxonomyRouter {
         }
     }
 
-    fn build_binary_response(&self, payload: &Binary) -> IronResult<Response> {
-        use core::ops::Deref;
-        use hyper::mime::Mime;
-
-        let mime : Mime = format!("{}", payload.mimetype).parse().unwrap();
-        // TODO: stop copying the array here.
-        let data = payload.data.deref().clone();
-
-        let mut response = Response::with(data);
-        response.status = Some(Status::Ok);
-        response.headers.set(ContentType(mime));
-        Ok(response)
-    }
-
     fn build_response<S: ToJSON>(&self, obj: S) -> IronResult<Response> {
-        let json = obj.to_json();
+        // Serialize the data.
+        let mut bin = MultiPart::new();
+        let json = obj.to_json(&mut bin);
         let serialized = itry!(serde_json::to_string(&json));
-        let mut response = Response::with(serialized);
+
+        let mut response;
+        if bin.buf.is_empty() {
+            // Single part.
+            response = Response::with(serialized);
+            response.headers.set(ContentType::json());
+        } else {
+            use hyper::mime::{Mime, TopLevel, SubLevel, Attr, Value};
+            use rustc_serialize::base64;
+            use rustc_serialize::base64::ToBase64;
+            // Multipart
+
+            // Generate content
+            // FIXME: Create id text/json once and for all.
+            bin.buf.insert(0, (Id::new("text/json"), serialized.into_bytes()));
+            let mut content = "This is a response with multiple parts in MIME format.".to_owned();
+            let config = base64::Config {
+                char_set: base64::CharacterSet::Standard,
+                newline: base64::Newline::LF,
+                pad: false,
+                line_length: Some(1024),
+            };
+            for (mime, data) in bin.buf {
+                content.push_str("\n--frontier\n");
+                content.push_str("\nContentType: ");
+                content.push_str(&mime.to_string() as &str);
+                content.push_str("\n");
+                content.push_str(&data.to_base64(config) as &str);
+                content.push_str("\n");
+            }
+            content.push_str("\n--frontier--\n");
+
+            response = Response::with(content);
+            response.headers.set(ContentType(Mime(
+                TopLevel::Multipart,
+                SubLevel::Ext("mixed".to_owned()),
+                vec![(Attr::Boundary, Value::Ext("frontier".to_owned()))]
+            )));
+        }
+
         response.status = Some(Status::Ok);
-        response.headers.set(ContentType::json());
         Ok(response)
     }
 
@@ -74,29 +101,6 @@ impl TaxonomyRouter {
         Ok(s)
     }
 
-    // Checks if a getter result map is a binary payload.
-    fn get_binary(&self, map: &GetterResultMap) -> Option<Binary> {
-        // For now, consider as binary a result map with a single element that
-        // holds a binary value.
-        if map.len() != 1 {
-            return None;
-        }
-
-        for map_value in map.values() {
-            if let Ok(ref opt_res) = *map_value  {
-                if let  Some(ref value) = *opt_res {
-                    if let Value::Binary(ref data) = *value {
-                        return Some(Binary {
-                            mimetype: (*data).mimetype.clone(),
-                            data: (*data).data.clone()
-                        });
-                    }
-                }
-            }
-        }
-
-        None
-    }
 }
 
 impl Handler for TaxonomyRouter {
@@ -140,18 +144,7 @@ impl Handler for TaxonomyRouter {
         }
 
         macro_rules! simple {
-            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg)))
-        }
-
-        macro_rules! binary {
-            ($api:ident, $arg:ident, $call:ident) => ({
-                        let res = $api.$call($arg);
-                        if let Some(payload) = self.get_binary(&res) {
-                            self.build_binary_response(&payload)
-                        } else {
-                            self.build_response(&res)
-                        }
-                    })
+            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg, User::None)))
         }
 
         // Generates the code to process a given HTTP call with a json body.
@@ -208,7 +201,7 @@ impl Handler for TaxonomyRouter {
         // Fetching and getting values.
         // We can't use a GET http method here because the Fetch() DOM api
         // doesn't allow bodies with GET and HEAD requests.
-        payload_api!(fetch_values, Vec<GetterSelector>, ["channels", "get"], Method::Put, binary);
+        payload_api!(fetch_values, Vec<GetterSelector>, ["channels", "get"], Method::Put, simple);
         payload_api!(send_values, TargetMap<SetterSelector, Value>, ["channels", "set"], Method::Put, simple);
 
         // Adding tags.
