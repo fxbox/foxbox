@@ -13,7 +13,7 @@ dependencies = [
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=e351cac)",
+ "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=96ede73)",
  "iron-test 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -354,9 +354,9 @@ dependencies = [
 [[package]]
 name = "iron-cors"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/iron-cors.git?rev=e351cac#e351cac8bb007615490b199822ed3f6c2228d7e3"
+source = "git+https://github.com/fxbox/iron-cors.git?rev=96ede73#96ede73614bb0889a1fefbe7b17ed85630af08f7"
 dependencies = [
- "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "iron 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicase 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

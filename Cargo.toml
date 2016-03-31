@@ -20,7 +20,7 @@ foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "73e8943" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
 multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
-iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "e351cac" }
+iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "96ede73" }
 libc = "0.2.7"
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
