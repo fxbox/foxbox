@@ -7,7 +7,7 @@ extern crate log;
 use taxonomy::util::Id as TaxId;
 use taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
 use taxonomy::values::*;
-use taxonomy::api::{ ResultMap, Error as TaxError, InternalError };
+use taxonomy::api::{ ResultMap, Error as TaxError, InternalError, User };
 use taxonomy::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
 use transformable_channels::mpsc::ExtSender;
 
@@ -358,7 +358,7 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
         &self.version
     }
 
-    fn fetch_values(&self, mut set: Vec<TaxId<Getter>>) -> ResultMap<TaxId<Getter>, Option<Value>, TaxError> {
+    fn fetch_values(&self, mut set: Vec<TaxId<Getter>>, _: User) -> ResultMap<TaxId<Getter>, Option<Value>, TaxError> {
         set.drain(..).map(|id| {
             let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_tax_id(&id).unwrap(); //FIXME no unwrap
 
@@ -376,7 +376,7 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
         }).collect()
     }
 
-    fn send_values(&self, values: HashMap<TaxId<Setter>, Value>) -> ResultMap<TaxId<Setter>, (), TaxError> {
+    fn send_values(&self, values: HashMap<TaxId<Setter>, Value>, _: User) -> ResultMap<TaxId<Setter>, (), TaxError> {
         unimplemented!()
     }
 
