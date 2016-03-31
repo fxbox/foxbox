@@ -139,6 +139,8 @@ impl UpnpManager {
             alive: alive,
         };
 
+        trace!("UPnP msearch callback: header {:?}, alive {}", header, alive);
+
         // No need to fetch the description XML if the device notified us
         // that it is disconnecting; should be even bother to tell adapters
         // about this?
@@ -166,6 +168,8 @@ impl UpnpManager {
                 Err(e) => { warn!("failed to get response {}: {:?}", header.location, e); return; }
             };
 
+            trace!("UPnP body: {:?}", body);
+
             let values;
             {
                 let cursor = Cursor::new(&body);
@@ -174,6 +178,8 @@ impl UpnpManager {
                     Err(e) => { warn!("failed to parse response {}: {:?}", header.location, e); return; }
                 };
             }
+
+            trace!("UPnP values: {:?}", values);
 
             UpnpManager::notify_service(listeners, UpnpService {
                 msearch: header,
@@ -226,7 +232,7 @@ impl UpnpManager {
         let cookie = self.handle.cookie as *mut libc::c_void;
         let err = unsafe { UpnpSearchAsync(self.handle.client, 1, target.as_ptr(), cookie) };
 
-        info!("search for devices matching {:?} ({})", target, err);
+        info!("UPnP search for devices matching {:?} ({})", target, err);
         match err {
             0 => Ok(()),
             _ => Err(err)

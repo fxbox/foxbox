@@ -2,30 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-pub mod structs;
+//! Implementation of the Philips Hue API
+//!
+//! This module is used in various places, for example in the Hub
+//! objects and in the Light objects.
 
-use adapters::philips_hue::light::Light;
-use adapters::philips_hue::http;
 use serde_json;
 use std;
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::hash::{ Hash, SipHasher, Hasher };
-
-#[derive(Debug, Hash)]
-struct HubApiToken {
-    iv: String,
-    id: String,
-}
-
-impl HubApiToken {
-    // This implementation offers 64 bit
-    fn as_hash(&self) -> String {
-        let mut hasher = SipHasher::new();
-        self.hash(&mut hasher);
-        format!("{:016x}", hasher.finish()).to_owned()
-    }
-}
+use super::http;
+use super::structs;
 
 #[derive(Debug, Clone)]
 pub struct HubApi {
@@ -41,22 +28,15 @@ impl std::fmt::Display for HubApi {
 }
 
 impl HubApi {
-    pub fn new(id: &str, ip: &str) -> HubApi {
-        // TODO: Generate a unique but reproducible access token.
-        // The token must not be guessable by an outsider.
-
-        // TODO: replace with a loooong stored random string
-        let stored_random = String::from("4"); // chosen by fair dice roll.
-        let token_gen = HubApiToken { iv: stored_random, id: id.to_owned() };
-        let token = format!("foxbox-{}", token_gen.as_hash());
-        HubApi { id: id.to_owned(), ip: ip.to_owned(), token: token }
+    pub fn new(id: &str, ip: &str, token: &str) -> HubApi {
+        HubApi { id: id.to_owned(), ip: ip.to_owned(), token: token.to_owned() }
     }
 
     pub fn get(&self, cmd: &str) -> Result<String, Box<Error>> {
         let url = format!("http://{}/api/{}/{}", self.ip, self.token, cmd);
         debug!("GET request to Philips Hue bridge {}: {}", self.id, url);
         let content = http::get(&url);
-        debug!("Philips Hue API response: {:?}", content);
+        trace!("Philips Hue API response: {:?}", content);
         content
     }
 
@@ -65,7 +45,7 @@ impl HubApi {
         let url = format!("http://{}/api/{}/{}", self.ip, self.token, cmd);
         debug!("POST request to Philips Hue bridge {}: {} data: {}", self.id, url, data);
         let content = http::post(&url, data);
-        debug!("Philips Hue API response: {:?}", content);
+        trace!("Philips Hue API response: {:?}", content);
         content
     }
 
@@ -73,7 +53,7 @@ impl HubApi {
         let url = format!("http://{}/{}", self.ip, cmd);
         debug!("POST request to Philips Hue bridge {}: {} data: {}", self.id, url, data);
         let content = http::post(&url, data);
-        debug!("Philips Hue API response: {:?}", content);
+        trace!("Philips Hue API response: {:?}", content);
         content
     }
 
@@ -81,7 +61,7 @@ impl HubApi {
         let url = format!("http://{}/api/{}/{}", self.ip, self.token, cmd);
         debug!("PUT request to Philips Hue bridge {}: {} data: {}", self.id, url, data);
         let content = http::put(&url, data);
-        debug!("Philips Hue API response: {:?}", content);
+        trace!("Philips Hue API response: {:?}", content);
         content
     }
 
@@ -117,18 +97,15 @@ impl HubApi {
         response.contains("success")
     }
 
-    pub fn get_lights(&self) -> Vec<Light> {
-        let mut lights: Vec<Light> = Vec::new();
+    pub fn get_lights(&self) -> Vec<String> {
+        let mut lights: Vec<String> = Vec::new();
         let url = "lights";
         let res = self.get(url).unwrap(); // TODO: remove unwrap
         let json: BTreeMap<String, structs::SettingsLightEntry> =
             structs::parse_json(&res).unwrap(); // TODO: no unwrap
 
-        for (key, value) in json {
-            if value.lighttype == "Extended color light" {
-                let light = Light::new(&self.id, &self.ip, &key);
-                lights.push(light);
-            }
+        for key in json.keys() {
+            lights.push(key.to_owned());
         }
 
         lights
@@ -140,9 +117,16 @@ impl HubApi {
         structs::parse_json(&res).unwrap() // TODO no unwrap
     }
 
+    #[allow(dead_code)]
     pub fn set_light_color(&self, light_id: &str, hue: u32, sat: u32, val: u32, on: bool) {
         let url = format!("lights/{}/state", light_id);
         let cmd = json!({ hue: hue, sat: sat, bri: val, on: on });
+        let _ = self.put(&url, &cmd);
+    }
+
+    pub fn set_light_power(&self, light_id: &str, on: bool) {
+        let url = format!("lights/{}/state", light_id);
+        let cmd = json!({ on: on });
         let _ = self.put(&url, &cmd);
     }
 
