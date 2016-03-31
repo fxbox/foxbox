@@ -6,7 +6,7 @@ pub use compile::{ Error as CompileError, SourceError, TypeError };
 use compile;
 
 use foxbox_taxonomy::api;
-use foxbox_taxonomy::api::{ API, Error as APIError, Targetted, WatchEvent };
+use foxbox_taxonomy::api::{ API, Error as APIError, Targetted, User, WatchEvent };
 use foxbox_taxonomy::services::{ Getter, Setter };
 use foxbox_taxonomy::util::{ Exactly, Id };
 use foxbox_taxonomy::values::Duration;
@@ -436,7 +436,7 @@ impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
         api.send_values(vec![Targetted {
             select: self.destination.clone(),
             payload: self.value.clone()
-        }])
+        }], User::None)
             .into_iter()
             .map(|(id, result)|
                  (id, result.map_err(|err| Error::APIError(err))))
