@@ -7,6 +7,7 @@ extern crate time;
 extern crate url;
 
 use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::services::*;
 use self::hyper::header::{ Authorization, Basic, Connection };
 use std::fs;
 use std::os::unix::fs::MetadataExt;
@@ -17,6 +18,24 @@ use std::path::Path;
 // TODO: The camera username and password need to be persisted per-camera
 static CAMERA_USERNAME: &'static str = "admin";
 static CAMERA_PASSWORD: &'static str = "password";
+
+pub fn create_service_id(service_id: &str) -> Id<ServiceId> {
+    Id::new(&format!("service:{}@link.mozilla.org", service_id))
+}
+
+pub fn create_setter_id(operation: &str, service_id: &str) -> Id<Setter> {
+    create_io_mechanism_id("setter", operation, service_id)
+}
+
+pub fn create_getter_id(operation: &str, service_id: &str) -> Id<Getter> {
+    create_io_mechanism_id("getter", operation, service_id)
+}
+
+pub fn create_io_mechanism_id<IO>(prefix: &str, operation: &str, service_id: &str) -> Id<IO>
+    where IO: IOMechanism
+{
+    Id::new(&format!("{}:{}.{}@link.mozilla.org", prefix, operation, service_id))
+}
 
 fn get_bytes(url: String) -> Result<Vec<u8>, Error> {
     let client = hyper::Client::new();
@@ -59,6 +78,10 @@ pub struct IpCamera {
     pub udn: String,
     url: String,
     snapshot_dir: String,
+
+    pub image_list_id: Id<Getter>,
+    pub image_newest_id: Id<Getter>,
+    pub snapshot_id: Id<Setter>,
 }
 
 impl IpCamera {
@@ -66,6 +89,9 @@ impl IpCamera {
         let camera = IpCamera {
             udn: udn.to_owned(),
             url: url.to_owned(),
+            image_list_id: create_getter_id("image_list", &udn),
+            image_newest_id: create_getter_id("image_newest", &udn),
+            snapshot_id: create_setter_id("snapshot", &udn),
             snapshot_dir: format!("{}/{}", root_snapshot_dir, udn)
         };
         // Create a directory to store snapshots for this camera.
