@@ -26,7 +26,7 @@ use std::sync::atomic::{ AtomicBool, Ordering };
 pub type AdapterRequest<T> = HashMap<Id<AdapterId>, (Arc<Adapter>, T)>;
 
 /// A request to an adapter, for performing a `fetch` operation.
-pub type FetchRequest = AdapterRequest<Vec<(Id<Getter>, Type)>>;
+pub type FetchRequest = AdapterRequest<HashMap<Id<Getter>, Type>>;
 
 /// A request to an adapter, for performing a `send` operation.
 pub type SendRequest = AdapterRequest<(HashMap<Id<Setter>, Value>, ResultMap<Id<Setter>, (), Error>)>;
@@ -902,7 +902,7 @@ impl State {
     pub fn prepare_fetch_values(&self, selectors: Vec<GetterSelector>) -> FetchRequest {
         // First, prepare the list of actual getters and group it by adapter.
         // Once we have done this, we can release the lock.
-        let mut per_adapter = HashMap::new();
+        let mut per_adapter : FetchRequest = HashMap::new();
         let adapter_by_id = &self.adapter_by_id;
         Self::with_channels(selectors, &self.getter_by_id, |data| {
             use std::collections::hash_map::Entry::*;
@@ -920,12 +920,13 @@ impl State {
                             adapter_data.adapter.clone()
                         }
                     };
-                    entry.insert((adapter, vec![(id, typ)]));
+                    let mut source = vec![(id, typ)];
+                    entry.insert((adapter, source.drain(..).collect()));
                 }
                 Occupied(mut entry) => {
-                    entry.get_mut().1.push((id, typ));
+                    entry.get_mut().1.insert(id, typ);
                 }
-            }
+            };
         });
         per_adapter
     }
@@ -997,16 +998,28 @@ impl State {
         per_adapter: &mut WatchRequest)
     {
         use std::collections::hash_map::Entry::*;
-        getter_data.watchers.insert(watcher.key, watcher.clone());
+
+        let id = getter_data.id.clone();
+        let adapter = getter_data.adapter.clone();
+
+        let insert_in_getter =
+            match InsertInMap::start(&mut getter_data.watchers, vec![ ( watcher.key, watcher.clone() )] ) {
+            Err(_) => {
+                debug_assert!(false, "Internal inconsistency: This watcher is already watching this getter.");
+                return
+            }
+            Ok(transaction) => transaction
+        };
 
         let range = match *filter {
             Exactly::Exactly(ref range) => Some(range.clone()),
             Exactly::Always => None,
-            _ => return // Don't watch data, just topology.
+            _ => {
+                insert_in_getter.commit();
+                return // Don't watch data, just topology.
+            }
         };
 
-        let data = (getter_data.id.clone(), range);
-        let adapter = getter_data.adapter.clone();
         match per_adapter.entry(adapter) {
             Vacant(entry) => {
                 let adapter = match adapter_by_id.get(&getter_data.channel.adapter) {
@@ -1020,10 +1033,14 @@ impl State {
                         adapter_data.adapter.clone()
                     }
                 };
-                entry.insert((adapter, (vec![data], watcher.clone())));
+                entry.insert((adapter, (vec![(id, range)], watcher.clone())));
             },
-            Occupied(mut entry) => (entry.get_mut().1).0.push(data),
+            Occupied(mut entry) => {
+                (entry.get_mut().1).0.push((id, range));
+            }
         }
+
+        insert_in_getter.commit();
     }
 
     pub fn prepare_channel_watch(&mut self, mut watch: TargetMap<GetterSelector, Exactly<Range>>,
@@ -1087,7 +1104,7 @@ impl State {
 
         // Sanity check
         debug_assert!(Arc::get_mut(&mut watcher_data).is_some(),
-            "This watcher is being unregistered but we still have strong references to it. That's not good.");
+            "This watcher is being unregistered but we still have strong references to it {:?}. That's not good.", id);
 
         // At this stage, `watcher_data` has no reference left. All its `guards` will be dropped.
     }
