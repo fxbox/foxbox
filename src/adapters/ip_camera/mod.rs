@@ -18,7 +18,7 @@ use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{Range, Value, Json, Binary, Type};
 use traits::Controller;
 use transformable_channels::mpsc::*;
-use self::api::IpCamera;
+use self::api::*;
 use self::upnp_listener::IpCameraUpnpListener;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -51,24 +51,6 @@ impl IPCameraAdapter {
         Id::new("ip-camera@link.mozilla.org")
     }
 
-    fn create_service_id(service_id: &str) -> Id<ServiceId> {
-        Id::new(&format!("service:{}@link.mozilla.org", service_id))
-    }
-
-    pub fn create_setter_id(operation: &str, service_id: &str) -> Id<Setter> {
-        Self::create_io_mechanism_id("setter", operation, service_id)
-    }
-
-    pub fn create_getter_id(operation: &str, service_id: &str) -> Id<Getter> {
-        Self::create_io_mechanism_id("getter", operation, service_id)
-    }
-
-    fn create_io_mechanism_id<IO>(prefix: &str, operation: &str, service_id: &str) -> Id<IO>
-        where IO: IOMechanism
-    {
-        Id::new(&format!("{}:{}.{}@link.mozilla.org", prefix, operation, service_id))
-    }
-
     pub fn init<C>(adapt: &Arc<AdapterManager>, controller: C) -> Result<(), Error>
         where C: Controller
     {
@@ -78,7 +60,7 @@ impl IPCameraAdapter {
             snapshot_root: controller.get_profile().path_for(SNAPSHOT_DIR),
         }));
         let ip_camera_adapter = Arc::new(IPCameraAdapter {
-            services: services.clone()
+            services: services.clone(),
         });
 
         try!(adapt.add_adapter(ip_camera_adapter));
@@ -98,7 +80,7 @@ impl IPCameraAdapter {
     pub fn init_service(adapt: &Arc<AdapterManager>, services: IpCameraServiceMap,
         udn: &str, url: &str, name: &str, manufacturer: &str, model_name: &str) -> Result<(), Error>
     {
-        let service_id = Self::create_service_id(udn);
+        let service_id = create_service_id(udn);
 
         let adapter_id = Self::id();
         let mut service_metadata = Service::empty(service_id.clone(), adapter_id.clone());
@@ -132,7 +114,7 @@ impl IPCameraAdapter {
               model_name,
               name);
 
-        let getter_image_list_id = Self::create_getter_id("image_list", udn);
+        let getter_image_list_id = create_getter_id("image_list", udn);
         try!(adapt.add_getter(Channel {
             tags: HashSet::new(),
             adapter: adapter_id.clone(),
@@ -141,8 +123,8 @@ impl IPCameraAdapter {
             service: service_id.clone(),
             mechanism: Getter {
                 kind: ChannelKind::Extension {
-                    vendor: Id::new("DLink"),
-                    adapter: Id::new("Adapter"),
+                    vendor: Id::new("foxlink@mozilla.com"),
+                    adapter: Id::new("IPCam Adapter"),
                     kind: Id::new("image_list"),
                     typ: Type::Json,
                 },
@@ -150,7 +132,7 @@ impl IPCameraAdapter {
             },
         }));
 
-        let getter_image_newest_id = Self::create_getter_id("image_newest", udn);
+        let getter_image_newest_id = create_getter_id("image_newest", udn);
         try!(adapt.add_getter(Channel {
             tags: HashSet::new(),
             adapter: adapter_id.clone(),
@@ -159,16 +141,16 @@ impl IPCameraAdapter {
             service: service_id.clone(),
             mechanism: Getter {
                 kind: ChannelKind::Extension {
-                    vendor: Id::new("DLink"),
-                    adapter: Id::new("Adapter"),
-                    kind: Id::new("image_newest"),
-                    typ: Type::Binary,
+                    vendor: Id::new("foxlink@mozilla.com"),
+                    adapter: Id::new("IPCam Adapter"),
+                    kind: Id::new("latest image"),
+                    typ: Type::Unit,
                 },
                 updated: None,
             },
         }));
 
-        let setter_snapshot_id = Self::create_setter_id("snapshot", udn);
+        let setter_snapshot_id = create_setter_id("snapshot", udn);
         try!(adapt.add_setter(Channel {
             tags: HashSet::new(),
             adapter: adapter_id.clone(),
@@ -176,13 +158,7 @@ impl IPCameraAdapter {
             last_seen: None,
             service: service_id.clone(),
             mechanism: Setter {
-                // FIXME: doesn't actually take any params
-                kind: ChannelKind::Extension {
-                    vendor: Id::new("DLink"),
-                    adapter: Id::new("Adapter"),
-                    kind: Id::new("snapshot"),
-                    typ: Type::Json,
-                },
+                kind: ChannelKind::TakeSnapshot,
                 updated: None,
             },
         }));
@@ -220,15 +196,15 @@ impl Adapter for IPCameraAdapter {
         set.drain(..).map(|id| {
             let camera = match self.services.lock().unwrap().getters.get(&id) {
                 Some(camera) => camera.clone(),
-                None => { return (id, Err(Error::InternalError(InternalError::InvalidInitialService))); }
+                None => return (id.clone(), Err(Error::InternalError(InternalError::NoSuchGetter(id))))
             };
 
-            if id == Self::create_getter_id("image_list", &camera.udn) {
+            if id == camera.image_list_id {
                 let rsp = camera.get_image_list();
                 return (id, Ok(Some(Value::Json(Arc::new(Json(serde_json::to_value(&rsp)))))));
             }
 
-            if id == Self::create_getter_id("image_newest", &camera.udn) {
+            if id == camera.image_newest_id {
                 return match camera.get_newest_image() {
                     Ok(rsp) => (id, Ok(Some(Value::Binary(Binary {
                         data: Arc::new(rsp),
@@ -249,7 +225,7 @@ impl Adapter for IPCameraAdapter {
                 None => { return (id, Err(Error::InternalError(InternalError::InvalidInitialService))); }
             };
 
-            if id == Self::create_setter_id("snapshot", &camera.udn) {
+            if id == camera.snapshot_id {
                 return match camera.take_snapshot() {
                     Ok(_) => (id, Ok(())),
                     Err(err) => (id, Err(err))
