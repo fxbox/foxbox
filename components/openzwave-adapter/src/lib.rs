@@ -150,10 +150,14 @@ fn kind_from_value(value: ValueID) -> Option<ChannelKind> {
     })
 }
 
-fn to_open_closed(val: bool) -> Value {
-    Value::OpenClosed(
-        if val { OpenClosed::Open } else { OpenClosed::Closed }
-    )
+fn to_open_closed(value: &ValueID) -> Option<Value> {
+    debug_assert_eq!(value.get_type(), ValueType::ValueType_Bool);
+
+    value.as_bool().ok().map(|val| {
+        Value::OpenClosed(
+            if val { OpenClosed::Open } else { OpenClosed::Closed }
+        )
+    })
 }
 
 struct WatcherGuard {
@@ -298,9 +302,11 @@ impl OpenzwaveAdapter {
 
                         for sender in &watchers {
                             let sender = sender.lock().unwrap();
-                            sender.send(
-                                WatchEvent::Enter { id: tax_id.clone(), value: to_open_closed(value.as_bool().unwrap()) }
-                            );
+                            if let Some(value) = to_open_closed(&value) {
+                                sender.send(
+                                    WatchEvent::Enter { id: tax_id.clone(), value: value }
+                                );
+                            }
                         }
                     }
                     ZWaveNotification::ValueRemoved(value)         => {}
@@ -328,19 +334,21 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
         &self.version
     }
 
-    fn fetch_values(&self, set: Vec<TaxId<Getter>>) -> ResultMap<TaxId<Getter>, Option<Value>, TaxError> {
-        set.iter().map(|id| {
-            let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_tax_id(id).unwrap();
+    fn fetch_values(&self, mut set: Vec<TaxId<Getter>>) -> ResultMap<TaxId<Getter>, Option<Value>, TaxError> {
+        set.drain(..).map(|id| {
+            let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_tax_id(&id).unwrap(); //FIXME no unwrap
 
             let ozw_value: Option<Option<Value>> = ozw_value.map(|ozw_value: ValueID| {
+                if !ozw_value.is_set() { return None }
+
                 let result: Option<Value> = match ozw_value.get_type() {
-                    ValueType::ValueType_Bool => ozw_value.as_bool().map(to_open_closed).ok(),
+                    ValueType::ValueType_Bool => to_open_closed(&ozw_value),
                     _ => Some(Value::Unit)
                 };
                 result
             });
             let value_result: Result<Option<Value>, TaxError> = ozw_value.ok_or(TaxError::InternalError(InternalError::NoSuchGetter(id.clone())));
-            (id.clone(), value_result)
+            (id, value_result)
         }).collect()
     }
 
@@ -348,15 +356,29 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
         unimplemented!()
     }
 
-    fn register_watch(&self, values: Vec<(TaxId<Getter>, Option<Range>)>, cb: Box<ExtSender<WatchEvent>>) -> ResultMap<TaxId<Getter>, Box<AdapterWatchGuard>, TaxError> {
-        let cb = Arc::new(Mutex::new(cb)); // Mutex is necessary because cb is not Sync.
-        values.iter().map(|&(ref id, _)| {
+    fn register_watch(&self, mut values: Vec<(TaxId<Getter>, Option<Range>)>, sender: Box<ExtSender<WatchEvent>>) -> ResultMap<TaxId<Getter>, Box<AdapterWatchGuard>, TaxError> {
+        let sender = Arc::new(Mutex::new(sender)); // Mutex is necessary because cb is not Sync.
+        values.drain(..).map(|(id, _)| {
             let watch_guard = {
                 let mut watchers = self.watchers.lock().unwrap();
-                watchers.push(id.clone(), cb.clone())
+                watchers.push(id.clone(), sender.clone())
             };
             let value_result: Result<Box<AdapterWatchGuard>, TaxError> = Ok(Box::new(watch_guard));
-            (id.clone(), value_result)
+
+            // if there is a set value already, let's send it.
+            let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_tax_id(&id).unwrap(); // FIXME no unwrap
+            if let Some(value) = ozw_value {
+                if value.is_set() && value.get_type() == ValueType::ValueType_Bool {
+                    if let Some(value) = to_open_closed(&value) {
+                        let sender = sender.lock().unwrap();
+                        sender.send(
+                            WatchEvent::Enter { id: id.clone(), value: value }
+                        );
+                    }
+                }
+            }
+
+            (id, value_result)
         }).collect()
     }
 }
