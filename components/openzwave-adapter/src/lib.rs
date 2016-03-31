@@ -20,6 +20,8 @@ use std::sync::mpsc;
 use std::sync::{ Arc, Mutex, RwLock, Weak };
 use std::collections::{ HashMap, HashSet };
 
+pub use self::OpenzwaveAdapter as Adapter;
+
 #[derive(Debug)]
 pub enum OpenzwaveError {
     RegisteringError(TaxError),
