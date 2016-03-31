@@ -1,6 +1,6 @@
 use compile::ExecutableDevEnv;
 
-use foxbox_taxonomy::api::{ API, Error };
+use foxbox_taxonomy::api::{ API, Error, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
@@ -53,7 +53,7 @@ impl TestSharedAdapterBackend {
         }
     }
 
-    fn fetch_values(&self, mut getters: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, mut getters: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         getters.drain(..).map(|id| {
             let got = self.getter_values.get(&id).cloned();
             match got {
@@ -64,7 +64,7 @@ impl TestSharedAdapterBackend {
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
         values.drain().map(|(id, value)| {
             match self.setter_errors.get(&id) {
                 None => {
@@ -176,10 +176,10 @@ impl TestSharedAdapterBackend {
         use self::AdapterOp::*;
         match op {
             FetchValues { getters, tx } => {
-                let _ = tx.send(self.fetch_values(getters));
+                let _ = tx.send(self.fetch_values(getters, User::None));
             }
             SendValues { values, tx } => {
-                let _ = tx.send(self.send_values(values));
+                let _ = tx.send(self.send_values(values, User::None));
             }
             Watch { source, cb, tx } => {
                 let _ = tx.send(self.register_watch(source, cb));
@@ -278,7 +278,7 @@ impl Adapter for TestAdapter {
     /// expects the adapter to attempt to minimize the connections with the actual devices.
     ///
     /// The AdapterManager is in charge of keeping track of the age of values.
-    fn fetch_values(&self, getters: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, getters: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         let (tx, rx) = channel();
         self.back_end.lock().unwrap().send(AdapterOp::FetchValues {
             getters: getters,
@@ -291,7 +291,7 @@ impl Adapter for TestAdapter {
     ///
     /// The AdapterManager always attempts to group calls to `send_values` by `Adapter`, and then
     /// expects the adapter to attempt to minimize the connections with the actual devices.
-    fn send_values(&self, values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
         let (tx, rx) = channel();
         self.back_end.lock().unwrap().send(AdapterOp::SendValues {
             values: values,
