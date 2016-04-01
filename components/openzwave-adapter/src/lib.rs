@@ -23,44 +23,54 @@ use std::collections::{ HashMap, HashSet };
 pub use self::OpenzwaveAdapter as Adapter;
 
 #[derive(Debug)]
-pub enum OpenzwaveError {
-    RegisteringError(TaxError),
+pub enum Error {
+    TaxonomyError(TaxError),
+    OpenzwaveError(openzwave::Error),
     UnknownError
 }
 
-impl From<TaxError> for OpenzwaveError {
+impl From<TaxError> for Error {
     fn from(err: TaxError) -> Self {
-        OpenzwaveError::RegisteringError(err)
+        Error::TaxonomyError(err)
     }
 }
 
-impl From<()> for OpenzwaveError {
+impl From<()> for Error {
     fn from(_: ()) -> Self {
-        OpenzwaveError::UnknownError
+        Error::UnknownError
     }
 }
 
-impl fmt::Display for OpenzwaveError {
+impl From<openzwave::Error> for Error {
+    fn from(error: openzwave::Error) -> Self {
+        Error::OpenzwaveError(error)
+    }
+}
+
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            OpenzwaveError::RegisteringError(ref err) => write!(f, "IO error: {}", err),
-            OpenzwaveError::UnknownError => write!(f, "Unknown error"),
+            Error::TaxonomyError(ref err)  => write!(f, "{}: {}", error::Error::description(self), err),
+            Error::OpenzwaveError(ref err) => write!(f, "{}: {}", error::Error::description(self), err),
+            Error::UnknownError => write!(f, "{}", error::Error::description(self)),
         }
     }
 }
 
-impl error::Error for OpenzwaveError {
+impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            OpenzwaveError::RegisteringError(ref err) => err.description(),
-            OpenzwaveError::UnknownError => "Unknown error",
+            Error::TaxonomyError(_) => "Taxonomy Error",
+            Error::OpenzwaveError(_) => "Openzwave Error",
+            Error::UnknownError => "Unknown error",
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            OpenzwaveError::RegisteringError(ref err) => Some(err),
-            OpenzwaveError::UnknownError => None,
+            Error::TaxonomyError(ref err) => Some(err),
+            Error::OpenzwaveError(ref err) => Some(err),
+            Error::UnknownError => None,
         }
     }
 }
