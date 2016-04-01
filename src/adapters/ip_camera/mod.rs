@@ -11,7 +11,7 @@ extern crate serde_json;
 mod api;
 mod upnp_listener;
 
-use foxbox_taxonomy::api::{Error, InternalError};
+use foxbox_taxonomy::api::{Error, InternalError, User};
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
@@ -191,7 +191,8 @@ impl Adapter for IPCameraAdapter {
     }
 
     fn fetch_values(&self,
-                    mut set: Vec<Id<Getter>>)
+                    mut set: Vec<Id<Getter>>,
+                    _ : User)
                     -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.drain(..).map(|id| {
             let camera = match self.services.lock().unwrap().getters.get(&id) {
@@ -218,7 +219,7 @@ impl Adapter for IPCameraAdapter {
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
         values.drain().map(|(id, _)| {
             let camera = match self.services.lock().unwrap().setters.get(&id) {
                 Some(camera) => camera.clone(),

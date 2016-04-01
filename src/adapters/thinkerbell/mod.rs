@@ -1,6 +1,6 @@
 //! An adapter providing access to the Thinkerbell rules engine.
 
-use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
 use foxbox_taxonomy::util::Id;
@@ -99,7 +99,7 @@ impl Adapter for ThinkerbellAdapter {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, set: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.iter().map(|id| {
             let (tx, rx) = channel();
             let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToGetter(tx, id.clone()));
@@ -112,7 +112,7 @@ impl Adapter for ThinkerbellAdapter {
         }).collect()
     }
 
-    fn send_values(&self, values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
         values.iter()
             .map(|(id, value)| {
                 let (tx, rx) = channel();

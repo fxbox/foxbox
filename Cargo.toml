@@ -14,8 +14,8 @@ clippy = "0.0.48"
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
-foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "8cad391" }
-foxbox_thinkerbell = { git = "https://github.com/fxbox/thinkerbell.git", rev = "ec60634" }
+foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "c222794d238072920857fea55e55d522ae75c192" }
+foxbox_thinkerbell = { git = "https://github.com/fxbox/thinkerbell.git", rev = "e05f93c" }
 foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "73e8943" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"

@@ -16,7 +16,7 @@
 mod crypto;
 mod db;
 
-use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Range, Type, Value, Json };
@@ -172,7 +172,7 @@ impl<C: Controller> Adapter for WebPush<C> {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, mut set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, mut set: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.drain(..).map(|id| {
             let user_id = 1; // FIXME: currently logged in user
 
@@ -196,7 +196,7 @@ impl<C: Controller> Adapter for WebPush<C> {
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
         values.drain().map(|(id, value)| {
             let user_id = 1; // FIXME: currently logged in user
 
