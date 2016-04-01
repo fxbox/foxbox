@@ -289,7 +289,7 @@ impl API for AdapterManager {
         // Now fetch the values
         let mut results = HashMap::new();
         for (_, (adapter, mut getters)) in request.drain() {
-            let (getters, mut types) : (Vec<_>, Vec<_>) = getters.drain(..).unzip();
+            let (getters, mut types) : (Vec<_>, Vec<_>) = getters.drain().unzip();
             let mut got = adapter
                 .fetch_values(getters, user.clone());
 
