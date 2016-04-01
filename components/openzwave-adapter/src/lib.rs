@@ -197,7 +197,7 @@ pub struct OpenzwaveAdapter {
 }
 
 impl OpenzwaveAdapter {
-    pub fn init<T: AdapterManagerHandle + Clone + Send + 'static> (box_manager: &T) -> Result<(), OpenzwaveError> {
+    pub fn init<T: AdapterManagerHandle + Send + Sync + 'static> (box_manager: &Arc<T>) -> Result<(), Error> {
         let options = InitOptions {
             device: None // TODO we should expose this as a Value
         };
@@ -223,7 +223,7 @@ impl OpenzwaveAdapter {
         Ok(())
     }
 
-    fn spawn_notification_thread<T: AdapterManagerHandle + Clone + Send + 'static>(&self, rx: mpsc::Receiver<ZWaveNotification>, box_manager: &T) {
+    fn spawn_notification_thread<T: AdapterManagerHandle + Send + Sync + 'static>(&self, rx: mpsc::Receiver<ZWaveNotification>, box_manager: &Arc<T>) {
         let adapter_id = self.id.clone();
         let box_manager = box_manager.clone();
         let mut controller_map = self.controller_map.clone();
