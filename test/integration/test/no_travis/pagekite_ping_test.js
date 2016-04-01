@@ -4,7 +4,7 @@ const chakram = require('chakram'), expect = chakram.expect;
 const Config = require('config-js');
 
 var config = new Config('./test/integration/lib/config/foxbox.js');
-var Prepper = require('../lib/testPrepper.js');
+var Prepper = require('../../lib/testPrepper.js');
 
 Prepper.makeSuite('Verify validity of pagekite ping endpoint', function(){
   var local_ip,tunnel_url;
