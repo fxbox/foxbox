@@ -8,6 +8,7 @@
   "scripts": {
     "test-selenium": "./tools/execute-selenium-tests",
     "test-integration": "npm run clean_db && ./node_modules/.bin/mocha test/integration/test/*.js",
+    "test-integration-travis": "npm run clean_db && ./node_modules/.bin/mocha test/integration/test/travis_*.js",
     "clean_db": "rm -f ~/.local/share/foxbox/users_db.sqlite"
   },
   "repository": {
