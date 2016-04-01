@@ -42,6 +42,7 @@ to install and switch between versions of Rust.
 | `libssl`     | `libssl-dev`          | `?`             | via `base-devel` | `openssl`       |
 | `libavahi`   | `libavahi-client-dev` | `?`             | `avahi`          | `n.a.`          |
 | `libsqlite3` | `libsqlite3-dev`      | `?`             | `sqlite`         | `sqlite`        |
+| `libespeak`  | `libsespeak-dev`      | `?`             | `?`              | `?`             |
 
 ### Node
 
