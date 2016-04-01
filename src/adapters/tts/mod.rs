@@ -9,7 +9,7 @@
 
 use foxbox_taxonomy::adapter::*;
 use foxbox_taxonomy::manager::AdapterManager;
-use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::services::{ AdapterId, Channel, ChannelKind, Getter, Id, Service, ServiceId, Setter };
 use foxbox_taxonomy::values::{ Range, Type, Value };
 use std::collections::{ HashMap, HashSet };
@@ -50,13 +50,13 @@ impl<T: TtsEngine> Adapter for TtsAdapter<T> {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, mut set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, mut set: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.drain(..).map(|id| {
             (id.clone(), Err(Error::InternalError(InternalError::NoSuchGetter(id))))
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
         use core::ops::Deref;
 
         values.drain().map(|(id, value)| {

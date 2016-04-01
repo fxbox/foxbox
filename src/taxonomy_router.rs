@@ -5,7 +5,7 @@
 extern crate serde_json;
 
 use foxbox_taxonomy::manager::*;
-use foxbox_taxonomy::api::{ API, Error, TargetMap };
+use foxbox_taxonomy::api::{ API, Error, TargetMap, User };
 use foxbox_taxonomy::values::{ Binary, Value };
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
@@ -140,12 +140,12 @@ impl Handler for TaxonomyRouter {
         }
 
         macro_rules! simple {
-            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg)))
+            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg, User::None)))
         }
 
         macro_rules! binary {
             ($api:ident, $arg:ident, $call:ident) => ({
-                        let res = $api.$call($arg);
+                        let res = $api.$call($arg, User::None);
                         if let Some(payload) = self.get_binary(&res) {
                             self.build_binary_response(&payload)
                         } else {
@@ -320,7 +320,7 @@ describe! binary_getter {
         extern crate serde_json;
 
         use foxbox_taxonomy::adapter::*;
-        use foxbox_taxonomy::api::{ Error, InternalError };
+        use foxbox_taxonomy::api::{ Error, InternalError, User };
         use foxbox_taxonomy::manager::AdapterManager;
         use foxbox_taxonomy::services::*;
         use foxbox_taxonomy::values::{ Range, Type, Value, Binary };
@@ -360,7 +360,7 @@ describe! binary_getter {
                 &ADAPTER_VERSION
             }
 
-            fn fetch_values(&self, mut set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+            fn fetch_values(&self, mut set: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
                 set.drain(..).map(|id| {
                     if id == Id::new("getter:binary@link.mozilla.org") {
                         let vec = vec![1, 2, 3, 10, 11, 12];
@@ -375,7 +375,7 @@ describe! binary_getter {
                 }).collect()
             }
 
-            fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+            fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
                 values.drain().map(|(id, _)| {
                     (id.clone(), Err(Error::InternalError(InternalError::NoSuchSetter(id))))
                 }).collect()
