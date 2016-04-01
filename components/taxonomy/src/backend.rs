@@ -1115,28 +1115,11 @@ impl State {
         }
 
         // At this stage, theoretically, no getters have a strong reference to watcher_data.
-        // There may still be weak references lying around, though.
-
-        #[cfg(debug_assertions)] {
-            for (id, getter) in &self.getter_by_id {
-                let found = getter.borrow().watchers.values().find(|candidate| {
-                    match candidate.upgrade() {
-                        None => false,
-                        Some(x) => x == watcher_data
-                    }
-                }).is_some();
-                if found {
-                    panic!("At this stage, no channel should hold a reference to this watcher_data {:?}.", id)
-                }
-            }
-        }
-
-        // At this stage, an Arc<WatcherData> could still be in transit between threads.
 
         debug_assert!(Arc::get_mut(&mut watcher_data).is_some(),
             "This watcher is being unregistered but we still have strong references to it. That's not good.");
 
-        // At this stage, `watcher_data` has no reference left. All its `guards` will be dropped.
+        // At this stage, `watcher_data` has no strong reference left. All its `guards` will be dropped.
     }
 
     /// Start watching a set of channels.
