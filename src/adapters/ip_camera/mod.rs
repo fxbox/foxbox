@@ -144,7 +144,7 @@ impl IPCameraAdapter {
                     vendor: Id::new("foxlink@mozilla.com"),
                     adapter: Id::new("IPCam Adapter"),
                     kind: Id::new("latest image"),
-                    typ: Type::Unit,
+                    typ: Type::Binary,
                 },
                 updated: None,
             },
