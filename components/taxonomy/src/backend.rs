@@ -34,7 +34,7 @@ pub type SendRequest = AdapterRequest<(HashMap<Id<Setter>, Value>, ResultMap<Id<
 /// A request to an adapter, for performing a `watch` operation.
 pub type WatchRequest = AdapterRequest<(Vec<(Id<Getter>, Option<Range>)>, Weak<WatcherData>)>;
 
-pub type WatchGuardCommit = Vec<(Arc<WatcherData>, Vec<(Id<Getter>, Box<AdapterWatchGuard>)>)>;
+pub type WatchGuardCommit = Vec<(Weak<WatcherData>, Vec<(Id<Getter>, Box<AdapterWatchGuard>)>)>;
 
 /// Information on a service.
 ///
@@ -1143,8 +1143,8 @@ impl State {
         //   by checking whether `is_dropped` is true.
 
         let mut to_add = vec![];
-        for (_, (adapter, (request, watch_data))) in per_adapter.drain() {
-            let watch_data = match watch_data.upgrade() {
+        for (_, (adapter, (request, weak_watch_data))) in per_adapter.drain() {
+            let watch_data = match weak_watch_data.upgrade() {
                 None => {
                     // The watch_data has already been dropped, nothing to do.
                     continue
@@ -1192,7 +1192,7 @@ impl State {
                     Ok(guard) => guards.push((id, guard))
                 }
             }
-            to_add.push((watch_data, guards));
+            to_add.push((weak_watch_data, guards));
         }
         to_add
     }
@@ -1201,8 +1201,10 @@ impl State {
     pub fn register_ongoing_watch(&mut self, mut ongoing: WatchGuardCommit)
     {
         for (watch_data, mut guards) in ongoing.drain(..) {
-            for (id, guard) in guards.drain(..) {
-                watch_data.push_guard(id, guard)
+            if let Some(ref watch_data) = watch_data.upgrade() {
+                for (id, guard) in guards.drain(..) {
+                    watch_data.push_guard(id, guard)
+                }
             }
         }
     }
