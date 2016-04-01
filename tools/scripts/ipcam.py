@@ -25,6 +25,7 @@ class Service:
                 if 'kind' in setter_kind:
                     if setter_kind['kind'] == kind:
                         return key
+        print("Unable to find getter for '{}'".format(kind))
 
     def setter(self, kind):
         for key, value in self.service['setters'].items():
@@ -33,6 +34,7 @@ class Service:
                 if 'kind' in setter_kind:
                     if setter_kind['kind'] == kind:
                         return key
+        print("Unable to find setter for '{}'".format(kind))
 
     def property(self, name):
         if name in self.service['properties']:
@@ -52,6 +54,12 @@ def main():
         dest='list_cams',
         action='store_true',
         help='List the available IP Cameras',
+    )
+    parser.add_argument(
+        '--list-services',
+        dest='list_services',
+        action='store_true',
+        help='List the available services',
     )
     parser.add_argument(
         '--list-snaps',
@@ -189,6 +197,8 @@ def main():
 
     camera_found = False
     for service in services:
+        if args.list_services:
+            print(json.dumps(service, indent=4))
         svc = Service(service)
         if svc.is_adapter('ip-camera'):
             service_id = service['id'].replace('service:', '')
@@ -217,7 +227,7 @@ def main():
                     else:
                         print('    No snapshots available')
                 if args.get:
-                    getter = svc.getter('image_newest')
+                    getter = svc.getter('latest image')
                     get_snap_get = bytes(json.dumps({'id': getter}), encoding='utf-8')
                     if args.verbose: print(get_snap_get)
                     get_snap_req = requests.put(get_url, headers=auth_header, data=get_snap_get)
@@ -228,7 +238,7 @@ def main():
                         print('Wrote image to {}'.format(filename))
                     else:
                         j_resp = get_snap_req.json()
-                        print(j_resp['error'])
+                        print(json.dumps(j_resp, indent=4))
     if not camera_found:
         if args.name is None:
             print('No IP Cameras found')
