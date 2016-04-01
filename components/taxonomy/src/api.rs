@@ -179,10 +179,18 @@ pub enum WatchEvent {
     },
 }
 
-#[derive(Debug, Clone)]
+/// User identifier that will be passed from the REST API handlers to the
+/// adapters.
+#[derive(Debug, Clone, PartialEq)]
 pub enum User {
     None,
     Id(i32)
+}
+
+#[test]
+fn test_user_partialeq() {
+    assert_eq!(User::None, User::None);
+    assert_eq!(User::Id(1), User::Id(1));
 }
 
 impl<K> Parser<Targetted<K, Value>> for Targetted<K, Value> where K: Parser<K> + Clone {
