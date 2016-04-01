@@ -18,6 +18,17 @@ use std::ops::{ Deref };
 use std::sync::{ Arc, Mutex, Weak };
 use std::sync::atomic::{ AtomicBool, Ordering };
 
+// In release build, log an error and continue.
+// In debug build, log an error and panic.
+macro_rules! log_debug_assert {
+    ($cond:expr, $($arg:tt)*) => {
+        if !$cond {
+            error!($($arg)*);
+            panic!($($arg)*);
+        }
+    };
+}
+
 /// A request to a bunch of adapters.
 ///
 /// Whenever possible, the AdapterManager attempts to place calls to the Adapters
@@ -504,9 +515,8 @@ impl State {
         for id in getters {
             match self.getter_by_id.get_mut(&id) {
                 None => {
-                    debug_assert!(false, "I have just added/modified getter {:?} but I can't \
+                    log_debug_assert!(false, "I have just added/modified getter {:?} but I can't \
                                             find it anymore", id);
-                    // FIXME: Logging would be nice.
                 },
                 Some(getter_data) => {
                     let mut getter_data = getter_data.borrow_mut();
@@ -924,8 +934,7 @@ impl State {
                 Vacant(entry) => {
                     let adapter = match adapter_by_id.get(&data.channel.adapter) {
                         None => {
-                            debug_assert!(false, "Internal inconsistency: Could not find adapter {:?}", id);
-                            // FIXME: Logging would be nice.
+                            log_debug_assert!(false, "Internal inconsistency: Could not find adapter {:?}", id);
                             return;
                         },
                         Some(ref adapter_data) => {
@@ -978,8 +987,7 @@ impl State {
                         }
                         let adapter = match self.adapter_by_id.get(&data.channel.adapter) {
                             None => {
-                                debug_assert!(false, "Internal inconsistency: could not find adapter {}", data.channel.adapter);
-                                // FIXME: Logging would be nice.
+                                log_debug_assert!(false, "Internal inconsistency: could not find adapter {}", data.channel.adapter);
                                 return
                             }
                             Some(adapter) => adapter
@@ -1017,7 +1025,7 @@ impl State {
         let insert_in_getter =
             match InsertInMap::start(&mut getter_data.watchers, vec![ ( watcher.key, Arc::downgrade(watcher) )] ) {
             Err(_) => {
-                debug_assert!(false, "Internal inconsistency: This watcher is already watching this getter.");
+                log_debug_assert!(false, "Internal inconsistency: This watcher is already watching this getter.");
                 return
             }
             Ok(transaction) => transaction
@@ -1036,9 +1044,8 @@ impl State {
             Vacant(entry) => {
                 let adapter = match adapter_by_id.get(&getter_data.channel.adapter) {
                     None => {
-                        debug_assert!(false, "Internal inconsistency: Could not find adapter {:?}",
+                        log_debug_assert!(false, "Internal inconsistency: Could not find adapter {:?}",
                             getter_data.channel.adapter);
-                        // FIXME: Logging would be nice.
                         return;
                     },
                     Some(ref adapter_data) => {
@@ -1090,7 +1097,7 @@ impl State {
 
         // Remove `key` from `watchers`. This will prevent the watcher from being registered
         // automatically with any new getter.
-        let mut watcher_data = match self.watchers.lock().unwrap().remove(key) {
+        let watcher_data = match self.watchers.lock().unwrap().remove(key) {
             None => {
                 // Attempting to unregister a watcher that has not been added yet.
                 // This can happen in case of race if `stop_watch` is executed before
@@ -1101,7 +1108,7 @@ impl State {
             Some(watcher_data) => watcher_data
         };
 
-        debug_assert!(watcher_data.is_dropped.load(Ordering::Relaxed));
+        log_debug_assert!(watcher_data.is_dropped.load(Ordering::Relaxed), "The watcher should have been dropped by now.");
 
         // Remove the watcher from all getters.
         for getter_id in watcher_data.guards.borrow().keys() {
@@ -1114,12 +1121,9 @@ impl State {
             }
         }
 
-        // At this stage, theoretically, no getters have a strong reference to watcher_data.
-
-        debug_assert!(Arc::get_mut(&mut watcher_data).is_some(),
-            "This watcher is being unregistered but we still have strong references to it. That's not good.");
-
-        // At this stage, `watcher_data` has no strong reference left. All its `guards` will be dropped.
+        // At this stage, one getter may still have a strong reference to watcher_data, if it has
+        // just been upgraded in `start_watch`. However, this reference will disappear soon. Once
+        // the last reference has disappeared, all `guards` will be dropped.
     }
 
     /// Start watching a set of channels.
