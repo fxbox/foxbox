@@ -21,7 +21,7 @@ rust:
 ```
 You should then be able to then use:
 ```
-rustup override add nightly-2016-03-07
+multirust override nightly-2016-03-07
 ```
 to get the same version of toolchain that's being used for the travis tests.
 
