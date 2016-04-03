@@ -21,7 +21,7 @@ rust:
 ```
 You should then be able to then use:
 ```
-multirust override nightly-2016-03-07
+rustup override add nightly-2016-03-07
 ```
 to get the same version of toolchain that's being used for the travis tests.
 
@@ -39,10 +39,11 @@ to install and switch between versions of Rust.
 | Dependency   | Debian/Raspian        | Fedora          | Arch             | OS X (Homebrew) |
 | ------------ | --------------------- | --------------- | ---------------- | --------------- |
 | `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `libupnp`        | `libupnp`       |
-| `libssl`     | `libssl-dev`          | `?`             | via `base-devel` | `openssl`       |
-| `libavahi`   | `libavahi-client-dev` | `?`             | `avahi`          | `n.a.`          |
-| `libsqlite3` | `libsqlite3-dev`      | `?`             | `sqlite`         | `sqlite`        |
-| `libespeak`  | `libsespeak-dev`      | `?`             | `?`              | `?`             |
+| `libssl`     | `libssl-dev`          | `openssl-devel`             | via `base-devel` | `openssl`       |
+| `libavahi`   | `libavahi-client-dev` | `avahi-devel`             | `avahi`          | `n.a.`          |
+| `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`             | `sqlite`         | `sqlite`        |
+| `libespeak`  | `libsespeak-dev`      | `espeak-devel`             | `?`              | `?`             |
+| `libdbus`  | `?`      | `dbus-devel`             | `?`              | `?`             |
 
 ### Node
 
@@ -121,7 +122,7 @@ Foxbox also takes a number of command line parameters:
 -h, --help : Print this help menu.
 --disable-tls : Run as a plain HTTP server, disabling encryption.
 --dns-domain <domain> : Set the top level domain for public DNS. If omitted, the tunnel is disabled
---dns-api <url> : Set the DNS API endpoint 
+--dns-api <url> : Set the DNS API endpoint
 --remote-name: external domain of foxbox
 
 ```
@@ -131,7 +132,7 @@ Example:
 # To start foxbox with the IP tunneling, HTTP only:
 $ cargo run -- -r http://someserver.org:4242 -t someserver.org:443 -s secret --remote-name foxbox.someserver.org --disable-tls
 # To change the philips hue nupnp server location to http://localhost:8002
-$ cargo run -- -c "philips_hue;nupnp_url;http://localhost:8002/" 
+$ cargo run -- -c "philips_hue;nupnp_url;http://localhost:8002/"
 ```
 
 ## Build time options
@@ -207,5 +208,3 @@ $ export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
 Previous versions of these instructions described setting ```OPENSSL_INCLUDE_DIR```.
 Make sure it is unset. In fact, an obsolete value may have been cached by cargo
 which is fixed by ```cargo clean```.
-
-
