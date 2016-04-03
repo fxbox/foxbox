@@ -39,11 +39,11 @@ to install and switch between versions of Rust.
 | Dependency   | Debian/Raspian        | Fedora          | Arch             | OS X (Homebrew) |
 | ------------ | --------------------- | --------------- | ---------------- | --------------- |
 | `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `libupnp`        | `libupnp`       |
-| `libssl`     | `libssl-dev`          | `openssl-devel`             | via `base-devel` | `openssl`       |
-| `libavahi`   | `libavahi-client-dev` | `avahi-devel`             | `avahi`          | `n.a.`          |
-| `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`             | `sqlite`         | `sqlite`        |
-| `libespeak`  | `libsespeak-dev`      | `espeak-devel`             | `?`              | `?`             |
-| `libdbus`  | `?`      | `dbus-devel`             | `?`              | `?`             |
+| `libssl`     | `libssl-dev`          | `openssl-devel` | via `base-devel` | `openssl`       |
+| `libavahi`   | `libavahi-client-dev` | `avahi-devel`   | `avahi`          | `n.a.`          |
+| `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`  | `sqlite`         | `sqlite`        |
+| `libespeak`  | `libsespeak-dev`      | `espeak-devel`  | `?`              | `?`             |
+| `libdbus`    | `?`                   | `dbus-devel`    | `?`              | `?`             |
 
 ### Node
 
