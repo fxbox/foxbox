@@ -7,3 +7,4 @@ authors = ["Julien Wajsberg <felash@gmail.com>"]
 openzwave-stateful = { git = "https://github.com/fxbox/openzwave-stateful-rust" }
 foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "8cad391" }
 transformable_channels = "^0.1"
+log = "^0.3"

@@ -1,6 +1,8 @@
 extern crate openzwave_stateful as openzwave;
 extern crate foxbox_taxonomy as taxonomy;
 extern crate transformable_channels;
+#[macro_use]
+extern crate log;
 
 use taxonomy::util::Id as TaxId;
 use taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
@@ -25,7 +27,6 @@ pub use self::OpenzwaveAdapter as Adapter;
 #[derive(Debug)]
 pub enum Error {
     TaxonomyError(TaxError),
-    NoDeviceFound(openzwave::Error),
     OpenzwaveError(openzwave::Error),
     UnknownError
 }
@@ -44,10 +45,7 @@ impl From<()> for Error {
 
 impl From<openzwave::Error> for Error {
     fn from(error: openzwave::Error) -> Self {
-        match error {
-            openzwave::Error::NoDeviceFound => Error::NoDeviceFound(error),
-            _                               => Error::OpenzwaveError(error)
-        }
+        Error::OpenzwaveError(error)
     }
 }
 
@@ -56,7 +54,7 @@ impl fmt::Display for Error {
         match *self {
             Error::TaxonomyError(ref err)  => write!(f, "{}: {}", error::Error::description(self), err),
             Error::OpenzwaveError(ref err) => write!(f, "{}: {}", error::Error::description(self), err),
-            Error::NoDeviceFound(_) | Error::UnknownError => write!(f, "{}", error::Error::description(self)),
+            Error::UnknownError => write!(f, "{}", error::Error::description(self)),
         }
     }
 }
@@ -66,7 +64,6 @@ impl error::Error for Error {
         match *self {
             Error::TaxonomyError(_) => "Taxonomy Error",
             Error::OpenzwaveError(_) => "Openzwave Error",
-            Error::NoDeviceFound(_) => "No Device Found",
             Error::UnknownError => "Unknown error",
         }
     }
@@ -75,7 +72,6 @@ impl error::Error for Error {
         match *self {
             Error::TaxonomyError(ref err) => Some(err),
             Error::OpenzwaveError(ref err) => Some(err),
-            Error::NoDeviceFound(ref err) => Some(err),
             Error::UnknownError => None,
         }
     }
@@ -210,7 +206,15 @@ impl OpenzwaveAdapter {
             user_path: "./config/openzwave/".to_string(),
         };
 
-        let (ozw, rx) = try!(openzwave::init(&options));
+        let (ozw, rx) = try!(match openzwave::init(&options) {
+            Err(openzwave::Error::NoDeviceFound) => {
+                // early return: we should not impair foxbox startup for this error.
+                // TODO concept of FatalError vs IgnoreableError
+                error!("No ZWave device has been found.");
+                return Ok(());
+            }
+            result => result
+        });
 
         let name = String::from("OpenZwave Adapter");
         let adapter = Arc::new(OpenzwaveAdapter {
