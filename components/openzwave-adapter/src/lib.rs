@@ -261,7 +261,7 @@ impl OpenzwaveAdapter {
                     ZWaveNotification::ValueAdded(value)           => {
                         if value.get_genre() != ValueGenre::ValueGenre_User { continue }
 
-                        let value_id = format!("OpenZWave/{}", value.get_id());
+                        let value_id = format!("OpenZWave/{} ({})", value.get_id(), value.get_label());
 
                         let controller_id = controller_map.find_tax_id_from_ozw(&value.get_controller()).unwrap();
                         if controller_id.is_none() { continue }
