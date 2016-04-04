@@ -192,7 +192,7 @@ impl Adapter for IPCameraAdapter {
 
     fn fetch_values(&self,
                     mut set: Vec<Id<Getter>>,
-                    _ : User)
+                    _: User)
                     -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.drain(..).map(|id| {
             let camera = match self.services.lock().unwrap().getters.get(&id) {
