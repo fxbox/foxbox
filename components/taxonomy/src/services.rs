@@ -195,6 +195,42 @@ pub enum ChannelKind {
     OpenClosed,
 
     //
+    // # String
+    //
+
+    /// The service is used to read or set the username associated with the
+    /// service. This is typically used for devices which have additional
+    /// authentication (like an IP Camera).
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by the string "Username".
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"Username\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::Username);
+    /// ```
+    Username,
+
+    /// The service is used to read or set the password associated with the
+    /// service. This is typically used for devices which have additional
+    /// authentication (like an IP Camera).
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by the string "Password".
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"Password\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::Password);
+    /// ```
+    Password,
+
+    //
     // # Time
     //
 
@@ -384,6 +420,8 @@ impl Parser<ChannelKind> for ChannelKind {
                 "Ready" => Ok(ChannelKind::Ready),
                 "OnOff" => Ok(ChannelKind::OnOff),
                 "OpenClosed" => Ok(ChannelKind::OpenClosed),
+                "Username" => Ok(ChannelKind::Username),
+                "Password" => Ok(ChannelKind::Password),
                 "CurrentTime" => Ok(ChannelKind::CurrentTime),
                 "CurrentTimeOfDay" => Ok(ChannelKind::CurrentTimeOfDay),
                 "AddThinkerbellRule" => Ok(ChannelKind::AddThinkerbellRule),
@@ -425,6 +463,8 @@ impl ToJSON for ChannelKind {
             Ready => JSON::String("Ready".to_owned()),
             OnOff => JSON::String("OnOff".to_owned()),
             OpenClosed => JSON::String("OpenClosed".to_owned()),
+            Username => JSON::String("Username".to_owned()),
+            Password => JSON::String("Password".to_owned()),
             CurrentTime => JSON::String("CurrentTime".to_owned()),
             CurrentTimeOfDay => JSON::String("CurrentTimeOfDay".to_owned()),
             RemainingTime => JSON::String("RemainingTime".to_owned()),
@@ -460,7 +500,7 @@ impl ChannelKind {
             OvenTemperature => Type::Temperature,
             AddThinkerbellRule => Type::ThinkerbellRule,
             RemoveThinkerbellRule => Type::Unit,
-            ThinkerbellRuleSource => Type::String,
+            Username | Password | ThinkerbellRuleSource => Type::String,
             Log => Type::String,
             TakeSnapshot => Type::Unit,
             Extension { ref typ, ..} => typ.clone(),
