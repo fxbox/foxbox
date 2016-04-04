@@ -187,4 +187,11 @@ pub trait Adapter: Send + Sync {
     fn register_watch(&self, Vec<(Id<Getter>, Option<Range>)>,
         cb: Box<ExtSender<WatchEvent>>) ->
             ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error>;
+
+    /// Signal the adapter that it is time to stop.
+    ///
+    /// Ideally, the adapter should not return until all its threads have been stopped.
+    fn stop(&self) {
+        // By default, do nothing.
+    }
 }

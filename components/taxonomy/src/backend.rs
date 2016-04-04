@@ -1215,3 +1215,16 @@ impl State {
 }
 
 
+impl State {
+    // Clear all state, removing any remaining cycle or lingering thread.
+    pub fn stop(&mut self) {
+        for adapter in self.adapter_by_id.values() {
+            adapter.stop();
+        }
+        self.adapter_by_id.clear();
+        self.service_by_id.clear();
+        self.getter_by_id.clear();
+        self.setter_by_id.clear();
+        self.watchers.lock().unwrap().watchers.clear();
+    }
+}
