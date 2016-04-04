@@ -440,3 +440,10 @@ impl Drop for WatchGuard {
         let _ = self.tx_owner.send(WatchOp::Release(self.key));
     }
 }
+
+
+impl AdapterManager {
+    pub fn stop(&self) {
+        self.back_end.write().unwrap().stop()
+    }
+}
