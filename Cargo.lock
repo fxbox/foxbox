@@ -191,7 +191,7 @@ dependencies = [
 [[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git#322ee02c6b58ab09d6291307b77184dd2a037b69"
+source = "git+https://github.com/fxbox/taxonomy.git#9480e0f3d11a8adaa90a4e26c7430323f16da251"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.48 (registry+https://github.com/rust-lang/crates.io-index)",

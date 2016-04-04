@@ -217,8 +217,8 @@ impl Controller for FoxBox {
         }
     }
 
-    fn get_config(&self) -> &ConfigService {
-        &self.config
+    fn get_config(&self) -> Arc<ConfigService> {
+        self.config.clone()
     }
 
     fn get_profile(&self) -> &ProfileService {

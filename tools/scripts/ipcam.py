@@ -15,30 +15,49 @@ class Service:
     def __init__(self, service):
         self.service = service
 
+    def adapter(self):
+        return self.service['adapter']
+
+    def id(self):
+        return self.service['id']
+
     def is_adapter(self, adapter_name):
         return self.service['adapter'].startswith(adapter_name)
 
-    def getter(self, kind):
-        for key, value in self.service['getters'].items():
-            if 'kind' in value:
-                setter_kind = value['kind']
-                if 'kind' in setter_kind:
-                    if setter_kind['kind'] == kind:
-                        return key
-        print("Unable to find getter for '{}'".format(kind))
+    def getter_contains(self, name):
+        getter_name = 'getter:' + name + '.'
+        for key in self.service['getters']:
+            if key.startswith(getter_name):
+                return key
+        print("Unable to find getter for '{}'".format(name))
 
-    def setter(self, kind):
-        for key, value in self.service['setters'].items():
-            if 'kind' in value:
-                setter_kind = value['kind']
-                if 'kind' in setter_kind:
-                    if setter_kind['kind'] == kind:
-                        return key
-        print("Unable to find setter for '{}'".format(kind))
+    def getters(self):
+        return self.service['getters']
 
     def property(self, name):
         if name in self.service['properties']:
             return self.service['properties'][name]
+
+    def has_properties(self):
+        return 'properties' in self.service
+
+    def has_property_value(self, value):
+        if value is None:
+            return True
+        if not self.has_properties():
+            return False
+        name = self.property('name')
+        return name and value in name
+
+    def setter_contains(self, name):
+        setter_name = 'setter:' + name + '.'
+        for key in self.service['setters']:
+            if key.startswith(setter_name):
+                return key
+        print("Unable to find setter for '{}'".format(name))
+
+    def setters(self):
+        return self.service['setters']
 
 
 def main():
@@ -209,17 +228,24 @@ def main():
                 if args.list_cams or args.list_snaps:
                     print('id: {} name: {}'.format(service_id, camera_name))
                 if args.snapshot:
-                    snapshot_get = bytes(json.dumps({'select': {'id': svc.setter('snapshot')}, 'value': {'Json': {}}}), encoding='utf-8')
-                    if args.verbose: print(snapshot_get)
-                    snapshot_req = requests.put(set_url, headers=auth_header, data=snapshot_get)
-                    print("Took a snapshot")
+                    setter = svc.setter_contains('snapshot');
+                    if setter:
+                        setter_data = json.dumps({'select': {'id': setter}, 'value': {'Unit': []}})
+                        if args.verbose:
+                            print(setter_data)
+                        setter_req = requests.put(set_url, headers=auth_header, data=bytes(setter_data, encoding='utf-8'))
+                        if args.verbose:
+                            print("Got {} response of '{}'".format(setter_req.headers['content-type'], setter_req.text))
+                        print("Took a snapshot")
                 if args.list_snaps:
-                    getter = svc.getter('image_list')
-                    list_snaps_get = bytes(json.dumps({'id': getter}), encoding='utf-8')
-                    if args.verbose: print(list_snaps_get)
-                    list_snaps_req = requests.put(get_url, headers=auth_header, data=list_snaps_get)
-                    if args.verbose: print(list_snaps_req.text)
-                    snaps_json = list_snaps_req.json()
+                    getter = svc.getter_contains('image_list')
+                    getter_data = json.dumps({'id': getter})
+                    if args.verbose:
+                        print(getter_data)
+                    getter_req = requests.put(get_url, headers=auth_header, data=bytes(getter_data, encoding='utf-8'))
+                    if args.verbose:
+                        print(getter_req.text)
+                    snaps_json = getter_req.json()
                     snaps = snaps_json[getter]['Json']
                     if snaps:
                         for snap in sorted(snaps):
@@ -227,17 +253,18 @@ def main():
                     else:
                         print('    No snapshots available')
                 if args.get:
-                    getter = svc.getter('latest image')
-                    get_snap_get = bytes(json.dumps({'id': getter}), encoding='utf-8')
-                    if args.verbose: print(get_snap_get)
-                    get_snap_req = requests.put(get_url, headers=auth_header, data=get_snap_get)
-                    if get_snap_req.status_code == 200 and get_snap_req.headers['content-type'] == 'image/jpeg':
+                    getter = svc.getter_contains('image_newest')
+                    getter_data = json.dumps({'id': getter})
+                    if args.verbose:
+                        print(getter_data)
+                    getter_req = requests.put(get_url, headers=auth_header, data=bytes(getter_data, encoding='utf-8'))
+                    if getter_req.status_code == 200 and getter_req.headers['content-type'] == 'image/jpeg':
                         filename = 'image.jpg'
                         with open(filename, 'wb') as f:
-                            f.write(get_snap_req.content)
+                            f.write(getter_req.content)
                         print('Wrote image to {}'.format(filename))
                     else:
-                        j_resp = get_snap_req.json()
+                        j_resp = getter_req.json()
                         print(json.dumps(j_resp, indent=4))
     if not camera_found:
         if args.name is None:
