@@ -232,6 +232,8 @@ impl OpenzwaveAdapter {
         adapter.spawn_notification_thread(rx, box_manager);
         try!(box_manager.add_adapter(adapter));
 
+        info!("Started Openzwave adapter.");
+
         Ok(())
     }
 
