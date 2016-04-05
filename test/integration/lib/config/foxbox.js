@@ -26,6 +26,14 @@ module.exports = {
     url : 'http://localhost:3000'
   },
 
+  ipCamera : {
+    ip: 'localhost',
+    port: '8111',
+    udn: 'ae67e622-7a66-465e-bab0-aaaaaaaaaaaa',
+    description: 'descriptionurl',
+    usn: 'urn:cellvision:service:Null:1'
+  },
+
   philips_hue : {
     url: 'localhost',
     port: 8001

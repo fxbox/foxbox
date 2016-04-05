@@ -26,7 +26,7 @@ var helper = (function() {
     '-t',config.get('pagekite.t'),
     '-s',config.get('pagekite.s'),
     '--remote-name',config.get('pagekite.externalURL'),
-    '--disable-tls'], {stdio: 'inherit'} ); // TODO TLS not yet supported
+    '--disable-tls'], {stdio: 'inherit'}); // TODO TLS not yet supported
   setTimeout(callback, FOXBOX_STARTUP_WAIT_TIME_IN_MS);
   }
 
