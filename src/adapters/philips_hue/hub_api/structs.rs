@@ -21,7 +21,7 @@ pub struct Settings {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SettingsConfig {
-    pub whitelist: BTreeMap<String, SettingsConfigWhitelistEntry>,
+    pub whitelist: Option<BTreeMap<String, SettingsConfigWhitelistEntry>>,
     pub portalconnection: String,
     pub modelid: String,
     pub proxyport: u32,
@@ -66,7 +66,7 @@ pub struct SettingsLightEntry {
     pub uniqueid: String,
     #[serde(rename="type")]
     pub lighttype: String,
-    pub pointsymbol: BTreeMap<String, String>,
+    pub pointsymbol: Option<BTreeMap<String, String>>,
     pub manufacturername: String,
     pub state: SettingsLightState,
 }
