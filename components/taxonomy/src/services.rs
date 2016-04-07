@@ -295,6 +295,26 @@ pub enum ChannelKind {
     /// ```
     TakeSnapshot,
 
+    /// Write to a log file
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "Log".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let source = r#""Log""#;
+    ///
+    /// let parsed = ChannelKind::from_str(source).unwrap();
+    /// assert_eq!(parsed, ChannelKind::Log);
+    ///
+    /// let serialized = parsed.to_json();
+    /// assert_eq!(serialized.as_string().unwrap(), "Log");
+    /// ```
+    Log,
+
     // TODO: Add more
 
     /// An operation of a kind that has not been standardized yet.
@@ -372,6 +392,7 @@ impl Parser<ChannelKind> for ChannelKind {
                 "RemainingTime" => Ok(ChannelKind::RemainingTime),
                 "OvenTemperature" => Ok(ChannelKind::OvenTemperature),
                 "TakeSnapshot" => Ok(ChannelKind::TakeSnapshot),
+                "Log" => Ok(ChannelKind::Log),
                 _ => Err(ParseError::unknown_constant(str, &path))
             }
         }
@@ -412,6 +433,7 @@ impl ToJSON for ChannelKind {
             RemoveThinkerbellRule => JSON::String("RemoveThinkerbellRule".to_owned()),
             ThinkerbellRuleSource => JSON::String("ThinkerbellRuleSource".to_owned()),
             TakeSnapshot => JSON::String("TakeSnapshot".to_owned()),
+            Log => JSON::String("Log".to_owned()),
             Extension { ref vendor, ref adapter, ref kind, ref typ } => {
                 vec![
                     ("vendor", vendor.to_json()),
@@ -439,6 +461,7 @@ impl ChannelKind {
             AddThinkerbellRule => Type::ThinkerbellRule,
             RemoveThinkerbellRule => Type::Unit,
             ThinkerbellRuleSource => Type::String,
+            Log => Type::String,
             TakeSnapshot => Type::Unit,
             Extension { ref typ, ..} => typ.clone(),
         }
