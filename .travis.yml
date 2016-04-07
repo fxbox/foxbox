@@ -2,7 +2,7 @@ sudo: required
 dist: trusty
 language: rust
 rust:
-    - nightly-2016-03-07
+    - nightly-2016-04-06
 cache:
     directories:
         - $HOME/.cargo
@@ -18,7 +18,7 @@ before_install:
   - sudo apt-get install -y avahi-daemon libavahi-client-dev libavahi-common-dev libavahi-common3 libdbus-1-dev libupnp-dev libespeak-dev libudev-dev
   - sudo usermod -a -G netdev $USER # "netdev" group membership allows to set custom host name via avahi-daemon.
   - sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev # kcov's dependencies
-  
+
 before_script:
     - "sh -e /etc/init.d/xvfb start"
     - "export DISPLAY=:99.0"
