@@ -3,7 +3,7 @@ name = "foxbox"
 version = "0.1.0"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
- "clippy 0.0.61 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clippy 0.0.61 (git+https://github.com/Manishearth/rust-clippy.git?rev=c1c935d)",
  "docopt 0.6.78 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt_macros 0.6.82 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -119,18 +119,6 @@ dependencies = [
 name = "clippy"
 version = "0.0.61"
 source = "git+https://github.com/Manishearth/rust-clippy.git?rev=c1c935d#c1c935db4611da949e4e79b1abe048d18d1224bf"
-dependencies = [
- "quine-mc_cluskey 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "regex-syntax 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "semver 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "toml 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
- "unicode-normalization 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "clippy"
-version = "0.0.61"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "quine-mc_cluskey 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex-syntax 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",

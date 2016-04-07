@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Cryptographic operations for WebPush.
+//! Cryptographic operations for `WebPush`.
 //!
 //! Implemented as described in the draft IETF RFC:
 //! https://tools.ietf.org/html/draft-ietf-webpush-encryption-02
@@ -401,7 +401,7 @@ pub struct EncryptData {
     pub output: Vec<u8>
 }
 
-/// Encrypt a payload using the given public key according to the WebPush
+/// Encrypt a payload using the given public key according to the `WebPush`
 /// RFC specifications.
 pub fn encrypt(peer_key: &str, input: String) -> Option<EncryptData> {
     // Derive public and secret keys from peer public key

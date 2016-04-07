@@ -52,6 +52,12 @@ impl SslContextProvider for SniSslContextProvider {
     }
 }
 
+impl Default for SniSslContextProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SniSslContextProvider {
     pub fn new() -> Self {
         SniSslContextProvider {

@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Stores subscription information for WebPush.
+//! Stores subscription information for `WebPush`.
 //!
-//! # The WebPush database
+//! # The `WebPush` database
 //!
-//! The "subscriptions" table stores the WebPush subscription metadata
+//! The "subscriptions" table stores the `WebPush` subscription metadata
 //! necessary to encrypt a message (ECDH public key) and to send said
 //! message to a push service (push URI). The user is identified via
 //! an ID shared with the Users database. Each user may have any number

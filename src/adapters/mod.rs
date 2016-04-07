@@ -18,7 +18,7 @@ mod philips_hue;
 /// An adapter providing access to Thinkerbell.
 mod thinkerbell;
 
-/// An adapter providing WebPush services.
+/// An adapter providing `WebPush` services.
 pub mod webpush;
 
 use foxbox_taxonomy::manager::AdapterManager as TaxoManager;

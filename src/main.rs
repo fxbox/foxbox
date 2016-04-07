@@ -10,7 +10,7 @@
 
 // Make linter fail for every warning
 #![plugin(clippy)]
-// #![deny(clippy)]
+#![deny(clippy)]
 
 #![cfg_attr(test, feature(const_fn))] // Dependency of stainless
 #![cfg_attr(test, plugin(stainless))] // Test runner

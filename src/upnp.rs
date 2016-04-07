@@ -111,6 +111,12 @@ pub struct UpnpManager {
 unsafe impl Send for UpnpManager {}
 unsafe impl Sync for UpnpManager {}
 
+impl Default for UpnpManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UpnpManager {
     pub fn new() -> Self {
         UpnpManager {

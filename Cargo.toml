@@ -11,7 +11,8 @@ authentication = []
 
 [dependencies]
 chrono = "0.2.19"
-clippy = "0.0.61"
+# TODO: Use semantic version once 0.0.62 is out.
+clippy = {git = "https://github.com/Manishearth/rust-clippy.git", rev = "c1c935d"}
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
