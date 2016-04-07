@@ -26,7 +26,7 @@
   "devDependencies": {
     "jshint": "2.9.1",
     "mocha": "2.4.5",
-    "selenium-webdriver": "2.48.2",
+    "selenium-webdriver": "2.53.1",
     "chai": "^3.5.0",
     "body-parser": "^1.15.0",
     "should": "^8.2.2",
@@ -37,9 +37,6 @@
     "path": "^0.12.7",
     "config-js": "^1.1.9",
     "express": "^4.13.4",
-    "iso-date": "^1.0.0"
-  },
-  "dependencies": {
     "iso-date": "^1.0.0"
   }
 }

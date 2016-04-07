@@ -9,6 +9,9 @@ cache:
         - node_modules
         - $TRAVIS_BUILD_DIR/target
 
+addons:
+  firefox: latest
+
 # $BOX_HOST_NAME and $BOX_PORT are also used by Selenium tests.
 env:
   - BOX_LOCAL_NAME=foxbox BOX_PORT=3000
@@ -18,12 +21,12 @@ before_install:
   - sudo apt-get install -y avahi-daemon libavahi-client-dev libavahi-common-dev libavahi-common3 libdbus-1-dev libupnp-dev libespeak-dev libudev-dev
   - sudo usermod -a -G netdev $USER # "netdev" group membership allows to set custom host name via avahi-daemon.
   - sudo apt-get install -y libcurl4-openssl-dev libelf-dev libdw-dev # kcov's dependencies
-  
+
 before_script:
     - "sh -e /etc/init.d/xvfb start"
     - "export DISPLAY=:99.0"
-    - "wget http://selenium-release.storage.googleapis.com/2.50/selenium-server-standalone-2.50.1.jar"
-    - "java -jar selenium-server-standalone-2.50.1.jar > /dev/null &"
+    - "wget http://selenium-release.storage.googleapis.com/2.53/selenium-server-standalone-2.53.0.jar"
+    - "java -jar selenium-server-standalone-2.53.0.jar > /dev/null &"
     - sleep 5
     - nvm install 4.2
     - nvm use 4.2
