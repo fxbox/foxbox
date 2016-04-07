@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Adapter for WebPush.
+//! Adapter for `WebPush`.
 //!
 //! Implemented as described in the draft IETF RFC:
 //! https://tools.ietf.org/html/draft-ietf-webpush-protocol-04

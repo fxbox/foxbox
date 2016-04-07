@@ -44,6 +44,9 @@ impl Registrar {
         }
     }
 
+    // FIXME: Error is currently muted. The linter allows max 7 arguments for a function.
+    // https://github.com/Manishearth/rust-clippy/wiki#too_many_arguments
+    #[allow(too_many_arguments)]
     pub fn start(&self, endpoint_url: String,
                  iface: Option<String>,
                  domain: String,

@@ -22,11 +22,11 @@ static ADAPTER_NAME: &'static str = "Thinkerbell adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
 static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 
-/// ThinkerbellAdapter hooks up the rules engine (if this, then that) as an adapter.
+/// `ThinkerbellAdapter` hooks up the rules engine (if this, then that) as an adapter.
 ///
 /// Each "rule", or "script", is a JSON-serialized structure according to Thinkerbell conventions.
 ///
-/// This adapter exposes a root service, with one AddThinkerbellRule setter (to add a new rule).
+/// This adapter exposes a root service, with one `AddThinkerbellRule` setter (to add a new rule).
 /// Each rule that has been added is exposed as its own service, with the following getters/setters:
 /// - Set Enabled (setter) -- toggles whether or not the script is enabled
 /// - Get Enabled (getter) -- returns whether or not the script is enabled
@@ -76,8 +76,8 @@ impl ExecutableDevEnv for ThinkerbellExecutionEnv {
     }
 }
 
-/// Convert a ScriptManagerError into an API Error.
-/// We can't implement From<T> because ScriptManagerError is in a different crate.
+/// Convert a `ScriptManagerError` into an API Error.
+/// We can't implement From<T> because `ScriptManagerError` is in a different crate.
 fn sm_error(e: ScriptManagerError) -> Error {
     Error::InternalError(InternalError::GenericError(format!("{:?}", e)))
 }

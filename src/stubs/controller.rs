@@ -29,6 +29,12 @@ pub struct ControllerStub {
     profile_service: Arc<ProfileService>
 }
 
+impl Default for ControllerStub {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ControllerStub {
     pub fn new() -> Self {
         let path = format!("/tmp/{}", rand::random::<i32>());
