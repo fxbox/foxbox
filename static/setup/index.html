@@ -3,47 +3,46 @@
   <head>
     <title>FoxBox</title>
     <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' ; style-src 'self' 'unsafe-inline' ; connect-src * ; object-src 'none' ; img-src 'self' blob: ; referrer no-referrer ;">
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="stylesheet" href="shared/css/FiraSans/font.css">
+    <link rel="stylesheet" href="shared/css/common.css">
   </head>
   <body>
     <div id="signup">
-      <h1>Welcome to your FoxBox!</h1>
-      <p>
-        <label for="signup-pwd1">
-          Please choose an admin password (8 characters minimum):
-        </label>
-        <input type="password" id="signup-pwd1">
-      </p>
-      <p>
-        <label for="signup-pwd2">
-          Please repeat your admin password:
-        </label>
-        <input type="password" id="signup-pwd2">
-      </p>
-      <p>
-        <input id="signup-button" type="submit" value="Signup">
-      </p>
+      <div class="container">
+        <div class="inner-container">
+          <p>
+            <label for="signup-pwd1">
+              Please choose an admin password (8 characters minimum):
+            </label>
+            <input type="password" id="signup-pwd1">
+          </p>
+          <p>
+            <label for="signup-pwd2">
+              Please repeat your admin password:
+            </label>
+            <input type="password" id="signup-pwd2">
+          </p>
+          <p>
+            <button id="signup-button">Sign up</button>
+          </p>
+        </div>
+      </div>
     </div>
+
     <div id="signup-success" hidden>
-      <h1 id="thank-you">Thank you!</h1>
-      <p>
-        Now please use an app like
-        <a href="http://example.com/">http://example.com/</a>
-        to connect your IoT devices and set everything up. Please write down the
-        following information:
-      </p>
-      <ul>
-        <li>
-          FoxBox location ('<span id="location">
-            <em>determining...</em>
-          </span>').
-        </li>
-        <li>
-          Your username ('admin')
-        </li>
-        <li>
-          Your password (the one you just created).
-        </li>
-      </ul>
+      <div class="container">
+        <div class="inner-container">
+          <h1 id="thank-you">Thank you!</h1>
+          <p>
+            Now please use an app like
+            <a href="http://fxbox.github.io/app/">http://fxbox.github.io/app/</a>
+            to connect your IoT devices and set everything up.
+          </p>
+        </div>
+      </div>
     </div>
   </body>
   <script src="shared/js/url_search_params.js"></script>

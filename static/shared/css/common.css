@@ -1,0 +1,60 @@
+
+
+/** General styles **/
+html {
+  height: 100%;
+  font: normal 10px/10px Arial;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  font: normal 2.2rem/4.4rem "Fira Sans", Arial;
+  font-weight: 300;
+  position: relative;
+  overflow-y: auto;
+}
+
+input {
+  font: normal 2.2rem/4.4rem "Fira Sans", Arial;
+  font-weight: 300;
+  background: #f2f2f2;
+  border: 0;
+  border-radius: .3rem;
+  outline: 0;
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 1rem;
+  box-sizing: border-box;
+  font-size: 1.5rem;
+}
+
+button {
+  font: normal 2.2rem/4.4rem "Fira Sans", Arial;
+  font-weight: 300;
+  background: #0ca8a4;
+  margin: 0 1rem;
+  border: none;
+  border-radius: .3rem;
+  color: white;
+}
+
+.container {
+  position: relative;
+  width: 70%;
+  padding: 20% 0 0;
+  margin: auto;
+}
+
+.inner-container {
+  position: relative;
+  z-index: 1;
+  background: #FFFFFF;
+  max-width: 360px;
+  margin: 0 auto 100px;
+  padding: 45px;
+  text-align: center;
+  box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
+}
