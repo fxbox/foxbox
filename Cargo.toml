@@ -6,7 +6,7 @@ build = "build.rs"
 exclude = [ "config/**" ]
 
 [features]
-default = ["authentication"]
+default = []
 authentication = []
 
 [dependencies]
@@ -15,8 +15,8 @@ clippy = "0.0.48"
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
-foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "c222794d238072920857fea55e55d522ae75c192" }
-foxbox_thinkerbell = { git = "https://github.com/fxbox/thinkerbell.git", rev = "e05f93c" }
+foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git" }
+foxbox_thinkerbell = { git = "https://github.com/fxbox/thinkerbell.git" }
 foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "1033e08" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
@@ -59,3 +59,4 @@ iron-test = "0.2.0"
 regex = "0.1.55"
 rand = "0.3.14"
 tempdir = "0.3.4"
+
