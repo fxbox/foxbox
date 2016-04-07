@@ -5,6 +5,9 @@
 /// An adapter providing time services.
 pub mod clock;
 
+/// An adapter displaying messages on the console.
+pub mod console;
+
 /// A Text To Speak adapter
 #[cfg(target_os = "linux")]
 pub mod tts;
@@ -60,6 +63,7 @@ impl<T: Controller> AdapterManager<T> {
     pub fn start(&mut self, manager: &Arc<TaxoManager>) {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
         self.start_adapter(Box::new(PhilipsHueAdapter::new(c.clone())));
+        console::Console::init(manager).unwrap(); // FIXME: We should have a way to report errors
         clock::Clock::init(manager).unwrap(); // FIXME: We should have a way to report errors
         webpush::WebPush::init(c, manager).unwrap();
         ip_camera::IPCameraAdapter::init(manager, self.controller.clone()).unwrap();
