@@ -335,6 +335,7 @@ impl OpenzwaveAdapter {
                     }
                     ZWaveNotification::ValueRemoved(value)         => {}
                     ZWaveNotification::Generic(string)             => {}
+                    other => { warn!("Notification not handled {:?}", other)}
                 }
             }
         });
