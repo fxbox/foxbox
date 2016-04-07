@@ -9,41 +9,41 @@
 
 ### Rust
 
-We're using Rust for the daemon/server. Currently v1.9.x nightly is required.
+We're using Rust for the daemon/server.
 
-To determine which version of rust is being used, check the
-[.travis.yml](https://github.com/fxbox/foxbox/blob/master/.travis.yml) file.
+Currently a fairly recent nightly is required. To determine which version of rust is being used, check the [.travis.yml](https://github.com/fxbox/foxbox/blob/master/.travis.yml) file.
 
 Look for these 2 lines near the top of the file:
 ```yaml
 rust:
-    - nightly-2016-04-10
+    - nightly-YYYY-MM-DD
 ```
-You should then be able to then use:
-```
-multirust override nightly-2016-04-10
-```
-to get the same version of toolchain that's being used for the travis tests.
 
-Incidently, nightly-2016-04-10 corresponds to:
+It's recommended that you use [`multirust`](https://github.com/brson/multirust) to install and switch between versions of Rust. You should then be able to then use:
+```
+cd /your/path/to/foxbox     # Required, otherwise you might replace rustc for another project
+multirust override nightly-YYYY-MM-DD   # Replace with the correct date you found
+```
+After that, you should be all set in regard to compiling the project.
+
+#### :warning: Warning
+
+Sometimes, there might be a 1-day-difference between the date shown in `.travis.yml` and the one reported by `rustc`. For example [nightly-2016-04-06](https://static.rust-lang.org/dist/2016-04-06/) corresponds to:
 ```bash
 $ rustc -V
-rustc 1.9.0-nightly (241a9d0dd 2016-04-10)
+rustc 1.9.0-nightly (241a9d0dd 2016-04-05)
 ```
-
-It's recommended that you use [`multirust`](https://github.com/brson/multirust)
-to install and switch between versions of Rust.
 
 #### Build requirements
 
-| Dependency   | Debian/Raspian        | Fedora          | Arch             | OS X (Homebrew) |
-| ------------ | --------------------- | --------------- | ---------------- | --------------- |
-| `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `libupnp`        | `libupnp`       |
-| `libssl`     | `libssl-dev`          | `openssl-devel` | via `base-devel` | `openssl`       |
-| `libavahi`   | `libavahi-client-dev` | `avahi-devel`   | `avahi`          | `n.a.`          |
-| `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`  | `sqlite`         | `sqlite`        |
-| `libespeak`  | `libsespeak-dev`      | `espeak-devel`  | `?`              | `?`             |
-| `libdbus`    | `?`                   | `dbus-devel`    | `?`              | `?`             |
+| Dependency   | Debian/Raspian        | Fedora          | Arch               | OS X (Homebrew) |
+| ------------ | --------------------- | --------------- | ------------------ | --------------- |
+| `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `extra/libupnp`    | `libupnp`       |
+| `libssl`     | `libssl-dev`          | `openssl-devel` | via `base-devel`   | `openssl`       |
+| `libavahi`   | `libavahi-client-dev` | `avahi-devel`   | `extra/avahi`      | `n.a.`          |
+| `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`  | `core/sqlite`      | `sqlite`        |
+| `libespeak`  | `libsespeak-dev`      | `espeak-devel`  | `community/espeak` | `?`             |
+| `libdbus`    | `?`                   | `dbus-devel`    | `core/libdbus`     | `?`             |
 
 ### Node
 
