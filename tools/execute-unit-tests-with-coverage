@@ -26,13 +26,7 @@ get_and_compile_kcov_locally() {
 }
 
 compile_foxbox_with_dead_code() {
-  # TODO: Clean up this workaround once this PR lands:
-  # https://github.com/rust-lang/cargo/pull/2241
-  RUSTC_COMMAND=$(cargo test --no-run --verbose | sed --quiet 's/.*`\(rustc .* --test .*\)`.*/\1/p')
-  # The previous line made binary. Here below we make sure that no unit test
-  # binary is left
-  find "$FOXBOX_BINARY_LOCATION" -maxdepth 1 -executable -name foxbox-\* -delete
-  eval $RUSTC_COMMAND -C link-dead-code
+  RUSTFLAGS="-C link-dead-code" cargo test --no-run
 }
 
 run_tests_and_coverage() {
