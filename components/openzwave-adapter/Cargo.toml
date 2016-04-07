@@ -5,6 +5,6 @@ authors = ["Julien Wajsberg <felash@gmail.com>"]
 
 [dependencies]
 openzwave-stateful = { git = "https://github.com/fxbox/openzwave-stateful-rust" }
-foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "c222794d238072920857fea55e55d522ae75c192" }
+foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git" }
 transformable_channels = "^0.1"
 log = "^0.3"
