@@ -8,6 +8,7 @@ use foxbox_thinkerbell::ast::*;
 #[test]
 fn test_parse_bad_field() {
     let src = "{
+      \"name\": \"foo\",
       \"requirements\": [],
       \"allocations\": [],
       \"rules\": []
@@ -18,7 +19,7 @@ fn test_parse_bad_field() {
 
 #[test]
 fn test_parse_empty() {
-    let src = "{ \"rules\": []}";
+    let src = "{ \"name\": \"foo\", \"rules\": []}";
     let script = Script::from_str(src).unwrap();
     assert_eq!(script.rules.len(), 0);
 }
@@ -27,6 +28,7 @@ fn test_parse_empty() {
 fn test_parse_simple_rule() {
     let src =
 "{
+  \"name\": \"foo\",
   \"rules\": [
     {
       \"execute\": [],

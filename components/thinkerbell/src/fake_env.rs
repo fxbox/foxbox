@@ -6,6 +6,7 @@ use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
 
 use std::cmp::{ Ord, PartialOrd, Ordering as OrdOrdering };
+use std::fmt;
 use std::collections::{ BinaryHeap, HashMap };
 use std::sync::{ Arc, Mutex };
 use std::sync::atomic::{ AtomicBool, Ordering as AtomicOrdering };
@@ -403,6 +404,11 @@ pub struct FakeEnv {
     ///
     on_event: Box<ExtSender<FakeEnvEvent>>,
     back_end: Box<ExtSender<AdapterOp>>,
+}
+impl fmt::Debug for FakeEnv {
+    fn fmt(&self, _: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        Ok(())
+    }
 }
 impl ExecutableDevEnv for FakeEnv {
     // Don't bother stopping watches.

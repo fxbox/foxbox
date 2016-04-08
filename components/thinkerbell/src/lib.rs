@@ -16,6 +16,9 @@ extern crate foxbox_taxonomy;
 extern crate transformable_channels;
 
 extern crate chrono;
+
+#[macro_use]
+extern crate log;
 extern crate rusqlite;
 extern crate serde;
 extern crate serde_json;

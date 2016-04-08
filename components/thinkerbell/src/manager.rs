@@ -3,6 +3,7 @@ use compile::ExecutableDevEnv;
 use run::{ Execution, ExecutionEvent, Error as RunError, StartStopError };
 
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::path::{ Path as FilePath, PathBuf as FilePathBuf };
 
 use foxbox_taxonomy::api::ResultMap;
@@ -36,7 +37,7 @@ pub struct ScriptId;
 /// Each script can be individually enabled or disabled.
 /// When a script is enabled, it is always running (unless an error occured during launch).
 /// Script sources are stored as JSON strings in a SQLite database.
-pub struct ScriptManager<Env, T> where Env: ExecutableDevEnv + Clone + 'static {
+pub struct ScriptManager<Env, T> where Env: ExecutableDevEnv + Clone + Debug + 'static {
     env: Env,
 
     /// The path to the SQLite file to store, e.g. "./database.sqlite"
@@ -50,7 +51,7 @@ pub struct ScriptManager<Env, T> where Env: ExecutableDevEnv + Clone + 'static {
 }
 
 impl<Env, T> ScriptManager<Env, T>
-    where Env: ExecutableDevEnv + Clone + 'static,
+    where Env: ExecutableDevEnv + Clone + Debug + 'static,
           T: ExtSender<(Id<ScriptId>, ExecutionEvent)> + TransformableSender<(Id<ScriptId>, ExecutionEvent)> {
 
     /// Create a ScriptManager using a SQLite database file with the given path, i.e. filename.

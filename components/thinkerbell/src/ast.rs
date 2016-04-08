@@ -11,7 +11,10 @@ use foxbox_taxonomy::values::*;
 use std::marker::PhantomData;
 
 /// A thinkerbell script.
+#[derive(Debug)]
 pub struct Script<Ctx> where Ctx: Context {
+    pub name: String,
+
     /// A set of rules, stating what must be done in which circumstance.
     pub rules: Vec<Rule<Ctx>>,
 
@@ -23,8 +26,10 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
         "Script".to_owned()
     }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let name =  try!(path.push("", |path| String::take(path, source, "name")));
         let rules = try!(path.push("", |path| Rule::take_vec(path, source, "rules")));
         Ok(Script {
+            name: name,
             rules: rules,
             phantom: PhantomData
         })
@@ -68,6 +73,7 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
 /// Rule::<UncheckedCtx>::from_str(&source).unwrap();
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Rule<Ctx> where Ctx: Context {
     /// The condition in which to execute the trigger. The condition
     /// is matched once *all* the `Match` branches are true. Whenever
@@ -140,6 +146,7 @@ impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
 /// assert_eq!(match_.kind, ChannelKind::OvenTemperature);
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Match<Ctx> where Ctx: Context {
     /// The set of getters to watch. Note that the set of getters may
     /// change (e.g. when devices are added/removed) without rebooting
@@ -227,6 +234,7 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
 /// assert_eq!(statement.kind, ChannelKind::OnOff);
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Statement<Ctx> where Ctx: Context {
     /// The set of setters to which to send a command. Note that the
     /// set of setters may change (e.g. when devices are
@@ -284,6 +292,7 @@ pub trait Context {
 
 /// A Context used to represent a script that hasn't been compiled
 /// yet.
+#[derive(Debug)]
 pub struct UncheckedCtx;
 impl Context for UncheckedCtx {
 }

@@ -25,6 +25,7 @@ use foxbox_taxonomy::values::Duration;
 
 use transformable_channels::mpsc::*;
 
+use std::fmt::{ Debug, Formatter, Error as FmtError };
 use std::marker::PhantomData;
 
 /// The environment in which the code is meant to be executed.  This
@@ -41,12 +42,17 @@ pub trait ExecutableDevEnv: Send {
     type TimerGuard;
     fn start_timer(&self, duration: Duration, timer: Box<ExtSender<()>>) -> Self::TimerGuard;
 }
-
+impl<W, A, T> Debug for ExecutableDevEnv<WatchGuard=W, API=A, TimerGuard=T> {
+    fn fmt(&self, _: &mut Formatter) -> Result<(), FmtError> {
+        Ok(())
+    }
+}
 
 ///
 /// # Precompilation
 ///
 
+#[derive(Debug)]
 pub struct CompiledCtx<Env>  {
     phantom: PhantomData<Env>,
 }
@@ -119,6 +125,7 @@ impl<Env> Compiler<Env> where Env: ExecutableDevEnv {
             self.compile_rule(rule)
         }));
         Ok(Script {
+            name: script.name,
             rules: rules,
             phantom: PhantomData
         })
