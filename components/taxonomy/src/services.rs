@@ -194,6 +194,21 @@ pub enum ChannelKind {
     /// ```
     OpenClosed,
 
+    /// The service is used to deterct or decide whether a door lock
+    /// is locked or unlocked.
+    /// # JSON
+    ///
+    /// This kind is represented by string "DoorLocked".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"DoorLocked\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::DoorLocked);
+    /// ```
+    DoorLocked,
+
     //
     // # String
     //
@@ -421,6 +436,7 @@ impl Parser<ChannelKind> for ChannelKind {
                 "Ready" => Ok(ChannelKind::Ready),
                 "LightOn" => Ok(ChannelKind::LightOn),
                 "OpenClosed" => Ok(ChannelKind::OpenClosed),
+                "DoorLocked" => Ok(ChannelKind::DoorLocked),
                 "Username" => Ok(ChannelKind::Username),
                 "Password" => Ok(ChannelKind::Password),
                 "CurrentTime" => Ok(ChannelKind::CurrentTime),
@@ -465,6 +481,7 @@ impl ToJSON for ChannelKind {
             Ready => JSON::String("Ready".to_owned()),
             LightOn => JSON::String("LightOn".to_owned()),
             OpenClosed => JSON::String("OpenClosed".to_owned()),
+            DoorLocked => JSON::String("DoorLocked".to_owned()),
             Username => JSON::String("Username".to_owned()),
             Password => JSON::String("Password".to_owned()),
             CurrentTime => JSON::String("CurrentTime".to_owned()),
@@ -498,6 +515,7 @@ impl ChannelKind {
             Ready => Type::Unit,
             LightOn => Type::OnOff,
             OpenClosed => Type::OpenClosed,
+            DoorLocked => Type::DoorLocked,
             CurrentTime => Type::TimeStamp,
             CurrentTimeOfDay | RemainingTime => Type::Duration,
             OvenTemperature => Type::Temperature,
