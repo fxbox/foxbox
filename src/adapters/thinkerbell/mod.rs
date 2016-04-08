@@ -14,6 +14,7 @@ use timer;
 use transformable_channels::mpsc::*;
 
 use std::collections::{ HashMap, HashSet };
+use std::fmt;
 use std::path::Path;
 use std::sync::{ Arc, Mutex };
 use std::thread;
@@ -57,6 +58,12 @@ struct ThinkerbellExecutionEnv {
     // FIXME: Timer's not clonable, so we should only use one, right? Does this have to be mutexed?
     timer: Arc<Mutex<timer::Timer>>
 }
+impl fmt::Debug for ThinkerbellExecutionEnv {
+    fn fmt(&self, _: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        Ok(())
+    }
+}
+
 
 impl ExecutableDevEnv for ThinkerbellExecutionEnv {
     // We don't support watches, so we don't care about the type of WatchGuard.
