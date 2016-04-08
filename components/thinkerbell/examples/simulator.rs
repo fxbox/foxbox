@@ -14,6 +14,7 @@ use foxbox_thinkerbell::run::Execution;
 use foxbox_thinkerbell::ast::Script;
 use foxbox_thinkerbell::fake_env::*;
 
+use foxbox_taxonomy::api::User;
 use foxbox_taxonomy::parse::Parser;
 
 use std::io::prelude::*;
@@ -83,7 +84,7 @@ fn main () {
 
         let mut runner = Execution::<FakeEnv>::new();
         let (tx, rx) = channel();
-        runner.start(env.clone(), script, tx).unwrap();
+        runner.start(env.clone(), script, User::None, tx).unwrap();
         match rx.recv().unwrap() {
             Starting { result: Ok(()) } => println!("ready."),
             err => panic!("Could not launch script {:?}", err)

@@ -48,7 +48,7 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + Debug + 'static {
     /// are:
     /// - `RunningError:AlreadyRunning` if the script is already running;
     /// - a compilation error if the script was incorrect.
-    pub fn start<S>(&mut self, env: Env, script: Script<UncheckedCtx>, on_event: S) ->
+    pub fn start<S>(&mut self, env: Env, script: Script<UncheckedCtx>, owner: User, on_event: S) ->
         Result<(), Error>
         where S: ExtSender<ExecutionEvent> + Clone
     {
@@ -67,7 +67,7 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + Debug + 'static {
             let (tx, rx) = channel();
             self.command_sender = Some(Box::new(tx.clone()));
             thread::spawn(move || {
-                match ExecutionTask::<Env>::new(script, tx, rx) {
+                match ExecutionTask::<Env>::new(script, owner, tx, rx) {
                     Err(er) => {
                         let _ = on_event.send(ExecutionEvent::Starting {
                             result: Err(er.clone())
@@ -121,6 +121,7 @@ impl<Env> Drop for Execution<Env> where Env: ExecutableDevEnv + Debug + 'static 
 /// executed in an individual thread.
 pub struct ExecutionTask<Env> where Env: ExecutableDevEnv {
     script: Script<CompiledCtx<Env>>,
+    owner: User,
 
     /// Communicating with the thread running script.
     tx: Box<ExtSender<ExecutionOp>>,
@@ -220,7 +221,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
     ///
     /// The caller is responsible for spawning a new thread and
     /// calling `run()`.
-    fn new<S>(script: Script<UncheckedCtx>, tx: S, rx: Receiver<ExecutionOp>) -> Result<Self, Error>
+    fn new<S>(script: Script<UncheckedCtx>, owner: User, tx: S, rx: Receiver<ExecutionOp>) -> Result<Self, Error>
         where S: ExtSender<ExecutionOp> + Clone
     {
         let compiler = try!(Compiler::new().map_err(|err| Error::CompileError(err)));
@@ -228,6 +229,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
 
         Ok(ExecutionTask {
             script: script,
+            owner: owner,
             rx: rx,
             tx: Box::new(tx)
         })
@@ -454,7 +456,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
             debug!("[Thinkerbell update_condition] Triggering {} statements.", self.script.rules[rule_index].execute.len());
             for (statement, statement_index) in self.script.rules[rule_index].execute.iter().zip(0..) {
                 debug!("[Thinkerbell update_condition] Triggering statement {}/{}.", statement_index, self.script.rules[rule_index].execute.len());
-                let result = statement.eval(&api);
+                let result = statement.eval(&api, &self.owner);
                 let _ = on_event.send(ExecutionEvent::Sent {
                     rule_index: rule_index,
                     statement_index: statement_index,
@@ -468,11 +470,11 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
 
 
 impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
-    fn eval(&self, api: &Env::API) ->  Vec<(Id<Setter>, Result<(), Error>)> {
+    fn eval(&self, api: &Env::API, owner: &User) ->  Vec<(Id<Setter>, Result<(), Error>)> {
         api.send_values(vec![Targetted {
             select: self.destination.clone(),
             payload: self.value.clone()
-        }], User::None)
+        }], owner.clone())
             .into_iter()
             .map(|(id, result)|
                  (id, result.map_err(|err| Error::APIError(err))))
