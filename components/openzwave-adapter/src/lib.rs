@@ -11,12 +11,14 @@ use taxonomy::api::{ ResultMap, Error as TaxError, InternalError, User };
 use taxonomy::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
 use transformable_channels::mpsc::ExtSender;
 
-use openzwave::{ InitOptions, ZWaveManager, ZWaveNotification };
+use openzwave::{ ConfigPath, InitOptions, ZWaveManager, ZWaveNotification };
 use openzwave::{ CommandClass, ValueGenre, ValueType, ValueID };
 use openzwave::{ Controller };
 
 use std::error;
 use std::fmt;
+use std::{ fs, io };
+use std::path::Path;
 use std::thread;
 use std::sync::mpsc;
 use std::sync::{ Arc, Mutex, RwLock, Weak };
@@ -27,6 +29,7 @@ pub use self::OpenzwaveAdapter as Adapter;
 #[derive(Debug)]
 pub enum Error {
     TaxonomyError(TaxError),
+    IOError(io::Error),
     OpenzwaveError(openzwave::Error),
     UnknownError
 }
@@ -49,11 +52,18 @@ impl From<openzwave::Error> for Error {
     }
 }
 
+impl From<io::Error> for Error {
+    fn from(error: io::Error) -> Self {
+        Error::IOError(error)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Error::TaxonomyError(ref err)  => write!(f, "{}: {}", error::Error::description(self), err),
             Error::OpenzwaveError(ref err) => write!(f, "{}: {}", error::Error::description(self), err),
+            Error::IOError(ref err) => write!(f, "{}: {}", error::Error::description(self), err),
             Error::UnknownError => write!(f, "{}", error::Error::description(self)),
         }
     }
@@ -64,6 +74,7 @@ impl error::Error for Error {
         match *self {
             Error::TaxonomyError(_) => "Taxonomy Error",
             Error::OpenzwaveError(_) => "Openzwave Error",
+            Error::IOError(_) => "I/O Error",
             Error::UnknownError => "Unknown error",
         }
     }
@@ -72,6 +83,7 @@ impl error::Error for Error {
         match *self {
             Error::TaxonomyError(ref err) => Some(err),
             Error::OpenzwaveError(ref err) => Some(err),
+            Error::IOError(ref err) => Some(err),
             Error::UnknownError => None,
         }
     }
@@ -198,12 +210,30 @@ pub struct OpenzwaveAdapter {
     watchers: Arc<Mutex<Watchers>>,
 }
 
+fn ensure_directory<T: AsRef<Path> + ?Sized>(directory: &T) -> Result<(), Error> {
+    let path = directory.as_ref();
+    if path.exists() && !path.is_dir() {
+        return Err(
+            Error::IOError(io::Error::new(io::ErrorKind::AlreadyExists, format!("The file {} already exists and isn't a directory.", path.display())))
+        );
+    }
+
+    if !path.exists() {
+        try!(fs::create_dir(path));
+    }
+
+    Ok(())
+}
+
 impl OpenzwaveAdapter {
-    pub fn init<T: AdapterManagerHandle + Send + Sync + 'static> (box_manager: &Arc<T>) -> Result<(), Error> {
+    pub fn init<T: AdapterManagerHandle + Send + Sync + 'static> (box_manager: &Arc<T>, user_path: &str) -> Result<(), Error> {
+
+        try!(ensure_directory(user_path));
+
         let options = InitOptions {
             device: None, // TODO we should expose this as a Value
-            config_path: "./config/openzwave/",
-            user_path: "./config/openzwave/",
+            config_path: ConfigPath::Default, // This is where the default system configuraton is, usually contains the device information.
+            user_path: user_path, // This is where we can override the system configuration, and where the network layout and logs are stored.
         };
 
         let (ozw, rx) = try!(match openzwave::init(&options) {
@@ -335,7 +365,7 @@ impl OpenzwaveAdapter {
                     }
                     ZWaveNotification::ValueRemoved(value)         => {}
                     ZWaveNotification::Generic(string)             => {}
-                    other => { warn!("Notification not handled {:?}", other)}
+                    _ => {}
                 }
             }
         });
