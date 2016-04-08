@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["fabrice <fabrice@desre.org>"]
 build = "build.rs"
 # Files that shouldn't retrigger a new rust build if they are changed
-exclude = [ "config/**", "**/*.conf",
+exclude = [ "**/*.conf",
             "node_modules/**/*", "test/**/*", "tools/**/*", # Non-rust scripts
             "**/*.log", "**/*.sqlite", # Application generated data
             "**/*.md", "**/*.yml"      # e.g.: READMEs, Travis
