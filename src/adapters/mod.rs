@@ -68,7 +68,8 @@ impl<T: Controller> AdapterManager<T> {
         webpush::WebPush::init(c, manager).unwrap();
         ip_camera::IPCameraAdapter::init(manager, self.controller.clone()).unwrap();
         ThinkerbellAdapter::init(manager).unwrap(); // FIXME: no unwrap!
-        OpenzwaveAdapter::init(manager).unwrap();
+        let profile_openzwave = &self.controller.get_profile().path_for("openzwave");
+        OpenzwaveAdapter::init(manager, profile_openzwave).unwrap();
 
         self.start_tts(manager);
     }

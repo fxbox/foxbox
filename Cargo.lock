@@ -625,7 +625,7 @@ dependencies = [
 [[package]]
 name = "openzwave"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-rust#4758d5f8f1f708bd27b8a2dfb6e2d01018388a62"
+source = "git+https://github.com/fxbox/openzwave-rust#c2bebed1d5e1bc40ea3de8971c0711c903f8f730"
 dependencies = [
  "itertools 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -635,7 +635,7 @@ dependencies = [
 [[package]]
 name = "openzwave-adapter"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-adapter#e86cb7d65c835f18105dbe0a4aee0e08e05ef2fa"
+source = "git+https://github.com/fxbox/openzwave-adapter#60829cb2c798ea1826c1866f603c28d90cb6ff5a"
 dependencies = [
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -646,7 +646,7 @@ dependencies = [
 [[package]]
 name = "openzwave-stateful"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-stateful-rust#41a54c4a6fad52b00199e0a2bc947a95aeadb609"
+source = "git+https://github.com/fxbox/openzwave-stateful-rust#2ee9cf8a5f80bbd72136dc8ff58a05f6e23790f8"
 dependencies = [
  "openzwave 0.1.0 (git+https://github.com/fxbox/openzwave-rust)",
 ]
@@ -654,7 +654,7 @@ dependencies = [
 [[package]]
 name = "openzwave-sys"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-rust#4758d5f8f1f708bd27b8a2dfb6e2d01018388a62"
+source = "git+https://github.com/fxbox/openzwave-rust#c2bebed1d5e1bc40ea3de8971c0711c903f8f730"
 dependencies = [
  "gcc 0.3.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
