@@ -202,8 +202,8 @@ impl OpenzwaveAdapter {
     pub fn init<T: AdapterManagerHandle + Send + Sync + 'static> (box_manager: &Arc<T>) -> Result<(), Error> {
         let options = InitOptions {
             device: None, // TODO we should expose this as a Value
-            config_path: "./config/openzwave/".to_string(),
-            user_path: "./config/openzwave/".to_string(),
+            config_path: "./config/openzwave/",
+            user_path: "./config/openzwave/",
         };
 
         let (ozw, rx) = try!(match openzwave::init(&options) {
