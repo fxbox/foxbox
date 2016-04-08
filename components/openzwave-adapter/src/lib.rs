@@ -315,7 +315,7 @@ impl OpenzwaveAdapter {
                 //debug!("Received notification {:?}", notification);
                 match notification {
                     ZWaveNotification::ControllerReady(controller) => {
-                        let service = format!("OpenZWave/{}", controller.get_home_id());
+                        let service = format!("OpenZWave-{:08x}", controller.get_home_id());
                         let service_id = TaxId::new(&service);
                         controller_map.push(service_id.clone(), controller);
 
@@ -327,7 +327,7 @@ impl OpenzwaveAdapter {
                     ZWaveNotification::ValueAdded(value)           => {
                         if value.get_genre() != ValueGenre::ValueGenre_User { continue }
 
-                        let value_id = format!("OpenZWave/{} ({})", value.get_id(), value.get_label());
+                        let value_id = format!("OpenZWave-{:08x}-{:016x} ({})", value.get_home_id(), value.get_id(), value.get_label());
 
                         let controller_id = controller_map.find_tax_id_from_ozw(&value.get_controller()).unwrap();
                         if controller_id.is_none() { continue }
