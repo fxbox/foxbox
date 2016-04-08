@@ -14,17 +14,19 @@ use foxbox_taxonomy::values::Duration;
 use transformable_channels::mpsc::*;
 
 use std::collections::HashSet;
+use std::fmt;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::thread;
 use std::sync::Mutex;
 
 /// Running and controlling a single script.
-pub struct Execution<Env> where Env: ExecutableDevEnv + 'static {
+pub struct Execution<Env> where Env: ExecutableDevEnv + Debug + 'static {
     command_sender: Option<Box<ExtSender<ExecutionOp>>>,
     phantom: PhantomData<Env>,
 }
 
-impl<Env> Execution<Env> where Env: ExecutableDevEnv + 'static {
+impl<Env> Execution<Env> where Env: ExecutableDevEnv + Debug + 'static {
     pub fn new() -> Self {
         Execution {
             command_sender: None,
@@ -50,6 +52,8 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + 'static {
         Result<(), Error>
         where S: ExtSender<ExecutionEvent> + Clone
     {
+        info!("Thinkerbell: Starting compilation of script '{}'", script.name);
+        debug!("Thinkerbell: Starting compilation of {:?}", script);
         if self.command_sender.is_some() {
             let err = Err(Error::StartStopError(StartStopError::AlreadyRunning));
             let _ = on_event.send(ExecutionEvent::Starting {
@@ -107,7 +111,7 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + 'static {
     }
 }
 
-impl<Env> Drop for Execution<Env> where Env: ExecutableDevEnv + 'static {
+impl<Env> Drop for Execution<Env> where Env: ExecutableDevEnv + Debug + 'static {
     fn drop(&mut self) {
         let _ignored = self.stop(|_ignored| { });
     }
@@ -183,6 +187,17 @@ enum ExecutionOp {
     Stop(Mutex<Box<Fn(Result<(), Error>) + Send>>)
 }
 
+impl Debug for ExecutionOp {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        use self::ExecutionOp::*;
+        match *self {
+            Update {..} => formatter.write_str("Update"),
+            UpdateCondition { .. } => formatter.write_str("UpdateCondition"),
+            Stop (_) => formatter.write_str("Stop")
+        }
+    }
+}
+
 struct ConditionState {
     match_is_met: bool,
 
@@ -200,7 +215,7 @@ struct RuleState<Env> where Env: ExecutableDevEnv {
     ongoing_timer: Option<Env::TimerGuard>, // FIXME: It's actually a guard.
 }
 
-impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
+impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
     /// Create a new execution task.
     ///
     /// The caller is responsible for spawning a new thread and
@@ -221,6 +236,9 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
     /// Execute the monitoring task.
     /// This currently expects to be executed in its own thread.
     fn run<S>(&mut self, env: Env, on_event: S) where S: ExtSender<ExecutionEvent> + Clone {
+        info!("Thinkerbell: Starting execution of script '{}'", self.script.name);
+        debug!("Thinkerbell: Starting execution of {:?}", self.script);
+
         let mut witnesses = Vec::new();
         let api = env.api();
 
@@ -267,6 +285,8 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv {
         }).collect();
 
         for msg in self.rx.iter() {
+            debug!("Thinkerbell: Received message {:?}", msg);
+
             match msg {
                 ExecutionOp::Stop(cb) => {
                     // Leave the loop. Watching will stop once

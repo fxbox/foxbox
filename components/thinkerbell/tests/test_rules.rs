@@ -46,7 +46,7 @@ fn test_compile() {
     });
 
     println!("* Attempting to parse an run an empty script will raise an error.");
-    let script = Script::from_str("{\"rules\": []}").unwrap();
+    let script = Script::from_str(r#"{"name": "foo", "rules": []}"#).unwrap();
     match exec.start(env, script, tx_run) {
         Err(Error::CompileError(CompileError::SourceError(SourceError::NoRule))) => {},
         other => panic!("Unexpected result {:?}", other)
@@ -88,6 +88,7 @@ fn test_run() {
     });
 
     let script_1 = Script {
+        name: "Test script".to_owned(),
         rules: vec![
             Rule {
                 conditions: vec![
@@ -509,6 +510,7 @@ fn test_run_with_delay() {
     });
 
     let script_1 = Script {
+        name: "Test script".to_owned(),
         rules: vec![
             Rule {
                 conditions: vec![
