@@ -2,19 +2,15 @@
 //!
 //! Useful for logging.
 
-
-//! An adapter providing time-related services, such as the current
-//! timestamp or the current time of day.
-
-use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::api::{ Error, InternalError, User };
-use foxbox_taxonomy::values::{ Duration as ValDuration, Range, TimeStamp, Type, Value };
+use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
+use foxbox_taxonomy::values::{ Range, Value };
 
 use transformable_channels::mpsc::*;
 
 use std::collections::{ HashMap, HashSet };
-use std::sync::{ Arc, Mutex };
+use std::sync::Arc;
 
 
 static ADAPTER_NAME: &'static str = "Console adapter (built-in)";
@@ -23,11 +19,6 @@ static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 
 pub struct Console {
     setter_stdout_id: Id<Setter>
-}
-
-// We do not need any guard.
-struct Guard;
-impl AdapterWatchGuard for Guard {
 }
 
 impl Console {
