@@ -9,7 +9,7 @@ use foxbox_thinkerbell::fake_env::*;
 use foxbox_thinkerbell::run::*;
 use foxbox_thinkerbell::ast::*;
 
-use foxbox_taxonomy::api::{ Error as APIError };
+use foxbox_taxonomy::api::{ Error as APIError, User };
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Duration, OnOff, Range, TimeStamp, Type, TypeError as APITypeError , Value };
@@ -48,7 +48,7 @@ fn test_compile() {
 
     println!("* Attempting to parse an run an empty script will raise an error.");
     let script = Script::from_str(r#"{"name": "foo", "rules": []}"#).unwrap();
-    match exec.start(env, script, tx_run) {
+    match exec.start(env, script, User::None, tx_run) {
         Err(Error::CompileError(CompileError::SourceError(SourceError::NoRule))) => {},
         other => panic!("Unexpected result {:?}", other)
     }
@@ -131,7 +131,7 @@ fn test_run() {
     let setter_id_3 = Id::<Setter>::new("Setter 3");
 
     println!("* We can start executing a trivial rule.");
-    exec.start(env.clone(), script_1, tx_run).unwrap();
+    exec.start(env.clone(), script_1, User::None, tx_run).unwrap();
 
     println!("* Changing the structure of the network doesn't break the rule.");
     env.execute(Instruction::AddAdapters(vec![adapter_id_1.to_string()]));
@@ -555,7 +555,7 @@ fn test_run_with_delay() {
 
     sleep(&rx_done, &rx_send, &rx_timer);
 	println!("* We can start executing a trivial rule.");
-    exec.start(env.clone(), script_1, tx_run).unwrap();
+    exec.start(env.clone(), script_1, User::None, tx_run).unwrap();
 
     sleep(&rx_done, &rx_send, &rx_timer);
 	println!("* Changing the structure of the network doesn't break the rule.");

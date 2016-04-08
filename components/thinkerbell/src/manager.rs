@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::{ Path as FilePath, PathBuf as FilePathBuf };
 
-use foxbox_taxonomy::api::ResultMap;
+use foxbox_taxonomy::api::{ ResultMap, User };
 use foxbox_taxonomy::parse::*;
 use foxbox_taxonomy::util::{ Id };
 
@@ -59,6 +59,14 @@ impl<Env, T> ScriptManager<Env, T>
     ///
     /// NOTE: You MUST consume the contents of `tx` to prevent memory leaks.
     ///
+    /// The database stores records with this schema:
+    /// {
+    ///   id, // Record identifier. Primary key.
+    ///   source, // Script source. Defines the behavior of the rule.
+    ///   is_enabled, // Boolean flag that indicates if the rule is enabled or disabled.
+    ///   owner // User identifier (i32) of the owner of the rule. Defaults to no user (-1).
+    /// }
+    ///
     /// The database stores the raw script source, but only after the source has been parsed
     /// to ensure validity.
     pub fn new(env: Env, path: &FilePath, tx: Box<T>) -> Result<Self, Error> {
@@ -67,7 +75,8 @@ impl<Env, T> ScriptManager<Env, T>
         try!(connection.execute("CREATE TABLE IF NOT EXISTS scripts (
             id          TEXT NOT NULL PRIMARY KEY,
             source      TEXT NOT NULL,
-            is_enabled  BOOL NOT NULL DEFAULT 1
+            is_enabled  BOOL NOT NULL DEFAULT 1,
+            owner       INTEGER NOT NULL DEFAULT -1
         )", &[]));
 
         Ok(ScriptManager {
@@ -82,7 +91,7 @@ impl<Env, T> ScriptManager<Env, T>
     pub fn load(&mut self) -> Result<ResultMap<Id<ScriptId>, (), Error>, Error> {
         let connection = try!(rusqlite::Connection::open(&self.path));
         let mut result_map = HashMap::new();
-        let mut stmt = try!(connection.prepare("SELECT id, source, is_enabled FROM scripts"));
+        let mut stmt = try!(connection.prepare("SELECT id, source, is_enabled, owner FROM scripts"));
         let rows = try!(stmt.query(&[]));
 
         for result_row in rows {
@@ -91,11 +100,16 @@ impl<Env, T> ScriptManager<Env, T>
             let id: Id<ScriptId> = Id::new(&id_string);
             let source: String = try!(row.get_checked(1));
             let is_enabled: bool = try!(row.get_checked(2));
+            let owner_value: i32 = try!(row.get_checked(3));
+            let owner: User = match owner_value {
+                -1 => User::None,
+                _ => User::Id(owner_value)
+            };
 
             if is_enabled {
                 result_map.insert(
                     id.clone(),
-                    self.start_script(&id, &source).map(|_| ()));
+                    self.start_script(&id, &source, &owner).map(|_| ()));
             } else {
                 result_map.insert(id.clone(), Ok(()));
             }
@@ -103,20 +117,29 @@ impl<Env, T> ScriptManager<Env, T>
         Ok(result_map)
     }
 
-    /// Attempt to add a new script. The script will be executed and persisted to disk.
+    /// Attempt to add a new script.
+    /// The script will be executed and persisted to disk.
     /// The ID is chosen by the consumer and must be unique.
-    pub fn put(&mut self, id: &Id<ScriptId>, source: &String) -> Result<(), Error> {
-        try!(self.start_script(&id, &source));
+    /// The script may have (User::Id(i32)) or may not have a owner (User::None).
+    /// If the script has owner, this value will be propagated to Thinkerbell's
+    /// adapter.
+    pub fn put(&mut self, id: &Id<ScriptId>, source: &String, owner: &User) -> Result<(), Error> {
+        try!(self.start_script(&id, &source, &owner));
+
+        let owner_value: i32 = match *owner {
+            User::Id(id) => id,
+            User::None => -1
+        };
 
         let connection = try!(rusqlite::Connection::open(&self.path));
-        connection.execute("INSERT OR REPLACE INTO scripts (id, source, is_enabled)
-                VALUES ($1, $2, $3)", &[&id.to_string(), source, &1])
+        connection.execute("INSERT OR REPLACE INTO scripts (id, source, is_enabled, owner)
+                VALUES ($1, $2, $3, $4)", &[&id.to_string(), source, &1, &owner_value])
             .map(|_| ()).map_err(From::from)
     }
 
     /// Enable or disable a script, starting or stopping the script if necessary.
     pub fn set_enabled(&mut self, id: &Id<ScriptId>, enabled: bool) -> Result<(), Error> {
-        let source = try!(self.get_source(id));
+        let (source, owner) = try!(self.get_source_and_owner(id));
         let is_running = self.runners.contains_key(&id);
         match (enabled, is_running) {
             (false, true) => {
@@ -135,7 +158,7 @@ impl<Env, T> ScriptManager<Env, T>
                                         &[&id.to_string()]));
             },
             (true, false) => {
-                try!(self.start_script(id, &source));
+                try!(self.start_script(id, &source, &owner));
                 let connection = try!(rusqlite::Connection::open(&self.path));
                 try!(connection.execute("UPDATE scripts SET is_enabled = 1 WHERE id = $1",
                                         &[&id.to_string()]));
@@ -184,13 +207,20 @@ impl<Env, T> ScriptManager<Env, T>
         self.runners.len()
     }
 
-    /// Get the source for a script with the given id.
-    pub fn get_source(&self, id: &Id<ScriptId>) -> Result<String, Error> {
+    /// Get the source and user identifier of the owner of a script given the
+    /// script id.
+    pub fn get_source_and_owner(&self, id: &Id<ScriptId>) -> Result<(String, User), Error> {
         let connection = try!(rusqlite::Connection::open(&self.path));
-        let mut stmt = try!(connection.prepare("SELECT source FROM scripts WHERE id = $1"));
+        let mut stmt = try!(connection.prepare("SELECT source, owner FROM scripts WHERE id = $1"));
         let mut rows = try!(stmt.query(&[&id.to_string()]));
         let first_row = try!(try!(rows.nth(0).ok_or(Error::NoSuchScriptError)));
-        Ok(try!(first_row.get_checked(0)))
+        let source = try!(first_row.get_checked(0));
+        let owner_value = try!(first_row.get_checked(1));
+        let owner = match owner_value {
+            -1 => User::None,
+            _ => User::Id(owner_value)
+        };
+        Ok((source, owner))
     }
 
     /// Return true if the script is enabled.
@@ -200,7 +230,7 @@ impl<Env, T> ScriptManager<Env, T>
 
     /// Execute a script. Returns an error if the script is already running,
     /// or it won't parse, or it won't compile.
-    fn start_script(&mut self, id: &Id<ScriptId>, source: &String) -> Result<(), Error> {
+    fn start_script(&mut self, id: &Id<ScriptId>, source: &String, owner: &User) -> Result<(), Error> {
         if self.runners.contains_key(id) {
             return Err(Error::RunError(RunError::StartStopError(StartStopError::AlreadyRunning)));
         }
@@ -210,7 +240,7 @@ impl<Env, T> ScriptManager<Env, T>
             (tx_id.clone(), event)
         });
         let parsed_source = try!(Script::from_str(source));
-        try!(runner.start(self.env.clone(), parsed_source, tx));
+        try!(runner.start(self.env.clone(), parsed_source, owner.clone(), tx));
         self.runners.insert(id.clone(), runner);
         Ok(())
     }
