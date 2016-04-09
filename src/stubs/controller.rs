@@ -79,8 +79,8 @@ impl Controller for ControllerStub {
     fn remove_websocket(&mut self, socket: ws::Sender) {}
     fn broadcast_to_websockets(&self, data: serde_json::value::Value) {}
 
-    fn get_config(&self) -> &ConfigService {
-        &self.config
+    fn get_config(&self) -> Arc<ConfigService> {
+        self.config.clone()
     }
     fn get_upnp_manager(&self) -> Arc<UpnpManager> {
         Arc::new(UpnpManager::new())
