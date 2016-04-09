@@ -14,3 +14,6 @@ serde_macros = "0.6.14"
 string_cache = "^0.2"
 sublock = "^0.1"
 transformable_channels = "^0.1"
+
+[dev-dependencies]
+assert_matches = "1.0.0"
