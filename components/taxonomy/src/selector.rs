@@ -24,7 +24,7 @@ pub trait SelectedBy<T> {
     fn matches(&self, &T) -> bool;
 }
 
-/// A trait used to let ServiceSelector work on complex data structures
+/// A trait used to let `ServiceSelector` work on complex data structures
 /// that are not necessarily exactly Selector.
 pub trait ServiceLike {
     fn id(&self) -> &Id<ServiceId>;
@@ -83,9 +83,9 @@ impl ServiceLike for Service {
 ///
 /// - (optional) string `id`: accept only a service with a given id;
 /// - (optional) array of string `tags`:  accept only services with all the tags in the array;
-/// - (optional) array of objects `getters` (see GetterSelector): accept only services with
+/// - (optional) array of objects `getters` (see `GetterSelector`): accept only services with
 ///    channels matching all the selectors in this array;
-/// - (optional) array of objects `setters` (see SetterSelector): accept only services with
+/// - (optional) array of objects `setters` (see `SetterSelector`): accept only services with
 ///    channels matching all the selectors in this array;
 ///
 /// While each field is optional, at least one field must be provided.
@@ -244,21 +244,21 @@ impl ServiceSelector {
         }
         // If any of the getter selectors doesn't find a getter,
         // we don't match.
-        let getters_fail = self.getters.iter().find(|selector| {
+        let getters_fail = self.getters.iter().any(|selector| {
             !service.has_getters(|channel| {
                 selector.matches(&self.tags, channel)
             })
-        }).is_some();
+        });
         if getters_fail {
             return false;
         }
         // If any of the setter selectors doesn't find a setter,
         // we don't match.
-        let setters_fail = self.setters.iter().find(|selector| {
+        let setters_fail = self.setters.iter().any(|selector| {
             !service.has_setters(|channel| {
                 selector.matches(&self.tags, channel)
             })
-        }).is_some();
+        });
         if setters_fail {
             return false;
         }
@@ -296,7 +296,7 @@ impl SelectedBy<ServiceSelector> for Service {
 /// - (optional) array of string `tags`:  accept only channels with all the tags in the array;
 /// - (optional) array of string `service_tags`:  accept only channels of a service with all the
 ///        tags in the array;
-/// - (optional) string|object `kind` (see ChannelKind): accept only channels of a given kind.
+/// - (optional) string|object `kind` (see `ChannelKind`): accept only channels of a given kind.
 ///
 /// While each field is optional, at least one field must be provided.
 ///
@@ -491,7 +491,7 @@ impl GetterSelector {
 /// - (optional) array of string `tags`:  accept only channels with all the tags in the array;
 /// - (optional) array of string `service_tags`:  accept only channels of a service with all the
 ///        tags in the array;
-/// - (optional) string|object `kind` (see ChannelKind): accept only channels of a given kind.
+/// - (optional) string|object `kind` (see `ChannelKind`): accept only channels of a given kind.
 ///
 /// While each field is optional, at least one field must be provided.
 ///

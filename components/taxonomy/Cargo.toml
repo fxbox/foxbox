@@ -5,12 +5,13 @@ authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
 chrono = "0.2.19"
-clippy = "0.0.48"
+clippy = "0.0.63"
+#clippy = {git = "https://github.com/Manishearth/rust-clippy.git", rev = "c1c935d"}
 lazy_static = "^0.1"
 log = "0.3"
-serde = "0.6.13"
-serde_json = "0.6.0"
-serde_macros = "0.6.14"
+serde = "0.7.0"
+serde_json = "0.7.0"
+serde_macros = "0.7.0" 
 string_cache = "^0.2"
 sublock = "^0.1"
 transformable_channels = "^0.1"

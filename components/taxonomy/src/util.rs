@@ -9,7 +9,7 @@ use std::fmt;
 use string_cache::Atom;
 
 use serde::ser::{ Serialize, Serializer };
-use serde::de::{ Deserialize, Deserializer, Error as DeserializationError, Type as DeserializationType };
+use serde::de::{ Deserialize, Deserializer, Error, Type };
 
 /// A marker for a request that a expects a specific value.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -286,7 +286,7 @@ impl<T, U> ToJSON for HashMap<Id<U>, T> where T: ToJSON {
 ///
 /// impl Deserialize for Foo {
 ///   fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error> where D: Deserializer {
-///     deserializer.visit_string(TrivialEnumVisitor::new(|source| {
+///     deserializer.deserialize_string(TrivialEnumVisitor::new(|source| {
 ///       match source {
 ///         "A" => Ok(Foo::A),
 ///         "B" => Ok(Foo::B),
@@ -311,7 +311,7 @@ impl<T> TrivialEnumVisitor<T> where T: Deserialize {
             }
         }
     fn parse<E>(&self, source: &str) -> Result<T, E>
-        where E: DeserializationError
+        where E: Error
     {
         (self.parser)(source)
             .map_err(|()| E::unknown_field(&source.to_owned()))
@@ -322,33 +322,33 @@ use serde::de::Visitor;
 impl<T> Visitor for TrivialEnumVisitor<T> where T: Deserialize {
     type Value = T;
     fn visit_str<E>(&mut self, v: &str) -> Result<T, E>
-        where E: DeserializationError,
+        where E: Error,
     {
         self.parse(v)
     }
 
     fn visit_string<E>(&mut self, v: String) -> Result<T, E>
-        where E: DeserializationError,
+        where E: Error,
     {
         self.parse(&v)
     }
 
     fn visit_bytes<E>(&mut self, v: &[u8]) -> Result<T, E>
-        where E: DeserializationError,
+        where E: Error,
     {
         use std::str;
         match str::from_utf8(v) {
             Ok(s) => self.parse(s),
-            Err(_) => Err(E::type_mismatch(DeserializationType::String)),
+            Err(_) => Err(E::invalid_type(Type::String)),
         }
     }
 
     fn visit_byte_buf<E>(&mut self, v: Vec<u8>) -> Result<T, E>
-        where E: DeserializationError,
+        where E: Error,
     {
         match String::from_utf8(v) {
             Ok(s) => self.parse(&s),
-            Err(_) => Err(DeserializationError::type_mismatch(DeserializationType::String)),
+            Err(_) => Err(Error::invalid_type(Type::String)),
         }
     }
 }
