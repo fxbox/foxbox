@@ -162,21 +162,21 @@ pub enum ChannelKind {
     // # Boolean
     //
 
-    /// The service is used to detect or decide whether some device
+    /// The service is used to detect or decide whether some light
     /// is on or off.
     ///
     /// # JSON
     ///
-    /// This kind is represented by string "OnOff".
+    /// This kind is represented by string "LightOn".
     ///
     /// ```
     /// use foxbox_taxonomy::services::*;
     /// use foxbox_taxonomy::parse::*;
     ///
-    /// let parsed = ChannelKind::from_str("\"OnOff\"").unwrap();
-    /// assert_eq!(parsed, ChannelKind::OnOff);
+    /// let parsed = ChannelKind::from_str("\"LightOn\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::LightOn);
     /// ```
-    OnOff,
+    LightOn,
 
     /// The service is used to detect or decide whether some device
     /// is open or closed.
@@ -310,6 +310,7 @@ pub enum ChannelKind {
     AddThinkerbellRule,
     RemoveThinkerbellRule,
     ThinkerbellRuleSource,
+    ThinkerbellRuleOn,
 
     /// Capture a new snapshot.
     ///
@@ -418,7 +419,7 @@ impl Parser<ChannelKind> for ChannelKind {
         if let Some(str) = source.as_string() {
             return match str {
                 "Ready" => Ok(ChannelKind::Ready),
-                "OnOff" => Ok(ChannelKind::OnOff),
+                "LightOn" => Ok(ChannelKind::LightOn),
                 "OpenClosed" => Ok(ChannelKind::OpenClosed),
                 "Username" => Ok(ChannelKind::Username),
                 "Password" => Ok(ChannelKind::Password),
@@ -427,6 +428,7 @@ impl Parser<ChannelKind> for ChannelKind {
                 "AddThinkerbellRule" => Ok(ChannelKind::AddThinkerbellRule),
                 "RemoveThinkerbellRule" => Ok(ChannelKind::RemoveThinkerbellRule),
                 "ThinkerbellRuleSource" => Ok(ChannelKind::ThinkerbellRuleSource),
+                "ThinkerbellRuleOn" => Ok(ChannelKind::ThinkerbellRuleOn),
                 "RemainingTime" => Ok(ChannelKind::RemainingTime),
                 "OvenTemperature" => Ok(ChannelKind::OvenTemperature),
                 "TakeSnapshot" => Ok(ChannelKind::TakeSnapshot),
@@ -461,7 +463,7 @@ impl ToJSON for ChannelKind {
         use self::ChannelKind::*;
         match *self {
             Ready => JSON::String("Ready".to_owned()),
-            OnOff => JSON::String("OnOff".to_owned()),
+            LightOn => JSON::String("LightOn".to_owned()),
             OpenClosed => JSON::String("OpenClosed".to_owned()),
             Username => JSON::String("Username".to_owned()),
             Password => JSON::String("Password".to_owned()),
@@ -472,6 +474,7 @@ impl ToJSON for ChannelKind {
             AddThinkerbellRule => JSON::String("AddThinkerbellRule".to_owned()),
             RemoveThinkerbellRule => JSON::String("RemoveThinkerbellRule".to_owned()),
             ThinkerbellRuleSource => JSON::String("ThinkerbellRuleSource".to_owned()),
+            ThinkerbellRuleOn => JSON::String("ThinkerbellRuleOn".to_owned()),
             TakeSnapshot => JSON::String("TakeSnapshot".to_owned()),
             Log => JSON::String("Log".to_owned()),
             Extension { ref vendor, ref adapter, ref kind, ref typ } => {
@@ -493,16 +496,18 @@ impl ChannelKind {
         use values::Type;
         match *self {
             Ready => Type::Unit,
-            OnOff => Type::OnOff,
+            LightOn => Type::OnOff,
             OpenClosed => Type::OpenClosed,
             CurrentTime => Type::TimeStamp,
             CurrentTimeOfDay | RemainingTime => Type::Duration,
             OvenTemperature => Type::Temperature,
             AddThinkerbellRule => Type::ThinkerbellRule,
             RemoveThinkerbellRule => Type::Unit,
-            Username | Password | ThinkerbellRuleSource => Type::String,
+			ThinkerbellRuleSource => Type::String,
+            ThinkerbellRuleOn => Type::OnOff,
             Log => Type::String,
             TakeSnapshot => Type::Unit,
+			Username | Password => Type::String,
             Extension { ref typ, ..} => typ.clone(),
         }
     }
