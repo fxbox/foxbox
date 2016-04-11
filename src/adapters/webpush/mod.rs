@@ -2,13 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Adapter for WebPush.
+//! Adapter for `WebPush`.
 //!
 //! Implemented as described in the draft IETF RFC:
 //! https://tools.ietf.org/html/draft-ietf-webpush-protocol-04
 //!
 //! Encryption and sending of push notifications is controlled by the
-//! "webpush" build feature. Older versions of OpenSSL (< 1.0.0) are
+//! "webpush" build feature. Older versions of `OpenSSL` (< 1.0.0) are
 //! missing the necessary APIs to support the implementation.
 //!
 

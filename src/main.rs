@@ -11,6 +11,8 @@
 // Make linter fail for every warning
 #![plugin(clippy)]
 #![deny(clippy)]
+// Don't fail on doc_markdown as clippy is sometimes a bit over zealous.
+#![warn(doc_markdown)]
 
 #![cfg_attr(test, feature(const_fn))] // Dependency of stainless
 #![cfg_attr(test, plugin(stainless))] // Test runner

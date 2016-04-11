@@ -10,12 +10,14 @@ authentication = []
 
 [dependencies]
 chrono = "0.2.19"
-clippy = "0.0.48"
+clippy = "0.0.63"
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
-foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "aa03b11" }
-foxbox_thinkerbell = { git = "https://github.com/fxbox/thinkerbell.git", rev = "98ecba4" }
+#foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git", rev = "aa03b11" }
+foxbox_taxonomy = { path = "../taxonomy" }
+#foxbox_thinkerbell = { git = "https://github.com/fxbox/thinkerbell.git", rev = "98ecba4" }
+foxbox_thinkerbell = { path = "../thinkerbell" }
 foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "73e8943" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
@@ -33,9 +35,9 @@ router = "0.1.0"
 rust-crypto = "0.2.34"
 rustc-serialize = "0.3"
 rusqlite = "0.6.0"
-serde = "0.6.13"
-serde_json = "0.6.0"
-serde_macros = "0.6.14"
+serde = "0.7.0"
+serde_json = "0.7.0"
+serde_macros = "0.7.2"
 staticfile = "0.1.0"
 transformable_channels = "^0.1"
 unicase = "1.3.0"

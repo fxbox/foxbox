@@ -8,12 +8,12 @@ mod philips_hue;
 /// An adapter providing time services.
 pub mod clock;
 
-/// An adapter providing WebPush services.
+/// An adapter providing `WebPush` services.
 pub mod webpush;
 
 mod ip_camera;
 
-/// An adapter providing access to Thinkerbell.
+/// An adapter providing access to `Thinkerbell`.
 mod thinkerbell;
 
 use foxbox_taxonomy::manager::AdapterManager as TaxoManager;

@@ -22,11 +22,11 @@ static ADAPTER_NAME: &'static str = "Thinkerbell adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
 static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 
-/// ThinkerbellAdapter hooks up the rules engine (if this, then that) as an adapter.
+/// `ThinkerbellAdapter` hooks up the rules engine (if this, then that) as an adapter.
 ///
 /// Each "rule", or "script", is a JSON-serialized structure according to Thinkerbell conventions.
 ///
-/// This adapter exposes a root service, with one AddThinkerbellRule setter (to add a new rule).
+/// This adapter exposes a root service, with one `AddThinkerbellRule` setter (to add a new rule).
 /// Each rule that has been added is exposed as its own service, with the following getters/setters:
 /// - Set Enabled (setter) -- toggles whether or not the script is enabled
 /// - Get Enabled (getter) -- returns whether or not the script is enabled
@@ -36,7 +36,7 @@ static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 #[derive(Clone)]
 pub struct ThinkerbellAdapter {
 
-    /// The sending end of the channel for sending messages to ThinkerbellAdapter's main loop.
+    /// The sending end of the channel for sending messages to `ThinkerbellAdapter`'s main loop.
     tx: Arc<Mutex<RawSender<ThinkAction>>>,
 
     /// A reference to the AdapterManager.
@@ -50,7 +50,7 @@ pub struct ThinkerbellAdapter {
 }
 
 /// Thinkerbell requires an execution environment following this API.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct ThinkerbellExecutionEnv {
     adapter_manager: Arc<AdapterManager>,
 
@@ -76,8 +76,8 @@ impl ExecutableDevEnv for ThinkerbellExecutionEnv {
     }
 }
 
-/// Convert a ScriptManagerError into an API Error.
-/// We can't implement From<T> because ScriptManagerError is in a different crate.
+/// Convert a `ScriptManagerError` into an API Error.
+/// We can't implement From<T> because `ScriptManagerError` is in a different crate.
 fn sm_error(e: ScriptManagerError) -> Error {
     Error::InternalError(InternalError::GenericError(format!("{:?}", e)))
 }
@@ -378,7 +378,7 @@ impl ThinkerbellAdapter {
             setter_add_rule_id: setter_add_rule_id.clone(),
         };
 
-        // Add the adapter and the root service (the one that exposes AddThinkerbellRule for adding new rules).
+        // Add the adapter and the root service (the one that exposes `AddThinkerbellRule` for adding new rules).
         try!(manager.add_adapter(Arc::new(adapter.clone())));
         try!(manager.add_service(Service::empty(root_service_id.clone(), adapter_id.clone())));
         try!(manager.add_setter(Channel {
