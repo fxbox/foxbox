@@ -163,6 +163,7 @@ struct ThinkerbellRule {
 
 impl ThinkerbellAdapter {
 
+    #[allow(cyclomatic_complexity)]
     fn main(
         &self,
         rx: Receiver<ThinkAction>,
@@ -170,7 +171,7 @@ impl ThinkerbellAdapter {
     ) {
         // Store an in-memory list of all of the rules (their getters, setters, etc.).
         // We need to track these to respond to getter/setter requests.
-        let mut rules = Vec::new();
+        let mut rules: Vec<ThinkerbellRule> = Vec::new();
 
         'recv: for action in rx {
             match action {
@@ -178,6 +179,15 @@ impl ThinkerbellAdapter {
                 // The script has already been started with ScriptManager at this point;
                 // we're just adding the adapter's services now.
                 ThinkAction::AddRuleService(script_id) => {
+                    // If the rule already existed (i.e. we're overwriting the original source),
+                    // we don't need to re-add a Service. This is safe, because a Service doesn't
+                    // know or care about the contents of the rule, just the ID.
+                    for ref rule in &rules {
+                        if rule.script_id == script_id {
+                            info!("No need to add new ThinkerbellRule; ID '{}' already exists.", &script_id);
+                            continue 'recv;
+                        }
+                    }
                     match self.add_rule_service(script_id) {
                         Ok(rule) => {
                             rules.push(rule);
