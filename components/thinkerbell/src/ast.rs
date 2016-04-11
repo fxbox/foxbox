@@ -66,7 +66,7 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
 ///   "execute": [{
 ///     "destination": [{"id": "my setter"}],
 ///     "value": {"OnOff": "Off"},
-///     "kind": "OnOff"
+///     "kind": "LightOn"
 ///   }]
 /// }"#;
 ///
@@ -226,12 +226,12 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
 /// let source = r#"{
 ///   "destination": [{"id": "my setter"}],
 ///   "value": {"OnOff": "Off"},
-///   "kind": "OnOff"
+///   "kind": "LightOn"
 /// }"#;
 ///
 /// let statement = Statement::<UncheckedCtx>::from_str(&source).unwrap();
 /// assert_eq!(statement.value, Value::OnOff(OnOff::Off));
-/// assert_eq!(statement.kind, ChannelKind::OnOff);
+/// assert_eq!(statement.kind, ChannelKind::LightOn);
 /// # }
 /// ```
 #[derive(Debug)]
