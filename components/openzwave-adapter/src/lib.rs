@@ -197,21 +197,55 @@ impl Watchers {
     }
 }
 
-fn kind_from_value(value: ValueID) -> Option<ChannelKind> {
-    value.get_command_class().map(|cc| match cc {
-        CommandClass::SensorBinary => ChannelKind::OpenClosed,
-        _ => ChannelKind::Ready // TODO
-    })
+fn tax_kind_from_ozw_vid(vid: &ValueID) -> Option<ChannelKind> {
+    match (vid.get_type(), vid.get_command_class(), vid.get_index()) {
+        (ValueType::ValueType_Bool, Some(CommandClass::DoorLock),     0) => Some(ChannelKind::DoorLocked),
+        (ValueType::ValueType_Bool, Some(CommandClass::SensorBinary), _) => Some(ChannelKind::OpenClosed),
+        // (ValueType::ValueType_Bool, Some(_)) => Some(ChannelKind::OnOff), TODO Find a proper type
+        // Unrecognized command class or type - we don't know what to do with it.
+        _ => None
+    }
 }
 
-fn to_open_closed(value: &ValueID) -> Option<Value> {
-    debug_assert_eq!(value.get_type(), ValueType::ValueType_Bool);
+fn ozw_vid_as_tax_value(vid: &ValueID) -> Option<Value> {
+    if vid.get_command_class().is_none() {
+        return None;
+    }
 
-    value.as_bool().ok().map(|val| {
-        Value::OpenClosed(
-            if val { OpenClosed::Open } else { OpenClosed::Closed }
-        )
-    })
+    match vid.get_type() {
+        ValueType::ValueType_Bool => {
+            if let Ok(value) = vid.as_bool() {
+                match tax_kind_from_ozw_vid(vid) {
+                    // Some(ChannelKind::OnOff)  => Some(Value::OnOff(if value {OnOff::On} else {OnOff::Off})), // TODO support switches
+                    Some(ChannelKind::OpenClosed)  => Some(Value::OpenClosed(if value {OpenClosed::Open} else {OpenClosed::Closed})),
+                    Some(ChannelKind::DoorLocked)  => Some(Value::DoorLocked(if value {DoorLocked::Locked} else {DoorLocked::Unlocked})),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        },
+        _ => None,   // TODO: Support more ValueType's
+    }
+}
+
+fn set_ozw_vid_from_tax_value(vid: &ValueID, value: Value) -> Result<(), TaxError> {
+    if vid.get_command_class().is_none() {
+        return Err(TaxError::InternalError(InternalError::GenericError(format!("Unknown command class: {}", vid.get_command_class_id()))));
+    }
+
+    match vid.get_type() {
+        ValueType::ValueType_Bool => {
+            match value {
+                //Value::OnOff(onOff) => { vid.set_bool(onOff == OnOff::On); } // TODO support switches
+                Value::OpenClosed(open_closed) => { vid.set_bool(open_closed == OpenClosed::Open); }
+                Value::DoorLocked(locked_unlocked) => { vid.set_bool(locked_unlocked == DoorLocked::Locked); }
+                _ => { return Err(TaxError::InternalError(InternalError::GenericError(format!("Unsupported value type: {:?}", value)))); }
+            }
+        }
+        _ => { return Err(TaxError::InternalError(InternalError::GenericError(format!("Unsupported OZW type: {:?}", vid.get_type())))); }
+    };
+    Ok(())
 }
 
 struct WatcherGuard {
@@ -324,25 +358,25 @@ impl OpenzwaveAdapter {
                     ZWaveNotification::NodeNew(node)               => {}
                     ZWaveNotification::NodeAdded(node)             => {}
                     ZWaveNotification::NodeRemoved(node)           => {}
-                    ZWaveNotification::ValueAdded(value)           => {
-                        if value.get_genre() != ValueGenre::ValueGenre_User { continue }
+                    ZWaveNotification::ValueAdded(vid)             => {
+                        if vid.get_genre() != ValueGenre::ValueGenre_User { continue }
 
-                        let value_id = format!("OpenZWave-{:08x}-{:016x} ({})", value.get_home_id(), value.get_id(), value.get_label());
+                        let value_id = format!("OpenZWave-{:08x}-{:016x} ({})", vid.get_home_id(), vid.get_id(), vid.get_label());
 
-                        let controller_id = controller_map.find_tax_id_from_ozw(&value.get_controller()).unwrap();
+                        let controller_id = controller_map.find_tax_id_from_ozw(&vid.get_controller()).unwrap();
                         if controller_id.is_none() { continue }
                         let controller_id = controller_id.unwrap();
 
-                        let has_getter = !value.is_write_only();
-                        let has_setter = !value.is_read_only();
+                        let has_getter = !vid.is_write_only();
+                        let has_setter = !vid.is_read_only();
 
-                        let kind = kind_from_value(value);
+                        let kind = tax_kind_from_ozw_vid(&vid);
                         if kind.is_none() { continue }
                         let kind = kind.unwrap();
 
                         if has_getter {
                             let getter_id = TaxId::new(&value_id);
-                            getter_map.push(getter_id.clone(), value);
+                            getter_map.push(getter_id.clone(), vid);
                             box_manager.add_getter(Channel {
                                 id: getter_id.clone(),
                                 service: controller_id.clone(),
@@ -358,7 +392,7 @@ impl OpenzwaveAdapter {
 
                         if has_setter {
                             let setter_id = TaxId::new(&value_id);
-                            setter_map.push(setter_id.clone(), value);
+                            setter_map.push(setter_id.clone(), vid);
                             box_manager.add_setter(Channel {
                                 id: setter_id.clone(),
                                 service: controller_id.clone(),
@@ -372,18 +406,18 @@ impl OpenzwaveAdapter {
                             });
                         }
                     }
-                    ZWaveNotification::ValueChanged(value)         => {
-                        match value.get_type() {
+                    ZWaveNotification::ValueChanged(vid)         => {
+                        match vid.get_type() {
                             ValueType::ValueType_Bool => {},
                             _ => continue // ignore non-bool vals for now
                         };
 
-                        let tax_id = match getter_map.find_tax_id_from_ozw(&value) {
+                        let tax_id = match getter_map.find_tax_id_from_ozw(&vid) {
                             Ok(Some(tax_id)) => tax_id,
                             _ => continue
                         };
 
-                        let value = match to_open_closed(&value) {
+                        let tax_value = match ozw_vid_as_tax_value(&vid) {
                             Some(value) => value,
                             _ => continue
                         };
@@ -398,14 +432,14 @@ impl OpenzwaveAdapter {
                         let previous_value = {
                             let mut cache = value_cache.lock().unwrap();
                             let previous = cache.get(&tax_id).cloned();
-                            cache.insert(tax_id.clone(), value.clone());
+                            cache.insert(tax_id.clone(), tax_value.clone());
                             previous
                         };
 
                         for &(ref range, ref sender) in &watchers {
                             debug!("Openzwave::Adapter::ValueChanged iterate over watcher {:?} {:?}", tax_id, range);
 
-                            let should_send_value = range.should_send(&value, SendDirection::Enter);
+                            let should_send_value = range.should_send(&tax_value, SendDirection::Enter);
 
                             if let Some(ref previous_value) = previous_value {
                                 let should_send_previous = range.should_send(previous_value, SendDirection::Exit);
@@ -414,19 +448,19 @@ impl OpenzwaveAdapter {
                                 if should_send_value && should_send_previous { continue }
 
                                 if should_send_previous {
-                                    debug!("Openzwave::Adapter::ValueChanged Sending event Exit {:?} {:?}", tax_id, value);
+                                    debug!("Openzwave::Adapter::ValueChanged Sending event Exit {:?} {:?}", tax_id, tax_value);
                                     let sender = sender.lock().unwrap();
                                     sender.send(
-                                        WatchEvent::Exit { id: tax_id.clone(), value: value.clone() }
+                                        WatchEvent::Exit { id: tax_id.clone(), value: tax_value.clone() }
                                     );
                                 }
                             }
 
                             if should_send_value {
-                                debug!("Openzwave::Adapter::ValueChanged Sending event Enter {:?} {:?}", tax_id, value);
+                                debug!("Openzwave::Adapter::ValueChanged Sending event Enter {:?} {:?}", tax_id, tax_value);
                                 let sender = sender.lock().unwrap();
                                 sender.send(
-                                    WatchEvent::Enter { id: tax_id.clone(), value: value.clone() }
+                                    WatchEvent::Enter { id: tax_id.clone(), value: tax_value.clone() }
                                 );
                             }
                         }
@@ -459,24 +493,26 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
 
     fn fetch_values(&self, mut set: Vec<TaxId<Getter>>, _: User) -> ResultMap<TaxId<Getter>, Option<Value>, TaxError> {
         set.drain(..).map(|id| {
-            let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_tax_id(&id).unwrap(); //FIXME no unwrap
+            let ozw_vid = self.getter_map.find_ozw_from_tax_id(&id).unwrap();
 
-            let ozw_value: Option<Option<Value>> = ozw_value.map(|ozw_value: ValueID| {
-                if !ozw_value.is_set() { return None }
+            let tax_value: Option<Option<Value>> = ozw_vid.map(|ozw_vid: ValueID| {
+                if !ozw_vid.is_set() { return None }
 
-                let result: Option<Value> = match ozw_value.get_type() {
-                    ValueType::ValueType_Bool => to_open_closed(&ozw_value),
-                    _ => Some(Value::Unit)
-                };
-                result
+                ozw_vid_as_tax_value(&ozw_vid)
             });
-            let value_result: Result<Option<Value>, TaxError> = ozw_value.ok_or(TaxError::InternalError(InternalError::NoSuchGetter(id.clone())));
+            let value_result: Result<Option<Value>, TaxError> = tax_value.ok_or(TaxError::InternalError(InternalError::NoSuchGetter(id.clone())));
             (id, value_result)
         }).collect()
     }
 
-    fn send_values(&self, values: HashMap<TaxId<Setter>, Value>, _: User) -> ResultMap<TaxId<Setter>, (), TaxError> {
-        unimplemented!()
+    fn send_values(&self, mut values: HashMap<TaxId<Setter>, Value>, _: User) -> ResultMap<TaxId<Setter>, (), TaxError> {
+        values.drain().map(|(id, value)| {
+            if let Some(ozw_vid) = self.setter_map.find_ozw_from_tax_id(&id).unwrap() {
+                (id, set_ozw_vid_from_tax_value(&ozw_vid, value))
+            } else {
+                (id.clone(), Err(TaxError::InternalError(InternalError::NoSuchSetter(id))))
+            }
+        }).collect()
     }
 
     fn register_watch(&self, mut values: Vec<(TaxId<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) -> Vec<(TaxId<Getter>, Result<Box<AdapterWatchGuard>, TaxError>)> {
@@ -494,7 +530,7 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
             let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_tax_id(&id).unwrap(); // FIXME no unwrap
             if let Some(value) = ozw_value {
                 if value.is_set() && value.get_type() == ValueType::ValueType_Bool {
-                    if let Some(value) = to_open_closed(&value) {
+                    if let Some(value) = ozw_vid_as_tax_value(&value) {
                         self.value_cache.lock().unwrap().insert(id.clone(), value.clone());
                         if range.should_send(&value, SendDirection::Enter) {
                             debug!("Openzwave::Adapter::register_watch Sending event Enter {:?} {:?}", id, value);
