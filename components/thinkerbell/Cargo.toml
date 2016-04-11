@@ -5,12 +5,11 @@ authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
 log = "0.3"
-serde = "0.6.13"
-serde_json = "0.6.0"
-serde_macros = "0.6.14"
+serde = "0.7.0"
+serde_json = "0.7.0"
+serde_macros = "0.7.2"
 chrono = "0.2.19"
 foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git" }
-# foxbox_taxonomy = { path = "../taxonomy" }
 rusqlite = "0.6.0"
 transformable_channels = "*"
 
