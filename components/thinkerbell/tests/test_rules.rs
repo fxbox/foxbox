@@ -96,7 +96,7 @@ fn test_run() {
                         source: vec![
                             GetterSelector::new()
                         ],
-                        kind: ChannelKind::OnOff,
+                        kind: ChannelKind::LightOn,
                         range: Range::Eq(Value::OnOff(OnOff::On)),
                         duration: None,
                         phantom: PhantomData
@@ -108,7 +108,7 @@ fn test_run() {
                             SetterSelector::new()
                         ],
                         value: Value::OnOff(OnOff::Off),
-                        kind: ChannelKind::OnOff,
+                        kind: ChannelKind::LightOn,
                         phantom: PhantomData,
                     }
                 ],
@@ -154,7 +154,7 @@ fn test_run() {
             last_seen: None,
             mechanism: Getter {
                 updated: None,
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::LightOn,
             }
         }
     ]));
@@ -169,7 +169,7 @@ fn test_run() {
             tags: HashSet::new(),
             mechanism: Setter {
                 updated: None,
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::LightOn,
             }
         }
     ]));
@@ -224,7 +224,7 @@ fn test_run() {
             last_seen: None,
             mechanism: Getter {
                 updated: None,
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::LightOn,
             }
         }
     ]));
@@ -313,7 +313,7 @@ fn test_run() {
             tags: HashSet::new(),
             mechanism: Setter {
                 updated: None,
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::LightOn,
             }
         }
     ]));
@@ -434,7 +434,7 @@ fn test_run() {
             tags: HashSet::new(),
             mechanism: Setter {
                 updated: None,
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::LightOn,
             }
         }
     ]));
@@ -518,7 +518,7 @@ fn test_run_with_delay() {
                         source: vec![
                             GetterSelector::new()
                         ],
-                        kind: ChannelKind::OnOff,
+                        kind: ChannelKind::LightOn,
                         range: Range::Eq(Value::OnOff(OnOff::On)),
                         duration: Some(Duration::from(chrono::Duration::seconds(10))),
                         phantom: PhantomData
@@ -530,7 +530,7 @@ fn test_run_with_delay() {
                             SetterSelector::new()
                         ],
                         value: Value::OnOff(OnOff::Off),
-                        kind: ChannelKind::OnOff,
+                        kind: ChannelKind::LightOn,
                         phantom: PhantomData,
                     }
                 ],
@@ -576,7 +576,7 @@ fn test_run_with_delay() {
             last_seen: None,
             mechanism: Getter {
                 updated: None,
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::LightOn,
             }
         }
     ]));
@@ -591,7 +591,7 @@ fn test_run_with_delay() {
             tags: HashSet::new(),
             mechanism: Setter {
                 updated: None,
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::LightOn,
             }
         }
     ]));
@@ -712,7 +712,7 @@ fn test_run_with_delay() {
             last_seen: None,
             mechanism: Getter {
                 updated: None,
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::LightOn,
             }
         }
     ]));

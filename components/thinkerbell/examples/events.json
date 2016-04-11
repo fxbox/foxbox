@@ -10,8 +10,7 @@
         "mechanism": {
             "kind": {
                 "CurrentTimeOfDay": []
-            },
-            "watch": true
+            }
         },
         "adapter": "Simulator",
         "tags": [],
@@ -27,8 +26,7 @@
         "mechanism": {
             "kind": {
                 "Ready": []
-            },
-            "push": 0
+            }
         }
     }]
 }, {
