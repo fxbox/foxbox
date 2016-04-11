@@ -13,6 +13,7 @@ use transformable_channels::mpsc::*;
 use foxbox_thinkerbell::fake_env::FakeEnv;
 use foxbox_thinkerbell::manager::*;
 
+use foxbox_taxonomy::api::User;
 use foxbox_taxonomy::util::Id;
 
 fn load_json(path: &str) -> String {
@@ -33,7 +34,9 @@ fn test_database_add_remove_script() {
     db.remove_all().unwrap();
 
     let name = Id::<ScriptId>::new("Sample Ruleset");
-    db.put(&name, &load_json("./examples/ruleset.json")).unwrap();
+    db.put(&name, &load_json("./examples/ruleset.json"), &User::Id(1)).unwrap();
+    let (_, owner) = db.get_source_and_owner(&name).unwrap();
+    assert_eq!(owner, User::Id(1));
     db.set_enabled(&name, true).unwrap();
     assert_eq!(db.get_running_count(), 1);
     db.set_enabled(&name, false).unwrap();
