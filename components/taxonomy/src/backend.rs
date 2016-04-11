@@ -478,6 +478,10 @@ impl State {
                         continue;
                     }
                 };
+                if watcher.is_dropped.load(Ordering::Relaxed) {
+                    // The guard has been dropped, we don't care anymore.
+                    continue;
+                }
 
                 // We need to disconnect the watcher if either the channel is being removed
                 // or it doesn't match anymore any of the selectors for the watchers
@@ -525,6 +529,10 @@ impl State {
                     for watcher in &mut self.watchers.lock().unwrap().watchers.values() {
                         if watcher.guards.borrow().contains_key(&id) {
                             // The watcher already matches this getter.
+                            continue;
+                        }
+                        if watcher.is_dropped.load(Ordering::Relaxed) {
+                            // The guard has been dropped, we don't care anymore.
                             continue;
                         }
                         for targetted in &watcher.watch {
