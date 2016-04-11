@@ -3,7 +3,7 @@
 //! Note that all the data structures in this module represent
 //! snapshots of subsets of the devices available. None of these data
 //! structures are live, so there is always the possibility that
-//! devices may have been added or removed from the FoxBox by the time
+//! devices may have been added or removed from the `FoxBox` by the time
 //! these data structures are read.
 
 use parse::*;
@@ -35,7 +35,7 @@ macro_rules! tag_id {
 }
 
 /// Metadata on a service. A service is a device or collection of devices
-/// that may offer services. The FoxBox itself is a service offering
+/// that may offer services. The `FoxBox` itself is a service offering
 /// services such as a clock, communicating with the user through her
 /// smart devices, etc.
 ///

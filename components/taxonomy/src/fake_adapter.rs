@@ -180,7 +180,7 @@ impl Adapter for FakeAdapter {
         &VERSION
     }
 
-    /// Request a value from a channel. The FoxBox (not the adapter)
+    /// Request a value from a channel. The `FoxBox` (not the adapter)
     /// is in charge of keeping track of the age of values.
     fn fetch_values(&self, mut channels: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         let map = self.values.lock().unwrap();

@@ -15,7 +15,7 @@ use chrono::{ Duration as ChronoDuration, DateTime, Local, TimeZone, UTC };
 
 use serde_json;
 use serde::ser::{ Serialize, Serializer };
-use serde::de::{ Deserialize, Deserializer, Error, Visitor as DeserializationVisitor };
+use serde::de::{ Deserialize, Deserializer, Error, Visitor };
 
 /// Representation of a type error.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -286,7 +286,7 @@ impl Serialize for OnOff {
 }
 impl Deserialize for OnOff {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error> where D: Deserializer {
-        deserializer.visit_string(TrivialEnumVisitor::new(|source| {
+        deserializer.deserialize_string(TrivialEnumVisitor::new(|source| {
             match source {
                 "On" => Ok(OnOff::On),
                 "Off" => Ok(OnOff::Off),
@@ -417,7 +417,7 @@ impl Serialize for OpenClosed {
 }
 impl Deserialize for OpenClosed {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error> where D: Deserializer {
-        deserializer.visit_string(TrivialEnumVisitor::new(|source| {
+        deserializer.deserialize_string(TrivialEnumVisitor::new(|source| {
             match source {
                 "Open" | "open" => Ok(OpenClosed::Open),
                 "Closed" | "closed" => Ok(OpenClosed::Closed),
@@ -428,7 +428,7 @@ impl Deserialize for OpenClosed {
 }
 
 /// A temperature. Internal representation may be either Fahrenheit or
-/// Celcius. The FoxBox adapters are expected to perform conversions
+/// Celcius. The `FoxBox` adapters are expected to perform conversions
 /// to the format requested by their devices.
 ///
 /// # JSON
@@ -532,7 +532,7 @@ impl PartialOrd for Temperature {
     }
 }
 
-/// A color. Internal representation may vary. The FoxBox adapters are
+/// A color. Internal representation may vary. The `FoxBox` adapters are
 /// expected to perform conversions to the format requested by their
 /// device.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -1535,7 +1535,7 @@ impl Deserialize for TimeStamp {
         let str = try!(String::deserialize(deserializer));
         match DateTime::<UTC>::from_str(&str) {
             Ok(dt) => Ok(TimeStamp(dt)),
-            Err(_) => Err(D::Error::syntax("Invalid date"))
+            Err(_) => Err(D::Error::custom("Invalid date"))
         }
     }
 }
@@ -1776,7 +1776,7 @@ impl Serialize for Duration {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer
      {
-         serializer.visit_f64(self.0.num_milliseconds() as f64 / 1000 as f64)
+         serializer.serialize_f64(self.0.num_milliseconds() as f64 / 1000 as f64)
      }
 }
 impl From<ChronoDuration> for Duration {
@@ -1796,7 +1796,7 @@ impl Deserialize for Duration {
         where D: Deserializer
     {
         struct DurationVisitor;
-        impl DeserializationVisitor for DurationVisitor
+        impl Visitor for DurationVisitor
         {
             type Value = Duration;
             fn visit_f64<E>(&mut self, v: f64) -> Result<Self::Value, E>
@@ -1815,7 +1815,7 @@ impl Deserialize for Duration {
                 self.visit_i64(v as i64)
             }
         }
-        deserializer.visit_f64(DurationVisitor)
-            .or_else(|_| deserializer.visit_i64(DurationVisitor))
+        deserializer.deserialize_f64(DurationVisitor)
+            .or_else(|_| deserializer.deserialize_i64(DurationVisitor))
     }
 }
