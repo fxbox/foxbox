@@ -299,7 +299,7 @@ impl ThinkerbellAdapter {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Getter {
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::ThinkerbellRuleOn,
                 updated: None
             },
         }));
@@ -325,7 +325,7 @@ impl ThinkerbellAdapter {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Setter {
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::ThinkerbellRuleOn,
                 updated: None
             },
         }));
