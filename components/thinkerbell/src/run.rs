@@ -285,16 +285,17 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
         }).collect();
 
         for msg in self.rx.iter() {
-            debug!("Thinkerbell: Received message {:?}", msg);
-
             match msg {
                 ExecutionOp::Stop(cb) => {
+                    debug!("[Thinkerbell {}] Shutting down recipe.", self.script.name);
+
                     // Leave the loop. Watching will stop once
                     // `witnesses` is dropped.
                     cb.lock().unwrap()(Ok(()));
                     return;
                 },
                 ExecutionOp::UpdateCondition { id, is_met, rule_index, condition_index } => {
+                    debug!("[Thinkerbell {}] Updating the state of rule {}, condition {} => {}", self.script.name, rule_index, condition_index, is_met);
                     self.update_conditions(id, is_met, &mut per_rule,
                         rule_index, condition_index, &api, &on_event);
                 }
@@ -304,12 +305,14 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                             channel,
                             error
                         } => {
+                            debug!("[Thinkerbell {}] Initialization error for {}: {}", self.script.name, channel, error);
                             let _ = on_event.send(ExecutionEvent::ChannelError {
                                 id: channel,
                                 error: error,
                             });
                         },
                         WatchEvent::GetterRemoved(id) => {
+                            debug!("[Thinkerbell {}] Removed getter {}, resetting condition to `false`", self.script.name, id);
                             // A getter was removed. Its condition is therefore not met anymore.
                             let msg = ExecutionOp::UpdateCondition {
                                 id: id.clone(),
@@ -320,10 +323,12 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                             // This send will fail only if the thread is already down.
                             let _ = self.tx.send(msg);
                         },
-                        WatchEvent::GetterAdded(_) => {
+                        WatchEvent::GetterAdded(id) => {
+                            debug!("[Thinkerbell {}] Added getter {}.", self.script.name, id);
                             // An getter was added. Nothing to do.
                         }
-                        WatchEvent::EnterRange { from: id, .. } => {
+                        WatchEvent::EnterRange { from: id, value } => {
+                            debug!("[Thinkerbell {}] Getter {} has entered the range for rule {}, condition {}: {:?}", self.script.name, id, rule_index, condition_index, value);
                             // We have entered a range. If there is a
                             // timer, start it, otherwise update conditions.
                             let msg = move || {
@@ -338,10 +343,12 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                                 per_condition[condition_index].
                                 duration {
                                 None => {
+                                    debug!("[Thinkerbell {}] No timer for rule {}, condition {}, we should trigger the execution immediately.", self.script.name, rule_index, condition_index);
                                     let _ = self.tx.send(msg());
                                     continue
                                 }
                                 Some(ref duration) => {
+                                    debug!("[Thinkerbell {}] There is a timer for rule {}, condition {}, we should trigger the execution in {:?}s.", self.script.name, rule_index, condition_index, duration);
                                     duration.clone()
                                 }
                             };
@@ -356,8 +363,10 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                                 condition_index: condition_index,
                             });
                         }
-                        WatchEvent::ExitRange { from: id, .. } => {
+                        WatchEvent::ExitRange { from: id, value } => {
+                            debug!("[Thinkerbell {}] Getter {} has left the range for rule {}, condition {}: {:?}", self.script.name, id, rule_index, condition_index, value);
                             if per_rule[rule_index].ongoing_timer.is_some() {
+                                debug!("[Thinkerbell {}] I need to cancel the timer for rule {}, condition {}", self.script.name, id, rule_index);
                                 // Cancel the timer.
                                 per_rule[rule_index].ongoing_timer.take();
                                 let _ = on_event.send(ExecutionEvent::TimerCancel {
@@ -401,7 +410,9 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 .remove(&id)
         };
 
+        debug!("[Thinkerbell update_condition] Updating condition for getter: {} => {}", was_met, getter_is_met);
         if was_met == getter_is_met {
+            debug!("[Thinkerbell update_condition] Nothing has changed.");
             // Nothing has changed, no need to update any further.
             return;
         }
@@ -436,9 +447,13 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
         let condition_was_met =
             replace(&mut per_rule[rule_index].rule_is_met, condition_is_met);
 
+        debug!("[Thinkerbell update_condition] Updating condition for rule: {} => {}", condition_was_met, condition_is_met);
+
         if !condition_was_met && condition_is_met {
             // Ahah, we have just triggered the statements!
+            debug!("[Thinkerbell update_condition] Triggering {} statements.", self.script.rules[rule_index].execute.len());
             for (statement, statement_index) in self.script.rules[rule_index].execute.iter().zip(0..) {
+                debug!("[Thinkerbell update_condition] Triggering statement {}/{}.", statement_index, self.script.rules[rule_index].execute.len());
                 let result = statement.eval(&api);
                 let _ = on_event.send(ExecutionEvent::Sent {
                     rule_index: rule_index,
@@ -447,6 +462,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 });
             }
         }
+        debug!("[Thinkerbell update_condition] done.");
     }
 }
 
