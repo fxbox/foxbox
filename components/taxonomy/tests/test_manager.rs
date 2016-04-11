@@ -1414,6 +1414,9 @@ fn test_watch() {
 
         println!("* We stop receiving value change notifications once we have dropped the guard.");
         drop(guard);
+
+        // Wait until all messages have been handled.
+        thread::sleep(std::time::Duration::new(1, 0));
         assert_matches!(rx_watch.try_recv(), Err(_));
 
         tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
