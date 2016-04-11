@@ -65,6 +65,7 @@ fn test_compile() {
 
 #[test]
 fn test_run() {
+    println!("* Starting test_run.");
     let (tx, rx) : (_, Receiver<Event>) = channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
@@ -75,6 +76,7 @@ fn test_run() {
     let env = FakeEnv::new(tx_env);
     let mut exec = Execution::<FakeEnv>::new();
 
+    println!("* Spawning thread.");
     thread::spawn(move || {
         for msg in rx {
             if let Event::Env(FakeEnvEvent::Done) = msg {
@@ -83,11 +85,12 @@ fn test_run() {
                 tx_send.send((id, value)).unwrap();
             } else {
                 // Can be useful for debugging, but that's generally noise.
-                // println!("LOG: {:?}", msg)
+                println!("LOG: {:?}", msg)
             }
         }
     });
 
+    println!("* Preparing script.");
     let script_1 = Script {
         name: "Test script".to_owned(),
         rules: vec![
@@ -485,7 +488,7 @@ fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Setter>, Value)>, rx_
 
 #[test]
 fn test_run_with_delay() {
-    let (tx, rx) : (_, Receiver<Event>)= channel();
+{    let (tx, rx) : (_, Receiver<Event>)= channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
     let tx_run = tx.map(|event| Event::Run(event));
@@ -768,7 +771,7 @@ fn test_run_with_delay() {
     rx_done.try_recv().unwrap_err();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Cleanup complete.");
+    println!("* Cleanup complete.");}
 
-    println!("");
+    println!("* Drop complete.");
 }
