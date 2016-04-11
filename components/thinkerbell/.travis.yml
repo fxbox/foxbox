@@ -3,5 +3,5 @@ script:
   - cargo build
   - cargo test -- --nocapture
 rust:
-  - nightly-2016-03-07
+  - nightly-2016-04-10
 
