@@ -14,6 +14,7 @@ use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Duration, OnOff, Range, TimeStamp, Type, TypeError as APITypeError , Value };
 
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::thread;
 use std::collections::{ HashMap, HashSet };
@@ -470,13 +471,16 @@ fn test_run() {
 }
 
 
-fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Setter>, Value)>, rx_timer: &Receiver<T>) {
+fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Setter>, Value)>, rx_timer: &Receiver<T>)
+    where T: Debug {
     thread::sleep(std::time::Duration::from_millis(100));
     rx_send.try_recv().unwrap_err();
     rx_done.try_recv().unwrap_err();
-    while rx_timer.try_recv().is_ok() {
+    while let Ok(msg) = rx_timer.try_recv() {
         // Consume rx_timer
+        println!("...(consuming rx_timer {:?})", msg);
     }
+    println!("...(sleep complete)");
 }
 
 #[test]
@@ -758,11 +762,13 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Test complete.");
+    println!("* Test complete, cleaning up.");
 
     sleep(&rx_done, &rx_send, &rx_timer);
     rx_done.try_recv().unwrap_err();
     rx_send.try_recv().unwrap_err();
+
+    println!("* Cleanup complete.");
 
     println!("");
 }
