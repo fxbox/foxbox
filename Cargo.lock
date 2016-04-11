@@ -208,7 +208,7 @@ dependencies = [
 [[package]]
 name = "foxbox_thinkerbell"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/thinkerbell.git#ee0486b937d324f6a85191c3e2eb161f08ad5b36"
+source = "git+https://github.com/fxbox/thinkerbell.git#1b2bf10fc271af0448f71f3d96689163f1b040e4"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",

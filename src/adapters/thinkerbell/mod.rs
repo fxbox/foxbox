@@ -119,11 +119,11 @@ impl Adapter for ThinkerbellAdapter {
         }).collect()
     }
 
-    fn send_values(&self, values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, values: HashMap<Id<Setter>, Value>, user: User) -> ResultMap<Id<Setter>, (), Error> {
         values.iter()
             .map(|(id, value)| {
                 let (tx, rx) = channel();
-                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone()));
+                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone(), user.clone()));
                 match rx.recv() {
                     Ok(result) => (id.clone(), result),
                     // If an error occurs, the channel died!
@@ -148,7 +148,7 @@ enum ThinkAction {
     AddRuleService(Id<ScriptId>),
     RemoveRuleService(Id<ScriptId>),
     RespondToGetter(RawSender<Result<Option<Value>, Error>>, Id<Getter>),
-    RespondToSetter(RawSender<Result<(), Error>>, Id<Setter>, Value),
+    RespondToSetter(RawSender<Result<(), Error>>, Id<Setter>, Value, User),
 }
 
 /// An internal data structure to track getters and setters.
@@ -211,8 +211,8 @@ impl ThinkerbellAdapter {
                             let _ = tx.send(Ok(Some(Value::OnOff(if is_enabled { OnOff::On } else { OnOff::Off }))));
                             continue 'recv;
                         } else if getter_id == rule.getter_source_id {
-                            match script_manager.get_source(&rule.script_id) {
-                                Ok(source) => {
+                            match script_manager.get_source_and_owner(&rule.script_id) {
+                                Ok((source, _)) => {
                                     let _ = tx.send(Ok(Some(Value::String(Arc::new(source.to_owned())))));
                                 },
                                 Err(e) => {
@@ -225,13 +225,13 @@ impl ThinkerbellAdapter {
                     let _ = tx.send(Err(Error::InternalError(InternalError::NoSuchGetter(getter_id.clone()))));
                 },
                 // Respond to a pending Setter request.
-                ThinkAction::RespondToSetter(tx, setter_id, value) => {
+                ThinkAction::RespondToSetter(tx, setter_id, value, user) => {
                     // Add a new rule (with the given JSON source).
                     if setter_id == self.setter_add_rule_id {
                         match value {
                             Value::ThinkerbellRule(ref rule_source) => {
                                 let script_id = Id::new(&rule_source.name);
-                                let _ = tx.send(script_manager.put(&script_id, &rule_source.source).map_err(sm_error));
+                                let _ = tx.send(script_manager.put(&script_id, &rule_source.source, &user).map_err(sm_error));
                                 let _ = self.tx.lock().unwrap().send(ThinkAction::AddRuleService(script_id.clone()));
                             },
                             _ => {
