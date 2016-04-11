@@ -355,7 +355,7 @@ impl ThinkerbellAdapter {
     }
 
     /// Everything is initialized here, but the real work happens in the main() loop.
-    pub fn init(manager: &Arc<AdapterManager>) -> Result<(), Error> {
+    pub fn init(manager: &Arc<AdapterManager>, scripts_path: &str) -> Result<(), Error> {
         let adapter_id = Id::new("thinkerbell-adapter");
         let setter_add_rule_id = Id::new("thinkerbell-add-rule");
         let root_service_id = Id::new("thinkerbell-root-service");
@@ -368,7 +368,7 @@ impl ThinkerbellAdapter {
         };
 
         let mut script_manager = try!(
-            ScriptManager::new(env, Path::new("./scripts.sqlite"), Box::new(tx_env)).map_err(sm_error));
+            ScriptManager::new(env, Path::new(scripts_path), Box::new(tx_env)).map_err(sm_error));
 
         let result_map = try!(script_manager.load().map_err(sm_error));
 

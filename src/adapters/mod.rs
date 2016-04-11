@@ -67,7 +67,8 @@ impl<T: Controller> AdapterManager<T> {
         clock::Clock::init(manager).unwrap(); // FIXME: We should have a way to report errors
         webpush::WebPush::init(c, manager).unwrap();
         ip_camera::IPCameraAdapter::init(manager, self.controller.clone()).unwrap();
-        ThinkerbellAdapter::init(manager).unwrap(); // FIXME: no unwrap!
+        let scripts_path = &self.controller.get_profile().path_for("thinkerbell_scripts.sqlite");
+        ThinkerbellAdapter::init(manager, scripts_path).unwrap(); // FIXME: no unwrap!
         let profile_openzwave = &self.controller.get_profile().path_for("openzwave");
         OpenzwaveAdapter::init(manager, profile_openzwave).unwrap();
 
