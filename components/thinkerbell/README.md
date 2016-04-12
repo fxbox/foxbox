@@ -1,6 +1,7 @@
 # ThinkerBell: A scripting engine for the world of IoT
 
 [![Build Status](https://api.travis-ci.org/fxbox/thinkerbell.svg?branch=master)](https://travis-ci.org/fxbox/thinkerbell)
+[![Coverage Status](https://coveralls.io/repos/github/fxbox/thinkerbell/badge.svg?branch=master)](https://coveralls.io/github/fxbox/thinkerbell?branch=master)
 
 ThinkerBell is two things:
 - an engine designed to let users assemble scripts to automate their devices, without any knowledge of programming;
