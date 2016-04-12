@@ -14,6 +14,7 @@ use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Duration, OnOff, Range, TimeStamp, Type, TypeError as APITypeError , Value };
 
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::thread;
 use std::collections::{ HashMap, HashSet };
@@ -64,6 +65,7 @@ fn test_compile() {
 
 #[test]
 fn test_run() {
+    println!("* Starting test_run.");
     let (tx, rx) : (_, Receiver<Event>) = channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
@@ -74,6 +76,7 @@ fn test_run() {
     let env = FakeEnv::new(tx_env);
     let mut exec = Execution::<FakeEnv>::new();
 
+    println!("* Spawning thread.");
     thread::spawn(move || {
         for msg in rx {
             if let Event::Env(FakeEnvEvent::Done) = msg {
@@ -82,11 +85,12 @@ fn test_run() {
                 tx_send.send((id, value)).unwrap();
             } else {
                 // Can be useful for debugging, but that's generally noise.
-                // println!("LOG: {:?}", msg)
+                println!("LOG: {:?}", msg)
             }
         }
     });
 
+    println!("* Preparing script.");
     let script_1 = Script {
         name: "Test script".to_owned(),
         rules: vec![
@@ -470,18 +474,21 @@ fn test_run() {
 }
 
 
-fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Setter>, Value)>, rx_timer: &Receiver<T>) {
+fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Setter>, Value)>, rx_timer: &Receiver<T>)
+    where T: Debug {
     thread::sleep(std::time::Duration::from_millis(100));
     rx_send.try_recv().unwrap_err();
     rx_done.try_recv().unwrap_err();
-    while rx_timer.try_recv().is_ok() {
+    while let Ok(msg) = rx_timer.try_recv() {
         // Consume rx_timer
+        println!("...(consuming rx_timer {:?})", msg);
     }
+    println!("...(sleep complete)");
 }
 
 #[test]
 fn test_run_with_delay() {
-    let (tx, rx) : (_, Receiver<Event>)= channel();
+{    let (tx, rx) : (_, Receiver<Event>)= channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
     let tx_run = tx.map(|event| Event::Run(event));
@@ -758,11 +765,13 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Test complete.");
+    println!("* Test complete, cleaning up.");
 
     sleep(&rx_done, &rx_send, &rx_timer);
     rx_done.try_recv().unwrap_err();
     rx_send.try_recv().unwrap_err();
 
-    println!("");
+    println!("* Cleanup complete.");}
+
+    println!("* Drop complete.");
 }

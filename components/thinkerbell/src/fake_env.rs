@@ -83,13 +83,12 @@ impl TestSharedAdapterBackend {
         }).collect()
     }
 
-    fn register_watch(&mut self, mut source: Vec<(Id<Getter>, Option<Range>)>,
-        cb: Box<ExtSender<WatchEvent>>) ->
-            ResultMap<Id<Getter>, usize, Error>
+    fn register_watch(&mut self, mut source: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) ->
+            Vec<(Id<Getter>, Result<usize, Error>)>
     {
-        let results = source.drain(..).map(|(id, range)| {
+        let results = source.drain(..).map(|(id, range, tx)| {
             let result = (id.clone(), Ok(self.counter));
-            self.watchers.insert(self.counter, (id, range, cb.clone()));
+            self.watchers.insert(self.counter, (id, range, tx));
             self.counter += 1;
             result
         }).collect();
@@ -182,8 +181,8 @@ impl TestSharedAdapterBackend {
             SendValues { values, tx } => {
                 let _ = tx.send(self.send_values(values, User::None));
             }
-            Watch { source, cb, tx } => {
-                let _ = tx.send(self.register_watch(source, cb));
+            Watch { source, tx } => {
+                let _ = tx.send(self.register_watch(source));
             }
             Unwatch(key) => {
                 let _ = self.remove_watch(key);
@@ -316,19 +315,17 @@ impl Adapter for TestAdapter {
     /// If no `Range` option is set, the watcher expects to receive `EnterRange` events whenever
     /// a new value is available on the device. The adapter may decide to reject the request if
     /// this is clearly not the expected usage for a device, or to throttle it.
-    fn register_watch(&self, source: Vec<(Id<Getter>, Option<Range>)>,
-        cb: Box<ExtSender<WatchEvent>>) ->
-            ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error>
+    fn register_watch(&self, source: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) ->
+            Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)>
     {
         let (tx, rx) = channel();
         self.back_end.lock().unwrap().send(AdapterOp::Watch {
             source: source,
-            cb: cb,
             tx: Box::new(tx),
         }).unwrap();
         let received = rx.recv().unwrap();
         let tx_unregister = self.back_end.lock().unwrap().clone();
-        received.iter().map(|(id, result)| {
+        received.iter().map(|&(ref id, ref result)| {
             let tx_unregister = tx_unregister.clone();
             (id.clone(), match *result {
                 Err(ref err) => Err(err.clone()),
@@ -559,9 +556,8 @@ enum AdapterOp {
         tx: Box<ExtSender<ResultMap<Id<Setter>, (), Error>>>
     },
     Watch {
-        source: Vec<(Id<Getter>, Option<Range>)>,
-        cb: Box<ExtSender<WatchEvent>>,
-        tx: Box<ExtSender<ResultMap<Id<Getter>, usize, Error>>>
+        source: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>,
+        tx: Box<ExtSender<Vec<(Id<Getter>, Result<usize, Error>)>>>
     },
     AddTimer(Timer),
     Unwatch(usize),

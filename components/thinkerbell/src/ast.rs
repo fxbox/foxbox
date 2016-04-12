@@ -10,7 +10,7 @@ use foxbox_taxonomy::values::*;
 
 use std::marker::PhantomData;
 
-/// A thinkerbell script.
+/// A thinkerbell scrip"t.
 #[derive(Debug)]
 pub struct Script<Ctx> where Ctx: Context {
     pub name: String,
