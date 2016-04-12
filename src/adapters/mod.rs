@@ -26,7 +26,6 @@ pub mod webpush;
 
 use foxbox_taxonomy::manager::AdapterManager as TaxoManager;
 
-use self::philips_hue::PhilipsHueAdapter;
 use self::thinkerbell::ThinkerbellAdapter;
 use service::ServiceAdapter;
 use traits::Controller;
@@ -62,8 +61,8 @@ impl<T: Controller> AdapterManager<T> {
     /// Start all the adapters.
     pub fn start(&mut self, manager: &Arc<TaxoManager>) {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
-        self.start_adapter(Box::new(PhilipsHueAdapter::new(c.clone())));
         console::Console::init(manager).unwrap(); // FIXME: We should have a way to report errors
+        philips_hue::PhilipsHueAdapter::init(manager, c.clone()).unwrap();
         clock::Clock::init(manager).unwrap(); // FIXME: We should have a way to report errors
         webpush::WebPush::init(c, manager).unwrap();
         ip_camera::IPCameraAdapter::init(manager, self.controller.clone()).unwrap();
@@ -73,11 +72,6 @@ impl<T: Controller> AdapterManager<T> {
         OpenzwaveAdapter::init(manager, profile_openzwave).unwrap();
 
         self.start_tts(manager);
-    }
-
-    fn start_adapter(&mut self, adapter: Box<ServiceAdapter>) {
-        adapter.start();
-        self.adapters.push(adapter);
     }
 
     /// Stop all the adapters.

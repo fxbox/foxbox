@@ -9,13 +9,13 @@ var Prepper = require('../lib/testPrepper.js');
 Prepper.makeSuite('Control lights locally',function(){
   var lightinfo;
   var header = new Config('./test/integration/lib/config/header.js');
-  var credential = config.get('credential'); 
+  var credential = config.get('credential');
 
   var setupURL = config.get('foxbox.url') + '/users/setup';
   var loginURL = config.get('foxbox.url') + '/users/login';
   var serviceURL = config.get('foxbox.url') + '/services/';
-  var serviceListURL = serviceURL + 'list';  
-  
+  var serviceListURL = serviceURL + 'list';
+
   it('create a new credential',function(){
 
     return chakram.post(setupURL,credential)
@@ -82,7 +82,7 @@ Prepper.makeSuite('Control lights locally',function(){
         })
         .then(function(cmdResponse) {
          Prepper.expectLightIsOn(cmdResponse);
-         
+
          // check no lights are turned off now
          expect(Prepper.philipshue_server.lightStatus(1) &&
           Prepper.philipshue_server.lightStatus(2) &&

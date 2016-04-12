@@ -11,7 +11,8 @@ exclude = [ "**/*.conf",
           ]
 
 [features]
-default = ["authentication"]
+#default = ["authentication"]
+default = []
 authentication = []
 
 [dependencies]
