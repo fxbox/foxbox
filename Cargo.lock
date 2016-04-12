@@ -193,7 +193,7 @@ dependencies = [
 [[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git#d23884aa159ce57e4932b22e3fcee09ef9762525"
+source = "git+https://github.com/fxbox/taxonomy.git#0f9cdeac24d3a9d14c068f028206d301f716702b"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.63 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -202,7 +202,7 @@ dependencies = [
  "serde 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_macros 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "string_cache 0.2.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "string_cache 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "sublock 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "transformable_channels 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -210,7 +210,7 @@ dependencies = [
 [[package]]
 name = "foxbox_thinkerbell"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/thinkerbell.git#f3621be66882f64bc5a863b503c4b91a3fc9af9e"
+source = "git+https://github.com/fxbox/thinkerbell.git#4174c07b9ed6aaab6b2fb75674f0fd55716294f8"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
@@ -634,7 +634,7 @@ dependencies = [
 [[package]]
 name = "openzwave-adapter"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-adapter#60829cb2c798ea1826c1866f603c28d90cb6ff5a"
+source = "git+https://github.com/fxbox/openzwave-adapter#a4656b7544c6ba28285447f13a8f1c33c41e9d44"
 dependencies = [
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -912,7 +912,7 @@ dependencies = [
 
 [[package]]
 name = "string_cache"
-version = "0.2.12"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "debug_unreachable 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -19,7 +19,7 @@ mod db;
 use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ Range, Type, Value, Json };
+use foxbox_taxonomy::values::{ Type, Value, Json };
 
 #[cfg(not(target_os = "macos"))]
 use hyper::header::{ ContentEncoding, Encoding };
@@ -251,11 +251,9 @@ impl<C: Controller> Adapter for WebPush<C> {
         }).collect()
     }
 
-    fn register_watch(&self, mut watch: Vec<(Id<Getter>, Option<Range>)>,
-        _: Box<ExtSender<WatchEvent>>) ->
-           ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error>
+    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult
     {
-        watch.drain(..).map(|(id, _)| {
+        watch.drain(..).map(|(id, _, _)| {
             (id.clone(), Err(Error::GetterDoesNotSupportWatching(id)))
         }).collect()
     }
