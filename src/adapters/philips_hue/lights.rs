@@ -103,12 +103,7 @@ impl Light {
                 last_seen: None,
                 service: self.service_id.clone(),
                 mechanism: Getter {
-                    kind: ChannelKind::Extension {
-                        vendor: Id::new("foxlink@mozilla.com"),
-                        adapter: Id::new("Philips Hue Adapter"),
-                        kind: Id::new("power"),
-                        typ: Type::OnOff,
-                    },
+                    kind: ChannelKind::LightOn,
                     updated: None,
                 },
             }));
@@ -120,12 +115,7 @@ impl Light {
                 last_seen: None,
                 service: self.service_id.clone(),
                 mechanism: Setter {
-                    kind: ChannelKind::Extension {
-                        vendor: Id::new("foxlink@mozilla.com"),
-                        adapter: Id::new("Philips Hue Adapter"),
-                        kind: Id::new("power"),
-                        typ: Type::OnOff,
-                    },
+                    kind: ChannelKind::LightOn,
                     updated: None,
                 },
             }));
