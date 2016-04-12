@@ -24,12 +24,16 @@ class Service:
     def is_adapter(self, adapter_name):
         return self.service['adapter'].startswith(adapter_name)
 
+    def getter(self, getter_key):
+        getters = self.getters()
+        if getter_key in getters:
+            return getters[getter_key]
+
     def getter_contains(self, name):
-        getter_name = 'getter:' + name + '.'
-        for key in self.service['getters']:
-            if key.startswith(getter_name):
-                return key
-        print("Unable to find getter for '{}'".format(name))
+        for (getter_key, getter) in self.getters().items():
+            if name in getter_key:
+                return (getter_key, getter)
+        return (None, None)
 
     def getters(self):
         return self.service['getters']
@@ -50,24 +54,23 @@ class Service:
         return name and value in name
 
     def setter_contains(self, name):
-        setter_name = 'setter:' + name + '.'
-        for key in self.service['setters']:
-            if key.startswith(setter_name):
-                return key
-        print("Unable to find setter for '{}'".format(name))
+        for (setter_key, setter) in self.setters().items():
+            if name in setter_key:
+                return (setter_key, setter)
+        return (None, None)
 
     def setters(self):
         return self.service['setters']
 
-
-def fmt_response(getter, getter_req):
-    if getter_req.headers['content-type'].startswith('application/json'):
-        j = getter_req.json()
-        if getter in j:
-            rsp = j[getter]
-            for type in rsp:
-                if type == "String":
-                    return rsp[type]
+    def fmt_response(self, getter_key, getter_req):
+        if getter_req.headers['content-type'].startswith('application/json'):
+            j = getter_req.json()
+            if getter_key in j:
+                rsp = j[getter_key]
+                getter = self.getter(getter_key)
+                for type in rsp:
+                    if type == getter['kind']:
+                        return rsp[type]
 
 def main():
     default_server = 'localhost'
@@ -112,6 +115,12 @@ def main():
         help='List the available services',
     )
     parser.add_argument(
+        '--service',
+        dest='service',
+        action='store',
+        help='List the services which match',
+    )
+    parser.add_argument(
         '--service-property',
         dest='service_property',
         action='store',
@@ -152,6 +161,7 @@ def main():
     if args.verbose:
         print('server =', args.server)
         print('port =', args.port)
+        print('service =', args.service)
         print('services =', args.services)
         print('service_property =', args.service_property)
         print('server_url =', server_url)
@@ -228,37 +238,38 @@ def main():
         svc = Service(service)
         if not svc.has_property_value(args.service_property):
             continue
-        if args.services:
-            if args.verbose:
-                print(json.dumps(service, indent=4))
-            else:
-                print('Adapter: {} ID: {}'.format(svc.adapter(), svc.id()))
-                print('  setters:')
-                for setter in sorted(svc.setters()):
-                    print('    {}'.format(setter))
-                print('  getters:')
-                for getter in sorted(svc.getters()):
-                    print('    {}'.format(getter))
+        if args.services or args.service:
+            if not args.service or args.service in svc.adapter():
+                if args.verbose:
+                    print(json.dumps(service, indent=4))
+                else:
+                    print('Adapter: {} ID: {}'.format(svc.adapter(), svc.id()))
+                    print('  setters:')
+                    for setter in sorted(svc.setters()):
+                        print('    {}'.format(setter))
+                    print('  getters:')
+                    for getter in sorted(svc.getters()):
+                        print('    {}'.format(getter))
         if args.get:
-            getter = svc.getter_contains(args.get);
+            getter_key, getter = svc.getter_contains(args.get);
             if not getter:
                 continue
-            getter_data = json.dumps({'id': getter})
+            getter_data = json.dumps({'id': getter_key})
             if args.verbose:
                 print("Sending PUT to {} data={}".format(get_url, getter_data))
             getter_req = requests.put(get_url, headers=auth_header, data=bytes(getter_data, encoding='utf-8'))
             if args.verbose:
                 print("Got {} response of '{}'".format(getter_req.headers['content-type'], getter_req.text))
-            print("{} = '{}'".format(args.get, fmt_response(getter, getter_req)))
+            print("{} = '{}'".format(args.get, svc.fmt_response(getter_key, getter_req)))
         if args.set:
             set_name, set_value = args.set.split('=', 1)
             if args.verbose:
                 print('set_name =', set_name)
                 print('set_value =', set_value)
-            setter = svc.setter_contains(set_name);
+            setter_key, setter = svc.setter_contains(set_name);
             if not setter:
                 continue
-            setter_data = json.dumps({'select': {'id': setter}, 'value': {'String': set_value}})
+            setter_data = json.dumps({'select': {'id': setter_key}, 'value': {setter['kind']: set_value}})
             if args.verbose:
                 print("Sending PUT to {} data={}".format(set_url, setter_data))
             setter_req = requests.put(set_url, headers=auth_header, data=bytes(setter_data, encoding='utf-8'))
