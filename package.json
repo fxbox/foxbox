@@ -7,8 +7,11 @@
   },
   "scripts": {
     "test-selenium": "./tools/execute-selenium-tests",
-    "test-integration": "npm run clean_db && ./node_modules/.bin/mocha test/integration/test/*.js",
-    "clean_db": "rm -f ~/.local/share/foxbox/users_db.sqlite"
+    "test-integration": "npm run clean && ./node_modules/.bin/mocha test/integration/test/*.js && ./node_modules/.bin/mocha test/integration/test/no_travis/*.js",
+    "test-integration-travis": "npm run clean && ./node_modules/.bin/mocha test/integration/test/*.js",
+    "clean": "npm run clean_db && npm run clean_picture",
+    "clean_db": "rm -f ~/.local/share/foxbox/users_db.sqlite",
+    "clean_picture": "rm -rf ~/.local/share/foxbox/snapshots"
   },
   "repository": {
     "type": "git",
@@ -23,7 +26,7 @@
   "devDependencies": {
     "jshint": "2.9.1",
     "mocha": "2.4.5",
-    "selenium-webdriver": "2.48.2",
+    "selenium-webdriver": "2.53.1",
     "chai": "^3.5.0",
     "body-parser": "^1.15.0",
     "should": "^8.2.2",
@@ -33,8 +36,7 @@
     "chakram": "^1.2.2",
     "path": "^0.12.7",
     "config-js": "^1.1.9",
-    "express": "^4.13.4"
-  },
-  "dependencies": {
+    "express": "^4.13.4",
+    "iso-date": "^1.0.0"
   }
 }

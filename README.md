@@ -39,9 +39,11 @@ to install and switch between versions of Rust.
 | Dependency   | Debian/Raspian        | Fedora          | Arch             | OS X (Homebrew) |
 | ------------ | --------------------- | --------------- | ---------------- | --------------- |
 | `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `libupnp`        | `libupnp`       |
-| `libssl`     | `libssl-dev`          | `?`             | via `base-devel` | `openssl`       |
-| `libavahi`   | `libavahi-client-dev` | `?`             | `avahi`          | `n.a.`          |
-| `libsqlite3` | `libsqlite3-dev`      | `?`             | `sqlite`         | `sqlite`        |
+| `libssl`     | `libssl-dev`          | `openssl-devel` | via `base-devel` | `openssl`       |
+| `libavahi`   | `libavahi-client-dev` | `avahi-devel`   | `avahi`          | `n.a.`          |
+| `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`  | `sqlite`         | `sqlite`        |
+| `libespeak`  | `libsespeak-dev`      | `espeak-devel`  | `?`              | `?`             |
+| `libdbus`    | `?`                   | `dbus-devel`    | `?`              | `?`             |
 
 ### Node
 
@@ -79,11 +81,60 @@ $ git clone git@github.com:<username>/foxbox.git
 $ cd foxbox
 ```
 
+## Build time options
+### Disable authentication
+You may want to disable endpoints authentication to ease your development process. You can do that by removing `authentication` from the `default` feature in the `Cargo.toml` file.
+
+```conf
+[features]
+default = []
+authentication = []
+```
+
 ## Running the daemon
 
 ```bash
 $ cargo run
 ```
+
+There are several command line options to start the daemon:
+
+```bash
+-v, --verbose : Toggle verbose output.
+-l, --local-name <hostname> : Set local hostname. Linux only. Requires to be a member of the netdev group.
+-p, --port <port>  : Set port to listen on for http connections. [default: 3000]
+-w, --wsport <wsport> : Set port to listen on for websocket. [default: 4000]
+-d, --profile <path> : Set profile path to store user data.
+-r, --register <url> : URL of registration endpoint [default: http://localhost:4242]
+-t, --tunnel <tunnel> : Set the tunnel endpoint hostname. If omitted, the tunnel is disabled.
+-s, --tunnel-secret <secret> : Set the tunnel shared secret. [default: secret]
+-c, --config <namespace;key;value> :  Set configuration override
+-h, --help : Print this help menu.
+--disable-tls : Run as a plain HTTP server, disabling encryption.
+--dns-domain <domain> : Set the top level domain for public DNS. If omitted, the tunnel is disabled
+--dns-api <url> : Set the DNS API endpoint
+--remote-name: external domain of foxbox
+```
+
+Currently you would likely want to start the daemon like this:
+
+```bash
+cargo run -- -r http://knilxof.org:4242 --disable-tls
+```
+
+That means that your foxbox will be using our dev [registration server](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Registration_Server) and you will be disabling [TLS](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/TLS) support. We hope to have out-of-the-box TLS support ready pretty soon, but for now disabling it is the easiest way to run foxbox.
+
+### Enable tunneling support
+
+If you want to access your foxbox from outside of the network where it is running, you'll need to enable [tunneling](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Tunneling) support. To do that you need to specify the address of the tunneling server that you want to use, the shared secret for this server (if any) and the remote name that you want to use to access to your foxbox from outside of your foxbox' local network.
+
+```bash
+cargo run -- -r http://knilxof.org:4242 -t knilxof.org:443 -s secret --remote-name yourname.knilxof.org --disable-tls
+```
+
+In the example above, `knilxof.org:443` is the location of our tunneling dev server, which has a not-that-secret-anymore value that you'll need to ask for on [IRC](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link#IRC). You are supposed to substitute `<yourname>` by the subdomain of your choice, but take into account that you'll need to keep the domain name of the tunneling server, in this case `.knilxof.org`. Starting the daemon with the command line options above you should be able to access your foxbox through `http://yourname.knilxof.org`.
+
+### Custom local hostname
 
 To run with custom local host name (eg. foxbox.local):
 
@@ -99,28 +150,23 @@ __NOTE:__ currently changing of host name is done via ```avahi-daemon``` and the
 </policy>
 ```
 
-Alternatively you can build the app without running it via:
+### Custom Philips Hue nUPNP server
 
-```bash
-$ cargo build
+```
+$ cargo run -- -c "philips_hue;nupnp_url;http://localhost:8002/"
 ```
 
-## Build time options
-### Disable authentication
-You may want to disable endpoints authentication to ease your development process. You can do that by removing `authentication` from the `default` feature in the `Cargo.toml` file.
+## Interacting with the daemon
 
-```conf
-[features]
-default = []
-authentication = []
-```
+Once you have your foxbox up and running you can try our [demo application](https://github.com/fxbox/app) by browsing to [https://fxbox.github.io/app](https://fxbox.github.io/app).
+
+Alternatively, you can use the foxbox' current [REST API](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Taxonomy#Current_REST_API)
 
 ## Rust tests
 
 ```bash
 $ cargo test
 ```
-
 
 ## Selenium tests
 
@@ -178,4 +224,3 @@ $ export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
 Previous versions of these instructions described setting ```OPENSSL_INCLUDE_DIR```.
 Make sure it is unset. In fact, an obsolete value may have been cached by cargo
 which is fixed by ```cargo clean```.
-

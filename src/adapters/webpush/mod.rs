@@ -16,7 +16,7 @@
 mod crypto;
 mod db;
 
-use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Range, Type, Value, Json };
@@ -41,6 +41,8 @@ header! { (EncryptionKey, "Encryption-Key") => [String] }
 static ADAPTER_NAME: &'static str = "WebPush adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
 static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
+// This user identifier will be used when authentication is disabled.
+static NO_AUTH_USER_ID: i32 = -1;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Subscription {
@@ -172,9 +174,19 @@ impl<C: Controller> Adapter for WebPush<C> {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, mut set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, mut set: Vec<Id<Getter>>, user: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.drain(..).map(|id| {
-            let user_id = 1; // FIXME: currently logged in user
+            let user_id = if cfg!(feature = "authentication") {
+                match user {
+                    User::None => {
+                        return (id,
+                                Err(Error::InternalError(InternalError::InvalidInitialService)));
+                    },
+                    User::Id(id) => id
+                }
+            } else {
+                NO_AUTH_USER_ID
+            };
 
             macro_rules! getter_api {
                 ($getter:ident, $getter_id:ident, $getter_type:ident) => (
@@ -196,9 +208,19 @@ impl<C: Controller> Adapter for WebPush<C> {
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, user: User) -> ResultMap<Id<Setter>, (), Error> {
         values.drain().map(|(id, value)| {
-            let user_id = 1; // FIXME: currently logged in user
+            let user_id = if cfg!(feature = "authentication") {
+                match user {
+                    User::None => {
+                        return (id,
+                                Err(Error::InternalError(InternalError::InvalidInitialService)));
+                    },
+                    User::Id(id) => id
+                }
+            } else {
+                NO_AUTH_USER_ID
+            };
 
             let arc_json_value = match value {
                 Value::Json(v) => v,

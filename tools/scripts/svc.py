@@ -60,6 +60,15 @@ class Service:
         return self.service['setters']
 
 
+def fmt_response(getter, getter_req):
+    if getter_req.headers['content-type'].startswith('application/json'):
+        j = getter_req.json()
+        if getter in j:
+            rsp = j[getter]
+            for type in rsp:
+                if type == "String":
+                    return rsp[type]
+
 def main():
     default_server = 'localhost'
     default_port = 3000
@@ -69,48 +78,10 @@ def main():
         description="Interact with Foxbox IP Cameras",
     )
     parser.add_argument(
-        '-l', '--list-cams',
-        dest='list_cams',
-        action='store_true',
-        help='List the available IP Cameras',
-    )
-    parser.add_argument(
-        '--list-services',
-        dest='list_services',
-        action='store_true',
-        help='List the available services',
-    )
-    parser.add_argument(
-        '--list-snaps',
-        dest='list_snaps',
-        action='store_true',
-        help='List the snapshots available for a given IP Camera',
-    )
-    parser.add_argument(
-        '--get',
-        dest='get',
-        action='store_true',
-        help='Retrieve the latest snapshot from the server.',
-    )
-    parser.add_argument(
-        '--snapshot',
-        dest='snapshot',
-        action='store_true',
-        help='Take a snapshot',
-        default=False
-    )
-    parser.add_argument(
         '-s', '--server',
         dest='server',
         default=default_server,
         help='Server to connect to (default is {})'.format(default_server),
-    )
-    parser.add_argument(
-        '--password',
-        dest='password',
-        action='store',
-        help='Specify password for signing onto foxbox',
-        default=''
     )
     parser.add_argument(
         '-p', '--port',
@@ -121,17 +92,42 @@ def main():
         help='Port to connect to (default is {})'.format(default_port),
     )
     parser.add_argument(
-        '-n', '-name',
-        dest='name',
-        action='store',
-        help='Portion of camera name to serach for',
-    )
-    parser.add_argument(
         '--user',
         dest='username',
         action='store',
         help='Specify username for signing onto foxbox',
         default='admin'
+    )
+    parser.add_argument(
+        '--password',
+        dest='password',
+        action='store',
+        help='Specify password for signing onto foxbox',
+        default=''
+    )
+    parser.add_argument(
+        '--services',
+        dest='services',
+        action='store_true',
+        help='List the available services',
+    )
+    parser.add_argument(
+        '--service-property',
+        dest='service_property',
+        action='store',
+        help='Filter services based on a property value',
+    )
+    parser.add_argument(
+        '--get',
+        dest='get',
+        action='store',
+        help='Retrieves the current value from the named getter',
+    )
+    parser.add_argument(
+        '--set',
+        dest='set',
+        action='store',
+        help='Sets the value of the named setter. (i.e. --set name=value)',
     )
     parser.add_argument(
         '-v', '--verbose',
@@ -143,6 +139,7 @@ def main():
     args = parser.parse_args(sys.argv[1:])
 
     server_url = 'http://{}:{}'.format(args.server, args.port)
+    login_url = '{}/users/login'.format(server_url)
     services_url = '{}/api/v1/services'.format(server_url)
     get_url = '{}/api/v1/channels/get'.format(server_url)
     set_url = '{}/api/v1/channels/set'.format(server_url)
@@ -150,16 +147,22 @@ def main():
     username = args.username
     password = args.password
 
-    auth_filename = os.path.expanduser('~/.ipcam_auth_token')
+    auth_filename = os.path.expanduser('~/.svc_auth_token')
 
     if args.verbose:
         print('server =', args.server)
         print('port =', args.port)
-        print('name =', args.name)
+        print('services =', args.services)
+        print('service_property =', args.service_property)
         print('server_url =', server_url)
+        print('login_url =', login_url)
         print('services_url =', services_url)
+        print('get_url =', get_url)
+        print('set_url =', set_url)
         print('username =', username)
         print('password =', password)
+        print('get = ', args.get)
+        print('set = ', args.set)
 
     token = None
     token_changed = False
@@ -177,8 +180,11 @@ def main():
             password = getpass.getpass(prompt='Enter password for {} user: '.format(username))
         if password:
             # if a password was provided - use it, even if we had stashed a token
-            login_url = '{}/users/login'.format(server_url)
-            r = requests.post(login_url, auth=(username, password))
+            try:
+                r = requests.post(login_url, auth=(username, password))
+            except requests.exceptions.ConnectionError:
+                print('Unable to connect to server @ {}'.format(services_url))
+                return
             if r.status_code != 201:
                 print('Authentication failed')
                 password = None
@@ -195,7 +201,11 @@ def main():
 
         # We now have a token - try it out
         auth_header = {'Authorization': 'Bearer {}'.format(token)}
-        r = requests.get(services_url, headers=auth_header)
+        try:
+            r = requests.get(services_url, headers=auth_header)
+        except requests.exceptions.ConnectionError:
+            print('Unable to connect to server @ {}'.format(services_url))
+            return
         if r.status_code == 200:
             # Token was accepted
             break
@@ -214,64 +224,47 @@ def main():
 
     services = json.loads(str(r.content, 'utf-8'))
 
-    camera_found = False
-    for service in services:
-        if args.list_services:
-            print(json.dumps(service, indent=4))
+    for service in sorted(services, key=lambda entry: entry['adapter'] + entry['id']):
         svc = Service(service)
-        if svc.is_adapter('ip-camera'):
-            service_id = service['id'].replace('service:', '')
-            if args.verbose: print('service_id =', service_id)
-            camera_name = svc.property('name')
-            if args.name is None or args.name in camera_name:
-                camera_found = True
-                if args.list_cams or args.list_snaps:
-                    print('id: {} name: {}'.format(service_id, camera_name))
-                if args.snapshot:
-                    setter = svc.setter_contains('snapshot');
-                    if setter:
-                        setter_data = json.dumps({'select': {'id': setter}, 'value': {'Unit': []}})
-                        if args.verbose:
-                            print(setter_data)
-                        setter_req = requests.put(set_url, headers=auth_header, data=bytes(setter_data, encoding='utf-8'))
-                        if args.verbose:
-                            print("Got {} response of '{}'".format(setter_req.headers['content-type'], setter_req.text))
-                        print("Took a snapshot")
-                if args.list_snaps:
-                    getter = svc.getter_contains('image_list')
-                    getter_data = json.dumps({'id': getter})
-                    if args.verbose:
-                        print(getter_data)
-                    getter_req = requests.put(get_url, headers=auth_header, data=bytes(getter_data, encoding='utf-8'))
-                    if args.verbose:
-                        print(getter_req.text)
-                    snaps_json = getter_req.json()
-                    snaps = snaps_json[getter]['Json']
-                    if snaps:
-                        for snap in sorted(snaps):
-                            print('    {}'.format(snap))
-                    else:
-                        print('    No snapshots available')
-                if args.get:
-                    getter = svc.getter_contains('image_newest')
-                    getter_data = json.dumps({'id': getter})
-                    if args.verbose:
-                        print(getter_data)
-                    getter_req = requests.put(get_url, headers=auth_header, data=bytes(getter_data, encoding='utf-8'))
-                    if getter_req.status_code == 200 and getter_req.headers['content-type'] == 'image/jpeg':
-                        filename = 'image.jpg'
-                        with open(filename, 'wb') as f:
-                            f.write(getter_req.content)
-                        print('Wrote image to {}'.format(filename))
-                    else:
-                        j_resp = getter_req.json()
-                        print(json.dumps(j_resp, indent=4))
-    if not camera_found:
-        if args.name is None:
-            print('No IP Cameras found')
-        else:
-            print('No IP Cameras found with a description containing \'{}\''.format(args.name))
-
+        if not svc.has_property_value(args.service_property):
+            continue
+        if args.services:
+            if args.verbose:
+                print(json.dumps(service, indent=4))
+            else:
+                print('Adapter: {} ID: {}'.format(svc.adapter(), svc.id()))
+                print('  setters:')
+                for setter in sorted(svc.setters()):
+                    print('    {}'.format(setter))
+                print('  getters:')
+                for getter in sorted(svc.getters()):
+                    print('    {}'.format(getter))
+        if args.get:
+            getter = svc.getter_contains(args.get);
+            if not getter:
+                continue
+            getter_data = json.dumps({'id': getter})
+            if args.verbose:
+                print("Sending PUT to {} data={}".format(get_url, getter_data))
+            getter_req = requests.put(get_url, headers=auth_header, data=bytes(getter_data, encoding='utf-8'))
+            if args.verbose:
+                print("Got {} response of '{}'".format(getter_req.headers['content-type'], getter_req.text))
+            print("{} = '{}'".format(args.get, fmt_response(getter, getter_req)))
+        if args.set:
+            set_name, set_value = args.set.split('=', 1)
+            if args.verbose:
+                print('set_name =', set_name)
+                print('set_value =', set_value)
+            setter = svc.setter_contains(set_name);
+            if not setter:
+                continue
+            setter_data = json.dumps({'select': {'id': setter}, 'value': {'String': set_value}})
+            if args.verbose:
+                print("Sending PUT to {} data={}".format(set_url, setter_data))
+            setter_req = requests.put(set_url, headers=auth_header, data=bytes(setter_data, encoding='utf-8'))
+            if args.verbose:
+                print("Got {} response of '{}'".format(setter_req.headers['content-type'], setter_req.text))
+            
 
 if __name__ == "__main__":
     main()

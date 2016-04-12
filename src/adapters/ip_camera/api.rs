@@ -6,26 +6,44 @@ extern crate hyper;
 extern crate time;
 extern crate url;
 
+use config_store::ConfigService;
 use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::services::*;
+use rustc_serialize::base64::{ FromBase64, ToBase64, STANDARD };
 use self::hyper::header::{ Authorization, Basic, Connection };
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::io::{ BufWriter, ErrorKind };
 use std::io::prelude::*;
 use std::path::Path;
+use std::sync::Arc;
 
-// TODO: The camera username and password need to be persisted per-camera
-static CAMERA_USERNAME: &'static str = "admin";
-static CAMERA_PASSWORD: &'static str = "password";
+pub fn create_service_id(service_id: &str) -> Id<ServiceId> {
+    Id::new(&format!("service:{}@link.mozilla.org", service_id))
+}
 
-fn get_bytes(url: String) -> Result<Vec<u8>, Error> {
+pub fn create_setter_id(operation: &str, service_id: &str) -> Id<Setter> {
+    create_io_mechanism_id("setter", operation, service_id)
+}
+
+pub fn create_getter_id(operation: &str, service_id: &str) -> Id<Getter> {
+    create_io_mechanism_id("getter", operation, service_id)
+}
+
+pub fn create_io_mechanism_id<IO>(prefix: &str, operation: &str, service_id: &str) -> Id<IO>
+    where IO: IOMechanism
+{
+    Id::new(&format!("{}:{}.{}@link.mozilla.org", prefix, operation, service_id))
+}
+
+fn get_bytes(url: &str, username: &str, password: &str) -> Result<Vec<u8>, Error> {
     let client = hyper::Client::new();
-    let get_result = client.get(&url)
+    let get_result = client.get(url)
                            .header(
                                Authorization(
                                    Basic {
-                                       username: CAMERA_USERNAME.to_owned(),
-                                       password: Some(CAMERA_PASSWORD.to_owned())
+                                       username: username.to_owned(),
+                                       password: Some(password.to_owned())
                                    }
                                )
                            )
@@ -59,14 +77,34 @@ pub struct IpCamera {
     pub udn: String,
     url: String,
     snapshot_dir: String,
+    config: Arc<ConfigService>,
+
+    upnp_name: String,
+
+    pub image_list_id: Id<Getter>,
+    pub image_newest_id: Id<Getter>,
+    pub snapshot_id: Id<Setter>,
+    pub get_username_id: Id<Getter>,
+    pub set_username_id: Id<Setter>,
+    pub get_password_id: Id<Getter>,
+    pub set_password_id: Id<Setter>,
 }
 
 impl IpCamera {
-    pub fn new(udn: &str, url: &str, root_snapshot_dir: &str) -> Result<Self, Error> {
+    pub fn new(udn: &str, url: &str, upnp_name: &str, root_snapshot_dir: &str, config: &Arc<ConfigService>) -> Result<Self, Error> {
         let camera = IpCamera {
             udn: udn.to_owned(),
             url: url.to_owned(),
-            snapshot_dir: format!("{}/{}", root_snapshot_dir, udn)
+            snapshot_dir: format!("{}/{}", root_snapshot_dir, udn),
+            config: config.clone(),
+            upnp_name: upnp_name.to_owned(),
+            image_list_id: create_getter_id("image_list", &udn),
+            image_newest_id: create_getter_id("image_newest", &udn),
+            snapshot_id: create_setter_id("snapshot", &udn),
+            get_username_id: create_getter_id("username", &udn),
+            set_username_id: create_setter_id("username", &udn),
+            get_password_id: create_getter_id("password", &udn),
+            set_password_id: create_setter_id("password", &udn),
         };
         // Create a directory to store snapshots for this camera.
         if let Err(err) = fs::create_dir_all(&camera.snapshot_dir) {
@@ -76,6 +114,48 @@ impl IpCamera {
             }
         }
         Ok(camera)
+    }
+
+    fn config_key(&self, key: &str) -> String {
+        format!("{}.{}", self.udn, key)
+    }
+
+    fn get_config(&self, key: &str) -> Option<String> {
+        self.config.get("ip_camera", &self.config_key(key))
+    }
+
+    fn set_config(&self, key: &str, value: &str) {
+        self.config.set("ip_camera", &self.config_key(key), value);
+    }
+
+    pub fn get_username(&self) -> String {
+        if let Some(username) = self.get_config("username") {
+            return username;
+        }
+        String::from("")
+    }
+
+    pub fn set_username(&self, username: &str) {
+        self.set_config("username", username);
+    }
+
+    pub fn get_password(&self) -> String {
+        if let Some(password) = self.get_config("password") {
+            if let Ok(password_bytes) = password.from_base64() {
+                if let Ok(password_str) = String::from_utf8(password_bytes) {
+                    return password_str;
+                }
+            }
+        }
+        String::from("")
+    }
+
+    pub fn set_password(&self, password: &str) {
+        // We base64 encode the password when we store it. The cameras only
+        // use HTTP Basic Authentication, which just base64 encodes the username
+        // and password anyway, so this is no less secure.
+
+        self.set_config("password", &password.as_bytes().to_base64(STANDARD));
     }
 
     pub fn get_image_list(&self) -> Vec<String> {
@@ -140,7 +220,7 @@ impl IpCamera {
         let image_url = "image/jpeg.cgi";
         let url = format!("{}/{}", self.url, image_url);
 
-        let image = match get_bytes(url) {
+        let image = match get_bytes(&url, &self.get_username(), &self.get_password()) {
             Ok(image) => image,
             Err(err) => {
                 warn!("Error '{:?}' retrieving image from camera {}", err, self.url);
@@ -190,7 +270,7 @@ impl IpCamera {
                 return Err(Error::InternalError(InternalError::InvalidInitialService));
             }
         }
-        debug!("Took a snapshot from {}: {}", self.udn, full_filename);
+        info!("Took a snapshot from {}: {}", self.udn, full_filename);
         Ok(format!("{}.jpg", filename))
     }
 }

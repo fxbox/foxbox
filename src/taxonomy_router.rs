@@ -5,14 +5,15 @@
 extern crate serde_json;
 
 use foxbox_taxonomy::manager::*;
-use foxbox_taxonomy::api::{ API, Error, TargetMap };
+use foxbox_taxonomy::api::{ API, Error, TargetMap, User };
 use foxbox_taxonomy::values::{ Binary, Value };
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 
 use foxbox_users::AuthEndpoint;
+use foxbox_users::SessionToken;
 
-use iron::{ Handler, IronResult, Request, Response };
+use iron::{ Handler, headers, IronResult, Request, Response };
 use iron::headers::ContentType;
 use iron::method::Method;
 use iron::prelude::Chain;
@@ -103,13 +104,18 @@ impl Handler for TaxonomyRouter {
 
     #[allow(cyclomatic_complexity)]
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        // The CORS middleware will take care of adding the CORS headers
-        // if they are allowed.
-        if req.method == Method::Options {
-            return Ok(Response::with(Status::Ok));
-        }
+        let user: User = match req.headers.clone().get::
+            <headers::Authorization<headers::Bearer>>() {
+            Some(&headers::Authorization(headers::Bearer { ref token })) => {
+                match SessionToken::from_string(token) {
+                    Ok(token) => User::Id(token.claims.id),
+                    Err(_) => return Ok(Response::with(Status::Unauthorized))
+                }
+            },
+            _ => User::None
+        };
 
-        // We are handled urls relative to the mounter set up in http_server.rs
+        // We are handling urls relative to the mounter set up in http_server.rs
         // That means that for a full url like http://localhost/api/v1/services
         // the req.url.path will only contain ["services"]
         let path = req.url.path.clone();
@@ -123,35 +129,33 @@ impl Handler for TaxonomyRouter {
             ($call:ident, $sel:ident, $path:expr) => (
             if path == $path {
                 return {
-                    if req.method != Method::Get && req.method != Method::Post {
-                        // Wrong method, return a 405 error.
-                        return Ok(Response::with((Status::MethodNotAllowed,
-                                                  format!("Bad method: {}", req.method))));
-                    }
-
-                    if req.method == Method::Get {
-                        // On a GET, just send the full taxonomy content for
-                        // this kind of selector.
-                        let result = self.api.$call(vec![$sel::new()]);
-                        self.build_response(&result)
-                    } else {
-                        let source = itry!(Self::read_body_to_string(&mut req.body));
-                        match Vec::<$sel>::from_str(&source as &str) {
-                            Ok(arg) => self.build_response(&self.api.$call(arg)),
-                            Err(err) => self.build_parse_error(&err)
-                        }
+                    match req.method {
+                        Method::Get => {
+                            // On a GET, just send the full taxonomy content for
+                            // this kind of selector.
+                            self.build_response(&self.api.$call(vec![$sel::new()]))
+                        },
+                        Method::Post => {
+                            let source = itry!(Self::read_body_to_string(&mut req.body));
+                            match Vec::<$sel>::from_str(&source as &str) {
+                                Ok(arg) => self.build_response(&self.api.$call(arg)),
+                                Err(err) => self.build_parse_error(&err)
+                            }
+                        },
+                        _ => Ok(Response::with((Status::MethodNotAllowed,
+                                                format!("Bad method: {}", req.method))))
                     }
                 }
             })
         }
 
         macro_rules! simple {
-            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg)))
+            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg, user)))
         }
 
         macro_rules! binary {
             ($api:ident, $arg:ident, $call:ident) => ({
-                        let res = $api.$call($arg);
+                        let res = $api.$call($arg, user);
                         if let Some(payload) = self.get_binary(&res) {
                             self.build_binary_response(&payload)
                         } else {
@@ -326,12 +330,12 @@ describe! binary_getter {
         extern crate serde_json;
 
         use foxbox_taxonomy::adapter::*;
-        use foxbox_taxonomy::api::{ Error, InternalError };
+        use foxbox_taxonomy::api::{ Error, InternalError, User };
         use foxbox_taxonomy::manager::AdapterManager;
         use foxbox_taxonomy::services::*;
         use foxbox_taxonomy::values::{ Range, Type, Value, Binary };
         use iron::Headers;
-        use iron::headers::{ ContentLength, ContentType };
+        use iron::headers::{ Authorization, Bearer, ContentLength, ContentType };
         use iron_test::{ request, response };
         use mount::Mount;
         use std::collections::{ HashMap, HashSet };
@@ -366,7 +370,9 @@ describe! binary_getter {
                 &ADAPTER_VERSION
             }
 
-            fn fetch_values(&self, mut set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+            fn fetch_values(&self, mut set: Vec<Id<Getter>>, user: User)
+                -> ResultMap<Id<Getter>, Option<Value>, Error> {
+                assert_eq!(user, User::Id(2));
                 set.drain(..).map(|id| {
                     if id == Id::new("getter:binary@link.mozilla.org") {
                         let vec = vec![1, 2, 3, 10, 11, 12];
@@ -381,7 +387,8 @@ describe! binary_getter {
                 }).collect()
             }
 
-            fn send_values(&self, mut values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+            fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User)
+                -> ResultMap<Id<Setter>, (), Error> {
                 values.drain().map(|(id, _)| {
                     (id.clone(), Err(Error::InternalError(InternalError::NoSuchSetter(id))))
                 }).collect()
@@ -429,8 +436,15 @@ describe! binary_getter {
         let mut mount = Mount::new();
         mount.mount("/api/v1", create(ControllerStub::new(), &taxo_manager));
 
+        // Token payload is { "id": 2, "name": "admin" }
+        let token = "eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJpZCI\
+                     6MiwibmFtZSI6ImFkbWluIn0.JNtvokupDl2hdqB+vER15y89qigPc4FviZfJOSR1Vso";
+
+        let mut headers = Headers::new();
+        headers.set(Authorization(Bearer { token: token.to_owned() }));
+
         let response = request::put("http://localhost:3000/api/v1/channels/get",
-                                    Headers::new(),
+                                    headers,
                                     r#"[{"id":"getter:binary@link.mozilla.org"}]"#,
                                     &mount).unwrap();
 

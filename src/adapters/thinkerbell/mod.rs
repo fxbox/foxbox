@@ -1,6 +1,6 @@
 //! An adapter providing access to the Thinkerbell rules engine.
 
-use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
 use foxbox_taxonomy::util::Id;
@@ -14,6 +14,7 @@ use timer;
 use transformable_channels::mpsc::*;
 
 use std::collections::{ HashMap, HashSet };
+use std::fmt;
 use std::path::Path;
 use std::sync::{ Arc, Mutex };
 use std::thread;
@@ -50,13 +51,19 @@ pub struct ThinkerbellAdapter {
 }
 
 /// Thinkerbell requires an execution environment following this API.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct ThinkerbellExecutionEnv {
     adapter_manager: Arc<AdapterManager>,
 
     // FIXME: Timer's not clonable, so we should only use one, right? Does this have to be mutexed?
     timer: Arc<Mutex<timer::Timer>>
 }
+impl fmt::Debug for ThinkerbellExecutionEnv {
+    fn fmt(&self, _: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        Ok(())
+    }
+}
+
 
 impl ExecutableDevEnv for ThinkerbellExecutionEnv {
     // We don't support watches, so we don't care about the type of WatchGuard.
@@ -99,7 +106,7 @@ impl Adapter for ThinkerbellAdapter {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, set: Vec<Id<Getter>>) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, set: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
         set.iter().map(|id| {
             let (tx, rx) = channel();
             let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToGetter(tx, id.clone()));
@@ -112,11 +119,11 @@ impl Adapter for ThinkerbellAdapter {
         }).collect()
     }
 
-    fn send_values(&self, values: HashMap<Id<Setter>, Value>) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, values: HashMap<Id<Setter>, Value>, user: User) -> ResultMap<Id<Setter>, (), Error> {
         values.iter()
             .map(|(id, value)| {
                 let (tx, rx) = channel();
-                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone()));
+                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone(), user.clone()));
                 match rx.recv() {
                     Ok(result) => (id.clone(), result),
                     // If an error occurs, the channel died!
@@ -141,7 +148,7 @@ enum ThinkAction {
     AddRuleService(Id<ScriptId>),
     RemoveRuleService(Id<ScriptId>),
     RespondToGetter(RawSender<Result<Option<Value>, Error>>, Id<Getter>),
-    RespondToSetter(RawSender<Result<(), Error>>, Id<Setter>, Value),
+    RespondToSetter(RawSender<Result<(), Error>>, Id<Setter>, Value, User),
 }
 
 /// An internal data structure to track getters and setters.
@@ -204,8 +211,8 @@ impl ThinkerbellAdapter {
                             let _ = tx.send(Ok(Some(Value::OnOff(if is_enabled { OnOff::On } else { OnOff::Off }))));
                             continue 'recv;
                         } else if getter_id == rule.getter_source_id {
-                            match script_manager.get_source(&rule.script_id) {
-                                Ok(source) => {
+                            match script_manager.get_source_and_owner(&rule.script_id) {
+                                Ok((source, _)) => {
                                     let _ = tx.send(Ok(Some(Value::String(Arc::new(source.to_owned())))));
                                 },
                                 Err(e) => {
@@ -218,13 +225,13 @@ impl ThinkerbellAdapter {
                     let _ = tx.send(Err(Error::InternalError(InternalError::NoSuchGetter(getter_id.clone()))));
                 },
                 // Respond to a pending Setter request.
-                ThinkAction::RespondToSetter(tx, setter_id, value) => {
+                ThinkAction::RespondToSetter(tx, setter_id, value, user) => {
                     // Add a new rule (with the given JSON source).
                     if setter_id == self.setter_add_rule_id {
                         match value {
                             Value::ThinkerbellRule(ref rule_source) => {
                                 let script_id = Id::new(&rule_source.name);
-                                let _ = tx.send(script_manager.put(&script_id, &rule_source.source).map_err(sm_error));
+                                let _ = tx.send(script_manager.put(&script_id, &rule_source.source, &user).map_err(sm_error));
                                 let _ = self.tx.lock().unwrap().send(ThinkAction::AddRuleService(script_id.clone()));
                             },
                             _ => {
@@ -292,7 +299,7 @@ impl ThinkerbellAdapter {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Getter {
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::ThinkerbellRuleOn,
                 updated: None
             },
         }));
@@ -318,7 +325,7 @@ impl ThinkerbellAdapter {
             last_seen: None,
             tags: HashSet::new(),
             mechanism: Setter {
-                kind: ChannelKind::OnOff,
+                kind: ChannelKind::ThinkerbellRuleOn,
                 updated: None
             },
         }));
@@ -348,7 +355,7 @@ impl ThinkerbellAdapter {
     }
 
     /// Everything is initialized here, but the real work happens in the main() loop.
-    pub fn init(manager: &Arc<AdapterManager>) -> Result<(), Error> {
+    pub fn init(manager: &Arc<AdapterManager>, scripts_path: &str) -> Result<(), Error> {
         let adapter_id = Id::new("thinkerbell-adapter");
         let setter_add_rule_id = Id::new("thinkerbell-add-rule");
         let root_service_id = Id::new("thinkerbell-root-service");
@@ -361,7 +368,7 @@ impl ThinkerbellAdapter {
         };
 
         let mut script_manager = try!(
-            ScriptManager::new(env, Path::new("./scripts.sqlite"), Box::new(tx_env)).map_err(sm_error));
+            ScriptManager::new(env, Path::new(scripts_path), Box::new(tx_env)).map_err(sm_error));
 
         let result_map = try!(script_manager.load().map_err(sm_error));
 

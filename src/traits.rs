@@ -41,7 +41,7 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn remove_websocket(&mut self, socket: ws::Sender);
     fn broadcast_to_websockets(&self, data: serde_json::value::Value);
 
-    fn get_config(&self) -> &ConfigService;
+    fn get_config(&self) -> Arc<ConfigService>;
     fn get_upnp_manager(&self) -> Arc<UpnpManager>;
     fn get_users_manager(&self) -> Arc<UsersManager>;
     fn get_profile(&self) -> &ProfileService;

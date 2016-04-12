@@ -10,7 +10,9 @@
 
 // Make linter fail for every warning
 #![plugin(clippy)]
-#![deny(clippy)]
+// Disable clippy for now.
+// TODO: re-enable once we have upgraded rustc.
+//#![deny(clippy)]
 // Don't fail on doc_markdown as clippy is sometimes a bit over zealous.
 #![warn(doc_markdown)]
 
@@ -59,6 +61,9 @@ extern crate uuid;
 extern crate ws;
 extern crate multicast_dns;
 extern crate xml;
+
+// adapters
+extern crate openzwave_adapter as openzwave;
 
 #[cfg(test)]
 extern crate regex;

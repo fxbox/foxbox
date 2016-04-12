@@ -120,7 +120,7 @@ var philipsHue_server = (function() {
        resolve(); // it's like if you called `callback()`
      });
    });
-}
+  }
 
   return {setup, stop, lastCmd, lightResponse, turnOnLight, 
     turnOffLight, lightStatus};

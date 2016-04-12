@@ -11,20 +11,23 @@ use std::sync::Arc;
 
 use foxbox_taxonomy::manager::*;
 
+use config_store::ConfigService;
 use super::IPCameraAdapter;
 use super::IpCameraServiceMap;
 use upnp::{UpnpListener, UpnpService};
 
 pub struct IpCameraUpnpListener {
     manager: Arc<AdapterManager>,
-    services: IpCameraServiceMap
+    services: IpCameraServiceMap,
+    config: Arc<ConfigService>,
 }
 
 impl IpCameraUpnpListener {
-    pub fn new(manager: &Arc<AdapterManager>, services: IpCameraServiceMap) -> Box<Self> {
+    pub fn new(manager: &Arc<AdapterManager>, services: IpCameraServiceMap, config: &Arc<ConfigService>) -> Box<Self> {
         Box::new(IpCameraUpnpListener {
             manager: manager.clone(),
-            services: services
+            services: services,
+            config: config.clone(),
         })
     }
 }
@@ -66,7 +69,7 @@ impl UpnpListener for IpCameraUpnpListener {
         let name = try_get!(service.description, "/root/device/friendlyName").clone();
         let manufacturer = try_get!(service.description, "/root/device/manufacturer");
 
-        IPCameraAdapter::init_service(&self.manager, self.services.clone(),
+        IPCameraAdapter::init_service(&self.manager, self.services.clone(), &self.config,
                                       &udn, &url, &name, &manufacturer, &model_name).unwrap();
         true
     }
