@@ -16,7 +16,7 @@ use foxbox_taxonomy::api::{Error, InternalError, User};
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{Range, Value, Json, Binary, Type, TypeError};
+use foxbox_taxonomy::values::{ Value, Json, Binary, Type, TypeError};
 use traits::Controller;
 use transformable_channels::mpsc::*;
 use self::api::*;
@@ -328,11 +328,9 @@ impl Adapter for IPCameraAdapter {
         }).collect()
     }
 
-    fn register_watch(&self,
-                      mut watch: Vec<(Id<Getter>, Option<Range>)>,
-                      _: Box<ExtSender<WatchEvent>>)
-                      -> ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error> {
-        watch.drain(..).map(|(id, _)| {
+    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult
+    {
+        watch.drain(..).map(|(id, _, _)| {
             (id.clone(), Err(Error::GetterDoesNotSupportWatching(id)))
         }).collect()
     }

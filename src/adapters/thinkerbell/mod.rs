@@ -4,7 +4,7 @@ use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
 use foxbox_taxonomy::util::Id;
-use foxbox_taxonomy::values::{ Range, Duration, Type, Value, TypeError, OnOff };
+use foxbox_taxonomy::values::{ Duration, Type, Value, TypeError, OnOff };
 
 use foxbox_thinkerbell::compile::ExecutableDevEnv;
 use foxbox_thinkerbell::manager::{ ScriptManager, ScriptId, Error as ScriptManagerError };
@@ -134,10 +134,9 @@ impl Adapter for ThinkerbellAdapter {
             .collect()
     }
 
-    fn register_watch(&self, mut watch: Vec<(Id<Getter>, Option<Range>)>,
-        _: Box<ExtSender<WatchEvent>>) ->
-            ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error> {
-        watch.drain(..).map(|(id, _)| {
+    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult
+    {
+        watch.drain(..).map(|(id, _, _)| {
             (id.clone(), Err(Error::GetterDoesNotSupportWatching(id)))
         }).collect()
     }

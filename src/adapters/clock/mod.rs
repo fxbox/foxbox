@@ -94,27 +94,25 @@ impl Adapter for Clock {
             .collect()
     }
 
-    fn register_watch(&self, mut watch: Vec<(Id<Getter>, Option<Range>)>,
-        tx: Box<ExtSender<WatchEvent>>) ->
-            ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error>
+    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult
     {
-        let tx = tx.map(|msg| {
-            match msg {
-                Op::Enter(id, value) => {
-                    WatchEvent::Enter {
-                        id: id,
-                        value: value
-                    }
-                },
-                Op::Exit(id, value) => {
-                    WatchEvent::Exit {
-                        id: id,
-                        value: value
-                    }
-                },
-            }
-        });
-        watch.drain(..).map(|(id, filter)| {
+        watch.drain(..).map(|(id, filter, tx)| {
+            let tx = tx.map(|msg| {
+                match msg {
+                    Op::Enter(id, value) => {
+                        WatchEvent::Enter {
+                            id: id,
+                            value: value
+                        }
+                    },
+                    Op::Exit(id, value) => {
+                        WatchEvent::Exit {
+                            id: id,
+                            value: value
+                        }
+                    },
+                }
+            });
             (id.clone(), match filter {
                 None => Err(Error::GetterRequiresThresholdForWatching(id)),
                 Some(range) => self.aux_register_watch(&id, range, Box::new(tx.clone()))
