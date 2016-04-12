@@ -1159,6 +1159,7 @@ impl State {
             let watch_data = match weak_watch_data.upgrade() {
                 None => {
                     // The watch_data has already been dropped, nothing to do.
+                    debug!(target: "Taxonomy", "State::start_watch, the guard has been dropped, cannot upgrade, skipping.");
                     continue
                 }
                 Some(watch_data) => watch_data
@@ -1166,10 +1167,13 @@ impl State {
             let is_dropped = watch_data.is_dropped.clone();
             if is_dropped.load(Ordering::Relaxed) {
                 // The WatchGuard has already been dropped.
+                debug!(target: "Taxonomy", "State::start_watch, the guard has been dropped, is_dropped detected, skipping.");
                 continue
             }
             let on_ok = watch_data.on_event.lock().unwrap().filter_map(move |event| {
                 if is_dropped.load(Ordering::Relaxed) {
+                    debug!(target: "Taxonomy", "State::start_watch, the guard has been dropped, is_dropped detected, don't propagate messages.");
+
                     // The WatchGuard has already been dropped.
                     // We want to stop propagating messages immediately, even if unregistration
                     // is not necessarily complete yet. Unregistration will be completed after
@@ -1191,6 +1195,8 @@ impl State {
             });
             let mut guards = vec![];
             for (id, result) in adapter.register_watch(request, Box::new(on_ok)) {
+                debug!(target: "Taxonomy", "State::start_watch, registered watch for {} => {}", id, result.is_ok());
+
                 match result {
                     Err(err) => {
                         let event = WatchEvent::InitializationError {
