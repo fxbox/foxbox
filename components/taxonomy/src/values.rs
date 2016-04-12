@@ -67,6 +67,9 @@ pub enum Type {
     /// windows, etc.
     OpenClosed,
 
+    /// A boolean locked/unlocked states. Used for door locks.
+    DoorLocked,
+
     ///
     /// # Time
     ///
@@ -103,6 +106,7 @@ impl Parser<Type> for Type {
                 "Unit" => Ok(Unit),
                 "OnOff" => Ok(OnOff),
                 "OpenClosed" => Ok(OpenClosed),
+                "DoorLocked" => Ok(DoorLocked),
                 "Duration" => Ok(Duration),
                 "TimeStamp" => Ok(TimeStamp),
                 "Temperature" => Ok(Temperature),
@@ -126,6 +130,7 @@ impl ToJSON for Type {
             Unit => "Unit",
             OnOff => "OnOff",
             OpenClosed => "OpenClosed",
+            DoorLocked => "DoorLocked",
             Duration => "Duration",
             TimeStamp => "TimeStamp",
             Temperature => "Temperature",
@@ -149,7 +154,8 @@ impl Type {
         use self::Type::*;
         match *self {
             Duration | TimeStamp | Temperature | ExtNumeric | Color | ThinkerbellRule => false,
-            Unit | String | Json | Binary | OnOff | OpenClosed | ExtBool => true,
+            Unit | String | Json | Binary | OnOff | OpenClosed |
+            DoorLocked | ExtBool => true,
         }
     }
 
@@ -421,6 +427,137 @@ impl Deserialize for OpenClosed {
             match source {
                 "Open" | "open" => Ok(OpenClosed::Open),
                 "Closed" | "closed" => Ok(OpenClosed::Closed),
+                _ => Err(())
+            }
+        }))
+    }
+}
+
+/// An locked/unlocked state.
+///
+/// # JSON
+///
+/// Values of this type are represented by strings "Locked" | "Unlocked".
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DoorLocked {
+    /// # JSON
+    ///
+    /// Represented by "Locked".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = DoorLocked::from_str("\"Locked\"").unwrap();
+    /// assert_eq!(parsed, DoorLocked::Locked);
+    ///
+    /// let serialized: JSON = DoorLocked::Locked.to_json();
+    /// assert_eq!(serialized.as_string().unwrap(), "Locked");
+    /// ```
+    Locked,
+
+    /// # JSON
+    ///
+    /// Represented by "Unlocked".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = DoorLocked::from_str("\"Unlocked\"").unwrap();
+    /// assert_eq!(parsed, DoorLocked::Unlocked);
+    ///
+    /// let serialized: JSON = DoorLocked::Unlocked.to_json();
+    /// assert_eq!(serialized.as_string().unwrap(), "Unlocked");
+    /// ```
+    Unlocked,
+}
+
+impl DoorLocked {
+    fn as_bool(&self) -> bool {
+        match *self {
+            DoorLocked::Locked => true,
+            DoorLocked::Unlocked => false,
+        }
+    }
+}
+
+impl Parser<DoorLocked> for DoorLocked {
+    fn description() -> String {
+        "DoorLocked".to_owned()
+    }
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        match source.as_string() {
+            Some("Locked") => Ok(DoorLocked::Locked),
+            Some("Unlocked") => Ok(DoorLocked::Unlocked),
+            Some(str) => Err(ParseError::unknown_constant(str, &path)),
+            None => Err(ParseError::type_error("DoorLocked", &path, "string"))
+        }
+    }
+}
+
+impl ToJSON for DoorLocked {
+    fn to_json(&self) -> JSON {
+        match *self {
+            DoorLocked::Locked => JSON::String("Locked".to_owned()),
+            DoorLocked::Unlocked => JSON::String("Unlocked".to_owned())
+        }
+    }
+}
+impl Into<Value> for DoorLocked {
+    fn into(self) -> Value {
+        Value::DoorLocked(self)
+    }
+}
+
+impl PartialOrd for DoorLocked {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DoorLocked {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_bool().cmp(&other.as_bool())
+    }
+}
+
+///
+/// # (De)serialization
+///
+/// Values of this state are represented by strings "Locked"|"Unlocked".
+///
+/// ```
+/// extern crate serde;
+/// extern crate serde_json;
+/// extern crate foxbox_taxonomy;
+///
+/// let locked = serde_json::to_string(&foxbox_taxonomy::values::DoorLocked::Locked).unwrap();
+/// assert_eq!(locked, "\"Locked\"");
+///
+/// let locked : foxbox_taxonomy::values::DoorLocked = serde_json::from_str("\"Locked\"").unwrap();
+/// assert_eq!(locked, foxbox_taxonomy::values::DoorLocked::Locked);
+///
+/// let unlocked = serde_json::to_string(&foxbox_taxonomy::values::DoorLocked::Unlocked).unwrap();
+/// assert_eq!(unlocked, "\"Unlocked\"");
+///
+/// let unlocked : foxbox_taxonomy::values::DoorLocked = serde_json::from_str("\"Unlocked\"").unwrap();
+/// assert_eq!(unlocked, foxbox_taxonomy::values::DoorLocked::Unlocked);
+/// ```
+impl Serialize for DoorLocked {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error> where S: Serializer {
+        match *self {
+            DoorLocked::Locked => "Locked".serialize(serializer),
+            DoorLocked::Unlocked => "Unlocked".serialize(serializer)
+        }
+    }
+}
+impl Deserialize for DoorLocked {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error> where D: Deserializer {
+        deserializer.deserialize_string(TrivialEnumVisitor::new(|source| {
+            match source {
+                "Locked" | "locked" => Ok(DoorLocked::Locked),
+                "Unlocked" | "unlocked" => Ok(DoorLocked::Unlocked),
                 _ => Err(())
             }
         }))
@@ -976,6 +1113,41 @@ pub enum Value {
     /// ```
     OpenClosed(OpenClosed),
 
+    /// An locked/unlocked value.
+    ///
+    /// # JSON
+    ///
+    /// Represented as `{"DoorLocked": string}`, where `string` is "Locked" or "Unlocked".
+    ///
+    /// ```
+    /// extern crate foxbox_taxonomy;
+    ///
+    /// use foxbox_taxonomy::values::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// # fn main() {
+    ///
+    /// let source = "{
+    ///   \"DoorLocked\": \"Locked\"
+    /// }";
+    ///
+    /// let parsed = Value::from_str(source).unwrap();
+    /// if let Value::DoorLocked(DoorLocked::Locked) = parsed {
+    ///   // ok
+    /// } else {
+    ///   panic!();
+    /// }
+    ///
+    ///
+    /// let serialized: JSON = parsed.to_json();
+    /// if let JSON::Object(ref obj) = serialized {
+    ///   let serialized = obj.get("DoorLocked").unwrap();
+    ///   assert_eq!(serialized.as_string().unwrap(), "Locked");
+    /// }
+    /// # }
+    /// ```
+    DoorLocked(DoorLocked),
+
     /// An absolute time and date.
     ///
     /// # JSON
@@ -1265,6 +1437,10 @@ lazy_static! {
             let value = try!(path.push("OpenClosed", |path| self::OpenClosed::parse(path, v)));
             Ok(OpenClosed(value))
         }));
+        map.insert("DoorLocked", Box::new(|path, v| {
+            let value = try!(path.push("DoorLocked", |path| self::DoorLocked::parse(path, v)));
+            Ok(DoorLocked(value))
+        }));
         map.insert("Duration", Box::new(|path, v| {
             let value = try!(path.push("Duration", |path| self::Duration::parse(path, v)));
             Ok(Duration(value))
@@ -1341,6 +1517,7 @@ impl ToJSON for Value {
             Unit => ("Unit", JSON::Null),
             OnOff(ref val) => ("OnOff", val.to_json()),
             OpenClosed(ref val) => ("OpenClosed", val.to_json()),
+            DoorLocked(ref val) => ("DoorLocked", val.to_json()),
             Duration(ref val) => ("Duration", val.to_json()),
             TimeStamp(ref val) => ("TimeStamp", val.to_json()),
             Color(ref val) => ("Color", val.to_json()),
@@ -1364,6 +1541,7 @@ impl Value {
             Value::Unit => Type::Unit,
             Value::OnOff(_) => Type::OnOff,
             Value::OpenClosed(_) => Type::OpenClosed,
+            Value::DoorLocked(_) => Type::DoorLocked,
             Value::String(_) => Type::String,
             Value::Duration(_) => Type::Duration,
             Value::TimeStamp(_) => Type::TimeStamp,
@@ -1408,6 +1586,9 @@ impl PartialOrd for Value {
 
             (&OpenClosed(ref a), &OpenClosed(ref b)) => a.partial_cmp(b),
             (&OpenClosed(_), _) => None,
+
+            (&DoorLocked(ref a), &DoorLocked(ref b)) => a.partial_cmp(b),
+            (&DoorLocked(_), _) => None,
 
             (&Duration(ref a), &Duration(ref b)) => a.partial_cmp(b),
             (&Duration(_), _) => None,
