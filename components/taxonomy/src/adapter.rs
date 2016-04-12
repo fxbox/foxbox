@@ -184,8 +184,8 @@ pub trait Adapter: Send + Sync {
     ///
     /// Similarly, successive calls to `register_watch` may end up watching the same getter. The
     /// adapter should handle this case, optimizing it if possible.
-    fn register_watch(&self, Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) ->
-            Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)>;
+    fn register_watch(&self, Vec<WatchTarget>) ->
+            WatchResult;
 
     /// Signal the adapter that it is time to stop.
     ///
@@ -194,3 +194,6 @@ pub trait Adapter: Send + Sync {
         // By default, do nothing.
     }
 }
+
+pub type WatchTarget = (Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>);
+pub type WatchResult = Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)>;
