@@ -131,6 +131,9 @@ impl AdapterManagerHandle for AdapterManager {
             // Acquire and release lock asap.
             try!(self.back_end.write().unwrap().add_getter(getter))
         };
+        if !request.is_empty() {
+            debug!(target: "Taxonomy-manager", "manager.add_getter => need to register watches");
+        }
         self.register_watches(request);
         Ok(())
     }
@@ -249,6 +252,9 @@ impl API for AdapterManager {
             // Acquire and release the write lock.
             self.back_end.write().unwrap().add_getter_tags(selectors, tags)
         };
+        if !request.is_empty() {
+            debug!(target: "Taxonomy-manager", "manager.add_getter_tags => need to register watches");
+        }
         self.register_watches(request);
         result
     }
@@ -349,6 +355,9 @@ impl API for AdapterManager {
                 .prepare_channel_watch(watch, on_event)
         };
 
+        if !request.is_empty() {
+            debug!(target: "Taxonomy-manager", "manager.watch_values => need to register watches");
+        }
         self.register_watches(request);
         WatchGuard::new(self.tx_watch.lock().unwrap().internal_clone(), watch_key, is_dropped)
     }

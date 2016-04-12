@@ -58,9 +58,8 @@ impl<T> Adapter for MakeSyncAdapter<T> where T: Adapter {
         self.lock.lock().unwrap().send_values(values, user)
     }
 
-    fn register_watch(&self, set: Vec<(Id<Getter>, Option<Range>)>,
-        cb: Box<ExtSender<WatchEvent>>) ->
-            ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error> {
-        self.lock.lock().unwrap().register_watch(set, cb)
+    fn register_watch(&self, watch: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)> ) ->
+            Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)> {
+        self.lock.lock().unwrap().register_watch(watch)
     }
 }
