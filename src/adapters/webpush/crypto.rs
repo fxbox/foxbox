@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//! Cryptographic operations for WebPush.
+//! Cryptographic operations for `WebPush`.
 //!
 //! Implemented as described in the draft IETF RFC:
 //! https://tools.ietf.org/html/draft-ietf-webpush-encryption-02
@@ -81,7 +81,7 @@ extern "C" {
     fn CRYPTO_free(ptr: *mut libc::c_void);
 }
 
-/// Creates an OpenSSL representation of the given ECDH X9.62 public key,
+/// Creates an `OpenSSL` representation of the given ECDH X9.62 public key,
 /// represented as a string of hex digits.
 fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
     let eckey;
@@ -137,7 +137,7 @@ fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
     peer_key
 }
 
-/// Generates an OpenSSL representation of the parameters describing
+/// Generates an `OpenSSL` representation of the parameters describing
 /// an ECDH X9.62 key pair.
 fn ecdh_generate_params() -> *mut EvpPkey {
     let ctx;
@@ -175,7 +175,7 @@ fn ecdh_generate_params() -> *mut EvpPkey {
     params
 }
 
-/// Generates an OpenSSL representation of an ECDH X9.62 key pair.
+/// Generates an `OpenSSL` representation of an ECDH X9.62 key pair.
 fn ecdh_generate_key_pair() -> *mut EvpPkey {
     let params;
     let mut ctx = ptr::null_mut();
@@ -265,7 +265,7 @@ fn ecdh_derive_shared_key(local_key: *mut EvpPkey, peer_key: *mut EvpPkey) -> Op
 }
 
 /// Creates a string of hex digits representing an ECDH X9.62 public key
-/// given an OpenSSL public/private key pair.
+/// given an `OpenSSL` public/private key pair.
 fn ecdh_export_public_key(key: *mut EvpPkey) -> Option<String> {
     if key.is_null() {
         return None;
@@ -401,7 +401,7 @@ pub struct EncryptData {
     pub output: Vec<u8>
 }
 
-/// Encrypt a payload using the given public key according to the WebPush
+/// Encrypt a payload using the given public key according to the `WebPush`
 /// RFC specifications.
 pub fn encrypt(peer_key: &str, input: String) -> Option<EncryptData> {
     // Derive public and secret keys from peer public key

@@ -23,11 +23,11 @@ static ADAPTER_NAME: &'static str = "Thinkerbell adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
 static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 
-/// ThinkerbellAdapter hooks up the rules engine (if this, then that) as an adapter.
+/// `ThinkerbellAdapter` hooks up the rules engine (if this, then that) as an adapter.
 ///
 /// Each "rule", or "script", is a JSON-serialized structure according to Thinkerbell conventions.
 ///
-/// This adapter exposes a root service, with one AddThinkerbellRule setter (to add a new rule).
+/// This adapter exposes a root service, with one `AddThinkerbellRule` setter (to add a new rule).
 /// Each rule that has been added is exposed as its own service, with the following getters/setters:
 /// - Set Enabled (setter) -- toggles whether or not the script is enabled
 /// - Get Enabled (getter) -- returns whether or not the script is enabled
@@ -37,7 +37,7 @@ static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 #[derive(Clone)]
 pub struct ThinkerbellAdapter {
 
-    /// The sending end of the channel for sending messages to ThinkerbellAdapter's main loop.
+    /// The sending end of the channel for sending messages to `ThinkerbellAdapter`'s main loop.
     tx: Arc<Mutex<RawSender<ThinkAction>>>,
 
     /// A reference to the AdapterManager.
@@ -83,8 +83,8 @@ impl ExecutableDevEnv for ThinkerbellExecutionEnv {
     }
 }
 
-/// Convert a ScriptManagerError into an API Error.
-/// We can't implement From<T> because ScriptManagerError is in a different crate.
+/// Convert a `ScriptManagerError` into an API Error.
+/// We can't implement From<T> because `ScriptManagerError` is in a different crate.
 fn sm_error(e: ScriptManagerError) -> Error {
     Error::InternalError(InternalError::GenericError(format!("{:?}", e)))
 }
@@ -119,11 +119,11 @@ impl Adapter for ThinkerbellAdapter {
         }).collect()
     }
 
-    fn send_values(&self, values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, values: HashMap<Id<Setter>, Value>, user: User) -> ResultMap<Id<Setter>, (), Error> {
         values.iter()
             .map(|(id, value)| {
                 let (tx, rx) = channel();
-                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone()));
+                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone(), user.clone()));
                 match rx.recv() {
                     Ok(result) => (id.clone(), result),
                     // If an error occurs, the channel died!
@@ -148,7 +148,7 @@ enum ThinkAction {
     AddRuleService(Id<ScriptId>),
     RemoveRuleService(Id<ScriptId>),
     RespondToGetter(RawSender<Result<Option<Value>, Error>>, Id<Getter>),
-    RespondToSetter(RawSender<Result<(), Error>>, Id<Setter>, Value),
+    RespondToSetter(RawSender<Result<(), Error>>, Id<Setter>, Value, User),
 }
 
 /// An internal data structure to track getters and setters.
@@ -211,8 +211,8 @@ impl ThinkerbellAdapter {
                             let _ = tx.send(Ok(Some(Value::OnOff(if is_enabled { OnOff::On } else { OnOff::Off }))));
                             continue 'recv;
                         } else if getter_id == rule.getter_source_id {
-                            match script_manager.get_source(&rule.script_id) {
-                                Ok(source) => {
+                            match script_manager.get_source_and_owner(&rule.script_id) {
+                                Ok((source, _)) => {
                                     let _ = tx.send(Ok(Some(Value::String(Arc::new(source.to_owned())))));
                                 },
                                 Err(e) => {
@@ -225,13 +225,13 @@ impl ThinkerbellAdapter {
                     let _ = tx.send(Err(Error::InternalError(InternalError::NoSuchGetter(getter_id.clone()))));
                 },
                 // Respond to a pending Setter request.
-                ThinkAction::RespondToSetter(tx, setter_id, value) => {
+                ThinkAction::RespondToSetter(tx, setter_id, value, user) => {
                     // Add a new rule (with the given JSON source).
                     if setter_id == self.setter_add_rule_id {
                         match value {
                             Value::ThinkerbellRule(ref rule_source) => {
                                 let script_id = Id::new(&rule_source.name);
-                                let _ = tx.send(script_manager.put(&script_id, &rule_source.source).map_err(sm_error));
+                                let _ = tx.send(script_manager.put(&script_id, &rule_source.source, &user).map_err(sm_error));
                                 let _ = self.tx.lock().unwrap().send(ThinkAction::AddRuleService(script_id.clone()));
                             },
                             _ => {
@@ -385,7 +385,7 @@ impl ThinkerbellAdapter {
             setter_add_rule_id: setter_add_rule_id.clone(),
         };
 
-        // Add the adapter and the root service (the one that exposes AddThinkerbellRule for adding new rules).
+        // Add the adapter and the root service (the one that exposes `AddThinkerbellRule` for adding new rules).
         try!(manager.add_adapter(Arc::new(adapter.clone())));
         try!(manager.add_service(Service::empty(root_service_id.clone(), adapter_id.clone())));
         try!(manager.add_setter(Channel {
