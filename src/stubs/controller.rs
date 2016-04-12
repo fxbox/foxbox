@@ -42,6 +42,12 @@ impl ControllerStub {
     }
 }
 
+impl Default for ControllerStub {
+    fn default() -> Self {
+        ControllerStub::new()
+    }
+}
+
 impl Controller for ControllerStub {
     fn run(&mut self, _: &AtomicBool) {}
     fn dispatch_service_request(&self, id: String, request: &mut Request)

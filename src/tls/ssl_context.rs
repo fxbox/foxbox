@@ -86,6 +86,12 @@ impl SniSslContextProvider {
     }
 }
 
+impl Default for SniSslContextProvider {
+    fn default() -> Self {
+        SniSslContextProvider::new()
+    }
+}
+
 pub trait SslForSni<T> {
     fn get_hostname(&self) -> Option<String>;
     fn set_context(&self, ctx: &T) -> Option<T>;

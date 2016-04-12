@@ -271,7 +271,7 @@ fn error_response() ->  IronResult<Response> {
     Ok(response)
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 struct StateCmd {
     on: Option<bool>,
     hue: Option<f32>,

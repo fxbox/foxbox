@@ -254,3 +254,9 @@ impl UpnpManager {
         }
     }
 }
+
+impl Default for UpnpManager {
+    fn default() -> Self {
+        UpnpManager::new()
+    }
+}
