@@ -1159,7 +1159,7 @@ impl State {
             let watch_data = match weak_watch_data.upgrade() {
                 None => {
                     // The watch_data has already been dropped, nothing to do.
-                    debug!(target: "Taxonomy", "State::start_watch, the guard has been dropped, cannot upgrade, skipping.");
+                    debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, cannot upgrade, skipping.");
                     continue
                 }
                 Some(watch_data) => watch_data
@@ -1167,12 +1167,12 @@ impl State {
             let is_dropped = watch_data.is_dropped.clone();
             if is_dropped.load(Ordering::Relaxed) {
                 // The WatchGuard has already been dropped.
-                debug!(target: "Taxonomy", "State::start_watch, the guard has been dropped, is_dropped detected, skipping.");
+                debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, is_dropped detected, skipping.");
                 continue
             }
             let on_ok = watch_data.on_event.lock().unwrap().filter_map(move |event| {
                 if is_dropped.load(Ordering::Relaxed) {
-                    debug!(target: "Taxonomy", "State::start_watch, the guard has been dropped, is_dropped detected, don't propagate messages.");
+                    debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, is_dropped detected, don't propagate messages.");
 
                     // The WatchGuard has already been dropped.
                     // We want to stop propagating messages immediately, even if unregistration
@@ -1194,8 +1194,9 @@ impl State {
                 })
             });
             let mut guards = vec![];
+            debug!(target: "Taxonomy-backend", "State::start_watch, about to register watches {:?}.", request);
             for (id, result) in adapter.register_watch(request, Box::new(on_ok)) {
-                debug!(target: "Taxonomy", "State::start_watch, registered watch for {} => {}", id, result.is_ok());
+                debug!(target: "Taxonomy-backend", "State::start_watch, registered watch for {} => {}.", id, result.is_ok());
 
                 match result {
                     Err(err) => {
@@ -1221,6 +1222,7 @@ impl State {
         for (watch_data, mut guards) in ongoing.drain(..) {
             if let Some(ref watch_data) = watch_data.upgrade() {
                 for (id, guard) in guards.drain(..) {
+                    debug!(target: "Taxonomy-backend", "State::register_ongoing_watch, registered watch for {}", id);
                     watch_data.push_guard(id, guard)
                 }
             }
