@@ -2,7 +2,7 @@ sudo: required
 dist: trusty
 language: rust
 rust:
-    - nightly-2016-03-07
+    - nightly-2016-04-10
 cache:
     directories:
         - $HOME/.cargo
