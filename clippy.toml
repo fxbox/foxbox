@@ -1,0 +1,3 @@
+doc-valid-idents = ["DLink", "UPnP"]
+too-many-arguments-threshold = 8
+

@@ -10,11 +10,9 @@
 
 // Make linter fail for every warning
 #![plugin(clippy)]
-// Disable clippy for now.
-// TODO: re-enable once we have upgraded rustc.
-//#![deny(clippy)]
-// Don't fail on doc_markdown as clippy is sometimes a bit over zealous.
-#![warn(doc_markdown)]
+#![deny(clippy)]
+// Needed for many #[derive(...)] macros
+#![allow(used_underscore_binding)]
 
 #![cfg_attr(test, feature(const_fn))] // Dependency of stainless
 #![cfg_attr(test, plugin(stainless))] // Test runner
@@ -103,13 +101,12 @@ mod stubs {
 use controller::FoxBox;
 use env_logger::LogBuilder;
 use tunnel_controller:: { TunnelConfig, Tunnel };
-use libc::SIGINT;
+use libc::{ sighandler_t, SIGINT };
 use log::{ LogRecord, LogLevelFilter };
 
 use multicast_dns::host::HostManager;
 use profile_service::ProfilePath;
 use std::env;
-use std::mem;
 use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
 use tls::TlsOption;
 use traits::Controller;
@@ -194,7 +191,7 @@ fn tid_str() -> &'static str {
 
 fn main() {
     unsafe {
-        libc::signal(SIGINT, mem::transmute(handle_sigint));
+        libc::signal(SIGINT, handle_sigint as sighandler_t);
     }
 
     let mut builder = LogBuilder::new();

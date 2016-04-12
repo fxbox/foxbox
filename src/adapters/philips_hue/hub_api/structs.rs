@@ -7,7 +7,7 @@ use serde::de::Deserialize;
 use serde_json;
 use std::collections::BTreeMap;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Settings {
     pub config: SettingsConfig,
     pub scenes: BTreeMap<String, serde_json::Value>,
@@ -19,7 +19,7 @@ pub struct Settings {
     pub resourcelinks: Option<BTreeMap<String, serde_json::Value>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct SettingsConfig {
     pub whitelist: BTreeMap<String, SettingsConfigWhitelistEntry>,
     pub portalconnection: String,
@@ -49,7 +49,7 @@ pub struct SettingsConfig {
     pub backup: BTreeMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct SettingsConfigWhitelistEntry {
     pub name: String,
     #[serde(rename="create date")]
@@ -58,7 +58,7 @@ pub struct SettingsConfigWhitelistEntry {
     pub last_use_date: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct SettingsLightEntry {
     pub swversion: String,
     pub modelid: String,
@@ -71,7 +71,7 @@ pub struct SettingsLightEntry {
     pub state: SettingsLightState,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct SettingsLightState {
     pub on: bool,
     pub ct: Option<u32>,
