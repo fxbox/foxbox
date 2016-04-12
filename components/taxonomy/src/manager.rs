@@ -384,10 +384,6 @@ impl AdapterManager {
     /// lock!
     fn register_watches(&self, request: WatchRequest) {
         if !request.is_empty() {
-            debug!(target: "Taxonomy-manager", "manager.register_watches {:?}", {
-                let vec: Vec<_> = request.values().map(|&(_, (ref vec, _))| vec).collect();
-                vec
-            });
             let (tx, rx) = channel();
             let _ = self.tx_watch.lock().unwrap().send(WatchOp::Start(request, tx));
             let _ = rx.recv();

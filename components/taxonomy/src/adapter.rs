@@ -153,7 +153,7 @@ pub trait Adapter: Send + Sync {
     /// expects the adapter to attempt to minimize the connections with the actual devices.
     ///
     /// The AdapterManager is in charge of keeping track of the age of values.
-    fn fetch_values(&self, set: Vec<Id<Getter>>, user: User) -> ResultMap<Id<Getter>, Option<Value>, Error>;
+    fn fetch_values(&self, mut target: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error>;
 
     /// Request that values be sent to channels.
     ///
@@ -184,9 +184,8 @@ pub trait Adapter: Send + Sync {
     ///
     /// Similarly, successive calls to `register_watch` may end up watching the same getter. The
     /// adapter should handle this case, optimizing it if possible.
-    fn register_watch(&self, Vec<(Id<Getter>, Option<Range>)>,
-        cb: Box<ExtSender<WatchEvent>>) ->
-            ResultMap<Id<Getter>, Box<AdapterWatchGuard>, Error>;
+    fn register_watch(&self, Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) ->
+            Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)>;
 
     /// Signal the adapter that it is time to stop.
     ///

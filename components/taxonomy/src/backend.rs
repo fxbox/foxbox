@@ -43,7 +43,7 @@ pub type FetchRequest = AdapterRequest<HashMap<Id<Getter>, Type>>;
 pub type SendRequest = AdapterRequest<(HashMap<Id<Setter>, Value>, ResultMap<Id<Setter>, (), Error>)>;
 
 /// A request to an adapter, for performing a `watch` operation.
-pub type WatchRequest = AdapterRequest<(Vec<(Id<Getter>, Option<Range>)>, Weak<WatcherData>)>;
+pub type WatchRequest = AdapterRequest<Vec<(Id<Getter>, Option<Range>, Weak<WatcherData>)>>;
 
 pub type WatchGuardCommit = Vec<(Weak<WatcherData>, Vec<(Id<Getter>, Box<AdapterWatchGuard>)>)>;
 
@@ -514,6 +514,7 @@ impl State {
     }
 
     fn aux_getters_may_need_registration(&mut self, getters: Vec<Id<Getter>>) -> WatchRequest {
+        debug!(target: "Taxonomy-backend", "checking if getters need to be watched {:?}", getters);
         let adapter_by_id = &self.adapter_by_id;
         let mut per_adapter = HashMap::new();
         for id in getters {
@@ -1060,10 +1061,10 @@ impl State {
                         adapter_data.adapter.clone()
                     }
                 };
-                entry.insert((adapter, (vec![(id, range)], Arc::downgrade(watcher))));
+                entry.insert((adapter, (vec![(id, range, Arc::downgrade(watcher) )])));
             },
             Occupied(mut entry) => {
-                (entry.get_mut().1).0.push((id, range));
+                (entry.get_mut().1).push((id, range, Arc::downgrade(watcher)));
             }
         }
 
@@ -1155,63 +1156,67 @@ impl State {
         //   by checking whether `is_dropped` is true.
 
         let mut to_add = vec![];
-        for (_, (adapter, (request, weak_watch_data))) in per_adapter.drain() {
-            let watch_data = match weak_watch_data.upgrade() {
-                None => {
-                    // The watch_data has already been dropped, nothing to do.
-                    debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, cannot upgrade, skipping.");
-                    continue
-                }
-                Some(watch_data) => watch_data
-            };
-            let is_dropped = watch_data.is_dropped.clone();
-            if is_dropped.load(Ordering::Relaxed) {
-                // The WatchGuard has already been dropped.
-                debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, is_dropped detected, skipping.");
-                continue
-            }
-            let on_ok = watch_data.on_event.lock().unwrap().filter_map(move |event| {
+        for (_, (adapter, mut adapter_request)) in per_adapter.drain() {
+            for (id, range, weak_watch_data) in adapter_request.drain(..) {
+                let watch_data = match weak_watch_data.upgrade() {
+                    None => {
+                        // The watch_data has already been dropped, nothing to do.
+                        debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, cannot upgrade, skipping.");
+                        continue
+                    }
+                    Some(watch_data) => watch_data
+                };
+                let is_dropped = watch_data.is_dropped.clone();
                 if is_dropped.load(Ordering::Relaxed) {
-                    debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, is_dropped detected, don't propagate messages.");
-
                     // The WatchGuard has already been dropped.
-                    // We want to stop propagating messages immediately, even if unregistration
-                    // is not necessarily complete yet. Unregistration will be completed after
-                    // the call to `stop_watch`.
-                    return None;
+                    debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, is_dropped detected, skipping.");
+                    return continue;
                 }
-                Some(match event {
-                    AdapterWatchEvent::Enter { id, value } =>
-                        WatchEvent::EnterRange {
-                            from: id,
-                            value: value
-                        },
-                    AdapterWatchEvent::Exit { id, value } =>
-                        WatchEvent::ExitRange {
-                            from: id,
-                            value: value
-                        },
-                })
-            });
-            let mut guards = vec![];
-            debug!(target: "Taxonomy-backend", "State::start_watch, about to register watches {:?}.", request);
-            for (id, result) in adapter.register_watch(request, Box::new(on_ok)) {
-                debug!(target: "Taxonomy-backend", "State::start_watch, registered watch for {} => {}.", id, result.is_ok());
+                let on_ok = watch_data.on_event.lock().unwrap().filter_map(move |event| {
+                    if is_dropped.load(Ordering::Relaxed) {
+                        debug!(target: "Taxonomy-backend", "State::start_watch, the guard has been dropped, is_dropped detected, don't propagate messages.");
 
-                match result {
-                    Err(err) => {
-                        let event = WatchEvent::InitializationError {
-                            channel: id.clone(),
-                            error: err
-                        };
-                        let _ = watch_data.on_event.lock().unwrap().send(event);
-                    },
-                    // Calling `watch_data.push((id, guard))` requires .write(), so we delay
-                    // this until we have grabbed the lock again.
-                    Ok(guard) => guards.push((id, guard))
+                        // The WatchGuard has already been dropped.
+                        // We want to stop propagating messages immediately, even if unregistration
+                        // is not necessarily complete yet. Unregistration will be completed after
+                        // the call to `stop_watch`.
+                        return None;
+                    }
+                    Some(match event {
+                        AdapterWatchEvent::Enter { id, value } =>
+                            WatchEvent::EnterRange {
+                                from: id,
+                                value: value
+                            },
+                        AdapterWatchEvent::Exit { id, value } =>
+                            WatchEvent::ExitRange {
+                                from: id,
+                                value: value
+                            },
+                    })
+                });
+
+                let mut guards = vec![];
+                for (id, result) in adapter.register_watch(vec![(id, range, Box::new(on_ok))]) {
+                    debug!(target: "Taxonomy-backend", "State::start_watch, registered watch for {} => {}.", id, result.is_ok());
+
+                    match result {
+                        Err(err) => {
+                            let event = WatchEvent::InitializationError {
+                                channel: id.clone(),
+                                error: err
+                            };
+                            let _ = watch_data.on_event.lock().unwrap().send(event);
+                        },
+                        // Calling `watch_data.push((id, guard))` requires .write(), so we delay
+                        // this until we have grabbed the lock again.
+                        Ok(guard) => guards.push((id, guard))
+                    }
+                }
+                if !guards.is_empty() {
+                    to_add.push((weak_watch_data, guards));
                 }
             }
-            to_add.push((weak_watch_data, guards));
         }
         to_add
     }
