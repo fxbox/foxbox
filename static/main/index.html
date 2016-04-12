@@ -3,26 +3,34 @@
   <head>
     <title>FoxBox</title>
     <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' ; style-src 'self' 'unsafe-inline' ; connect-src * ; object-src 'none' ; img-src 'self' blob: ; referrer no-referrer ;">
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="stylesheet" href="shared/css/FiraSans/font.css">
+    <link rel="stylesheet" href="shared/css/common.css">
   </head>
   <body>
     <div id="signedin" hidden>
-      <p>
-      You are signed in as admin.
-      </p>
-      <p>
-        <input id="signout-button" type="submit" value="Signout">
-      </p>
+      <div class="container">
+        <div class="inner-container">
+          <p>
+            You are signed in as admin.
+          </p>
+          <p>
+            <button id="signout-button">Log out</button>
+          </p>
+        </div>
+      </div>
     </div>
+
     <div id="signin" hidden>
-      <p>
-        <label for="signin-pwd">
-          Please enter your admin password:
-        </label>
-        <input type="password" id="signin-pwd">
-      </p>
-      <p>
-        <input id="signin-button" type="submit" value="Signin">
-      </p>
+      <div class="container">
+        <div class="inner-container">
+            <label for="signin-pwd">Please, enter your password</label>
+            <input id="signin-pwd" type="password" placeholder="password"/>
+            <button id="signin-button">Log in</button>
+        </div>
+      </div>
     </div>
   </body>
   <script src="shared/js/url_search_params.js"></script>

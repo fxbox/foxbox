@@ -27,7 +27,8 @@ node_modules
 .*.sw?
 
 # Shared copied assets
-/static/**/shared
+/static/main/shared
+/static/setup/shared
 
 # Foxbox config
 foxbox.conf

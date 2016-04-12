@@ -12,7 +12,6 @@ var SetupUI = {
       signupPwd1: document.querySelector('#signup-pwd1'),
       signupPwd2: document.querySelector('#signup-pwd2'),
       signupButton: document.querySelector('#signup-button'),
-      location: document.querySelector('#location'),
     };
     SetupUI.screens = {
       signup: document.querySelector('#signup'),
@@ -72,7 +71,6 @@ var SetupUI = {
         window.location.replace(url.toString());
       } else {
         localStorage.setItem('session', token);
-        SetupUI.elements.location.innerHTML = window.location.href;
         SetupUI.screens.signupSuccess.hidden = false;
         SetupUI.screens.signup.hidden = true;
       }
