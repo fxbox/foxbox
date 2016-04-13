@@ -194,7 +194,7 @@ dependencies = [
 [[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git#0f9cdeac24d3a9d14c068f028206d301f716702b"
+source = "git+https://github.com/fxbox/taxonomy.git#1191bf8f528456cc987ff648dd149e6b6a7d3d50"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.63 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -211,7 +211,7 @@ dependencies = [
 [[package]]
 name = "foxbox_thinkerbell"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/thinkerbell.git#4174c07b9ed6aaab6b2fb75674f0fd55716294f8"
+source = "git+https://github.com/fxbox/thinkerbell.git#370a3a450ed1a732dc58196a54bd4ab87d155420"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
@@ -643,7 +643,7 @@ dependencies = [
 [[package]]
 name = "openzwave-adapter"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-adapter#a4656b7544c6ba28285447f13a8f1c33c41e9d44"
+source = "git+https://github.com/fxbox/openzwave-adapter#9377332e19967b2342413beeb17acb5e54e9383a"
 dependencies = [
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -654,7 +654,7 @@ dependencies = [
 [[package]]
 name = "openzwave-stateful"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-stateful-rust#2ee9cf8a5f80bbd72136dc8ff58a05f6e23790f8"
+source = "git+https://github.com/fxbox/openzwave-stateful-rust#62b7c1489684a655e4938c126fe0e92632778673"
 dependencies = [
  "openzwave 0.1.0 (git+https://github.com/fxbox/openzwave-rust)",
 ]
