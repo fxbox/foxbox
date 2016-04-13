@@ -680,9 +680,9 @@ impl PartialOrd for Temperature {
 pub enum Color {
     /// # JSON
     ///
-    /// Values are represented as an object {r: float, f: float, b: float, a: float},
-    /// where each color is between 0 and 1. Field `a` may be omitted, in which case
-    /// it is taken to be 0.
+    /// Values are represented as an object {h: float, s: float, v: float},
+    /// where h is an arbitrary hue angle (interpreted mod 360), and s and
+    /// v are between 0 and 1.
     ///
     /// ```
     /// use foxbox_taxonomy::values::*;
@@ -690,38 +690,33 @@ pub enum Color {
     ///
     /// println!("Testing parsing");
     /// let source = "{
-    ///   \"r\": 0.1,
-    ///   \"g\": 0.2,
-    ///   \"b\": 0.4,
-    ///   \"a\": 0.8
+    ///   \"h\": 220.5,
+    ///   \"s\": 0.8,
+    ///   \"v\": 0.4
     /// }";
     ///
     /// let parsed = Color::from_str(source).unwrap();
-    /// let Color::RGBA(r, g, b, a) = parsed;
-    /// assert_eq!(r, 0.1);
-    /// assert_eq!(g, 0.2);
-    /// assert_eq!(b, 0.4);
-    /// assert_eq!(a, 0.8);
+    /// let Color::HSV(h, s, v) = parsed;
+    /// assert_eq!(h, 220.5);
+    /// assert_eq!(s, 0.8);
+    /// assert_eq!(v, 0.4);
     ///
     /// println!("Testing serialization");
     /// let serialized : JSON = parsed.to_json();
-    /// let r = serialized.find("r").unwrap().as_f64().unwrap();
-    /// assert_eq!(r, 0.1);
-    /// let g = serialized.find("g").unwrap().as_f64().unwrap();
-    /// assert_eq!(g, 0.2);
-    /// let b = serialized.find("b").unwrap().as_f64().unwrap();
-    /// assert_eq!(b, 0.4);
-    /// let a = serialized.find("a").unwrap().as_f64().unwrap();
-    /// assert_eq!(a, 0.8);
+    /// let h = serialized.find("h").unwrap().as_f64().unwrap();
+    /// assert_eq!(h, 220.5);
+    /// let s = serialized.find("s").unwrap().as_f64().unwrap();
+    /// assert_eq!(s, 0.8);
+    /// let v = serialized.find("v").unwrap().as_f64().unwrap();
+    /// assert_eq!(v, 0.4);
     ///
     ///
-    /// println!("Testing parsing error (value not in [0, 1])");
+    /// println!("Testing parsing error (saturation not in [0, 1])");
     /// // This source will not parse.
     /// let source_2 = "{
-    ///   \"r\": 100,
-    ///   \"g\": 0.2,
-    ///   \"b\": 0.4,
-    ///   \"a\": 0.9
+    ///   \"h\": -9.9,
+    ///   \"s\": 1.1,
+    ///   \"v\": 0.4
     /// }";
     ///
     /// match Color::from_str(source_2) {
@@ -730,61 +725,42 @@ pub enum Color {
     /// }
     ///
     ///
-    /// println!("Testing auto-added alpha");
-    /// // This source does not specify alpha, so alpha is 0.
-    /// let source_3 = "{
-    ///   \"r\": 0.1,
-    ///   \"g\": 0.2,
-    ///   \"b\": 0.4
-    /// }";
-    ///
-    /// let parsed = Color::from_str(source_3).unwrap();
-    /// let Color::RGBA(r, g, b, a) = parsed;
-    /// assert_eq!(r, 0.1);
-    /// assert_eq!(g, 0.2);
-    /// assert_eq!(b, 0.4);
-    /// assert_eq!(a, 0.);
-    ///
-    ///
     /// println!("Testing parsing error (missing field)");
-    /// // This source does not specify b, so it will not parse.
+    /// // This source does not specify h, so it will not parse.
     /// let source_4 = "{
-    ///   \"r\": 0.1,
-    ///   \"g\": 0.2
+    ///   \"s\": 0.1,
+    ///   \"v\": 0.2
     /// }";
     ///
     /// match Color::from_str(source_4) {
-    ///   Err(ParseError::MissingField{ref name, ..}) if &name as &str == "b" => {},
+    ///   Err(ParseError::MissingField{ref name, ..}) if &name as &str == "h" => {},
     ///   other => panic!("Unexpected result {:?}", other)
     /// }
     /// ```
-    RGBA(f64, f64, f64, f64)
+    HSV(f64, f64, f64)
 }
 impl Parser<Color> for Color {
     fn description() -> String {
         "Color".to_owned()
     }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
-        let r = try!(path.push("r", |path| f64::take(path, source, "r")));
-        let g = try!(path.push("g", |path| f64::take(path, source, "g")));
-        let b = try!(path.push("b", |path| f64::take(path, source, "b")));
-        let a = try!(match path.push("a", |path| f64::take_opt(path, source, "a")) {
-            None => Ok(0.),
-            Some(a) => a
-        });
-        for &(val, ref name) in &vec![(&r, "r"), (&g, "g"), (&b, "b"), (&a, "a")] {
+        let h = try!(path.push("h", |path| f64::take(path, source, "h")));
+        let s = try!(path.push("s", |path| f64::take(path, source, "s")));
+        let v = try!(path.push("v", |path| f64::take(path, source, "v")));
+        // h can be any hue angle, will be interpreted (mod 360) in [0, 360).
+        for &(val, ref name) in &vec![(&s, "s"), (&v, "v")] {
             if *val < 0. || *val > 1. {
                 return Err(ParseError::type_error(name, &path, "a number in [0, 1]"));
             }
         }
-        Ok(Color::RGBA(r, g, b, a))
+        Ok(Color::HSV(h, s, v))
     }
 }
 
 impl ToJSON for Color {
     fn to_json(&self) -> JSON {
-        let Color::RGBA(ref r, ref g, ref b, ref a) = *self;
-        let mut vec = vec![("r", r), ("g", g), ("b", b), ("a", a)];
+        let Color::HSV(ref h, ref s, ref v) = *self;
+        let mut vec = vec![("h", h), ("s", s), ("v", v)];
         let map = vec.drain(..)
             .map(|(name, value)| (name.to_owned(), JSON::F64(*value)))
             .collect();
@@ -1299,13 +1275,11 @@ pub enum Value {
     ///
     /// # JSON
     ///
-    /// Represented by `{Color: {r: float, g: float, b: float, a: float}}` where each
-    /// of `r`, `g`, `b`, `a` is in [0, 1]. Value `a` can be omitted, in which case it
-    /// is assumed to be 0.
+    /// Represented by `{Color: {h: float, s: float, v: float}}`,
+    /// where s and v are in [0, 1] and h will be interpreted (mod 360) in [0, 360).
     ///
     /// ```
     /// extern crate foxbox_taxonomy;
-    /// extern crate chrono;
     ///
     /// use foxbox_taxonomy::values::*;
     /// use foxbox_taxonomy::parse::*;
@@ -1314,13 +1288,13 @@ pub enum Value {
     ///
     /// let source = "{
     ///   \"Color\": {
-    ///     \"r\": 0.1,
-    ///     \"g\": 0.2,
-    ///     \"b\": 0.4
+    ///     \"h\": 23.5,
+    ///     \"s\": 0.2,
+    ///     \"v\": 0.4
     ///   }
     /// }";
     /// let parsed = Value::from_str(source).unwrap();
-    /// if let Value::Color(Color::RGBA(0.1, 0.2, 0.4, 0.0)) = parsed {
+    /// if let Value::Color(Color::HSV(23.5, 0.2, 0.4)) = parsed {
     ///   // Ok.
     /// } else {
     ///   panic!();
@@ -1328,7 +1302,7 @@ pub enum Value {
     ///
     ///
     /// let serialized: JSON = parsed.to_json();
-    /// let val = serialized.find_path(&["Color", "g"]).unwrap().as_f64().unwrap();
+    /// let val = serialized.find_path(&["Color", "s"]).unwrap().as_f64().unwrap();
     /// assert_eq!(val, 0.2);
     /// # }
     /// ```
