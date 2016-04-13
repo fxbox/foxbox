@@ -24,7 +24,7 @@ use std::sync::{ Arc, Mutex };
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::vec::IntoIter;
 use upnp::UpnpManager;
-use tls::{ CertificateManager, TlsOption };
+use tls::{ CertificateManager, CertificateRecord, SniSslContextProvider, TlsOption };
 use traits::Controller;
 use ws_server::WsServer;
 use ws;
@@ -45,13 +45,9 @@ pub struct FoxBox {
     profile_service: Arc<ProfileService>,
 }
 
-const DEFAULT_HOSTNAME: &'static str = "::"; // ipv6 default.
-const DEFAULT_DOMAIN: &'static str = ".local";
-
 impl FoxBox {
-
     pub fn new(verbose: bool,
-               hostname: Option<String>,
+               hostname: String,
                http_port: u16,
                ws_port: u16,
                tls_option: TlsOption,
@@ -64,14 +60,12 @@ impl FoxBox {
             config.get_or_set_default("foxbox", "certificate_directory", "certs/"));
 
         FoxBox {
-            certificate_manager: CertificateManager::new(certificate_directory),
+            certificate_manager: CertificateManager::new(certificate_directory, Box::new(SniSslContextProvider::new())),
             tls_option: tls_option,
             services: Arc::new(Mutex::new(HashMap::new())),
             websockets: Arc::new(Mutex::new(HashMap::new())),
             verbose: verbose,
-            hostname: hostname.map_or(DEFAULT_HOSTNAME.to_owned(), |name| {
-                format!("{}{}", name, DEFAULT_DOMAIN)
-            }),
+            hostname: hostname,
             http_port: http_port,
             ws_port: ws_port,
             config: config,
@@ -91,14 +85,6 @@ impl Controller for FoxBox {
 
         {
             Arc::get_mut(&mut self.upnp).unwrap().start().unwrap();
-        }
-
-        if self.get_tls_enabled() {
-            // If this fails, it just means that no certificates will be configured, which
-            // shouldn't cause a crash.
-            if let Err(error) = self.certificate_manager.reload() {
-                error!("{}", error);
-            }
         }
 
         // Create the taxonomy based AdapterManager
@@ -191,11 +177,11 @@ impl Controller for FoxBox {
     }
 
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
-        (self.hostname.as_str(), self.http_port).to_socket_addrs()
+        ("::", self.http_port).to_socket_addrs()
     }
 
     fn ws_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
-        (self.hostname.as_str(), self.ws_port).to_socket_addrs()
+        ("::", self.ws_port).to_socket_addrs()
     }
 
     fn add_websocket(&mut self, socket: ws::Sender) {
@@ -235,6 +221,15 @@ impl Controller for FoxBox {
 
     fn get_certificate_manager(&self) -> CertificateManager {
         self.certificate_manager.clone()
+    }
+
+    /// Every box should create a self signed certificate for a local name.
+    /// The fingerprint of that certificate becomes the box's identifier,
+    /// which is used to create the public DNS zone and local
+    /// (i.e. local.<fingerprint>.box.knilxof.org) and remote
+    /// (i.e. remote.<fingerprint>.box.knilxof.org) origins
+    fn get_box_certificate(&self) -> io::Result<CertificateRecord> {
+        self.certificate_manager.get_box_certificate()
     }
 
     fn get_tls_enabled(&self) -> bool {
@@ -280,7 +275,7 @@ describe! controller {
 
         let service = ServiceStub;
         let controller = FoxBox::new(
-            false, Some("foxbox".to_owned()), 1234, 5678,
+            false, "foxbox.local".to_owned(), 1234, 5678,
             TlsOption::Disabled,
             ProfilePath::Custom(profile_path));
     }
@@ -311,7 +306,7 @@ describe! controller {
             let profile_path = String::from(profile_dir.into_path()
                                             .to_str().unwrap());
 
-            let controller = FoxBox::new(false, Some("foxbox".to_owned()),
+            let controller = FoxBox::new(false, "foxbox.local".to_owned(),
                                          1234, 5678, TlsOption::Enabled,
                                          ProfilePath::Custom(profile_path));
             controller.add_service(Box::new(service));

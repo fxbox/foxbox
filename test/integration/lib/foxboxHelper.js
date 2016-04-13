@@ -12,21 +12,20 @@ var foxboxInstance;
 var helper = (function() {
 
   function removeUsersDB() {
-    var filePath = path.join(process.env.HOME, 
-      '/.local/share/foxbox/users_db.sqlite'); 
+    var filePath = path.join(process.env.HOME,
+      '/.local/share/foxbox/users_db.sqlite');
     fs.unlinkSync(filePath);
   }
 
   function fullOptionStart(callback) {
-  foxboxInstance = spawn('./target/debug/foxbox', 
-    ['-c',  config.get('nupnp_server.param')+';'+ 
-    config.get('nupnp_server.url')+':'+ 
+  foxboxInstance = spawn('./target/debug/foxbox',
+    ['-c',  config.get('nupnp_server.param')+';'+
+    config.get('nupnp_server.url')+':'+
     config.get('nupnp_server.port')+'/',
     '-r',config.get('pagekite.r'),
     '-t',config.get('pagekite.t'),
     '-s',config.get('pagekite.s'),
-    '--remote-name',config.get('pagekite.externalURL'),
-    '--disable-tls'], {stdio: 'inherit'}); // TODO TLS not yet supported
+    '--disable-tls'], {stdio: 'inherit'} ); // TODO TLS not yet supported
   setTimeout(callback, FOXBOX_STARTUP_WAIT_TIME_IN_MS);
   }
 

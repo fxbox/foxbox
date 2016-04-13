@@ -18,7 +18,7 @@ use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use tls::CertificateManager;
+use tls::{ CertificateManager, CertificateRecord, SniSslContextProvider };
 use traits::Controller;
 use upnp::UpnpManager;
 use ws;
@@ -105,7 +105,14 @@ impl Controller for ControllerStub {
         String::from("localhost")
     }
 
+    fn get_box_certificate(&self) -> io::Result<CertificateRecord> {
+        CertificateRecord::new_for_test("foxbox.local".to_owned(),
+                                        PathBuf::from("a/file.pem"),
+                                        PathBuf::from("b/file.pem"),
+                                        "abcdef".to_owned())
+    }
+
     fn get_certificate_manager(&self) -> CertificateManager {
-       CertificateManager::new(PathBuf::from(current_dir!()))
+       CertificateManager::new(PathBuf::from(current_dir!()), Box::new(SniSslContextProvider::new()))
     }
 }

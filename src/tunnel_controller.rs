@@ -6,6 +6,7 @@
 use std::io::prelude::*;
 use std::process::{ Child, Command };
 use std::io::Result;
+use url::Url;
 use managed_process::ManagedProcess;
 
 pub type TunnelProcess = ManagedProcess;
@@ -17,6 +18,7 @@ pub struct Tunnel {
 
 #[derive(Clone, Debug)]
 pub struct TunnelConfig {
+    /// The socket address that the box connects to to establish the tunnel.
     tunnel_url: String,
     tunnel_secret: String,
     local_http_port: u16,
@@ -99,11 +101,20 @@ impl Tunnel {
         }
     }
 
-    pub fn get_remote_hostname(&self) -> Option<String> {
-        if let None = self.tunnel_process {
-            return None;
+    pub fn get_frontend_name(&self) -> Option<String> {
+        if self.tunnel_process.is_none() {
+            None
+        } else {
+            match Url::parse(&self.config.tunnel_url) {
+                Ok(url) => {
+                    if let Some(host) = url.host() {
+                        Some(host.serialize())
+                    } else {
+                        None
+                    }
+                },
+                Err(_) => None
+            }
         }
-
-        Some(self.config.clone().remote_name)
     }
 }

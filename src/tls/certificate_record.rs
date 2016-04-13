@@ -4,7 +4,7 @@
 
 use std::io;
 use std::io::{ Error, ErrorKind };
-use std::fs::File;
+use std::fs;
 use std::path::PathBuf;
 
 use openssl::x509::X509;
@@ -27,22 +27,26 @@ pub struct CertificateRecord {
     pub hostname: String,
     pub private_key_file: PathBuf,
     pub cert_file: PathBuf,
+    pub full_chain: Option<PathBuf>,
 
     cert_fingerprint: String
 }
 
 fn get_x509_sha1_fingerprint_from_pem(pem_file: PathBuf) -> io::Result<String> {
-    let mut file = try!(File::open(pem_file.clone()));
+    let mut file = try!(fs::File::open(pem_file.clone()));
     match X509::from_pem(&mut file) {
         Ok(pem_file_x509) => {
             pem_file_x509.fingerprint(FINGERPRINT_DIGEST)
-                         .map(| fingerprint | {
-                             vec_to_str(fingerprint)
+                         .map(vec_to_str)
+                         .ok_or_else(|| {
+                             Error::new(
+                                 ErrorKind::InvalidData,
+                                 format!(
+                                     "The PEM file '{:?}' is not valid (a fingerprint could not be determined)",
+                                     pem_file
+                                 )
+                            )
                          })
-                        .ok_or_else(|| { Error::new(
-                            ErrorKind::InvalidData,
-                            format!("The PEM file '{:?}' is not valid (a fingerprint could not be determined)", pem_file))
-                        })
         },
         Err(error) => {
             Err(Error::new(
@@ -57,15 +61,18 @@ impl CertificateRecord {
 
     pub fn new(hostname: String,
                certificate_file: PathBuf,
-               private_key_file: PathBuf) -> io::Result<Self> {
+               private_key_file: PathBuf,
+               full_chain: Option<PathBuf>) -> io::Result<Self> {
         // Load PEMs
 
         let cert_fingerprint = try!(get_x509_sha1_fingerprint_from_pem(certificate_file.clone()));
 
         Ok(CertificateRecord {
             hostname: hostname,
-            cert_file: certificate_file,
-            private_key_file: private_key_file,
+            cert_file: fs::canonicalize(certificate_file).unwrap(),
+            private_key_file: fs::canonicalize(private_key_file).unwrap(),
+
+            full_chain: full_chain,
 
             cert_fingerprint: cert_fingerprint,
         })
@@ -83,7 +90,7 @@ impl CertificateRecord {
             hostname: hostname,
             cert_file: certificate_file,
             private_key_file: private_key_file,
-
+            full_chain: None,
             cert_fingerprint: cert_fingerprint,
         })
     }
@@ -99,13 +106,15 @@ mod certificate_record {
     use super::*;
     use super::get_x509_sha1_fingerprint_from_pem;
 
-
     #[test]
     fn test_fingerprint_certificate() {
         let mut cert_file = PathBuf::from(current_dir!());
         cert_file.push("test_fixtures");
         cert_file.push("cert.pem");
-        assert_eq!(get_x509_sha1_fingerprint_from_pem(cert_file).unwrap(), "1fa576050d8b3710e57a2d62e84f6781504caf7e");
+        assert_eq!(
+            get_x509_sha1_fingerprint_from_pem(cert_file).unwrap(),
+            "1fa576050d8b3710e57a2d62e84f6781504caf7e"
+        );
     }
 
     #[test]
@@ -118,12 +127,16 @@ mod certificate_record {
     #[test]
     fn should_get_cert_fingerprint() {
         let certificate_record = CertificateRecord {
-             cert_file: PathBuf::from("/test/crt.pem"),
-             private_key_file: PathBuf::from("/test/pkf.pem"),
+             cert_file: PathBuf::from("/test/cert.pem"),
+             private_key_file: PathBuf::from("/test/privkey.pem"),
              hostname: "test.example.com".to_owned(),
-             cert_fingerprint: "1234567890abcdef".to_owned()
+             cert_fingerprint: "1234567890abcdef".to_owned(),
+             full_chain: None
         };
 
-        assert_eq!(certificate_record.get_certificate_fingerprint(), "1234567890abcdef");
+        assert_eq!(
+            certificate_record.get_certificate_fingerprint(),
+            "1234567890abcdef"
+        );
     }
 }

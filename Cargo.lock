@@ -18,6 +18,7 @@ dependencies = [
  "libc 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.0 (git+https://github.com/carllerche/mio.git)",
+ "mktemp 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "mount 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "multicast_dns 0.1.0 (git+https://github.com/fxbox/multicast-dns.git?rev=a6e4bcc)",
  "nix 0.5.1-pre (git+https://github.com/nix-rust/nix.git?rev=138080)",
@@ -503,6 +504,14 @@ dependencies = [
  "net2 0.2.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "ws2_32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "mktemp"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "uuid 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
