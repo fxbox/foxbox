@@ -13,7 +13,6 @@ use iron::method::Method;
 use iron::status::Status;
 use mount::Mount;
 use router::NoRoute;
-use service_router;
 use static_router;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -66,8 +65,6 @@ impl<T: Controller> HttpServer<T> {
     }
 
     pub fn start(&mut self, adapter_api: &Arc<AdapterManager>) {
-
-        let router = service_router::create(self.controller.clone());
         let taxonomy_chain = taxonomy_router::create(self.controller.clone(),
                                                       adapter_api);
 
@@ -75,7 +72,6 @@ impl<T: Controller> HttpServer<T> {
         let mut mount = Mount::new();
         mount.mount("/", static_router::create(users_manager.clone()))
              .mount("/ping", Ping)
-             .mount("/services", router)
              .mount("/api/v1", taxonomy_chain)
              .mount("/users", users_manager.get_router_chain());
 
@@ -200,4 +196,3 @@ describe! http_server {
                    directory (os error 2)".to_owned());
     }
 }
-
