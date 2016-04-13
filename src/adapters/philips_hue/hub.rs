@@ -62,7 +62,8 @@ impl<C: Controller> Hub<C> {
 
                 // If the Hub is not paired, try pairing.
                 if !api.is_paired() {
-                    debug!("Push pairing button on Philips Hue Bridge ID {}", id);
+                    warn!("Philips Hue detected but not paired. Please, push pairing \
+                           button on Philips Hue Bridge ID {} to start using it.", id);
 
                     // Try pairing for 120 seconds.
                     for _ in 0..120 {
