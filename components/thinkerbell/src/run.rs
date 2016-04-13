@@ -298,7 +298,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 },
                 ExecutionOp::UpdateCondition { id, is_met, rule_index, condition_index } => {
                     debug!("[Thinkerbell {}] Updating the state of rule {}, condition {} => {}", self.script.name, rule_index, condition_index, is_met);
-                    self.update_conditions(id, is_met, &mut per_rule,
+                    self.update_conditions(&self.script.name, id, is_met, &mut per_rule,
                         rule_index, condition_index, &api, &on_event);
                 }
                 ExecutionOp::Update { event, rule_index, condition_index } => {
@@ -393,7 +393,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
 
     /// A getter just entered/left a range. Update the conditions to determine whether
     /// we now need to fire the statements.
-    fn update_conditions<S>(&self, id: Id<Getter>, getter_is_met: bool,
+    fn update_conditions<S>(&self, name: &str, id: Id<Getter>, getter_is_met: bool,
             per_rule: &mut Vec<RuleState<Env>>, rule_index: usize, condition_index: usize,
             api: &Env::API, on_event: &S)
             where S: ExtSender<ExecutionEvent> + Clone
@@ -412,9 +412,9 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 .remove(&id)
         };
 
-        debug!("[Thinkerbell update_condition] Updating condition for getter: {} => {}", was_met, getter_is_met);
+        debug!("[Thinkerbell update_condition {}] Updating condition for getter: {} => {}", name, was_met, getter_is_met);
         if was_met == getter_is_met {
-            debug!("[Thinkerbell update_condition] Nothing has changed.");
+            debug!("[Thinkerbell update_condition {}] Nothing has changed.", name);
             // Nothing has changed, no need to update any further.
             return;
         }
@@ -449,14 +449,16 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
         let condition_was_met =
             replace(&mut per_rule[rule_index].rule_is_met, condition_is_met);
 
-        debug!("[Thinkerbell update_condition] Updating condition for rule: {} => {}", condition_was_met, condition_is_met);
+        debug!("[Thinkerbell update_condition {}] Updating condition for rule: {} => {}", name, condition_was_met, condition_is_met);
 
         if !condition_was_met && condition_is_met {
             // Ahah, we have just triggered the statements!
-            debug!("[Thinkerbell update_condition] Triggering {} statements.", self.script.rules[rule_index].execute.len());
+            debug!("[Thinkerbell update_condition {}] Triggering {} statements.", name, self.script.rules[rule_index].execute.len());
             for (statement, statement_index) in self.script.rules[rule_index].execute.iter().zip(0..) {
-                debug!("[Thinkerbell update_condition] Triggering statement {}/{}.", statement_index, self.script.rules[rule_index].execute.len());
+                debug!("[Thinkerbell update_condition {}] Triggering statement {}/{}.", name, statement_index, self.script.rules[rule_index].execute.len());
                 let result = statement.eval(&api, &self.owner);
+                debug!("[Thinkerbell update_condition {}] Statement result {}/{}: {:?}.", name, statement_index, self.script.rules[rule_index].execute.len(), result);
+
                 let _ = on_event.send(ExecutionEvent::Sent {
                     rule_index: rule_index,
                     statement_index: statement_index,
@@ -464,7 +466,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 });
             }
         }
-        debug!("[Thinkerbell update_condition] done.");
+        debug!("[Thinkerbell update_condition {}] done.", name);
     }
 }
 
