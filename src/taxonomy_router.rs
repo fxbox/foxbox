@@ -137,7 +137,9 @@ impl Handler for TaxonomyRouter {
                         },
                         Method::Post => {
                             let source = itry!(Self::read_body_to_string(&mut req.body));
-                            match Vec::<$sel>::from_str(&source as &str) {
+                            match Path::new().push_str("body",
+                                |path| Vec::<$sel>::from_str_at(path, &source as &str))
+                            {
                                 Ok(arg) => self.build_response(&self.api.$call(arg)),
                                 Err(err) => self.build_parse_error(&err)
                             }
@@ -172,7 +174,9 @@ impl Handler for TaxonomyRouter {
                     return {
                         let api = &self.api;
                         let source = itry!(Self::read_body_to_string(&mut req.body));
-                        match Selectors::from_str(&source as &str) {
+                        match Path::new().push_str("body",
+                            |path| Selectors::from_str_at(path, &source as &str))
+                        {
                             Ok(arg) => $action!(api, arg, $call),
                             Err(err) => self.build_parse_error(&err)
                         }
@@ -194,11 +198,13 @@ impl Handler for TaxonomyRouter {
                             Err(err) => return self.build_parse_error(&ParseError::json(err)),
                             Ok(args) => args
                         };
-                        let arg_1 = match Param1::take(Path::new(), &mut json, stringify!($name1)) {
+                        let arg_1 = match Path::new().push_str(&format!("body.{}", stringify!($name1)),
+                            |path| Param1::take(path, &mut json, stringify!($name1))) {
                             Err(err) => return self.build_parse_error(&err),
                             Ok(val) => val
                         };
-                        let arg_2 = match Param2::take(Path::new(), &mut json, stringify!($name2)) {
+                        let arg_2 = match Path::new().push_str(&format!("body.{}", stringify!($name2)),
+                            |path| Param2::take(path, &mut json, stringify!($name2))) {
                             Err(err) => return self.build_parse_error(&err),
                             Ok(val) => val
                         };
