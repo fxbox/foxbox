@@ -80,7 +80,6 @@ mod profile_service;
 mod registration;
 mod service;
 mod upnp;
-mod service_router;
 mod stable_uuid;
 mod static_router;
 mod taxonomy_router;
