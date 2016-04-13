@@ -168,17 +168,22 @@ impl HubApi {
         structs::parse_json(&res).unwrap() // TODO no unwrap
     }
 
-    #[allow(dead_code)]
-    pub fn set_light_color(&self, light_id: &str, hue: u32, sat: u32, val: u32, on: bool) {
-        let url = format!("lights/{}/state", light_id);
-        let cmd = json!({ hue: hue, sat: sat, bri: val, on: on });
-        let _ = self.put(&url, &cmd);
-    }
-
     pub fn set_light_power(&self, light_id: &str, on: bool) {
         let url = format!("lights/{}/state", light_id);
         let cmd = json!({ on: on });
         let _ = self.put(&url, &cmd);
     }
 
+    pub fn set_light_color(&self, light_id: &str, hsv: (u32, u32, u32)) {
+        let (hue, sat, val) = hsv;
+        let url = format!("lights/{}/state", light_id);
+        let cmd = json!({ hue: hue, sat: sat, bri: val });
+        let _ = self.put(&url, &cmd);
+    }
+
+    pub fn set_light_brightness(&self, light_id: &str, bri: u32) {
+        let url = format!("lights/{}/state", light_id);
+        let cmd = json!({ bri: bri });
+        let _ = self.put(&url, &cmd);
+    }
 }
