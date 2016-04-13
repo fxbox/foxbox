@@ -211,7 +211,9 @@ fn c_rv_retry<F>(mut f: F) -> Result<c_int>
     }
 }
 
+// TODO: Reactivate this test on mac os in https://github.com/fxbox/foxbox/issues/354
 #[test]
+#[cfg_attr(target_os = "macos", ignore)]
 fn test_managed_process_restart() {
     use std::sync::mpsc::channel;
     use std::process::Command;
