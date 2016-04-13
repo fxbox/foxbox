@@ -13,7 +13,7 @@ use transformable_channels::mpsc::ExtSender;
 
 use openzwave::{ ConfigPath, InitOptions, ZWaveManager, ZWaveNotification };
 use openzwave::{ CommandClass, ValueGenre, ValueType, ValueID };
-use openzwave::{ Controller };
+use openzwave::{ Node };
 
 use std::error;
 use std::fmt;
@@ -109,7 +109,7 @@ impl<Kind, Type> IdMap<Kind, Type> where Type: Eq + Clone, Kind: Clone {
 
     fn find_tax_id_from_ozw(&self, needle: &Type) -> Result<Option<TaxId<Kind>>, ()> {
         let guard = try!(self.map.read().or(Err(())));
-        let find_result = guard.iter().find(|&&(_, ref controller)| controller == needle);
+        let find_result = guard.iter().find(|&&(_, ref item)| item == needle);
         Ok(find_result.map(|&(ref id, _)| id.clone()))
     }
 
@@ -270,7 +270,7 @@ pub struct OpenzwaveAdapter {
     vendor: String,
     version: [u32; 4],
     ozw: ZWaveManager,
-    controller_map: IdMap<ServiceId, Controller>,
+    node_map: IdMap<ServiceId, Node>,
     getter_map: IdMap<Getter, ValueID>,
     setter_map: IdMap<Setter, ValueID>,
     watchers: Arc<Mutex<Watchers>>,
@@ -320,7 +320,7 @@ impl OpenzwaveAdapter {
             vendor: String::from("Mozilla"),
             version: [1, 0, 0, 0],
             ozw: ozw,
-            controller_map: IdMap::new(),
+            node_map: IdMap::new(),
             getter_map: IdMap::new(),
             setter_map: IdMap::new(),
             watchers: Arc::new(Mutex::new(Watchers::new())),
@@ -338,7 +338,7 @@ impl OpenzwaveAdapter {
     fn spawn_notification_thread<T: AdapterManagerHandle + Send + Sync + 'static>(&self, rx: mpsc::Receiver<ZWaveNotification>, box_manager: &Arc<T>) {
         let adapter_id = self.id.clone();
         let box_manager = box_manager.clone();
-        let mut controller_map = self.controller_map.clone();
+        let mut node_map = self.node_map.clone();
         let mut getter_map = self.getter_map.clone();
         let mut setter_map = self.setter_map.clone();
         let watchers = self.watchers.clone();
@@ -348,24 +348,35 @@ impl OpenzwaveAdapter {
             for notification in rx {
                 //debug!("Received notification {:?}", notification);
                 match notification {
-                    ZWaveNotification::ControllerReady(controller)  => {
-                        let service = format!("OpenZWave-{:08x}", controller.get_home_id());
-                        let service_id = TaxId::new(&service);
-                        controller_map.push(service_id.clone(), controller);
-
-                        box_manager.add_service(Service::empty(service_id.clone(), adapter_id.clone()));
-                    }
+                    ZWaveNotification::ControllerReady(_controller) => {}
                     ZWaveNotification::NodeNew(_node)               => {}
-                    ZWaveNotification::NodeAdded(_node)             => {}
+                    ZWaveNotification::NodeAdded(node)              => {
+                        let service = format!("OpenZWave-{:08x}-{:02x}", node.get_home_id(), node.get_id());
+                        let service_id = TaxId::new(&service);
+                        node_map.push(service_id.clone(), node);
+
+                        let mut service = Service::empty(service_id.clone(), adapter_id.clone());
+                        service.properties.insert(String::from("name"), node.get_name());
+                        service.properties.insert(String::from("product_name"), node.get_product_name());
+                        service.properties.insert(String::from("manufacturer_name"), node.get_manufacturer_name());
+                        service.properties.insert(String::from("location"), node.get_location());
+
+                        box_manager.add_service(service);
+                    }
+                    ZWaveNotification::NodeNaming(_node)             => {
+                        // unfortunately we can't change a service' properties :(
+                        // https://github.com/fxbox/taxonomy/issues/97
+                        // When it's done we can move the properties change from above to here.
+                    }
                     ZWaveNotification::NodeRemoved(_node)           => {}
                     ZWaveNotification::ValueAdded(vid)              => {
                         if vid.get_genre() != ValueGenre::ValueGenre_User { continue }
 
                         let value_id = format!("OpenZWave-{:08x}-{:016x} ({})", vid.get_home_id(), vid.get_id(), vid.get_label());
 
-                        let controller_id = controller_map.find_tax_id_from_ozw(&vid.get_controller()).unwrap();
-                        if controller_id.is_none() { continue }
-                        let controller_id = controller_id.unwrap();
+                        let node_id = node_map.find_tax_id_from_ozw(&vid.get_node()).unwrap();
+                        if node_id.is_none() { continue }
+                        let node_id = node_id.unwrap();
 
                         let has_getter = !vid.is_write_only();
                         let has_setter = !vid.is_read_only();
@@ -379,7 +390,7 @@ impl OpenzwaveAdapter {
                             getter_map.push(getter_id.clone(), vid);
                             box_manager.add_getter(Channel {
                                 id: getter_id.clone(),
-                                service: controller_id.clone(),
+                                service: node_id.clone(),
                                 adapter: adapter_id.clone(),
                                 last_seen: None,
                                 tags: HashSet::new(),
@@ -395,7 +406,7 @@ impl OpenzwaveAdapter {
                             setter_map.push(setter_id.clone(), vid);
                             box_manager.add_setter(Channel {
                                 id: setter_id.clone(),
-                                service: controller_id.clone(),
+                                service: node_id.clone(),
                                 adapter: adapter_id.clone(),
                                 last_seen: None,
                                 tags: HashSet::new(),
