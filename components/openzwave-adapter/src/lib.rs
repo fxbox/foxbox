@@ -348,17 +348,17 @@ impl OpenzwaveAdapter {
             for notification in rx {
                 //debug!("Received notification {:?}", notification);
                 match notification {
-                    ZWaveNotification::ControllerReady(controller) => {
+                    ZWaveNotification::ControllerReady(controller)  => {
                         let service = format!("OpenZWave-{:08x}", controller.get_home_id());
                         let service_id = TaxId::new(&service);
                         controller_map.push(service_id.clone(), controller);
 
                         box_manager.add_service(Service::empty(service_id.clone(), adapter_id.clone()));
                     }
-                    ZWaveNotification::NodeNew(node)               => {}
-                    ZWaveNotification::NodeAdded(node)             => {}
-                    ZWaveNotification::NodeRemoved(node)           => {}
-                    ZWaveNotification::ValueAdded(vid)             => {
+                    ZWaveNotification::NodeNew(_node)               => {}
+                    ZWaveNotification::NodeAdded(_node)             => {}
+                    ZWaveNotification::NodeRemoved(_node)           => {}
+                    ZWaveNotification::ValueAdded(vid)              => {
                         if vid.get_genre() != ValueGenre::ValueGenre_User { continue }
 
                         let value_id = format!("OpenZWave-{:08x}-{:016x} ({})", vid.get_home_id(), vid.get_id(), vid.get_label());
@@ -406,7 +406,7 @@ impl OpenzwaveAdapter {
                             });
                         }
                     }
-                    ZWaveNotification::ValueChanged(vid)         => {
+                    ZWaveNotification::ValueChanged(vid)          => {
                         match vid.get_type() {
                             ValueType::ValueType_Bool => {},
                             _ => continue // ignore non-bool vals for now
@@ -465,8 +465,8 @@ impl OpenzwaveAdapter {
                             }
                         }
                     }
-                    ZWaveNotification::ValueRemoved(value)         => {}
-                    ZWaveNotification::Generic(string)             => {}
+                    ZWaveNotification::ValueRemoved(_value)         => {}
+                    ZWaveNotification::Generic(_string)             => {}
                     _ => {}
                 }
             }
