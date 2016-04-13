@@ -333,7 +333,7 @@ describe! binary_getter {
         use foxbox_taxonomy::api::{ Error, InternalError, User };
         use foxbox_taxonomy::manager::AdapterManager;
         use foxbox_taxonomy::services::*;
-        use foxbox_taxonomy::values::{ Range, Type, Value, Binary };
+        use foxbox_taxonomy::values::{ Type, Value, Binary };
         use iron::Headers;
         use iron::headers::{ Authorization, Bearer, ContentLength, ContentType };
         use iron_test::{ request, response };
