@@ -10,6 +10,11 @@ import json
 import os
 import sys
 
+kind_map = {
+    'Password': 'String',
+    'Username': 'String'
+}
+
 class Service:
 
     def __init__(self, service):
@@ -69,7 +74,10 @@ class Service:
                 rsp = j[getter_key]
                 getter = self.getter(getter_key)
                 for type in rsp:
-                    if type == getter['kind']:
+                    kind = getter['kind']
+                    if kind in kind_map:
+                        kind = kind_map[kind]
+                    if type == kind:
                         return rsp[type]
 
 def main():
@@ -260,7 +268,7 @@ def main():
             getter_req = requests.put(get_url, headers=auth_header, data=bytes(getter_data, encoding='utf-8'))
             if args.verbose:
                 print("Got {} response of '{}'".format(getter_req.headers['content-type'], getter_req.text))
-            print("{} = '{}'".format(args.get, svc.fmt_response(getter_key, getter_req)))
+            print("{} = '{}'".format(getter_key, svc.fmt_response(getter_key, getter_req)))
         if args.set:
             set_name, set_value = args.set.split('=', 1)
             if args.verbose:
@@ -269,7 +277,10 @@ def main():
             setter_key, setter = svc.setter_contains(set_name);
             if not setter:
                 continue
-            setter_data = json.dumps({'select': {'id': setter_key}, 'value': {setter['kind']: set_value}})
+            kind = setter['kind']
+            if kind in kind_map:
+                kind = kind_map[kind]
+            setter_data = json.dumps({'select': {'id': setter_key}, 'value': {kind: set_value}})
             if args.verbose:
                 print("Sending PUT to {} data={}".format(set_url, setter_data))
             setter_req = requests.put(set_url, headers=auth_header, data=bytes(setter_data, encoding='utf-8'))
