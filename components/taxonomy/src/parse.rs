@@ -218,9 +218,7 @@ pub trait Parser<T: Sized> {
                 if let JSON::Array(ref mut vec) = *json {
                     let mut result = Vec::with_capacity(vec.len());
                     for (json, i) in vec.iter_mut().zip(0..) {
-                        match path.push(&format!("[{}]", i),
-                            |path| Self::parse(path, json)
-                        ) {
+                        match path.push_index(i, |path| Self::parse(path, json)) {
                             Err(error) => return Some(Err(error)),
                             Ok(parsed) => result.push(parsed)
                         }
