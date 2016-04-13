@@ -8,6 +8,7 @@ use self::crypto::digest::Digest;
 use self::crypto::sha1::Sha1;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub fn from_str(seed: String) -> Uuid {
     let mut sha = Sha1::new();
     sha.input_str(&seed);
