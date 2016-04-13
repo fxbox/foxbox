@@ -367,6 +367,9 @@ pub enum ChannelKind {
     /// ```
     Log,
 
+    /// Set of WebPush push subscriptions
+    WebPushNotify,
+
     // TODO: Add more
 
     /// An operation of a kind that has not been standardized yet.
@@ -449,6 +452,7 @@ impl Parser<ChannelKind> for ChannelKind {
                 "OvenTemperature" => Ok(ChannelKind::OvenTemperature),
                 "TakeSnapshot" => Ok(ChannelKind::TakeSnapshot),
                 "Log" => Ok(ChannelKind::Log),
+                "WebPushNotify" => Ok(ChannelKind::WebPushNotify),
                 _ => Err(ParseError::unknown_constant(str, &path))
             }
         }
@@ -494,6 +498,7 @@ impl ToJSON for ChannelKind {
             ThinkerbellRuleOn => JSON::String("ThinkerbellRuleOn".to_owned()),
             TakeSnapshot => JSON::String("TakeSnapshot".to_owned()),
             Log => JSON::String("Log".to_owned()),
+            WebPushNotify => JSON::String("WebPushNotify".to_owned()),
             Extension { ref vendor, ref adapter, ref kind, ref typ } => {
                 vec![
                     ("vendor", vendor.to_json()),
@@ -526,6 +531,7 @@ impl ChannelKind {
             Log => Type::String,
             TakeSnapshot => Type::Unit,
 			Username | Password => Type::String,
+            WebPushNotify => Type::WebPushNotify,
             Extension { ref typ, ..} => typ.clone(),
         }
     }
