@@ -367,7 +367,10 @@ pub enum ChannelKind {
     /// ```
     Log,
 
-    /// Set of WebPush push subscriptions
+    //
+    // # WebPush
+    //
+
     WebPushNotify,
 
     // TODO: Add more
