@@ -507,7 +507,7 @@ impl ToJSON for ChannelKind {
                     ("vendor", vendor.to_json()),
                     ("adapter", adapter.to_json()),
                     ("kind", kind.to_json()),
-                    ("typ", typ.to_json()),
+                    ("type", typ.to_json()),
                 ].to_json()
             }
         }
