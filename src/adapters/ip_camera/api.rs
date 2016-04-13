@@ -10,7 +10,6 @@ use config_store::ConfigService;
 use foxbox_taxonomy::api::{ Error, InternalError };
 use foxbox_taxonomy::services::*;
 use rustc_serialize::base64::{ FromBase64, ToBase64, STANDARD };
-use self::hyper::header::{ Authorization, Basic, Connection };
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::io::{ BufWriter, ErrorKind };
@@ -34,42 +33,6 @@ pub fn create_io_mechanism_id<IO>(prefix: &str, operation: &str, service_id: &st
     where IO: IOMechanism
 {
     Id::new(&format!("{}:{}.{}@link.mozilla.org", prefix, operation, service_id))
-}
-
-fn get_bytes(url: &str, username: &str, password: &str) -> Result<Vec<u8>, Error> {
-    let client = hyper::Client::new();
-    let get_result = client.get(url)
-                           .header(
-                               Authorization(
-                                   Basic {
-                                       username: username.to_owned(),
-                                       password: Some(password.to_owned())
-                                   }
-                               )
-                           )
-                           .header(Connection::close())
-                           .send();
-    let mut res = match get_result {
-        Ok(res) => res,
-        Err(err) => {
-            warn!("GET on {} failed: {}", url, err);
-            return Err(Error::InternalError(InternalError::InvalidInitialService));
-        }
-    };
-
-    if res.status != self::hyper::status::StatusCode::Ok {
-        warn!("GET on {} failed: {}", url, res.status);
-        return Err(Error::InternalError(InternalError::InvalidInitialService));
-    }
-
-    let mut image = Vec::new();
-    match res.read_to_end(&mut image) {
-        Ok(_) => Ok(image),
-        Err(err) => {
-            warn!("read of image data from {} failed: {}", url, err);
-            Err(Error::InternalError(InternalError::InvalidInitialService))
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -114,6 +77,54 @@ impl IpCamera {
             }
         }
         Ok(camera)
+    }
+
+    #[cfg(not(test))]
+    fn get_bytes(&self, url: &str, username: &str, password: &str) -> Result<Vec<u8>, Error> {
+        use self::hyper::header::{ Authorization, Basic, Connection };
+        let client = hyper::Client::new();
+        let get_result = client.get(url)
+                               .header(
+                                   Authorization(
+                                       Basic {
+                                           username: username.to_owned(),
+                                           password: Some(password.to_owned())
+                                       }
+                                   )
+                               )
+                               .header(Connection::close())
+                               .send();
+        let mut res = match get_result {
+            Ok(res) => res,
+            Err(err) => {
+                warn!("GET on {} failed: {}", url, err);
+                return Err(Error::InternalError(InternalError::InvalidInitialService));
+            }
+        };
+
+        if res.status != self::hyper::status::StatusCode::Ok {
+            warn!("GET on {} failed: {}", url, res.status);
+            return Err(Error::InternalError(InternalError::InvalidInitialService));
+        }
+
+        let mut image = Vec::new();
+        match res.read_to_end(&mut image) {
+            Ok(_) => Ok(image),
+            Err(err) => {
+                warn!("read of image data from {} failed: {}", url, err);
+                Err(Error::InternalError(InternalError::InvalidInitialService))
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn get_bytes(&self, url: &str, username: &str, _password: &str) -> Result<Vec<u8>, Error> {
+        // For testing assume that url is a filename.
+        if username == "get_bytes:fail" {
+            Err(Error::InternalError(InternalError::GenericError("get_bytes".to_owned())))
+        } else {
+            self.read_image(url)
+        }
     }
 
     fn config_key(&self, key: &str) -> String {
@@ -174,12 +185,10 @@ impl IpCamera {
         array
     }
 
-    pub fn get_image(&self, filename: &str) -> Result<Vec<u8>, Error> {
-        let full_filename = format!("{}/{}", self.snapshot_dir, filename);
-        debug!("get_image: filename = {}", full_filename.clone());
+    pub fn read_image(&self, full_filename: &str) -> Result<Vec<u8>, Error> {
         let mut options = fs::OpenOptions::new();
         options.read(true);
-        if let Ok(mut image_file) = options.open(full_filename.clone()) {
+        if let Ok(mut image_file) = options.open(full_filename) {
             let mut image = Vec::new();
             if let Ok(_) = image_file.read_to_end(&mut image) {
                 return Ok(image);
@@ -189,6 +198,11 @@ impl IpCamera {
             warn!("Image {} not found", full_filename);
         }
         Err(Error::InternalError(InternalError::InvalidInitialService))
+    }
+
+    pub fn get_image(&self, filename: &str) -> Result<Vec<u8>, Error> {
+        let full_filename = format!("{}/{}", self.snapshot_dir, filename);
+        self.read_image(&full_filename)
     }
 
     pub fn get_newest_image(&self) -> Result<Vec<u8>, Error> {
@@ -220,7 +234,7 @@ impl IpCamera {
         let image_url = "image/jpeg.cgi";
         let url = format!("{}/{}", self.url, image_url);
 
-        let image = match get_bytes(&url, &self.get_username(), &self.get_password()) {
+        let image = match self.get_bytes(&url, &self.get_username(), &self.get_password()) {
             Ok(image) => image,
             Err(err) => {
                 warn!("Error '{:?}' retrieving image from camera {}", err, self.url);
@@ -272,6 +286,129 @@ impl IpCamera {
         }
         info!("Took a snapshot from {}: {}", self.udn, full_filename);
         Ok(format!("{}.jpg", filename))
+    }
+}
+
+#[cfg(test)]
+use std::io;
+
+#[cfg(test)]
+pub fn remove_file<P: AsRef<Path>>(filename: P) -> io::Result<()> {
+    if filename.as_ref().is_file() {
+        fs::remove_file(filename)
+    } else {
+        // File doesn't exist -> we're good
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+pub fn remove_dir_all<P: AsRef<Path>>(dirname: P) -> io::Result<()> {
+    if dirname.as_ref().is_dir() {
+        fs::remove_dir_all(dirname)
+    } else {
+        // Directory doesn't exist -> we're good.
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+describe! ip_camera {
+
+    before_each {
+        use config_store::ConfigService;
+        use std::sync::Arc;
+        use uuid::Uuid;
+
+        let uniq_str = Uuid::new_v4().to_simple_string();
+        let config_filename = format!("ip-camera-test-conf-{}.tmp", uniq_str);
+        let config = ConfigService::new(&config_filename);
+        let snapshot_dir = format!("ip-camera-test-snapshot-dir-{}.tmp", uniq_str);
+    }
+
+    after_each {
+        remove_file(&config_filename).unwrap();
+        remove_dir_all(&snapshot_dir).unwrap();
+    }
+
+    describe! good_camera {
+
+        before_each {
+            let snapshot_dir = snapshot_dir.clone();
+            let camera = IpCamera::new("udn", "test/ip-camera", "upnp_name", &snapshot_dir, &Arc::new(config)).unwrap();
+        }
+
+        it "should store username" {
+            assert_eq!(camera.get_username(), "");
+            camera.set_username("foobar_username");
+            assert_eq!(camera.get_username(), "foobar_username");
+        }
+
+        it "test invalid stored password" {
+            camera.set_config("password", "invalid password");
+            assert_eq!(camera.get_password(), "");
+        }
+
+        it "should store password" {
+            camera.set_password("foobar_password");
+            assert_eq!(camera.get_password(), "foobar_password");
+
+            let stored_password = camera.get_config("password").unwrap();
+            assert!(stored_password != "foobar_password");
+        }
+
+        failing "non-existant latest image" {
+            // Make sure that get_newest_image returns an empty list
+            remove_dir_all(&snapshot_dir).unwrap();
+            camera.get_newest_image().unwrap();
+        }
+
+        it "image list tests" {
+            let images = camera.get_image_list();
+            assert_eq!(images.len(), 0);
+
+            camera.take_snapshot().unwrap();
+
+            let images = camera.get_image_list();
+            assert_eq!(images.len(), 1);
+
+            let image_data = camera.get_newest_image().unwrap();
+            let sample_image_data = camera.read_image("test/ip-camera/image/jpeg.cgi").unwrap();
+            assert_eq!(image_data, sample_image_data);
+        }
+
+        failing "bad snapshot name" {
+            // Removing the snapshot dir will cause get_image to fail.
+            remove_dir_all(&snapshot_dir).unwrap();
+            camera.get_image("xxx").unwrap();
+        }
+
+        failing "take_snapshot - get_bytes failure" {
+            camera.set_username("get_bytes:fail");
+            let result = camera.take_snapshot();
+
+            // Do cleanup now since we're going to panic
+            remove_file(&config_filename).unwrap();
+            remove_dir_all(&snapshot_dir).unwrap();
+
+            result.unwrap();
+        }
+
+        failing "take_snapshot - no snapshot dir" {
+            remove_dir_all(&snapshot_dir).unwrap();
+            camera.take_snapshot().unwrap();
+        }
+    }
+
+    failing "bad snapshot dir" {
+        // Pick a root directory that we can't create
+        IpCamera::new("udn", "test/ip-camera", "upnp_name", "/unwritable", &Arc::new(config)).unwrap();
+    }
+
+    failing "take_snapsot - bad url" {
+        let camera = IpCamera::new("udn", "xxx/ip-camera", "upnp_name", &snapshot_dir, &Arc::new(config)).unwrap();
+        remove_dir_all(&snapshot_dir).unwrap();
+        camera.take_snapshot().unwrap();
     }
 }
 
