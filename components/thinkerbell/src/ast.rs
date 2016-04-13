@@ -26,8 +26,8 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
         "Script".to_owned()
     }
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
-        let name =  try!(path.push("", |path| String::take(path, source, "name")));
-        let rules = try!(path.push("", |path| Rule::take_vec(path, source, "rules")));
+        let name =  try!(path.push("name", |path| String::take(path, source, "name")));
+        let rules = try!(path.push("rules", |path| Rule::take_vec(path, source, "rules")));
         Ok(Script {
             name: name,
             rules: rules,

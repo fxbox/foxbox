@@ -239,7 +239,7 @@ impl<Env, T> ScriptManager<Env, T>
         let tx = self.tx.map(move |event| {
             (tx_id.clone(), event)
         });
-        let parsed_source = try!(Script::from_str(source));
+        let parsed_source = try!(Path::new().push_str("recipe", |path| Script::from_str_at(path, source)));
         try!(runner.start(self.env.clone(), parsed_source, owner.clone(), tx));
         self.runners.insert(id.clone(), runner);
         Ok(())
