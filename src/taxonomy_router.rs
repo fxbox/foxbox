@@ -239,7 +239,7 @@ impl Handler for TaxonomyRouter {
         payload_api2!(add_setter_tags,
                       setters => Vec<SetterSelector>,
                       tags => Vec<Id<TagId>>,
-                      ["channels", "getter", "tags"], Method::Post);
+                      ["channels", "setter", "tags"], Method::Post);
 
         // Removing tags.
         payload_api2!(remove_service_tags,
@@ -253,7 +253,7 @@ impl Handler for TaxonomyRouter {
         payload_api2!(remove_setter_tags,
                       setters => Vec<SetterSelector>,
                       tags => Vec<Id<TagId>>,
-                      ["channels", "getter", "tags"], Method::Delete);
+                      ["channels", "setter", "tags"], Method::Delete);
 
         // Fallthrough, returning a 404.
         Ok(Response::with((Status::NotFound,
