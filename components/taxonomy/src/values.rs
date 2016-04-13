@@ -83,6 +83,8 @@ pub enum Type {
 
     ThinkerbellRule,
 
+    WebPushNotify,
+
     Temperature,
     String,
     ///
@@ -111,6 +113,7 @@ impl Parser<Type> for Type {
                 "TimeStamp" => Ok(TimeStamp),
                 "Temperature" => Ok(Temperature),
                 "ThinkerbellRule" => Ok(ThinkerbellRule),
+                "WebPushNotify" => Ok(WebPushNotify),
                 "String" => Ok(String),
                 "Color" => Ok(Color),
                 "Json" => Ok(Json),
@@ -135,6 +138,7 @@ impl ToJSON for Type {
             TimeStamp => "TimeStamp",
             Temperature => "Temperature",
             ThinkerbellRule => "ThinkerbellRule",
+            WebPushNotify => "WebPushNotify",
             String => "String",
             Color => "Color",
             Json => "Json",
@@ -154,7 +158,7 @@ impl Type {
         use self::Type::*;
         match *self {
             Duration | TimeStamp | Temperature | ExtNumeric | Color | ThinkerbellRule => false,
-            Unit | String | Json | Binary | OnOff | OpenClosed |
+            WebPushNotify | Unit | String | Json | Binary | OnOff | OpenClosed |
             DoorLocked | ExtBool => true,
         }
     }
@@ -789,6 +793,32 @@ impl ToJSON for Color {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WebPushNotify {
+    pub resource: String,
+    pub message: String,
+}
+
+impl Parser<WebPushNotify> for WebPushNotify {
+    fn description() -> String {
+        "WebPushNotify".to_owned()
+    }
+    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+        let resource = try!(path.push("resource", |path| String::take(path, source, "resource")));
+        let message = try!(path.push("message", |path| String::take(path, source, "message")));
+        Ok(WebPushNotify { resource: resource, message: message})
+    }
+}
+
+impl ToJSON for WebPushNotify {
+    fn to_json(&self) -> JSON {
+        vec![
+            ("resource", &self.resource),
+            ("message", &self.message),
+        ].to_json()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThinkerbellRule {
     pub name: String,
     pub source: String,
@@ -1340,6 +1370,7 @@ pub enum Value {
     // FIXME: Add more as we identify needs
 
     ThinkerbellRule(ThinkerbellRule),
+    WebPushNotify(WebPushNotify),
 
     /// A boolean value representing a unit that has not been
     /// standardized yet into the API.
@@ -1457,6 +1488,10 @@ lazy_static! {
             let value = try!(path.push("ThinkerbellRule", |path| self::ThinkerbellRule::parse(path, v)));
             Ok(ThinkerbellRule(value))
         }));
+        map.insert("WebPushNotify", Box::new(|path, v| {
+            let value = try!(path.push("WebPushNotify", |path| self::WebPushNotify::parse(path, v)));
+            Ok(WebPushNotify(value))
+        }));
         map.insert("Color", Box::new(|path, v| {
             let value = try!(path.push("Color", |path| self::Color::parse(path, v)));
             Ok(Color(value))
@@ -1526,6 +1561,7 @@ impl ToJSON for Value {
             Binary(ref val) => ("Binary", val.to_json()),
             Temperature(ref val) => ("Temperature", val.to_json()),
             ThinkerbellRule(ref val) => ("ThinkerbellRule", val.to_json()),
+            WebPushNotify(ref val) => ("WebPushNotify", val.to_json()),
             ExtBool(ref val) => ("ExtBool", val.to_json()),
             ExtNumeric(ref val) => ("ExtNumeric", val.to_json()),
         };
@@ -1552,6 +1588,7 @@ impl Value {
             Value::ExtBool(_) => Type::ExtBool,
             Value::ExtNumeric(_) => Type::ExtNumeric,
             Value::ThinkerbellRule(_) => Type::ThinkerbellRule,
+            Value::WebPushNotify(_) => Type::WebPushNotify,
         }
     }
 
@@ -1616,6 +1653,9 @@ impl PartialOrd for Value {
 
             (&ThinkerbellRule(ref a), &ThinkerbellRule(ref b)) => a.name.partial_cmp(&b.name),
             (&ThinkerbellRule(_), _) => None,
+
+            (&WebPushNotify(ref a), &WebPushNotify(ref b)) => a.resource.partial_cmp(&b.resource),
+            (&WebPushNotify(_), _) => None,
 
             (&Binary(self::Binary {mimetype: ref a_mimetype, data: ref a_data}),
              &Binary(self::Binary {mimetype: ref b_mimetype, data: ref b_data})) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
