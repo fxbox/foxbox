@@ -177,9 +177,12 @@ impl Serialize for JSONError {
 pub trait Parser<T: Sized> {
     fn description() -> String;
     fn from_str(source: &str) -> Result<T, ParseError> {
+        Self::from_str_at(Path::new(), source)
+    }
+    fn from_str_at(path: Path, source: &str) -> Result<T, ParseError> {
         match serde_json::from_str(source) {
             Err(err) => Err(ParseError::json(err)),
-            Ok(mut json) => Self::parse(Path::new(), &mut json)
+            Ok(mut json) => Self::parse(path, &mut json)
         }
     }
 
