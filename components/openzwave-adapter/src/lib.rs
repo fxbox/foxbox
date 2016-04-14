@@ -477,6 +477,10 @@ impl OpenzwaveAdapter {
                         }
                     }
                     ZWaveNotification::ValueRemoved(_value)         => {}
+                    ZWaveNotification::AwakeNodesQueried(ref controller) | ZWaveNotification::AllNodesQueried(ref controller) => {
+                        debug!("Openzwave::Adapter writing the network config.");
+                        controller.write_config();
+                    }
                     ZWaveNotification::Generic(_string)             => {}
                     _ => {}
                 }
@@ -556,6 +560,11 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
 
             (id, value_result)
         }).collect()
+    }
+
+    fn stop(&self) {
+        info!("Openzwave::Adapter::stop Stopping the Openzwave adapter: writing the network config.");
+        self.ozw.write_configs();
     }
 }
 
