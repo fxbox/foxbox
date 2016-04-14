@@ -35,3 +35,4 @@ foxbox.conf
 
 # Generated certs
 certs
+*.pkcs12
