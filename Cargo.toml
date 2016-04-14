@@ -14,6 +14,14 @@ exclude = [ "**/*.conf",
 default = ["authentication"]
 authentication = []
 
+[[bin]]
+name = "dnschallenge"
+path = "src/challenge_bin.rs"
+
+[[bin]]
+name = "foxbox"
+path = "src/main.rs"
+
 [dependencies]
 foxbox_thinkerbell = { path = "components/thinkerbell/" }
 openzwave-adapter = { path = "components/openzwave-adapter/" }
