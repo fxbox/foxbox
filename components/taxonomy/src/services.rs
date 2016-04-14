@@ -249,6 +249,36 @@ pub enum ChannelKind {
     // # Time
     //
 
+    /// The service is used to execute something after a given delay.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "Countdown".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"Countdown\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::Countdown);
+    /// ```
+    Countdown,
+
+    /// The service is used to execute something at a regular interval.
+    ///
+    /// # JSON
+    ///
+    /// This kind is represented by string "CountEveryInterval".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"CountEveryInterval\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::CountEveryInterval);
+    /// ```
+    CountEveryInterval,
+
     /// The service is used to read or set the current absolute time.
     /// Used for instance to wait until a specific time and day before
     /// triggering an action, or to set the appropriate time on a new
@@ -445,6 +475,8 @@ impl Parser<ChannelKind> for ChannelKind {
                 "DoorLocked" => Ok(ChannelKind::DoorLocked),
                 "Username" => Ok(ChannelKind::Username),
                 "Password" => Ok(ChannelKind::Password),
+                "Countdown" => Ok(ChannelKind::Countdown),
+                "CountEveryInterval" => Ok(ChannelKind::CountEveryInterval),
                 "CurrentTime" => Ok(ChannelKind::CurrentTime),
                 "CurrentTimeOfDay" => Ok(ChannelKind::CurrentTimeOfDay),
                 "AddThinkerbellRule" => Ok(ChannelKind::AddThinkerbellRule),
@@ -460,7 +492,7 @@ impl Parser<ChannelKind> for ChannelKind {
             }
         }
         if source.is_object() {
-            for key in vec!["vendor", "adapter", "kind", "type"] {
+            for key in &["vendor", "adapter", "kind", "type"] {
                 if source.find(key).is_none() {
                     return Err(ParseError::type_error("ChannelKind", &path, "string|object {vendor, adapter, kind, type}"))
                 }
@@ -493,6 +525,8 @@ impl ToJSON for ChannelKind {
             Password => JSON::String("Password".to_owned()),
             CurrentTime => JSON::String("CurrentTime".to_owned()),
             CurrentTimeOfDay => JSON::String("CurrentTimeOfDay".to_owned()),
+            CountEveryInterval => JSON::String("CountEveryInterval".to_owned()),
+            Countdown => JSON::String("Countdown".to_owned()),
             RemainingTime => JSON::String("RemainingTime".to_owned()),
             OvenTemperature => JSON::String("OvenTemperature".to_owned()),
             AddThinkerbellRule => JSON::String("AddThinkerbellRule".to_owned()),
@@ -525,7 +559,7 @@ impl ChannelKind {
             OpenClosed => Type::OpenClosed,
             DoorLocked => Type::DoorLocked,
             CurrentTime => Type::TimeStamp,
-            CurrentTimeOfDay | RemainingTime => Type::Duration,
+            CurrentTimeOfDay | RemainingTime | Countdown | CountEveryInterval => Type::Duration,
             OvenTemperature => Type::Temperature,
             AddThinkerbellRule => Type::ThinkerbellRule,
             RemoveThinkerbellRule => Type::Unit,
