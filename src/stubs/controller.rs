@@ -6,12 +6,9 @@ extern crate rand;
 
 use config_store::ConfigService;
 use foxbox_users::UsersManager;
-use iron::{Request, Response, IronResult};
-use iron::status::Status;
 use profile_service::{ ProfilePath, ProfileService };
 use std::vec::IntoIter;
 use serde_json;
-use service::{ Service, ServiceProperties };
 use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
@@ -50,29 +47,8 @@ impl Default for ControllerStub {
 
 impl Controller for ControllerStub {
     fn run(&mut self, _: &AtomicBool) {}
-    fn dispatch_service_request(&self, id: String, request: &mut Request)
-        -> IronResult<Response> {
-        Ok(Response::with(Status::Ok))
-    }
     fn adapter_started(&self, _: String) {}
     fn adapter_notification(&self, _: serde_json::value::Value) {}
-    fn add_service(&self, _: Box<Service>) {}
-    fn remove_service(&self, _: String) {}
-    fn get_service_properties(&self, id: String) -> Option<ServiceProperties> {
-        None
-    }
-    fn services_count(&self) -> usize {
-        0
-    }
-    fn services_as_json(&self) -> Result<String, serde_json::error::Error> {
-        Ok(String::from(""))
-    }
-    fn get_http_root_for_service(&self, service_id: String) -> String {
-        String::from("")
-    }
-    fn get_ws_root_for_service(&self, service_id: String) -> String {
-        String::from("")
-    }
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error> {
         ("localhost", 3000).to_socket_addrs()
     }

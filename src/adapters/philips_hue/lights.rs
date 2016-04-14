@@ -16,7 +16,6 @@ use super::*;
 use super::hub_api::HubApi;
 use std::collections::HashSet;
 use std::sync::Arc;
-use traits::Controller;
 
 const CUSTOM_PROPERTY_MANUFACTURER: &'static str = "manufacturer";
 const CUSTOM_PROPERTY_MODEL: &'static str = "model";

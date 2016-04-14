@@ -80,7 +80,6 @@ mod http_server;
 mod managed_process;
 mod profile_service;
 mod registration;
-mod service;
 mod upnp;
 mod stable_uuid;
 mod static_router;
@@ -95,7 +94,6 @@ mod stubs {
     #![allow(dead_code)]
     #![allow(unused_variables)]
     #![allow(boxed_local)]
-    pub mod service;
     pub mod controller;
 }
 
