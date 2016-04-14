@@ -228,12 +228,18 @@ impl<Env, T> ScriptManager<Env, T>
         self.runners.contains_key(id)
     }
 
-    /// Execute a script. Returns an error if the script is already running,
-    /// or it won't parse, or it won't compile.
+    /// Execute a script. If the script is already running, stop the existing script.
     fn start_script(&mut self, id: &Id<ScriptId>, source: &String, owner: &User) -> Result<(), Error> {
-        if self.runners.contains_key(id) {
-            return Err(Error::RunError(RunError::StartStopError(StartStopError::AlreadyRunning)));
+        // Stop the script is necessary.
+        if let Some(mut runner) = self.runners.remove(&id) {
+            let (tx, rx) = channel();
+            runner.stop(move |result| {
+                let _ = tx.send(result);
+            });
+            // If the Thinkerbell script has panicked, ignore it.
+            let _ = rx.recv();
         }
+        // Now start it.
         let mut runner = Execution::<Env>::new();
         let tx_id = id.clone();
         let tx = self.tx.map(move |event| {
