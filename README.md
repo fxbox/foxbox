@@ -13,10 +13,10 @@ We're using Rust for the daemon/server.
 
 Currently a fairly recent nightly is required. To determine which version of rust is being used, check the [.travis.yml](https://github.com/fxbox/foxbox/blob/master/.travis.yml) file.
 
-Look for these 2 lines near the top of the file:
+Look for these lines near the top of the file:
 ```yaml
 rust:
-    - nightly-YYYY-MM-DD
+  - nightly-YYYY-MM-DD
 ```
 
 It's recommended that you use [`multirust`](https://github.com/brson/multirust) to install and switch between versions of Rust. You should then be able to then use:

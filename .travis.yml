@@ -1,4 +1,10 @@
 sudo: required
+
+env:
+  global:
+    # $BOX_HOST_NAME and $BOX_PORT are also used by Selenium tests.
+    - BOX_LOCAL_NAME=foxbox BOX_PORT=3000
+
 os:
   - osx
   - linux
@@ -14,12 +20,17 @@ matrix:
   fast_finish: true
   allow_failures:
     - rust: nightly
+  include:
+    - sudo: required
+      os: linux
+      rust: nightly-2016-04-10
+      env: BUILD_ENV=-arm_cross_compile
 
 cache:
-    directories:
-        - $HOME/.cargo
-        - node_modules
-        - $TRAVIS_BUILD_DIR/target
+  directories:
+    - $HOME/.cargo
+    - node_modules
+    - $TRAVIS_BUILD_DIR/target
 
 addons:
   firefox: latest
@@ -33,11 +44,7 @@ addons:
       - libelf-dev
       - libdw-dev
 
-# $BOX_HOST_NAME and $BOX_PORT are also used by Selenium tests.
-env:
-  - BOX_LOCAL_NAME=foxbox BOX_PORT=3000
-
-before_install: source $TRAVIS_BUILD_DIR/tools/travis-$TRAVIS_OS_NAME.sh
+before_install: source $TRAVIS_BUILD_DIR/tools/travis-$TRAVIS_OS_NAME$BUILD_ENV.sh
 install: install_dependencies
 
 before_script: set_up_tests
