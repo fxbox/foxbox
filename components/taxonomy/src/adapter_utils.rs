@@ -9,8 +9,6 @@ use values::*;
 use std::collections::HashMap;
 use std::sync::{ Arc, Mutex };
 
-use transformable_channels::mpsc::*;
-
 /// A simple way of converting an Adapter to an Adapter + Sync.
 ///
 /// Hardly optimal, but useful for testing and prototyping.
@@ -58,8 +56,7 @@ impl<T> Adapter for MakeSyncAdapter<T> where T: Adapter {
         self.lock.lock().unwrap().send_values(values, user)
     }
 
-    fn register_watch(&self, watch: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)> ) ->
-            Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)> {
+    fn register_watch(&self, watch: Vec<WatchTarget>) -> WatchResult {
         self.lock.lock().unwrap().register_watch(watch)
     }
 }

@@ -209,9 +209,7 @@ impl Adapter for FakeAdapter {
         }).collect()
     }
 
-    fn register_watch(&self, mut watch: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) ->
-            Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)>
-    {
+    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult {
         let mut watchers = self.watchers.lock().unwrap();
         watch.drain(..).map(|(id, filter, on_event)| {
             let is_dropped = Arc::new(AtomicBool::new(false));

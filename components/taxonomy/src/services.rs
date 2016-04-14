@@ -460,7 +460,7 @@ impl Parser<ChannelKind> for ChannelKind {
             }
         }
         if source.is_object() {
-            for key in vec!["vendor", "adapter", "kind", "type"] {
+            for key in &["vendor", "adapter", "kind", "type"] {
                 if source.find(key).is_none() {
                     return Err(ParseError::type_error("ChannelKind", &path, "string|object {vendor, adapter, kind, type}"))
                 }

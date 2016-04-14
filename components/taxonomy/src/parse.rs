@@ -35,6 +35,7 @@ pub struct Path {
     buf: Rc<RefCell<String>>,
     len: usize,
 }
+
 impl Path {
     /// Create an empty Path.
     pub fn new() -> Self {
@@ -83,6 +84,12 @@ impl Path {
         let mut str = self.buf.borrow().clone();
         str.truncate(self.len);
         str
+    }
+}
+
+impl Default for Path {
+    fn default() -> Self {
+        Path::new()
     }
 }
 
