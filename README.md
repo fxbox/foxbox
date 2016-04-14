@@ -215,10 +215,12 @@ You'll need some dependencies installed to build.
 $ brew install openssl libupnp sqlite
 ```
 
-This is required to build the openssl crate using homebrew's openssl:
+This is required to build/link the openssl crate and foxbox using homebrew's openssl:
 
 ``` bash
 $ export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
+$ export OPENSSL_LIB_DIR=/usr/local/opt/openssl/lib
+$ export EXTRA_LDFLAGS=-L/usr/local/opt/openssl/lib
 ```
 
 Previous versions of these instructions described setting ```OPENSSL_INCLUDE_DIR```.

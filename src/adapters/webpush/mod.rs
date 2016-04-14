@@ -12,7 +12,6 @@
 //! missing the necessary APIs to support the implementation.
 //!
 
-#[cfg(not(target_os = "macos"))]
 mod crypto;
 mod db;
 
@@ -21,11 +20,8 @@ use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Type, Value, Json };
 
-#[cfg(not(target_os = "macos"))]
 use hyper::header::{ ContentEncoding, Encoding };
-#[cfg(not(target_os = "macos"))]
 use hyper::Client;
-#[cfg(not(target_os = "macos"))]
 use hyper::client::Body;
 use rusqlite::{ self };
 use serde_json;
@@ -83,7 +79,6 @@ pub struct NotifySetter {
 }
 
 impl Subscription {
-    #[cfg(not(target_os = "macos"))]
     fn notify(&self, message: &str) {
         let enc = match self::crypto::encrypt(&self.public_key, message.to_owned()) {
             Some(x) => x,
@@ -105,11 +100,6 @@ impl Subscription {
             };
 
         info!("notified subscription {} (status {:?})", self.push_uri, res.status);
-    }
-
-    #[cfg(target_os = "macos")]
-    fn notify(&self, _: &str) {
-        warn!("discard notification for subscription {}, webpush disabled at build time", self.push_uri);
     }
 }
 
