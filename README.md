@@ -93,38 +93,19 @@ authentication = []
 
 ## Running the daemon
 
-```bash
-$ cargo run
-```
-
-There are several command line options to start the daemon:
-
-```bash
--v, --verbose : Toggle verbose output.
--l, --local-name <hostname> : Set local hostname. Linux only. Requires to be a member of the netdev group.
--p, --port <port>  : Set port to listen on for http connections. [default: 3000]
--w, --wsport <wsport> : Set port to listen on for websocket. [default: 4000]
--d, --profile <path> : Set profile path to store user data.
--r, --register <url> : URL of registration endpoint [default: http://localhost:4242]
--t, --tunnel <tunnel> : Set the tunnel endpoint hostname. If omitted, the tunnel is disabled.
--s, --tunnel-secret <secret> : Set the tunnel shared secret. [default: secret]
--c, --config <namespace;key;value> :  Set configuration override
--h, --help : Print this help menu.
---disable-tls : Run as a plain HTTP server, disabling encryption.
---dns-domain <domain> : Set the top level domain for public DNS. If omitted, the tunnel is disabled
---dns-api <url> : Set the DNS API endpoint
---remote-name: external domain of foxbox
-```
-
 Currently you would likely want to start the daemon like this:
 
 ```bash
-cargo run -- -r http://knilxof.org:4242 --disable-tls
+cargo run -- --disable-tls
 ```
 
-That means that your foxbox will be using our dev [registration server](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Registration_Server) and you will be disabling [TLS](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/TLS) support. We hope to have out-of-the-box TLS support ready pretty soon, but for now disabling it is the easiest way to run foxbox.
+You will be disabling [TLS](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/TLS) support. We hope to have out-of-the-box TLS support ready pretty soon, but for now disabling it is the easiest way to run foxbox.
 
-### Enable tunneling support
+### More options
+
+To see every available options, run: `cargo run -- --help`. Here below are detailed some specific configurations.
+
+#### Enable tunneling support
 
 If you want to access your foxbox from outside of the network where it is running, you'll need to enable [tunneling](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Tunneling) support. To do that you need to specify the address of the tunneling server that you want to use, the shared secret for this server (if any) and the remote name that you want to use to access to your foxbox from outside of your foxbox' local network.
 
@@ -134,27 +115,34 @@ cargo run -- -r http://knilxof.org:4242 -t knilxof.org:443 -s secret --remote-na
 
 In the example above, `knilxof.org:443` is the location of our tunneling dev server, which has a not-that-secret-anymore value that you'll need to ask for on [IRC](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link#IRC). You are supposed to substitute `<yourname>` by the subdomain of your choice, but take into account that you'll need to keep the domain name of the tunneling server, in this case `.knilxof.org`. Starting the daemon with the command line options above you should be able to access your foxbox through `http://yourname.knilxof.org`.
 
-### Custom local hostname
+#### Custom Philips Hue nUPNP server
 
-To run with custom local host name (eg. foxbox.local):
-
-```bash
-$ cargo run -- -l foxbox
+```
+$ cargo run -- -c "philips_hue;nupnp_url;http://localhost:8002/"
 ```
 
-__NOTE:__ currently changing of host name is done via ```avahi-daemon``` and therefore supported only on Linux platform. To be able to change local host machine name user must be either included into ```netdev``` group or allow any other suitable user group to manage host name by adding the following policy to ```/etc/dbus-1/system.d/avahi-dbus.conf```:
+#### Common issues
+
+##### "Failed set host name"
+
+Since [3e758cc](https://github.com/fxbox/foxbox/commit/3e758cc83a0511f5b6a206d6ee10df308f04456d), foxbox tries to set a custom host name for the Avahi daemon. This is a Linux-only feature. Depending on your configuration, you may get this error:
+```
+Running `target/debug/foxbox --disable-tls`
+thread '<main>' panicked at 'Failed set host name: Access denied (code -20)', /home/YOUR_LOGIN/.multirust/toolchains/nightly-2016-04-10/cargo/git/checkouts/multicast-dns-d51af2fa146824d6/a6e4bcc/src/adapters/avahi/adapter.rs:346
+```
+
+To get rid of it, without running the box with `sudo`, add your user to the group that allows to administrate the network. On Ubuntu this group is called `netdev`, on Arch Linux, it's `network`.
+
+If your distribution is different, take a look at the avahi configuration file (`/etc/dbus-1/system.d/avahi-dbus.conf`), and find the group that has these rights:
 ```xml
-<policy group="any_suitable_group_name">
+<policy group="GROUP_NAME_TO_LOOK_FOR">
   <allow send_destination="org.freedesktop.Avahi"/>
   <allow receive_sender="org.freedesktop.Avahi"/>
 </policy>
 ```
 
-### Custom Philips Hue nUPNP server
+Then, add yourself to the group, login again and run foxbox. You might need to wait about 1 minute to be able to run foxbox with the corrects rights.
 
-```
-$ cargo run -- -c "philips_hue;nupnp_url;http://localhost:8002/"
-```
 
 ## Interacting with the daemon
 
