@@ -307,7 +307,7 @@ impl OpenzwaveAdapter {
             Err(openzwave::Error::NoDeviceFound) => {
                 // early return: we should not impair foxbox startup for this error.
                 // TODO concept of FatalError vs IgnoreableError
-                error!("No ZWave device has been found.");
+                info!("No ZWave device has been found.");
                 return Ok(());
             }
             result => result
