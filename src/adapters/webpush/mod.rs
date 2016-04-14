@@ -18,7 +18,7 @@ mod db;
 use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ Type, TypeError, Value, Json };
+use foxbox_taxonomy::values::{ Type, TypeError, Value, Json, WebPushNotify };
 
 use hyper::header::{ ContentEncoding, Encoding };
 use hyper::Client;
@@ -70,12 +70,6 @@ impl ResourceGetter {
             resources: res
         }
     }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct NotifySetter {
-    resource: String,
-    message: String
 }
 
 impl Subscription {
@@ -212,6 +206,18 @@ impl<C: Controller> Adapter for WebPush<C> {
                 NO_AUTH_USER_ID
             };
 
+            if id == self.setter_notify_id {
+                match value {
+                    Value::WebPushNotify(notification) => {
+                        match self.set_notify(user_id, &notification) {
+                            Ok(_) => return (id, Ok(())),
+                            Err(err) => return (id, Err(Error::InternalError(InternalError::GenericError(format!("Database error: {}", err)))))
+                        }
+                    },
+                   _ => return (id, Err(Error::TypeError(TypeError { expected: Type::WebPushNotify, got: value.get_type() })))
+                }
+            }
+
             let arc_json_value = match value {
                 Value::Json(v) => v,
                 _ => return (id, Err(Error::TypeError(TypeError { expected: Type::Json, got: value.get_type() })))
@@ -236,7 +242,6 @@ impl<C: Controller> Adapter for WebPush<C> {
             setter_api!(set_resources, "set_resources", setter_resource_id, ResourceGetter);
             setter_api!(set_subscribe, "set_subscribe", setter_subscribe_id, SubscriptionGetter);
             setter_api!(set_unsubscribe, "set_unsubscribe", setter_unsubscribe_id, SubscriptionGetter);
-            setter_api!(set_notify, "set_notify", setter_notify_id, NotifySetter);
             (id.clone(), Err(Error::InternalError(InternalError::NoSuchSetter(id))))
         }).collect()
     }
@@ -306,12 +311,23 @@ impl<C: Controller> WebPush<C> {
             )
         }
 
+        try!(adapt.add_setter(Channel {
+            tags: HashSet::new(),
+            adapter: id.clone(),
+            id: setter_notify_id,
+            last_seen: None,
+            service: service_id.clone(),
+            mechanism: Setter {
+                kind: ChannelKind::WebPushNotify,
+                updated: None
+            }
+        }));
+
         add_getter!(getter_resource_id, "WebPushResource");
         add_getter!(getter_subscription_id, "WebPushSubscription");
         add_setter!(setter_resource_id, "WebPushResource");
         add_setter!(setter_subscribe_id, "WebPushSubscription");
         add_setter!(setter_unsubscribe_id, "WebPushSubscription");
-        add_setter!(setter_notify_id, "WebPushNotify");
         Ok(())
     }
 
@@ -365,7 +381,7 @@ impl<C: Controller> WebPush<C> {
         self.get_db().get_resource_subscriptions(resource)
     }
 
-    fn set_notify(&self, _: i32, setter: &NotifySetter) -> rusqlite::Result<()> {
+    fn set_notify(&self, _: i32, setter: &WebPushNotify) -> rusqlite::Result<()> {
         info!("notify on resource {}: {}", setter.resource, setter.message);
 
         let json = json!({resource: setter.resource, message: setter.message});
