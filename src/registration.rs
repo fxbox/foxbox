@@ -165,7 +165,6 @@ impl Registrar {
             let rx = get_san_cert_for(
                 domains.into_iter(),
                 self.certificate_manager.clone(),
-                self.certificate_manager.get_box_certificate().unwrap(),
                 self.dns_api_endpoint.clone()
             );
 
