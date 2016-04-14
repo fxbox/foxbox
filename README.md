@@ -207,7 +207,7 @@ For an extensive write-up about cross compiling Rust programs see:
 Cross compiling on Mac hasn't been documented. A PR is welcomed. :wink:
 
 
-## Notes for Mac OS X
+## Notes for Mac OS X with Brew
 
 You'll need some dependencies installed to build.
 
