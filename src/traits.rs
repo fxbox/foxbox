@@ -5,10 +5,8 @@
 use config_store::ConfigService;
 use core::marker::Reflect;
 use foxbox_users::UsersManager;
-use iron::{ IronResult, Response, Request };
 use profile_service::ProfileService;
 use serde_json;
-use service::{ Service, ServiceProperties };
 use std::io;
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicBool;
@@ -20,16 +18,8 @@ use ws;
 
 pub trait Controller : Send + Sync + Clone + Reflect + 'static {
     fn run(&mut self, shutdown_flag: &AtomicBool);
-    fn dispatch_service_request(&self, id: String, request: &mut Request) -> IronResult<Response>;
     fn adapter_started(&self, adapter: String);
     fn adapter_notification(&self, notification: serde_json::value::Value);
-    fn add_service(&self, service: Box<Service>);
-    fn remove_service(&self, id: String);
-    fn get_service_properties(&self, id: String) -> Option<ServiceProperties>;
-    fn services_count(&self) -> usize;
-    fn services_as_json(&self) -> Result<String, serde_json::error::Error>;
-    fn get_http_root_for_service(&self, service_id: String) -> String;
-    fn get_ws_root_for_service(&self, service_id: String) -> String;
     fn http_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error>;
     fn ws_as_addrs(&self) -> Result<IntoIter<SocketAddr>, io::Error>;
 

@@ -27,7 +27,6 @@ pub mod webpush;
 use foxbox_taxonomy::manager::AdapterManager as TaxoManager;
 
 use self::thinkerbell::ThinkerbellAdapter;
-use service::ServiceAdapter;
 use traits::Controller;
 
 use openzwave::Adapter as OpenzwaveAdapter;
@@ -36,7 +35,6 @@ use std::sync::Arc;
 
 pub struct AdapterManager<T> {
     controller: T,
-    adapters: Vec<Box<ServiceAdapter>>,
 }
 
 impl<T: Controller> AdapterManager<T> {
@@ -44,7 +42,6 @@ impl<T: Controller> AdapterManager<T> {
         debug!("Creating Adapter Manager");
         AdapterManager {
             controller: controller,
-            adapters: Vec::new(),
         }
     }
 
@@ -76,8 +73,5 @@ impl<T: Controller> AdapterManager<T> {
 
     /// Stop all the adapters.
     pub fn stop(&self) {
-        for adapter in &self.adapters {
-            adapter.stop();
-        }
     }
 }
