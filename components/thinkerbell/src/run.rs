@@ -257,6 +257,10 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 // (which we should eventually optimize, if we find
                 // out that we end up with large rulesets).
 
+                let getters = api.get_getter_channels(condition.source.clone());
+                info!("[Thinkerbell {}] Initializing rule {} condition {}. Currently, it can listen to {} channels.", self.script.name,
+                    rule_index, condition_index, getters.len());
+
                 let rule_index = rule_index.clone();
                 let condition_index = condition_index.clone();
                 witnesses.push(
@@ -289,7 +293,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
         for msg in self.rx.iter() {
             match msg {
                 ExecutionOp::Stop(cb) => {
-                    debug!("[Thinkerbell {}] Shutting down recipe.", self.script.name);
+                    info!("[Thinkerbell {}] Shutting down recipe.", self.script.name);
 
                     // Leave the loop. Watching will stop once
                     // `witnesses` is dropped.
@@ -307,7 +311,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                             channel,
                             error
                         } => {
-                            debug!("[Thinkerbell {}] Initialization error for {}: {}", self.script.name, channel, error);
+                            info!("[Thinkerbell {}] Initialization error for {}: {}", self.script.name, channel, error);
                             let _ = on_event.send(ExecutionEvent::ChannelError {
                                 id: channel,
                                 error: error,
@@ -458,6 +462,10 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 debug!("[Thinkerbell update_condition {}] Triggering statement {}/{}.", name, statement_index, self.script.rules[rule_index].execute.len());
                 let result = statement.eval(&api, &self.owner);
                 debug!("[Thinkerbell update_condition {}] Statement result {}/{}: {:?}.", name, statement_index, self.script.rules[rule_index].execute.len(), result);
+                if result.is_empty() {
+                    warn!("[Thinkerbell {}] In rule {}, attempting to trigger statement {}, couldn't find any receiver channel.", name,
+                            rule_index, condition_index);
+                }
 
                 let _ = on_event.send(ExecutionEvent::Sent {
                     rule_index: rule_index,
