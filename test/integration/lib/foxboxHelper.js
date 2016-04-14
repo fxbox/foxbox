@@ -6,7 +6,7 @@ const Config = require('config-js');
 const spawn = require('child_process').spawn;
 
 var config = new Config('./test/integration/lib/config/foxbox.js');
-var FOXBOX_STARTUP_WAIT_TIME_IN_MS = 3000;
+var FOXBOX_STARTUP_WAIT_TIME_IN_MS = 5000;
 var foxboxInstance;
 
 var helper = (function() {
@@ -22,9 +22,6 @@ var helper = (function() {
     ['-c',  config.get('nupnp_server.param')+';'+
     config.get('nupnp_server.url')+':'+
     config.get('nupnp_server.port')+'/',
-    '-r',config.get('pagekite.r'),
-    '-t',config.get('pagekite.t'),
-    '-s',config.get('pagekite.s'),
     '--disable-tls'], {stdio: 'inherit'} ); // TODO TLS not yet supported
   setTimeout(callback, FOXBOX_STARTUP_WAIT_TIME_IN_MS);
   }
