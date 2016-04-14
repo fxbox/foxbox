@@ -306,12 +306,23 @@ impl<C: Controller> WebPush<C> {
             )
         }
 
+        try!(adapt.add_setter(Channel {
+            tags: HashSet::new(),
+            adapter: id.clone(),
+            id: setter_notify_id,
+            last_seen: None,
+            service: service_id.clone(),
+            mechanism: Setter {
+                kind: ChannelKind::WebPushNotify,
+                updated: None
+            }
+        }));
+
         add_getter!(getter_resource_id, "WebPushResource");
         add_getter!(getter_subscription_id, "WebPushSubscription");
         add_setter!(setter_resource_id, "WebPushResource");
         add_setter!(setter_subscribe_id, "WebPushSubscription");
         add_setter!(setter_unsubscribe_id, "WebPushSubscription");
-        add_setter!(setter_notify_id, "WebPushNotify");
         Ok(())
     }
 
