@@ -61,9 +61,9 @@ impl Adapter for Console {
                 let result = {
                     if id == self.setter_stdout_id {
                         if let Value::String(s) = value {
-                            info!("[{:?}] {}", user, s);
+                            info!("[console@link.mozilla.org] {} (user {:?})", s, user);
                         } else {
-                            info!("[{:?}] {:?}", user, value);
+                            info!("[console@link.mozilla.org] {:?} (user {:?})", value, user);
                         }
                         Ok(())
                     } else {
