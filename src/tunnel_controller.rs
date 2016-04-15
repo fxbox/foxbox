@@ -6,7 +6,7 @@
 use std::io::prelude::*;
 use std::process::{ Child, Command };
 use std::io::Result;
-use url::Url;
+use url::{ SchemeData, Url };
 use managed_process::ManagedProcess;
 
 pub type TunnelProcess = ManagedProcess;
@@ -19,7 +19,7 @@ pub struct Tunnel {
 #[derive(Clone, Debug)]
 pub struct TunnelConfig {
     /// The socket address that the box connects to to establish the tunnel.
-    tunnel_url: String,
+    tunnel_url: Url,
     tunnel_secret: String,
     local_http_port: u16,
     local_ws_port: u16,
@@ -32,6 +32,35 @@ impl TunnelConfig {
                local_http_port: u16,
                local_ws_port: u16,
                remote_name: String) -> Self {
+
+        let tunnel_url = match Url::parse(&tunnel_url) {
+            Ok(url) => {
+                match url.scheme_data {
+                    SchemeData::Relative(..) => {
+                        url
+                    },
+                    SchemeData::NonRelative(..) => {
+                        // We don't care about the scheme, we just want domain
+                        // and port, but Url does not parse them properly without
+                        // the scheme, so we append a fake 'http'.
+                        match Url::parse(&format!("http://{}", tunnel_url)) {
+                            Ok(url) => url,
+                            Err(err) => {
+                                error!("Could not parse tunnel url.
+                                        Try something like knilxof.org:443");
+                                panic!(err)
+                            }
+                        }
+                    },
+                }
+            },
+            Err(err) => {
+                error!("Could not parse tunnel url.
+                        Try something like knilxof.org:443");
+                panic!(err)
+            }
+        };
+
         TunnelConfig {
             tunnel_url: tunnel_url,
             tunnel_secret: tunnel_secret,
@@ -52,8 +81,22 @@ impl TunnelConfig {
     /// we keep using pagekite.
     /// https://github.com/fxbox/foxbox/issues/177#issuecomment-194778308
     pub fn spawn(&self) -> Result<Child> {
+        let domain = match self.tunnel_url.domain() {
+            Some(domain) => domain,
+            None => {
+                panic!("No tunnel domain found. Cannot start tunneling");
+            }
+        };
+
+        let port = match self.tunnel_url.port() {
+            Some(port) => port,
+            None => {
+                panic!("No tunnel port found. Cannot start tunneling");
+            }
+        };
+
         Command::new("pagekite.py")
-                .arg(format!("--frontend={}", self.tunnel_url))
+                .arg(format!("--frontend={}", format!("{}:{}", domain, port)))
                 // XXX remove http service once we support https
                 .arg(format!("--service_on=http,https:{}:localhost:{}:{}",
                              self.remote_name,
@@ -102,19 +145,9 @@ impl Tunnel {
     }
 
     pub fn get_frontend_name(&self) -> Option<String> {
-        if self.tunnel_process.is_none() {
-            None
-        } else {
-            match Url::parse(&self.config.tunnel_url) {
-                Ok(url) => {
-                    if let Some(host) = url.host() {
-                        Some(host.serialize())
-                    } else {
-                        None
-                    }
-                },
-                Err(_) => None
-            }
+        match self.config.tunnel_url.host() {
+            Some(host) => Some(host.to_string()),
+            None => None
         }
     }
 }
