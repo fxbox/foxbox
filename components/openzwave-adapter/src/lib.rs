@@ -306,8 +306,13 @@ impl OpenzwaveAdapter {
         let (ozw, rx) = try!(match openzwave::init(&options) {
             Err(openzwave::Error::NoDeviceFound) => {
                 // early return: we should not impair foxbox startup for this error.
-                // TODO concept of FatalError vs IgnoreableError
-                info!("No ZWave device has been found.");
+                // TODO manage errors at adapter start: https://github.com/fxbox/RFC/issues/14
+                info!("[OpenzwaveAdapter] No ZWave device has been found.");
+                return Ok(());
+            },
+            Err(openzwave::Error::CannotReadDevice(device, cause)) => {
+                // early return for the same reason as above.
+                error!("[OpenzwaveAdapter] Could not read the device {}: {}.", device, cause);
                 return Ok(());
             }
             result => result
@@ -330,7 +335,7 @@ impl OpenzwaveAdapter {
         adapter.spawn_notification_thread(rx, box_manager);
         try!(box_manager.add_adapter(adapter));
 
-        info!("Started Openzwave adapter.");
+        info!("[OpenzwaveAdapter] Started.");
 
         Ok(())
     }
@@ -448,7 +453,7 @@ impl OpenzwaveAdapter {
                         };
 
                         for &(ref range, ref sender) in &watchers {
-                            debug!("Openzwave::Adapter::ValueChanged iterate over watcher {:?} {:?}", tax_id, range);
+                            debug!("[OpenzwaveAdapter::ValueChanged] Iterating over watcher {:?} {:?}", tax_id, range);
 
                             let should_send_value = range.should_send(&tax_value, SendDirection::Enter);
 
@@ -468,7 +473,7 @@ impl OpenzwaveAdapter {
                             }
 
                             if should_send_value {
-                                debug!("Openzwave::Adapter::ValueChanged Sending event Enter {:?} {:?}", tax_id, tax_value);
+                                debug!("[OpenzwaveAdapter::ValueChanged] Sending event Enter {:?} {:?}", tax_id, tax_value);
                                 let sender = sender.lock().unwrap();
                                 sender.send(
                                     WatchEvent::Enter { id: tax_id.clone(), value: tax_value.clone() }
@@ -478,7 +483,7 @@ impl OpenzwaveAdapter {
                     }
                     ZWaveNotification::ValueRemoved(_value)         => {}
                     ZWaveNotification::AwakeNodesQueried(ref controller) | ZWaveNotification::AllNodesQueried(ref controller) => {
-                        debug!("Openzwave::Adapter writing the network config.");
+                        debug!("[OpenzwaveAdapter] Writing the network config.");
                         controller.write_config();
                     }
                     ZWaveNotification::Generic(_string)             => {}
@@ -531,10 +536,10 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
     }
 
     fn register_watch(&self, mut values: Vec<(TaxId<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) -> Vec<(TaxId<Getter>, Result<Box<AdapterWatchGuard>, TaxError>)> {
-        debug!("Openzwave::Adapter::register_watch Should register some watchers");
+        debug!("[OpenzwaveAdapter::register_watch] Should register some watchers");
         values.drain(..).map(|(id, range, sender)| {
             let sender = Arc::new(Mutex::new(sender)); // Mutex is necessary because cb is not Sync.
-            debug!("Openzwave::Adapter::register_watch Should register a watcher for {:?} {:?}", id, range);
+            debug!("[OpenzwaveAdapter::register_watch] Should register a watcher for {:?} {:?}", id, range);
             let watch_guard = {
                 let mut watchers = self.watchers.lock().unwrap();
                 watchers.push(id.clone(), range.clone(), sender.clone())
@@ -548,7 +553,7 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
                     if let Some(value) = ozw_vid_as_tax_value(&value) {
                         self.value_cache.lock().unwrap().insert(id.clone(), value.clone());
                         if range.should_send(&value, SendDirection::Enter) {
-                            debug!("Openzwave::Adapter::register_watch Sending event Enter {:?} {:?}", id, value);
+                            debug!("[OpenzwaveAdapter::register_watch] Sending event Enter {:?} {:?}", id, value);
                             let sender = sender.lock().unwrap();
                             sender.send(
                                 WatchEvent::Enter { id: id.clone(), value: value }
@@ -563,7 +568,7 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
     }
 
     fn stop(&self) {
-        info!("Openzwave::Adapter::stop Stopping the Openzwave adapter: writing the network config.");
+        info!("[OpenzwaveAdapter::stop] Stopping the Openzwave adapter: writing the network config.");
         self.ozw.write_configs();
     }
 }
