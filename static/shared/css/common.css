@@ -44,8 +44,15 @@ button {
 .container {
   position: relative;
   width: 70%;
-  padding: 20% 0 0;
   margin: auto;
+}
+
+.signin-container {
+  padding: 30% 0 0
+}
+
+.signup-container {
+  padding: 20% 0 0;
 }
 
 .inner-container {
@@ -57,4 +64,25 @@ button {
   padding: 45px;
   text-align: center;
   box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
+}
+
+@media all and (max-width: 321px) {
+
+  body {
+    font: normal 1.8rem/2.4rem "Fira Sans", Arial;
+    font-weight: 300;
+  }
+
+  .inner-container {
+    padding: 20px;
+  }
+
+  .signup-container {
+    padding: 2% 0 0;
+  }
+
+  input {
+    margin-top: 2rem;
+  }
+
 }
