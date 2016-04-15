@@ -293,12 +293,12 @@ fn ensure_directory<T: AsRef<Path> + ?Sized>(directory: &T) -> Result<(), Error>
 }
 
 impl OpenzwaveAdapter {
-    pub fn init<T: AdapterManagerHandle + Send + Sync + 'static> (box_manager: &Arc<T>, user_path: &str) -> Result<(), Error> {
+    pub fn init<T: AdapterManagerHandle + Send + Sync + 'static> (box_manager: &Arc<T>, user_path: &str, device: Option<String>) -> Result<(), Error> {
 
         try!(ensure_directory(user_path));
 
         let options = InitOptions {
-            device: None, // TODO we should expose this as a Value
+            device: device,
             config_path: ConfigPath::Default, // This is where the default system configuraton is, usually contains the device information.
             user_path: user_path, // This is where we can override the system configuration, and where the network layout and logs are stored.
         };
