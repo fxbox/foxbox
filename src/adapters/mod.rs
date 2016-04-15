@@ -69,7 +69,8 @@ impl<T: Controller> AdapterManager<T> {
         let scripts_path = &self.controller.get_profile().path_for("thinkerbell_scripts.sqlite");
         ThinkerbellAdapter::init(manager, scripts_path).unwrap(); // FIXME: no unwrap!
         let profile_openzwave = &self.controller.get_profile().path_for("openzwave");
-        OpenzwaveAdapter::init(manager, profile_openzwave).unwrap();
+        let openzwave_device = self.controller.clone().get_config().get("openzwave", "device");
+        OpenzwaveAdapter::init(manager, profile_openzwave, openzwave_device).unwrap();
 
         self.start_tts(manager);
     }
