@@ -81,7 +81,6 @@ mod managed_process;
 mod profile_service;
 mod registration;
 mod upnp;
-mod stable_uuid;
 mod static_router;
 mod taxonomy_router;
 mod tls;
