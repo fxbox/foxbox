@@ -52,8 +52,8 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + Debug + 'static {
         Result<(), Error>
         where S: ExtSender<ExecutionEvent> + Clone
     {
-        info!("Thinkerbell: Starting compilation of script '{}'", script.name);
-        debug!("Thinkerbell: Starting compilation of {:?}", script);
+        let name = script.name.clone();
+        info!("[Recipe '{}'] Starting compilation of script.", name);
         if self.command_sender.is_some() {
             let err = Err(Error::StartStopError(StartStopError::AlreadyRunning));
             let _ = on_event.send(ExecutionEvent::Starting {
@@ -69,12 +69,14 @@ impl<Env> Execution<Env> where Env: ExecutableDevEnv + Debug + 'static {
             thread::spawn(move || {
                 match ExecutionTask::<Env>::new(script, owner, tx, rx) {
                     Err(er) => {
+                        info!("[Recipe '{}'] Compilation failed {:?}", name, er);
                         let _ = on_event.send(ExecutionEvent::Starting {
                             result: Err(er.clone())
                         });
                         let _ = tx_init.send(Err(er));
                     },
                     Ok(mut task) => {
+                        info!("[Recipe '{}'] Compilation succeeded.", name);
                         let _ = on_event.send(ExecutionEvent::Starting {
                             result: Ok(())
                         });
@@ -238,8 +240,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
     /// Execute the monitoring task.
     /// This currently expects to be executed in its own thread.
     fn run<S>(&mut self, env: Env, on_event: S) where S: ExtSender<ExecutionEvent> + Clone {
-        info!("Thinkerbell: Starting execution of script '{}'", self.script.name);
-        debug!("Thinkerbell: Starting execution of {:?}", self.script);
+        info!("[Recipe '{}'] Starting execution of script", self.script.name);
 
         let mut witnesses = Vec::new();
         let api = env.api();
@@ -258,7 +259,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 // out that we end up with large rulesets).
 
                 let getters = api.get_getter_channels(condition.source.clone());
-                info!("[Thinkerbell {}] Initializing rule {} condition {}. Currently, it can listen to {} channels.", self.script.name,
+                info!("[Recipe '{}'] Initializing rule {} condition {}. Currently, it can listen to {} channels.", self.script.name,
                     rule_index, condition_index, getters.len());
 
                 let rule_index = rule_index.clone();
@@ -293,7 +294,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
         for msg in self.rx.iter() {
             match msg {
                 ExecutionOp::Stop(cb) => {
-                    info!("[Thinkerbell {}] Shutting down recipe.", self.script.name);
+                    info!("[Recipe '{}'] Shutting down recipe.", self.script.name);
 
                     // Leave the loop. Watching will stop once
                     // `witnesses` is dropped.
@@ -301,7 +302,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                     return;
                 },
                 ExecutionOp::UpdateCondition { id, is_met, rule_index, condition_index } => {
-                    debug!("[Thinkerbell {}] Updating the state of rule {}, condition {} => {}", self.script.name, rule_index, condition_index, is_met);
+                    debug!("[Recipe '{}'] Updating the state of rule {}, condition {} => {}", self.script.name, rule_index, condition_index, is_met);
                     self.update_conditions(&self.script.name, id, is_met, &mut per_rule,
                         rule_index, condition_index, &api, &on_event);
                 }
@@ -311,14 +312,14 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                             channel,
                             error
                         } => {
-                            info!("[Thinkerbell {}] Initialization error for {}: {}", self.script.name, channel, error);
+                            info!("[Recipe '{}'] Initialization error for {}: {}", self.script.name, channel, error);
                             let _ = on_event.send(ExecutionEvent::ChannelError {
                                 id: channel,
                                 error: error,
                             });
                         },
                         WatchEvent::GetterRemoved(id) => {
-                            debug!("[Thinkerbell {}] Removed getter {}, resetting condition to `false`", self.script.name, id);
+                            debug!("[Recipe '{}'] Removed getter {}, resetting condition to `false`", self.script.name, id);
                             // A getter was removed. Its condition is therefore not met anymore.
                             let msg = ExecutionOp::UpdateCondition {
                                 id: id.clone(),
@@ -330,11 +331,11 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                             let _ = self.tx.send(msg);
                         },
                         WatchEvent::GetterAdded(id) => {
-                            debug!("[Thinkerbell {}] Added getter {}.", self.script.name, id);
+                            debug!("[Recipe '{}'] Added getter {}.", self.script.name, id);
                             // An getter was added. Nothing to do.
                         }
                         WatchEvent::EnterRange { from: id, value } => {
-                            debug!("[Thinkerbell {}] Getter {} has entered the range for rule {}, condition {}: {:?}", self.script.name, id, rule_index, condition_index, value);
+                            debug!("[Recipe '{}'] Getter {} has entered the range for rule {}, condition {}: {:?}", self.script.name, id, rule_index, condition_index, value);
                             // We have entered a range. If there is a
                             // timer, start it, otherwise update conditions.
                             let msg = move || {
@@ -349,12 +350,12 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                                 per_condition[condition_index].
                                 duration {
                                 None => {
-                                    debug!("[Thinkerbell {}] No timer for rule {}, condition {}, we should trigger the execution immediately.", self.script.name, rule_index, condition_index);
+                                    debug!("[Recipe '{}'] No timer for rule {}, condition {}, we should trigger the execution immediately.", self.script.name, rule_index, condition_index);
                                     let _ = self.tx.send(msg());
                                     continue
                                 }
                                 Some(ref duration) => {
-                                    debug!("[Thinkerbell {}] There is a timer for rule {}, condition {}, we should trigger the execution in {:?}s.", self.script.name, rule_index, condition_index, duration);
+                                    debug!("[Recipe '{}'] There is a timer for rule {}, condition {}, we should trigger the execution in {:?}s.", self.script.name, rule_index, condition_index, duration);
                                     duration.clone()
                                 }
                             };
@@ -370,9 +371,9 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                             });
                         }
                         WatchEvent::ExitRange { from: id, value } => {
-                            debug!("[Thinkerbell {}] Getter {} has left the range for rule {}, condition {}: {:?}", self.script.name, id, rule_index, condition_index, value);
+                            debug!("[Recipe '{}'] Getter {} has left the range for rule {}, condition {}: {:?}", self.script.name, id, rule_index, condition_index, value);
                             if per_rule[rule_index].ongoing_timer.is_some() {
-                                debug!("[Thinkerbell {}] I need to cancel the timer for rule {}, condition {}", self.script.name, id, rule_index);
+                                debug!("[Recipe '{}'] I need to cancel the timer for rule {}, condition {}", self.script.name, id, rule_index);
                                 // Cancel the timer.
                                 per_rule[rule_index].ongoing_timer.take();
                                 let _ = on_event.send(ExecutionEvent::TimerCancel {
@@ -463,7 +464,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 let result = statement.eval(&api, &self.owner);
                 debug!("[Thinkerbell update_condition {}] Statement result {}/{}: {:?}.", name, statement_index, self.script.rules[rule_index].execute.len(), result);
                 if result.is_empty() {
-                    warn!("[Thinkerbell {}] In rule {}, attempting to trigger statement {}, couldn't find any receiver channel.", name,
+                    warn!("[Recipe '{}'] In rule {}, attempting to trigger statement {}, couldn't find any receiver channel.", name,
                             rule_index, condition_index);
                 }
 
