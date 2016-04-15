@@ -183,7 +183,7 @@ impl ThinkerbellAdapter {
                     // know or care about the contents of the rule, just the ID.
                     for ref rule in &rules {
                         if rule.script_id == script_id {
-                            info!("No need to add new ThinkerbellRule; ID '{}' already exists.", &script_id);
+                            info!("[thinkerbell@link.mozilla.org] No need to create a new service for this rule; ID '{}' already exists.", &script_id);
                             continue 'recv;
                         }
                     }
@@ -192,7 +192,7 @@ impl ThinkerbellAdapter {
                             rules.push(rule);
                         },
                         Err(e) => {
-                            error!("Unable to add Thinkerbell Rule Service: {:?}", e);
+                            error!("[thinkerbell@link.mozilla.org] Unable to add Thinkerbell Rule Service: {:?}", e);
                         }
                     };
                 },
@@ -205,7 +205,7 @@ impl ThinkerbellAdapter {
                             match self.remove_rule_service(&rule) {
                                 Ok(_) => {},
                                 Err(e) => {
-                                    error!("Unable to remove Thinkerbell Rule Service: {:?}", e)
+                                    error!("[thinkerbell@link.mozilla.org] Unable to remove Thinkerbell Rule Service: {:?}", e)
                                 }
                             }
                             break;
@@ -352,20 +352,20 @@ impl ThinkerbellAdapter {
             },
         }));
 
-        info!("Added Thinkerbell Rule for '{}'", &script_id.to_string());
+        info!("[thinkerbell@link.mozilla.org] Added Thinkerbell Rule for '{}'", &script_id.to_string());
 
         Ok(rule)
     }
 
     /// Remove an already-added Service (this does not stop the script).
     fn remove_rule_service(&self, rule: &ThinkerbellRule) -> Result<(), Error> {
-        info!("Removed Thinkerbell Rule for '{}'", &rule.script_id.to_string());
+        info!("[thinkerbell@link.mozilla.org] Removed Thinkerbell Rule for '{}'", &rule.script_id.to_string());
         self.adapter_manager.remove_service(&rule.service_id)
     }
 
     /// Everything is initialized here, but the real work happens in the main() loop.
     pub fn init(manager: &Arc<AdapterManager>, scripts_path: &str) -> Result<(), Error> {
-        let adapter_id = Id::new("thinkerbell-adapter");
+        let adapter_id = Id::new("thinkerbell@link.mozilla.org");
         let setter_add_rule_id = Id::new("thinkerbell-add-rule");
         let root_service_id = Id::new("thinkerbell-root-service");
 
@@ -410,7 +410,7 @@ impl ThinkerbellAdapter {
         }));
 
         thread::spawn(move || {
-            info!("Started Thinkerbell main thread.");
+            info!("[thinkerbell@link.mozilla.org] Started Thinkerbell main thread.");
             adapter.main(rx, script_manager)
         });
 
