@@ -240,8 +240,13 @@ impl ThinkerbellAdapter {
                         match value {
                             Value::ThinkerbellRule(ref rule_source) => {
                                 let script_id = Id::new(&rule_source.name);
-                                let _ = tx.send(script_manager.put(&script_id, &rule_source.source, &user).map_err(sm_error));
-                                let _ = self.tx.lock().unwrap().send(ThinkAction::AddRuleService(script_id.clone()));
+                                match script_manager.put(&script_id, &rule_source.source, &user) {
+                                    Err(err) => {let _ = tx.send(Err(sm_error(err))) ;}
+                                    Ok(ok) => {
+                                        let _ = tx.send(Ok(ok));
+                                        let _ = self.tx.lock().unwrap().send(ThinkAction::AddRuleService(script_id.clone()));
+                                    }
+                                }
                             },
                             _ => {
                                 let _ = tx.send(Err(Error::TypeError(TypeError {
