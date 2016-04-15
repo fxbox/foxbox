@@ -30,8 +30,10 @@ enum Movement { Enter, Exit }
 pub struct Clock {
     /// Timer used to dispatch `register_watch` requests.
     timer: Mutex<timer::Timer>,
+
     getter_timestamp_id: Id<Getter>,
     getter_time_of_day_id: Id<Getter>,
+    getter_interval_id: Id<Getter>,
 }
 
 /// A guard used to cancel watching for values.
@@ -51,6 +53,9 @@ impl Clock {
     }
     pub fn getter_time_of_day_id() -> Id<Getter> {
         Id::new("getter:timeofday.clock@link.mozilla.org")
+    }
+    pub fn getter_interval_id() -> Id<Getter> {
+        Id::new("getter:interval.clock@link.mozilla.org")
     }
 }
 impl Adapter for Clock {
@@ -128,8 +133,42 @@ impl Clock {
         match () {
             _ if *id == self.getter_time_of_day_id => self.aux_register_watch_timeofday(id, range, tx),
             _ if *id == self.getter_timestamp_id => self.aux_register_watch_timestamp(id, range, tx),
+            _ if *id == self.getter_interval_id => self.aux_register_watch_interval(id, range, tx),
             _ => Err(Error::GetterDoesNotSupportWatching(id.clone()))
         }
+    }
+
+    fn aux_register_watch_interval(&self, id: &Id<Getter>, range: Range, tx: Box<ExtSender<Op>>)
+        -> Result<Box<AdapterWatchGuard>, Error>
+    {
+        use foxbox_taxonomy::values::Range::*;
+
+        // Sanity checks
+        let typ = try!(range.get_type().map_err(Error::TypeError));
+        try!(Type::Duration.ensure_eq(&typ).map_err(Error::TypeError));
+
+        // Now determine when to call the trigger.
+        let duration = match range {
+            Eq (ref val) | Geq (ref val) => {
+                // Equivalent to BetweenEq { min: val, max: 0am }
+                try!(val.as_duration().map_err(Error::TypeError))
+                    .clone().into()
+            }
+            _ => return Err(Error::RangeError(range))
+        };
+
+        debug!(target: "clock@link.mozilla.org", "[clock@link.mozilla.org] Scheduling a repeating watch with a duration of {}", duration);
+
+        let id = id.clone();
+        let guard = self.timer.lock().unwrap().schedule_repeating(duration, move || {
+            // Send Enter followed immediately by Exit, to make sure that Thinkerbell
+            // rules reset themselves.
+            let _ = tx.send(Op::Enter(id.clone(),
+                Value::Duration(ValDuration::from(duration))));
+            let _ = tx.send(Op::Exit(id.clone(),
+                Value::Duration(ValDuration::from(duration))));
+        });
+        Ok(Box::new(Guard(vec![guard])))
     }
 
     fn aux_register_watch_timeofday(&self, id: &Id<Getter>, range: Range, tx: Box<ExtSender<Op>>)
@@ -292,11 +331,13 @@ impl Clock {
     pub fn init(adapt: &Arc<AdapterManager>) -> Result<(), Error> {
         let getter_timestamp_id = Clock::getter_timestamp_id();
         let getter_time_of_day_id = Clock::getter_time_of_day_id();
+        let getter_interval_id = Clock::getter_interval_id();
         let service_clock_id = Clock::service_clock_id();
         let clock = Arc::new(Clock {
             timer: Mutex::new(timer::Timer::new()),
             getter_timestamp_id: getter_timestamp_id.clone(),
             getter_time_of_day_id: getter_time_of_day_id.clone(),
+            getter_interval_id: getter_interval_id.clone(),
         });
         try!(adapt.add_adapter(clock));
         let mut service = Service::empty(Clock::service_clock_id(), Clock::id());
@@ -305,7 +346,7 @@ impl Clock {
         try!(adapt.add_getter(Channel {
                 tags: HashSet::new(),
                 adapter: Clock::id(),
-                id: getter_time_of_day_id.clone(),
+                id: getter_time_of_day_id,
                 last_seen: None,
                 service: service_clock_id.clone(),
                 mechanism: Getter {
@@ -316,11 +357,22 @@ impl Clock {
         try!(adapt.add_getter(Channel {
                 tags: HashSet::new(),
                 adapter: Clock::id(),
-                id: getter_timestamp_id.clone(),
+                id: getter_timestamp_id,
                 last_seen: None,
                 service: service_clock_id.clone(),
                 mechanism: Getter {
                     kind: ChannelKind::CurrentTime,
+                    updated: None
+                }
+        }));
+        try!(adapt.add_getter(Channel {
+                tags: HashSet::new(),
+                adapter: Clock::id(),
+                id: getter_interval_id,
+                last_seen: None,
+                service: service_clock_id.clone(),
+                mechanism: Getter {
+                    kind: ChannelKind::CountEveryInterval,
                     updated: None
                 }
         }));
