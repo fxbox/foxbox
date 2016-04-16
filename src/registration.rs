@@ -86,7 +86,7 @@ impl Registrar {
         }) {
             Ok(body) => body,
             Err(_) => {
-                error!("nUPNP server: Serialization error. Will not send registration request.");
+                error!("registration server: Serialization error. Will not send registration request.");
                 return;
             }
         };
@@ -103,13 +103,13 @@ impl Registrar {
             if response.status == StatusCode::Ok {
                 let mut body = String::new();
                 if let Ok(_) = response.read_to_string(&mut body) {
-                    info!("nUPNP server responded with: {}", body);
+                    info!("registration server responded with: {}", body);
                 } else {
-                    warn!("nUPNP server: Unable to read answer from {}", self.registration_endpoint);
+                    warn!("registration server: Unable to read answer from {}", self.registration_endpoint);
                 }
             }
         } else {
-            warn!("nUPNP server: Unable to send request to {}", self.registration_endpoint);
+            warn!("registration server: Unable to send request to {}", self.registration_endpoint);
         }
     }
 
@@ -179,7 +179,7 @@ impl Registrar {
                                 tunnel: &Option<Tunnel>,
                                 box_port: u16,
                                 controller: &T) {
-        info!("nUPNP server: Starting registration with {}",
+        info!("registration server: Starting registration with {}",
                 self.registration_endpoint);
 
         let ip_addr = self.get_ip_addr(&iface);

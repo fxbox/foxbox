@@ -266,8 +266,8 @@ fn main() {
     }
 
     // The registrar manages registration with the registration server, and DNS
-    // server.  The registration server is used to orchestrate box discovery by
-    // clients via an "nUPNP" method where the box registers itself with an
+    // server. The registration server is used to orchestrate box discovery by
+    // clients via an "nUPNP like" method where the box registers itself with an
     // externally available cloud service that a client can use to discover any
     // boxes local to itself. See: https://github.com/fxbox/registration_server
     //
