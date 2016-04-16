@@ -19,7 +19,6 @@ module.exports = {
     'r' : 'http://knilxof.org:4242',
     't' : 'knilxof.org:443',
     's' : 'foxbox',
-    'externalURL' : 'integrationtestonly.knilxof.org'
   },
 
   foxbox : { 
