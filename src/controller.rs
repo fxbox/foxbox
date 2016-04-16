@@ -82,7 +82,8 @@ impl Controller for FoxBox {
         }
 
         // Create the taxonomy based AdapterManager
-        let taxo_manager = Arc::new(TaxoManager::new());
+        let tags_db_path = PathBuf::from(self.profile_service.path_for("taxonomy_tags.sqlite"));
+        let taxo_manager = Arc::new(TaxoManager::new(Some(tags_db_path)));
 
         let mut adapter_manager = AdapterManager::new(self.clone());
         adapter_manager.start(&taxo_manager);
