@@ -301,7 +301,7 @@ describe! taxonomy_router {
         use stubs::controller::ControllerStub;
         use std::sync::Arc;
 
-        let taxo_manager = Arc::new(AdapterManager::new());
+        let taxo_manager = Arc::new(AdapterManager::new(None));
         clock::Clock::init(&taxo_manager).unwrap();
 
         let mut mount = Mount::new();
@@ -349,7 +349,7 @@ describe! binary_getter {
         use stubs::controller::ControllerStub;
         use transformable_channels::mpsc::*;
 
-        let taxo_manager = Arc::new(AdapterManager::new());
+        let taxo_manager = Arc::new(AdapterManager::new(None));
 
         // Create a basic adpater and service with a getter returning binary data.
 
