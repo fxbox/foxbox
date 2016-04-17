@@ -152,7 +152,7 @@ describe! http_server {
         use std::time::Duration;
         use stubs::controller::ControllerStub;
 
-        let taxo_manager = Arc::new(AdapterManager::new());
+        let taxo_manager = Arc::new(AdapterManager::new(None));
 
         let mut http_server = HttpServer::new(ControllerStub::new());
         http_server.start(&taxo_manager);
