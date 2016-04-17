@@ -441,7 +441,7 @@ impl FakeEnv {
 
         FakeEnv {
             on_event: on_event,
-            manager: Arc::new(AdapterManager::new()),
+            manager: Arc::new(AdapterManager::new(None)),
             back_end: Box::new(tx),
         }
     }
