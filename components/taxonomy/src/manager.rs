@@ -14,6 +14,7 @@ use util::is_sync;
 use values::{ Range, TypeError, Value };
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{ Arc, Mutex, Weak };
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::thread;
@@ -40,11 +41,11 @@ pub struct AdapterManager {
 impl AdapterManager {
     /// Create an empty `AdapterManager`.
     /// This function does not attempt to load any state from the disk.
-    pub fn new() -> Self {
+    pub fn new(db_path: Option<PathBuf>) -> Self {
         // The code should build only if AdapterManager implements Sync.
         is_sync::<AdapterManager>();
 
-        let state = Arc::new(MainLock::new(|liveness| State::new(liveness)));
+        let state = Arc::new(MainLock::new(|liveness| State::new(liveness, db_path)));
         let tx_watch = Arc::new(Mutex::new(Self::handle_watches(Arc::downgrade(&state))));
         AdapterManager {
             back_end: state,
@@ -55,7 +56,7 @@ impl AdapterManager {
 
 impl Default for AdapterManager {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 

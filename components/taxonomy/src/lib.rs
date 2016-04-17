@@ -9,10 +9,10 @@
 extern crate lazy_static;
 
 extern crate chrono;
-
+extern crate libc;
 #[macro_use]
 extern crate log;
-
+extern crate rusqlite;
 extern crate serde;
 extern crate serde_json;
 extern crate string_cache;
@@ -53,6 +53,9 @@ pub mod adapter_utils;
 /// Utility module for inserting values in maps and keeping the insertion reversible in case of
 /// any error.
 pub mod transact;
+
+/// Implementation of the database storing tags.
+pub mod tag_storage;
 
 /// Implementation of a fake adapter, controlled entirely programmatically. Designed to be used
 /// as a component of tests.

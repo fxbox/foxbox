@@ -1,4 +1,5 @@
 extern crate foxbox_taxonomy;
+extern crate libc;
 extern crate transformable_channels;
 #[macro_use]
 extern crate assert_matches;
@@ -13,6 +14,7 @@ use foxbox_taxonomy::values::*;
 use transformable_channels::mpsc::*;
 
 use std::collections::{ HashMap, HashSet };
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 
@@ -22,12 +24,218 @@ fn target_map<K, T>(mut source: Vec<(Vec<K>, T)>) -> TargetMap<K, T> where K: Cl
     source.drain(..).map(|(v, t)| Targetted::new(v, t)).collect()
 }
 
+pub fn get_db_environment() -> PathBuf {
+    use libc::getpid;
+    use std::thread;
+    let tid = format!("{:?}", thread::current()).replace("(", "+").replace(")", "+");
+    let s = format!("./tagstore_db_test-{}-{}.sqlite", unsafe { getpid() }, tid.replace("/", "42"));
+    PathBuf::from(s)
+}
+
+pub fn remove_test_db() {
+    use std::fs;
+
+    let dbfile = get_db_environment();
+    match fs::remove_file(dbfile.clone()) {
+        Err(e) => panic!("Error {} cleaning up {}", e, dbfile.display()),
+        _ => assert!(true)
+    }
+}
+
+#[test]
+#[allow(unused_variables)]
+fn test_tags_in_db() {
+    // Simple RAII style struct to delete the test db.
+    struct AutoDeleteDb { };
+    impl Drop for AutoDeleteDb {
+        fn drop(&mut self) {
+            remove_test_db();
+        }
+    }
+    let auto_db = AutoDeleteDb { };
+
+    let id_1 = Id::<AdapterId>::new("adapter id 1");
+    let service_id_1 = Id::<ServiceId>::new("service id 1");
+    let getter_id_1 = Id::<Getter>::new("getter id 1");
+    let setter_id_1 = Id::<Setter>::new("setter id 1");
+
+    let tag_id_1 = Id::<TagId>::new("tag id 1");
+    let tag_id_2 = Id::<TagId>::new("tag id 2");
+    let tag_id_3 = Id::<TagId>::new("tag id 3");
+    let tag_id_4 = Id::<TagId>::new("tag id 4");
+
+    let service_1 = Service {
+        id: service_id_1.clone(),
+        adapter: id_1.clone(),
+        tags: HashSet::new(),
+        properties: HashMap::new(),
+        getters: HashMap::new(),
+        setters: HashMap::new(),
+    };
+
+    let getter_1 = Channel {
+        id: getter_id_1.clone(),
+        service: service_id_1.clone(),
+        adapter: id_1.clone(),
+        last_seen: None,
+        tags: HashSet::new(),
+        mechanism: Getter {
+            updated: None,
+            kind: ChannelKind::LightOn,
+        },
+    };
+
+    let setter_1 = Channel {
+        id: setter_id_1.clone(),
+        service: service_id_1.clone(),
+        adapter: id_1.clone(),
+        last_seen: None,
+        tags: HashSet::new(),
+        mechanism: Setter {
+            updated: None,
+            kind: ChannelKind::LightOn,
+        },
+    };
+
+    // Fist "session", starting from an empty state.
+    {
+        let manager = AdapterManager::new(Some(get_db_environment()));
+        manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
+        manager.add_service(service_1.clone()).unwrap();
+        manager.add_getter(getter_1.clone()).unwrap();
+        manager.add_setter(setter_1.clone()).unwrap();
+
+        manager.add_service_tags(vec![ServiceSelector::new().with_id(service_id_1.clone())],
+                                 vec![tag_id_1.clone(), tag_id_2.clone()]);
+
+        manager.add_getter_tags(vec![GetterSelector::new().with_id(getter_id_1.clone())],
+                                vec![tag_id_2.clone(), tag_id_3.clone()]);
+
+        manager.add_setter_tags(vec![SetterSelector::new().with_id(setter_id_1.clone())],
+                                vec![tag_id_1.clone(), tag_id_4.clone(), tag_id_3.clone()]);
+
+        manager.remove_getter(&getter_id_1).unwrap();
+        manager.remove_setter(&setter_id_1).unwrap();
+        manager.remove_service(&service_id_1).unwrap();
+        assert_eq!(manager.get_services(vec![]).len(), 0);
+
+        // Re-add the same service, getter and setter to check if we persisted the tags.
+        manager.add_service(service_1.clone()).unwrap();
+        manager.add_getter(getter_1.clone()).unwrap();
+        manager.add_setter(setter_1.clone()).unwrap();
+
+        let services = manager.get_services(vec![]);
+        assert_eq!(services.len(), 1);
+
+        let ref service = services[0];
+        assert_eq!(service.tags.len(), 2);
+        assert_eq!(service.tags.contains(&tag_id_1), true);
+        assert_eq!(service.tags.contains(&tag_id_2), true);
+
+        let getters = manager.get_getter_channels(vec![GetterSelector::new()]);
+        assert_eq!(getters.len(), 1);
+        let ref getter = getters[0];
+        assert_eq!(getter.tags.len(), 2);
+        assert_eq!(getter.tags.contains(&tag_id_2), true);
+        assert_eq!(getter.tags.contains(&tag_id_3), true);
+
+        let setters = manager.get_setter_channels(vec![SetterSelector::new()]);
+        assert_eq!(setters.len(), 1);
+        let ref setter = setters[0];
+        assert_eq!(setter.tags.len(), 3);
+        assert_eq!(setter.tags.contains(&tag_id_1), true);
+        assert_eq!(setter.tags.contains(&tag_id_3), true);
+        assert_eq!(setter.tags.contains(&tag_id_4), true);
+
+        manager.remove_adapter(&id_1).unwrap();
+        manager.stop();
+    }
+
+    // Second "session", starting with content added in session 1.
+    {
+        let manager = AdapterManager::new(Some(get_db_environment()));
+        manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
+        manager.add_service(service_1.clone()).unwrap();
+        manager.add_getter(getter_1.clone()).unwrap();
+        manager.add_setter(setter_1.clone()).unwrap();
+
+        let services = manager.get_services(vec![]);
+        assert_eq!(services.len(), 1);
+
+        let ref service = services[0];
+        assert_eq!(service.tags.len(), 2);
+        assert_eq!(service.tags.contains(&tag_id_1), true);
+        assert_eq!(service.tags.contains(&tag_id_2), true);
+
+        let getters = manager.get_getter_channels(vec![GetterSelector::new()]);
+        assert_eq!(getters.len(), 1);
+        let ref getter = getters[0];
+        assert_eq!(getter.tags.len(), 2);
+        assert_eq!(getter.tags.contains(&tag_id_2), true);
+        assert_eq!(getter.tags.contains(&tag_id_3), true);
+
+        let setters = manager.get_setter_channels(vec![SetterSelector::new()]);
+        assert_eq!(setters.len(), 1);
+        let ref setter = setters[0];
+        assert_eq!(setter.tags.len(), 3);
+        assert_eq!(setter.tags.contains(&tag_id_1), true);
+        assert_eq!(setter.tags.contains(&tag_id_3), true);
+        assert_eq!(setter.tags.contains(&tag_id_4), true);
+
+        // Remove all the tags, to check in session 3 if we start empty again.
+        manager.remove_service_tags(vec![ServiceSelector::new().with_id(service_id_1.clone())],
+                                    vec![tag_id_1.clone(), tag_id_2.clone()]);
+        let services = manager.get_services(vec![]);
+        assert_eq!(services.len(), 1);
+        assert_eq!(services[0].tags.len(), 0);
+
+        manager.remove_getter_tags(vec![GetterSelector::new().with_id(getter_id_1.clone())],
+                                vec![tag_id_2.clone(), tag_id_3.clone()]);
+        let getters = manager.get_getter_channels(vec![GetterSelector::new()]);
+        assert_eq!(getters.len(), 1);
+        assert_eq!(getters[0].tags.len(), 0);
+
+        manager.remove_setter_tags(vec![SetterSelector::new().with_id(setter_id_1.clone())],
+                                vec![tag_id_1.clone(), tag_id_4.clone(), tag_id_3.clone()]);
+        let setters = manager.get_setter_channels(vec![SetterSelector::new()]);
+        assert_eq!(setters.len(), 1);
+        assert_eq!(setters[0].tags.len(), 0);
+
+        manager.remove_adapter(&id_1).unwrap();
+        manager.stop();
+    }
+
+    // Third "session", checking that we have no tags anymore.
+    {
+        let manager = AdapterManager::new(Some(get_db_environment()));
+        manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
+        manager.add_service(service_1.clone()).unwrap();
+        manager.add_getter(getter_1.clone()).unwrap();
+        manager.add_setter(setter_1.clone()).unwrap();
+
+        let services = manager.get_services(vec![]);
+        assert_eq!(services.len(), 1);
+        assert_eq!(services[0].tags.len(), 0);
+
+        let getters = manager.get_getter_channels(vec![GetterSelector::new()]);
+        assert_eq!(getters.len(), 1);
+        assert_eq!(getters[0].tags.len(), 0);
+
+        let setters = manager.get_setter_channels(vec![SetterSelector::new()]);
+        assert_eq!(setters.len(), 1);
+        assert_eq!(setters[0].tags.len(), 0);
+
+        manager.remove_adapter(&id_1).unwrap();
+        manager.stop();
+    }
+}
+
 #[test]
 fn test_add_remove_adapter() {
     for clear in vec![false, true] {
 		println!("# Starting with test with clear {}.\n", clear);
 
-        let manager = AdapterManager::new();
+        let manager = AdapterManager::new(None);
         let id_1 = Id::new("id 1");
         let id_2 = Id::new("id 2");
 
@@ -76,7 +284,7 @@ fn test_add_remove_services() {
     for clear in vec![false, true] {
 		println!("# Starting with test with clear {}.", clear);
 
-        let manager = AdapterManager::new();
+        let manager = AdapterManager::new(None);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
         let id_3 = Id::<AdapterId>::new("adapter id 3");
@@ -393,7 +601,7 @@ fn test_add_remove_tags() {
 		println!("# Starting with test with clear {}.
 ", clear);
 
-        let manager = AdapterManager::new();
+        let manager = AdapterManager::new(None);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
 
@@ -755,7 +963,7 @@ fn test_fetch() {
 		println!("# Starting with test with clear {}.
 ", clear);
 
-        let manager = AdapterManager::new();
+        let manager = AdapterManager::new(None);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
 
@@ -953,7 +1161,7 @@ fn test_send() {
 		println!("# Starting with test with clear {}.
 ", clear);
 
-        let manager = AdapterManager::new();
+        let manager = AdapterManager::new(None);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
 
@@ -1179,7 +1387,7 @@ fn test_watch() {
 		println!("# Starting with test with clear {}.
 ", clear);
 
-        let manager = AdapterManager::new();
+        let manager = AdapterManager::new(None);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
 
