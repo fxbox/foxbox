@@ -190,7 +190,7 @@ $ npm install
 Then you can run the Selenium tests via:
 
 ```bash
-$ cargo run --bon foxbox -- --disable-tls
+$ cargo run --bin foxbox -- --disable-tls
 $ npm run test-selenium
 ```
 
