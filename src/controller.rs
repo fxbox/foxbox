@@ -100,6 +100,7 @@ impl Controller for FoxBox {
 
         debug!("Stopping controller");
         adapter_manager.stop();
+        taxo_manager.stop();
     }
 
     fn adapter_started(&self, adapter: String) {
