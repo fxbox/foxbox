@@ -33,8 +33,22 @@ var helper = (function() {
     foxboxInstance.kill('SIGINT');
   }
 
+  function getLatestIPFromPingSrv(body) {
+    var pick;
+    var timestamp = 0;
 
-  return {removeUsersDB, fullOptionStart, killFoxBox};
+    for (var match in body) {
+      // may be multiple entries.  in that case, pick latest
+      if (parseInt(body[match].timestamp) > 
+        parseInt(timestamp)) {
+        timestamp = body[match].timestamp;
+        pick = match;
+      }
+    }
+    return pick;
+  }
+
+  return {removeUsersDB, fullOptionStart, killFoxBox, getLatestIPFromPingSrv};
 })();
 
 module.exports = helper;
