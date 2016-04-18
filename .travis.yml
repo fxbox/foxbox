@@ -15,12 +15,6 @@ matrix:
   allow_failures:
     - rust: nightly
 
-cache:
-    directories:
-        - $HOME/.cargo
-        - node_modules
-        - $TRAVIS_BUILD_DIR/target
-
 addons:
   firefox: latest
   apt:
