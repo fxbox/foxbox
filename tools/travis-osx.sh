@@ -11,6 +11,8 @@ install_dependencies() {
 }
 
 build() {
+    rm -rf target
+    cargo clean
     cargo build
 }
 
