@@ -672,7 +672,7 @@ dependencies = [
 [[package]]
 name = "openzwave-adapter"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-adapter#571de808e0e072760ba927a8d65be0691f045737"
+source = "git+https://github.com/fxbox/openzwave-adapter#2e5220e15f9c140e6e19fc8ca0d8de9f5a7fbee4"
 dependencies = [
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
