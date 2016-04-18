@@ -1,6 +1,5 @@
 'use strict';
 const Config = require('config-js');
-const chakram = require('chakram'), expect = chakram.expect;
 
 var config = new Config('./test/integration/lib/config/foxbox.js');
 var philipshue_server = require('../lib/philipsHue_server.js');
@@ -10,17 +9,6 @@ var foxboxManager = require('../lib/foxboxHelper.js');
 var config = new Config('./test/integration/lib/config/foxbox.js');
 
 var testPrepper = (function() {
-
-  function expectLightIsOn(response) {
-   expect(response).to.have.status(200);
-   expect(response.body.result).equals('success');
-   expect(philipshue_server.lastCmd()).to.contain('"on":true');
-  }
-
-  function turnOnLight(lightinfo, serviceURL, index) {
-    return chakram.put(serviceURL + lightinfo[index].id + 
-      '/state', {'on': true});
-  }
 
   function beforeTest(done) { 
 
@@ -50,8 +38,7 @@ var testPrepper = (function() {
     });
   }
 
-  return {expectLightIsOn, turnOnLight, makeSuite, 
-    philipshue_server,ipcamera_server, foxboxManager};
+  return {makeSuite, philipshue_server,ipcamera_server, foxboxManager};
 })();
 
 module.exports = testPrepper;

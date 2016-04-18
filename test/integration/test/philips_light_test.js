@@ -7,15 +7,16 @@ var config = new Config('./test/integration/lib/config/foxbox.js');
 var Prepper = require('../lib/testPrepper.js');
 
 Prepper.makeSuite('Control lights locally',function(){
-  var lightinfo;
   var header = new Config('./test/integration/lib/config/header.js');
   var credential = config.get('credential');
-
   var setupURL = config.get('foxbox.url') + '/users/setup';
   var loginURL = config.get('foxbox.url') + '/users/login';
-  var serviceURL = config.get('foxbox.url') + '/services/';
-  var serviceListURL = serviceURL + 'list';
-
+  var channelURL = config.get('foxbox.url') + '/api/v1/channels';
+  var getURL = channelURL + '/get';
+  var setURL = channelURL + '/set';
+  var getterPayload = [{'kind': 'LightOn'}];
+  var lights;
+  
   it('create a new credential',function(){
 
     return chakram.post(setupURL,credential)
@@ -39,6 +40,7 @@ Prepper.makeSuite('Control lights locally',function(){
 
   describe ('once logged in', function () {
     before(function() {
+      
       return chakram.post(loginURL,null,{'headers' : header})
       .then(function(resp){
        header.Authorization = 'Bearer ' + resp.body.session_token;
@@ -47,48 +49,93 @@ Prepper.makeSuite('Control lights locally',function(){
     });
 
     it('check 3 bulbs are registered',function(){
-
-      return chakram.get(serviceListURL)
+      
+      // collect all getters for the lightbulbs
+      return chakram.put(getURL,getterPayload)
       .then(function(listResponse) {
-        expect(listResponse.body.length).equals(3);
+        lights = Object.keys(listResponse.body);
+        expect(lights.length).equals(3);
         expect(listResponse).to.have.status(200);
       });
     });
 
-    describe('once the lights are known', function(){
+    describe('manipulate lights', function () {
       before(function() {
         // turn off all lights in the simulator
         Prepper.philipshue_server.turnOffLight(1);
         Prepper.philipshue_server.turnOffLight(2);
         Prepper.philipshue_server.turnOffLight(3);
 
-        return chakram.get(serviceListURL)
+        return chakram.put(getURL,getterPayload)
         .then(function(listResponse) {
-          lightinfo = listResponse.body;
+          lights = Object.keys(listResponse.body);
+          expect(lights.length).equals(3);
+          expect(listResponse).to.have.status(200);
         });
       });
 
       // Currently, there is no mapping between the foxbox
-      // issues id and the philips hue id until the tag feature is implemented
-      it('Turn on all lights', function(){
-        return Prepper.turnOnLight(lightinfo, serviceURL, 0)
+      // id and the philips hue id until the tag feature is implemented
+      it('Turn on all lights one by one', function(){
+        var lightID = lights[0].replace('getter','setter');
+        var payload = {'select': {'id': lightID}, 'value': { 'OnOff': 'On' } };
+        
+        return chakram.put(setURL,payload)
         .then(function(cmdResponse) {
-          Prepper.expectLightIsOn(cmdResponse);
-          return Prepper.turnOnLight(lightinfo, serviceURL, 1);
+         expect(cmdResponse).to.have.status(200);
+         expect(cmdResponse.body[lightID]).equals(null);
+         lightID = lights[1].replace('getter','setter');
+         payload = {'select': {'id': lightID}, 'value': { 'OnOff': 'On' } };
+         return chakram.put(setURL,payload);
+       })
+        .then(function(cmdResponse) {
+          expect(cmdResponse).to.have.status(200);
+          expect(cmdResponse.body[lightID]).equals(null);
+          lightID = lights[2].replace('getter','setter');
+          payload = {'select': {'id': lightID}, 'value': { 'OnOff': 'On' } };
+          return chakram.put(setURL,payload);
         })
         .then(function(cmdResponse) {
-          Prepper.expectLightIsOn(cmdResponse);
-          return Prepper.turnOnLight(lightinfo, serviceURL, 2);
+          expect(cmdResponse).to.have.status(200);
+          expect(cmdResponse.body[lightID]).equals(null);
+          expect(Prepper.philipshue_server.areAllLightsOn()).to.be.true;
+          
+          //check all lights are reported to be on
+          return chakram.put(getURL,getterPayload);
         })
-        .then(function(cmdResponse) {
-         Prepper.expectLightIsOn(cmdResponse);
+        .then(function(listResponse) {
+          expect(listResponse).to.have.status(200);
+          lights = Object.keys(listResponse.body);
+          expect(lights.length).equals(3);
 
-         // check no lights are turned off now
-         expect(Prepper.philipshue_server.lightStatus(1) &&
-          Prepper.philipshue_server.lightStatus(2) &&
-          Prepper.philipshue_server.lightStatus(3)).equals(true);
-       });
+          lights.forEach(light => {
+            expect(listResponse.body[light].OnOff).equals('On'); 
+          });
+        }); 
       });
-});
-});
+
+      it('Turn off all lights at once', function() {
+        
+        var payload = {'select': {'kind': 'LightOn'}, 'value': {'OnOff':'Off'}};
+
+        return chakram.put(setURL,payload)
+        .then(function(cmdResponse) {
+          expect(cmdResponse).to.have.status(200);
+          expect(Prepper.philipshue_server.areAllLightsOn()).to.be.false;
+          
+          //check all lights are reported to be off
+          return chakram.put(getURL,getterPayload);
+        })
+        .then(function(listResponse) {
+          lights = Object.keys(listResponse.body);
+          expect(lights.length).equals(3);
+          expect(listResponse).to.have.status(200);
+
+          lights.forEach(light => {
+            expect(listResponse.body[light].OnOff).equals('Off'); 
+          });
+        }); 
+      });
+    });
+  });
 });

@@ -14,6 +14,10 @@ var philipsHue_server = (function() {
   var _server = express();
   var instance;
 
+  function areAllLightsOn() {
+    return [1, 2, 3].every(i => this.lightStatus(i));
+  }
+
   function _setLight(id,field,value) { 
     light_status[id].state[field] = value;
   }
@@ -123,7 +127,7 @@ var philipsHue_server = (function() {
   }
 
   return {setup, stop, lastCmd, lightResponse, turnOnLight, 
-    turnOffLight, lightStatus};
+    turnOffLight, lightStatus, areAllLightsOn};
 
   })();
 

@@ -105,10 +105,6 @@ Prepper.makeSuite('Control camera locally',function(){
           expect(cmdResponse).to.have.header('content-type', 'image/jpeg');
           expect(cmdResponse).to.have.header('content-length', '212502');
         });
-      }); 
-     
+      });    
   });
-
-
-
 });
