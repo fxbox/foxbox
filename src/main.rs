@@ -57,7 +57,6 @@ extern crate timer;
 extern crate transformable_channels;
 extern crate unicase;
 extern crate url;
-#[cfg(target_os = "linux")]
 extern crate users;
 extern crate uuid;
 extern crate ws;

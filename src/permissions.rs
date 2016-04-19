@@ -1,3 +1,5 @@
+extern crate users;
+
 use users::{ Groups, Users };
 use users::os::unix::GroupExt;
 
