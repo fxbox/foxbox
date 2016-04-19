@@ -21,7 +21,7 @@ lint() {
 }
 
 _set_up_unit_tests() {
-    sudo usermod -a -G netdev "$USER" # "netdev" group membership allows to set custom host name via avahi-daemon.
+    sudo usermod -a -G netdev,dialout "$USER"
 }
 
 _set_up_selenium_tests() {

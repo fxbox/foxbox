@@ -57,7 +57,6 @@ extern crate timer;
 extern crate transformable_channels;
 extern crate unicase;
 extern crate url;
-#[cfg(target_os = "linux")]
 extern crate users;
 extern crate uuid;
 extern crate ws;
@@ -89,6 +88,7 @@ mod tls;
 mod traits;
 mod tunnel_controller;
 mod ws_server;
+mod permissions;
 
 #[cfg(test)]
 mod stubs {
@@ -168,47 +168,18 @@ fn update_hostname(hostname: String) -> String {
 
 #[cfg(target_os = "linux")]
 fn check_permissions() {
-    use users::{ Groups, UsersCache };
-    use libc::{ gid_t, getgroups };
-    use std::env;
-
-    fn check_group_membership(cache: &UsersCache, groups: &[gid_t], group_name: &str) {
-        if let Some(group) = cache.get_group_by_name(group_name) {
-            if !groups.contains(&group.gid()) {
-                panic!("Not a member of the {} group.", group_name);
-            }
-        } else {
-            panic!("Group {} not defined in /etc/group file", group_name);
-        }
-    }
-
-    if let Ok(travis) = env::var("TRAVIS") {
-        if travis == "true" {
-            // We're running under Travis, so don't bother with the group membership
-            // tests.
-
-            // Adding a group to a user normally requires a logout/login since
-            // group membership is inherited from the parent process. So adding
-            // groups under travis is problematic.
-            info!("Skipping group membership tests since we're running on Travis");
-            return;
-        }
-    }
-
-    let max_groups:usize = 100;
-    let mut groups:Vec<gid_t> = vec![0;max_groups];
-    let num_groups = unsafe { getgroups(max_groups as i32, groups.as_mut_ptr()) };
-    groups.truncate(num_groups as usize);
+    use users::UsersCache;
+    use permissions::check_group_membership;
 
     let cache = UsersCache::new();
 
     // Members of the dialout group are allowed to open serial ports. This is
     // used for accessing the serial port dongles used with ZWave and ZigBee.
-    check_group_membership(&cache, &groups, "dialout");
+    check_group_membership(&cache, &["dialout", "uucp"]);
 
     // Member of the netdev group can perform certain priviledged network operations,
     // like setting our avahi hostname.
-    check_group_membership(&cache, &groups, "netdev");
+    check_group_membership(&cache, &["netdev", "network"]);
 }
 
 #[cfg(not(target_os = "linux"))]
