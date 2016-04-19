@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* global Console */
+/* global getElementName */
 /* global Session */
 /* global URLSearchParams */
 
@@ -9,7 +11,6 @@
 
 var SIGN_IN         = 2;
 var SIGNED_IN       = 3;
-
 
 var ELEMENTS = [{
   screen: SIGN_IN,
@@ -25,13 +26,6 @@ var ELEMENTS = [{
   event: 'click',
   listener: 'signout'
 }];
-
-function getElementName(str) {
-  str = str.toLowerCase().replace('#', '');
-  return str.replace(/-([a-z])/g, function(g) {
-    return g[1].toUpperCase();
-  });
-}
 
 var SessionUI = {
 
@@ -110,6 +104,13 @@ var SessionUI = {
     this.currentScreen = screen;
     this.screens.signin.hidden = (screen != SIGN_IN);
     this.screens.signedin.hidden = (screen != SIGNED_IN);
+
+    if (screen == SIGNED_IN) {
+      Console.setup();
+    } else {
+      Console.teardown();
+    }
+
     this.loadElements(screen);
   },
 

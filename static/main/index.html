@@ -11,7 +11,7 @@
   </head>
   <body>
     <div id="signedin" hidden>
-      <div class="container signin-container">
+      <div class="container">
         <div class="inner-container">
           <p>
             You are signed in as admin.
@@ -19,12 +19,35 @@
           <p>
             <button id="signout-button">Log out</button>
           </p>
+
+          <div id="console">
+            <h3>API Console</h3>
+            <div>
+              <label>Endpoint</label>
+              <input id="console-endpoint" type="text" placeholder="endpoint"></input>
+              <label>Method</label>
+              <select id="console-method">
+                <option>POST</option>
+                <option>GET</option>
+                <option>PUT</option>
+                <option>DELETE</option>
+              </select>
+              <label>Body</label>
+              <textarea id="console-body"></textarea>
+              <button id="console-send">Send</button>
+              <button id="console-clear">Clear</button>
+            </div>
+            <div id="console-response" hidden>
+              <label>Response</label>
+              <textarea id="console-response-content"></textarea>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <div id="signin" hidden>
-      <div class="container signin-container">
+      <div class="container">
         <div class="inner-container">
             <label for="signin-pwd">Please, enter your password</label>
             <input id="signin-pwd" type="password" placeholder="password"/>
@@ -33,7 +56,10 @@
       </div>
     </div>
   </body>
+  <script src="shared/bower_components/fetch/fetch.js"></script>
   <script src="shared/js/url_search_params.js"></script>
+  <script src="shared/js/utils.js"></script>
+  <script src="js/console.js"></script>
   <script src="js/session.js"></script>
   <script src="js/session_ui.js"></script>
 </html>
