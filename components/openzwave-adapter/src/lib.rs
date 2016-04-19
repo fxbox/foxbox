@@ -121,26 +121,26 @@ impl<Kind, Type> IdMap<Kind, Type> where Type: Eq + Clone, Kind: Clone {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum SendDirection {
+enum EventType {
     Enter,
     Exit,
 }
 
 trait RangeChecker {
-    fn should_send(&self, &Value, SendDirection) -> bool;
+    fn should_send(&self, &Value, EventType) -> bool;
 }
 
 impl RangeChecker for Option<Range> {
-    fn should_send(&self, value: &Value, direction: SendDirection) -> bool {
+    fn should_send(&self, value: &Value, event_type: EventType) -> bool {
         match *self {
-            None => direction == SendDirection::Enter, // no range means we send only Enter events
+            None => event_type == EventType::Enter, // no range means we send only Enter events
             Some(ref range) => range.contains(value)
         }
     }
 }
 
 impl RangeChecker for Range {
-    fn should_send(&self, value: &Value, _: SendDirection) -> bool {
+    fn should_send(&self, value: &Value, _: EventType) -> bool {
         self.contains(value)
     }
 }
@@ -455,10 +455,10 @@ impl OpenzwaveAdapter {
                         for &(ref range, ref sender) in &watchers {
                             debug!("[OpenzwaveAdapter::ValueChanged] Iterating over watcher {:?} {:?}", tax_id, range);
 
-                            let should_send_value = range.should_send(&tax_value, SendDirection::Enter);
+                            let should_send_value = range.should_send(&tax_value, EventType::Enter);
 
                             if let Some(ref previous_value) = previous_value {
-                                let should_send_previous = range.should_send(previous_value, SendDirection::Exit);
+                                let should_send_previous = range.should_send(previous_value, EventType::Exit);
                                 // If the new and the old values are both in the same range, we
                                 // need to send nothing.
                                 if should_send_value && should_send_previous { continue }
@@ -552,7 +552,7 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
                 if value.is_set() && value.get_type() == ValueType::ValueType_Bool {
                     if let Some(value) = ozw_vid_as_tax_value(&value) {
                         self.value_cache.lock().unwrap().insert(id.clone(), value.clone());
-                        if range.should_send(&value, SendDirection::Enter) {
+                        if range.should_send(&value, EventType::Enter) {
                             debug!("[OpenzwaveAdapter::register_watch] Sending event Enter {:?} {:?}", id, value);
                             let sender = sender.lock().unwrap();
                             sender.send(
