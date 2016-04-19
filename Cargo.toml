@@ -61,9 +61,9 @@ default-features = true
 features = ["ssl"]
 
 [dev-dependencies]
-stainless = "0.1.4"
+# TODO: Change to semver once 0.1.5+ is out
+stainless = { git = "https://github.com/reem/stainless.git", rev = "ae69bc0"}
 iron-test = "0.2.0"
 regex = "0.1.55"
 rand = "0.3.14"
 tempdir = "0.3.4"
-
