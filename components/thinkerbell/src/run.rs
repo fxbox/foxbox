@@ -312,7 +312,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                             channel,
                             error
                         } => {
-                            info!("[Recipe '{}'] Initialization error for {}: {}", self.script.name, channel, error);
+                            warn!("[Recipe '{}'] Initialization error for {}: {}", self.script.name, channel, error);
                             let _ = on_event.send(ExecutionEvent::ChannelError {
                                 id: channel,
                                 error: error,
@@ -508,4 +508,3 @@ pub enum Error {
     StartStopError(StartStopError),
     APIError(api::Error),
 }
-
