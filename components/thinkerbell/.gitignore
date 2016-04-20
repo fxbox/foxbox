@@ -1,0 +1,3 @@
+target
+Cargo.lock
+test_script_database.sqlite

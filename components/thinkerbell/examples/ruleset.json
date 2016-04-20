@@ -1,0 +1,48 @@
+{
+  "name": "Example ruleset",
+  "rules": [
+    {
+      "conditions": [
+        {
+          "source": [
+            {
+              "kind": "CurrentTimeOfDay"
+            }
+          ],
+          "kind": "CurrentTimeOfDay",
+          "range": {
+            "Geq": {
+              "Duration": 5
+            }
+          }
+        },
+        {
+          "source": [
+            {
+              "kind": "CurrentTimeOfDay"
+            }
+          ],
+          "kind": "CurrentTimeOfDay",
+          "range": {
+            "Leq": {
+              "Duration": 2
+            }
+          }
+        }
+      ],
+      "execute": [
+        {
+          "destination": [
+            {
+              "kind": "Ready"
+            }
+          ],
+          "value": {
+            "Unit": []
+          },
+          "kind": "Ready"
+        }
+      ]
+    }
+  ]
+}
