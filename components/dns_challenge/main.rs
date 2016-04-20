@@ -14,9 +14,6 @@
 // Needed for many #[derive(...)] macros
 #![allow(used_underscore_binding)]
 
-#![cfg_attr(test, feature(const_fn))] // Dependency of stainless
-#![cfg_attr(test, plugin(stainless))] // Test runner
-
 #![feature(associated_consts)]
 
 extern crate tls;
