@@ -176,7 +176,7 @@ mod certificate_manager {
     }
 
     fn test_cert_record() -> CertificateRecord {
-        CertificateRecord::new_for_test(
+        CertificateRecord::new_from_components(
             "test.example.com".to_owned(),
             PathBuf::from("/test/privkey.pem"),
             PathBuf::from("/test/cert.pem"),
