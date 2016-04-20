@@ -7,8 +7,6 @@
 // Needed to derive `Serialize` on ServiceProperties
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
-// For Docopt macro
-#![plugin(docopt_macros)]
 
 // Make linter fail for every warning
 #![plugin(clippy)]
@@ -21,21 +19,7 @@
 
 #![feature(associated_consts)]
 
-extern crate iron;
-extern crate mktemp;
-#[macro_use]
-extern crate hyper;
-extern crate openssl;
-extern crate openssl_sys;
-extern crate serde_json;
-extern crate xml;
-
-#[macro_use]
-mod utils;
-
-#[macro_use]
-extern crate log;
-mod tls;
+extern crate tls;
 
 use std::env::{ args, var };
 use std::path::PathBuf;

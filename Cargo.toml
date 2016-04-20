@@ -14,14 +14,6 @@ exclude = [ "**/*.conf",
 default = ["authentication"]
 authentication = []
 
-[[bin]]
-name = "dnschallenge"
-path = "src/challenge_bin.rs"
-
-[[bin]]
-name = "foxbox"
-path = "src/main.rs"
-
 [dependencies]
 foxbox_thinkerbell = { path = "components/thinkerbell/" }
 openzwave-adapter = { path = "components/openzwave-adapter/" }
@@ -37,7 +29,8 @@ docopt_macros = "0.6.80"
 env_logger = "0.3.2"
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
-mktemp = "0.1.2"
+multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
+iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "96ede73" }
 libc = "0.2.7"
 log = "0.3"
 mio = { git = "https://github.com/carllerche/mio.git" }
@@ -67,6 +60,9 @@ xml-rs = "0.3.0"
 version = "0.2.6"
 default-features = true
 features = ["ssl"]
+
+[dependencies.tls]
+path = "./components/tls"
 
 [dev-dependencies]
 stainless = "0.1.4"

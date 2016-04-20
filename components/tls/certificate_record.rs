@@ -78,10 +78,10 @@ impl CertificateRecord {
         })
     }
 
-    /// Create a test CertificateRecord (doesn't use the file system to load the PEM cert and
-    /// get its fingerprint
-    #[cfg(test)]
-    pub fn new_for_test(hostname: String,
+    /// Create a test CertificateRecord directly from its components
+    /// (doesn't use the file system to load the PEM cert and get its
+    /// fingerprint. Useful for testing.
+    pub fn new_from_components(hostname: String,
                         certificate_file: PathBuf,
                         private_key_file: PathBuf,
                         cert_fingerprint: String) -> io::Result<Self> {

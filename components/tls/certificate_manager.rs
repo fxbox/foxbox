@@ -8,9 +8,9 @@ use std::io::{ Error as IoError };
 use std::path::PathBuf;
 use std::sync::{ Arc, RwLock };
 
-use tls::certificate_record::CertificateRecord;
-use tls::ssl_context::SslContextProvider;
-use tls::utils::*;
+use certificate_record::CertificateRecord;
+use ssl_context::SslContextProvider;
+use utils::*;
 
 const DEFAULT_BOX_NAME: &'static str = "foxbox.local";
 
@@ -34,7 +34,7 @@ impl CertificateManager {
 
     #[cfg(test)]
     pub fn new_for_test() -> Self {
-        use tls::ssl_context::SniSslContextProvider;
+        use ssl_context::SniSslContextProvider;
         let mut test_certs_directory = PathBuf::from(current_dir!());
         test_certs_directory.push("test_fixtures");
         test_certs_directory.push("certs");
@@ -145,7 +145,8 @@ mod certificate_manager {
     use std::path::PathBuf;
     use std::sync::{ Arc, Mutex };
     use std::sync::mpsc::{ channel, Sender };
-    use tls::{ CertificateRecord, SslContextProvider };
+    use certificate_record::CertificateRecord;
+    use ssl_context::SslContextProvider;
 
     use super::*;
 

@@ -10,7 +10,7 @@ use std::path::{ Path, PathBuf };
 use std::process::Command;
 use std::sync::mpsc::{ channel, Receiver };
 use std::thread;
-use tls::CertificateManager;
+use CertificateManager;
 
 const LETS_ENCRYPT_CLIENT: &'static str = include_str!("scripts/letsencrypt.sh");
 

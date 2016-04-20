@@ -12,7 +12,7 @@ use std::fs;
 use std::io;
 use std::path::{ Path, PathBuf };
 
-use tls::certificate_record::CertificateRecord;
+use certificate_record::CertificateRecord;
 
 /// Create a `HashMap` of `CertificateRecord`s (hashed by the hostname it was created for)
 pub fn create_records_from_directory(path: &PathBuf)

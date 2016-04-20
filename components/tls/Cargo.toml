@@ -1,0 +1,25 @@
+[package]
+name = "tls"
+version = "0.1.0"
+authors = ["The Project Link Developers"]
+publish = false
+
+[lib]
+name = "tls"
+path = "lib.rs"
+
+[dependencies.iron]
+version = "0.2.6"
+default-features = true
+features = ["ssl"]
+
+[dependencies]
+clippy = "0.0.63"
+hyper = "0.7.2"
+log = "0.3"
+mktemp = "0.1.2"
+openssl = "0.7.6"
+openssl-sys = "0.7.6"
+serde = "0.7.0"
+serde_json = "0.7.0"
+serde_macros = "0.7.2"
