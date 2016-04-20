@@ -1,6 +1,8 @@
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::io::Result as IoResult;
+use std::path::{ Path, PathBuf };
+use std::process::{ Command, ExitStatus };
 
 fn update_local_git_hook() {
     let p = env::current_dir().unwrap();
@@ -44,7 +46,21 @@ fn copy_shared_static_files() {
     }
 }
 
+fn cargo_build_in_directory(directory: &str) -> IoResult<ExitStatus> {
+    let current_dir = env::current_dir().unwrap();
+    let mut run_in_dir = PathBuf::from(&current_dir);
+    run_in_dir.push(directory);
+
+    Command::new("cargo")
+            .arg("build")
+            .current_dir(run_in_dir)
+            .spawn()
+            .unwrap()
+            .wait()
+}
+
 fn main() {
     update_local_git_hook();
     copy_shared_static_files();
+    cargo_build_in_directory("./components/dns_challenge").unwrap();
 }
