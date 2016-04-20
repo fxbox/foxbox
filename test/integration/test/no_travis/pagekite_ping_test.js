@@ -11,6 +11,7 @@ Prepper.makeSuite('Verify validity of pagekite ping endpoint', function(){
   var header = new Config('./test/integration/lib/config/header.js');
   var credential = config.get('credential'); 
   var pingUrl = config.get('pagekite.r') + '/ping';
+  
   it('get address from pagekite ping endpoint', function() {  
     var pick;
     var timestamp = 0;

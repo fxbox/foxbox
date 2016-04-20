@@ -1,7 +1,8 @@
 'use strict';
-var fs = require('fs');
-var path = require('path');
+const fs = require('fs');
+const path = require('path');
 const Config = require('config-js');
+const chakram = require('chakram'), expect = chakram.expect;
 
 const spawn = require('child_process').spawn;
 
@@ -11,10 +12,29 @@ var foxboxInstance;
 
 var helper = (function() {
 
+  var setupURL = config.get('foxbox.url') + '/users/setup';
+  var loginURL = config.get('foxbox.url') + '/users/login';
+  var serviceURL = config.get('foxbox.url') + '/api/v1';
+  var serviceListURL = serviceURL + '/services'; 
+  var getterURL = serviceURL + '/channels/get';
+  var setterURL = serviceURL + '/channels/set';
+
+  function _removeFileIfItExists(filename,errMsg) {
+    try {
+      fs.unlinkSync(path.join(process.env.HOME, 
+      filename));
+    } catch (e) {
+      if (e.code === 'ENOENT') {
+        console.log(errMsg);
+      }
+    }
+  }
+
   function removeUsersDB() {
-    var filePath = path.join(process.env.HOME,
-      '/.local/share/foxbox/users_db.sqlite');
-    fs.unlinkSync(filePath);
+    _removeFileIfItExists('/.local/share/foxbox/users_db.sqlite',
+      'User DB not found!');
+    _removeFileIfItExists('/.local/share/foxbox/webpush.sqlite',
+      'webpush DB not found!');
   }
 
   function fullOptionStart(callback) {
@@ -22,8 +42,27 @@ var helper = (function() {
     ['-c',  config.get('nupnp_server.param')+';'+
     config.get('nupnp_server.url')+':'+
     config.get('nupnp_server.port')+'/',
-    '--disable-tls'], {stdio: 'inherit'} ); // TODO TLS not yet supported
+    '--disable-tls']/*, {stdio: 'inherit'}*/ ); // TODO TLS not yet supported
   setTimeout(callback, FOXBOX_STARTUP_WAIT_TIME_IN_MS);
+  }
+
+  function foxboxLogin() {
+    var credential = config.get('credential'); 
+    var header = new Config('./test/integration/lib/config/header.js');
+
+    return chakram.post(setupURL,credential)
+    .then(function(setupResp){
+      expect(setupResp).to.have.status(201);
+      var encoded_cred = new Buffer(credential.username+
+      ':'+credential.password).toString('base64');
+      header.Authorization = 'Basic ' + encoded_cred;
+
+      return chakram.post(loginURL,null,{'headers' : header});
+    })
+    .then(function(resp){
+       header.Authorization = 'Bearer ' + resp.body.session_token;
+       chakram.setRequestDefaults({'headers': header});
+     });
   }
 
   function killFoxBox() {
@@ -45,7 +84,9 @@ var helper = (function() {
     return pick;
   }
 
-  return {removeUsersDB, fullOptionStart, killFoxBox, getLatestIPFromPingSrv};
+  return {setupURL, loginURL, serviceURL, serviceListURL, getterURL, setterURL,
+    removeUsersDB, fullOptionStart, foxboxLogin, killFoxBox, 
+    getLatestIPFromPingSrv};
 })();
 
 module.exports = helper;

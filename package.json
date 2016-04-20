@@ -10,7 +10,7 @@
     "test-integration": "npm run clean && ./node_modules/.bin/mocha test/integration/test/*.js && ./node_modules/.bin/mocha test/integration/test/no_travis/*.js",
     "test-integration-travis": "npm run clean && ./node_modules/.bin/mocha test/integration/test/*.js",
     "clean": "npm run clean_db && npm run clean_picture",
-    "clean_db": "rm -f ~/.local/share/foxbox/users_db.sqlite",
+    "clean_db": "rm -rf ~/.local/share/foxbox",
     "clean_picture": "rm -rf ~/.local/share/foxbox/snapshots"
   },
   "repository": {
@@ -37,6 +37,12 @@
     "path": "^0.12.7",
     "config-js": "^1.1.9",
     "express": "^4.13.4",
-    "iso-date": "^1.0.0"
+    "iso-date": "^1.0.0",
+    "http_ece": "^0.5.0",
+    "media-typer": "^0.3.0",
+    "raw-body": "^2.1.6"
+  },
+  "dependencies": {
+    
   }
 }
