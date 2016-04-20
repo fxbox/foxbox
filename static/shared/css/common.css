@@ -41,18 +41,44 @@ button {
   color: white;
 }
 
+select {
+  border: 0;
+  padding: 1rem;
+  border-radius: 0.3rem;
+  width: 100%;
+  outline: medium none;
+  margin: 0.5rem 0;
+  font: normal 2.2rem/4.4rem "Fira Sans", Arial;
+  font-weight: 300;
+  background: #f2f2f2;
+}
+
+textarea {
+  background: #000;
+  border: none;
+  border-radius: 0.3rem;
+  color: #ccc;
+  display: block;
+  padding: 0.5rem;
+  width: 100%;
+  min-height: 10rem;
+  height: auto;
+  font-size: small;
+  overflow: hidden;
+  resize: none;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+label {
+  padding: 0.5 rem;
+}
+
 .container {
   position: relative;
   width: 70%;
   margin: auto;
-}
-
-.signin-container {
-  padding: 30% 0 0
-}
-
-.signup-container {
-  padding: 20% 0 0;
+  padding: 10% 0 0;
 }
 
 .inner-container {
