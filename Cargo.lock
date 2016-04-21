@@ -7,7 +7,7 @@ dependencies = [
  "docopt 0.6.80 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt_macros 0.6.83 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
+ "foxbox_taxonomy 0.1.2",
  "foxbox_thinkerbell 0.1.2",
  "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=1033e08)",
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -194,7 +194,6 @@ dependencies = [
 [[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git#674b72d5d7b6eb53f1010a0048d4c4e9f4afcb58"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.63 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -215,7 +214,7 @@ name = "foxbox_thinkerbell"
 version = "0.1.2"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
+ "foxbox_taxonomy 0.1.2",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusqlite 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -672,7 +671,7 @@ dependencies = [
 name = "openzwave-adapter"
 version = "0.1.0"
 dependencies = [
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
+ "foxbox_taxonomy 0.1.2",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "openzwave-stateful 0.1.0 (git+https://github.com/fxbox/openzwave-stateful-rust)",
  "transformable_channels 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
