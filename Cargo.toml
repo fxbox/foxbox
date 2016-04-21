@@ -15,18 +15,20 @@ default = ["authentication"]
 authentication = []
 
 [dependencies]
+foxbox_thinkerbell = { path = "components/thinkerbell/" }
+openzwave-adapter = { path = "components/openzwave-adapter/" }
+foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git" }
+foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "1033e08" }
+multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
+iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "96ede73" }
+
 chrono = "0.2.19"
 clippy = "0.0.63"
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
-foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git" }
-foxbox_thinkerbell = { path = "components/thinkerbell/" }
-foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "1033e08" }
 get_if_addrs = "0.3.1"
 hyper = "0.7.2"
-multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
-iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "96ede73" }
 mktemp = "0.1.2"
 libc = "0.2.7"
 log = "0.3"
@@ -35,7 +37,6 @@ mount = "0.0.10"
 nix = { git = "https://github.com/nix-rust/nix.git", rev = "138080" } # Until 0.5.1 is released
 openssl = "0.7.6"
 openssl-sys = "0.7.6"
-openzwave-adapter = { git = "https://github.com/fxbox/openzwave-adapter" }
 rand = "0.3"
 router = "0.1.0"
 rust-crypto = "0.2.34"

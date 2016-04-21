@@ -24,7 +24,7 @@ dependencies = [
  "nix 0.5.1-pre (git+https://github.com/nix-rust/nix.git?rev=138080)",
  "openssl 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "openssl-sys 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "openzwave-adapter 0.1.0 (git+https://github.com/fxbox/openzwave-adapter)",
+ "openzwave-adapter 0.1.0",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.66 (registry+https://github.com/rust-lang/crates.io-index)",
  "router 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -671,7 +671,6 @@ dependencies = [
 [[package]]
 name = "openzwave-adapter"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-adapter#99e4291f19bab5d25dca56d370ec441d84893819"
 dependencies = [
  "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
