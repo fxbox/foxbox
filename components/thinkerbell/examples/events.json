@@ -1,0 +1,50 @@
+[{ "AddAdapters": ["Simulator"] },
+ { "AddServices": [{
+        "adapter": "Simulator",
+        "tags": [],
+        "id": "Simulator service",
+        "getters": {},
+        "setters": {}
+ }]}, {
+    "AddGetters": [{
+        "mechanism": {
+            "kind": {
+                "CurrentTimeOfDay": []
+            }
+        },
+        "adapter": "Simulator",
+        "tags": [],
+        "id": "Clock #1",
+        "service": "Simulator service"
+    }]
+}, {
+    "AddSetters": [{
+       "adapter": "Simulator",
+        "tags": [],
+        "id": "Ready #1",
+        "service": "Simulator service",
+        "mechanism": {
+            "kind": {
+                "Ready": []
+            }
+        }
+    }]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 1}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 2}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 3}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 4}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 5}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 6}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 7}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 8}]]
+}, {
+    "InjectGetterValues": [["Clock #1", {"Duration": 9}]]
+}]

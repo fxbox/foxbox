@@ -50,10 +50,10 @@ compile_foxbox_with_dead_code() {
 
 run_tests_and_coverage() {
   PROJECT_UNIT_TEST_BINARY=$(find "$PROJECT_BINARY_LOCATION" -maxdepth 1 -executable -name "$PROJECT_NAME"-\*)
+  # TODO: Add components and figure out why its not counted as part of the report
   RUST_BACKTRACE=1 "$KCOV_BINARY" \
-    --exclude-path="${CARGO_HOME:=~/.cargo},\
-                    $PROJECT_HOME/src/stubs,\
-                    $PROJECT_HOME/target" \
+    --include-path="$PROJECT_HOME/src" \
+    --exclude-path="$PROJECT_HOME/src/stubs" \
     --coveralls-id="${TRAVIS_JOB_ID:=no-job-id}" \
     "$PROJECT_HOME/target/coverage-report/" \
     "$PROJECT_UNIT_TEST_BINARY"
