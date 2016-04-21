@@ -7,7 +7,7 @@ set -ex
 CURRENT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PROJECT_HOME="$CURRENT_PATH/.."
-PROJECT_NAME=$(sed --quiet '0,/^name *=/{s/^name *= *"\(.*\)"$/\1/p}' $PROJECT_HOME/Cargo.toml)
+PROJECT_NAME=$(sed --quiet 's/^name *= *"\(.*\)"$/\1/p' $PROJECT_HOME/Cargo.toml)
 PROJECT_BINARY_LOCATION="$PROJECT_HOME/target/debug"
 
 KCOV_VERSION="30"
