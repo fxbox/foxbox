@@ -4,6 +4,7 @@ const Config = require('config-js');
 var config = new Config('./test/integration/lib/config/foxbox.js');
 var philipshue_server = require('../lib/philipsHue_server.js');
 var ipcamera_server = require('../lib/ipcamera_server.js');
+var webPush_server = require('../lib/webpush_server.js');
 var nupnp_server = require('../lib/nupnp_PhilipsHue.js');
 var foxboxManager = require('../lib/foxboxHelper.js');
 var config = new Config('./test/integration/lib/config/foxbox.js');
@@ -20,6 +21,7 @@ var testPrepper = (function() {
     //Start the foxbox and associated simulators
     philipshue_server.setup(config.get('philips_hue.port'));
     ipcamera_server.setup();
+    webPush_server.setup();
     foxboxManager.fullOptionStart(done);          
   }
 
@@ -32,13 +34,14 @@ var testPrepper = (function() {
         foxboxManager.killFoxBox();
         foxboxManager.removeUsersDB();
         var promises = [nupnp_server.stop(), 
-        philipshue_server.stop(),ipcamera_server.stop()];
+        philipshue_server.stop(),ipcamera_server.stop(),webPush_server.stop()];
         return Promise.all(promises); 
       });
     });
   }
 
-  return {makeSuite, philipshue_server,ipcamera_server, foxboxManager};
+  return { makeSuite, 
+    philipshue_server,ipcamera_server, webPush_server, foxboxManager};
 })();
 
 module.exports = testPrepper;

@@ -33,6 +33,12 @@ module.exports = {
     usn: 'urn:cellvision:service:Null:1'
   },
 
+  webpush : {
+    ip: 'http://localhost',
+    port: '8112',
+    endpoint: '/endpoint'
+  },
+
   philips_hue : {
     url: 'localhost',
     port: 8001
