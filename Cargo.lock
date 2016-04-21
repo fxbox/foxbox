@@ -7,24 +7,24 @@ dependencies = [
  "docopt 0.6.80 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt_macros 0.6.83 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
- "foxbox_thinkerbell 0.1.2 (git+https://github.com/fxbox/thinkerbell.git)",
- "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=1033e08)",
+ "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?branch=demo-2016-04-19)",
+ "foxbox_thinkerbell 0.1.2 (git+https://github.com/fxbox/thinkerbell.git?branch=demo-2016-04-19)",
+ "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?branch=demo-2016-04-19)",
  "get_if_addrs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=96ede73)",
+ "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?branch=demo-2016-04-19)",
  "iron-test 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.0 (git+https://github.com/carllerche/mio.git)",
  "mktemp 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "mount 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "multicast_dns 0.1.0 (git+https://github.com/fxbox/multicast-dns.git?rev=a6e4bcc)",
+ "multicast_dns 0.1.0 (git+https://github.com/fxbox/multicast-dns.git?branch=demo-2016-04-19)",
  "nix 0.5.1-pre (git+https://github.com/nix-rust/nix.git?rev=138080)",
  "openssl 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "openssl-sys 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "openzwave-adapter 0.1.0 (git+https://github.com/fxbox/openzwave-adapter)",
+ "openzwave-adapter 0.1.0 (git+https://github.com/fxbox/openzwave-adapter?branch=demo-2016-04-19)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.66 (registry+https://github.com/rust-lang/crates.io-index)",
  "router 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -194,7 +194,7 @@ dependencies = [
 [[package]]
 name = "foxbox_taxonomy"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/taxonomy.git#674b72d5d7b6eb53f1010a0048d4c4e9f4afcb58"
+source = "git+https://github.com/fxbox/taxonomy.git?branch=demo-2016-04-19#674b72d5d7b6eb53f1010a0048d4c4e9f4afcb58"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.63 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -213,10 +213,10 @@ dependencies = [
 [[package]]
 name = "foxbox_thinkerbell"
 version = "0.1.2"
-source = "git+https://github.com/fxbox/thinkerbell.git#5225d90012e4997fd5d25ade63e385714c53c567"
+source = "git+https://github.com/fxbox/thinkerbell.git?branch=demo-2016-04-19#32f553d0ed8f3dcd3c94bb37d8b18116b8197e45"
 dependencies = [
  "chrono 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
+ "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?branch=demo-2016-04-19)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusqlite 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -228,10 +228,10 @@ dependencies = [
 [[package]]
 name = "foxbox_users"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/users.git?rev=1033e08#1033e087b775752818d946303226ba1d7f86a052"
+source = "git+https://github.com/fxbox/users.git?branch=demo-2016-04-19#b8269f22d57c8837312a400cb1c1df55292f01a9"
 dependencies = [
  "iron 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=96ede73)",
+ "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?branch=demo-2016-04-19)",
  "jwt 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "pwhash 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -363,7 +363,7 @@ dependencies = [
 [[package]]
 name = "iron-cors"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/iron-cors.git?rev=96ede73#96ede73614bb0889a1fefbe7b17ed85630af08f7"
+source = "git+https://github.com/fxbox/iron-cors.git?branch=demo-2016-04-19#69b6a6f9594d1cbfebe5c23bc690a99c361bef93"
 dependencies = [
  "iron 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicase 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -542,7 +542,7 @@ dependencies = [
 [[package]]
 name = "multicast_dns"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/multicast-dns.git?rev=a6e4bcc#a6e4bcc5ecbab86d1b23552e8b925f534f739e39"
+source = "git+https://github.com/fxbox/multicast-dns.git?branch=demo-2016-04-19#b9a07407c4dadc1b304615dc6c48a83d66d04d41"
 dependencies = [
  "libc 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -662,36 +662,36 @@ dependencies = [
 [[package]]
 name = "openzwave"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-rust#3fdf6ee82161b786b54fddaea53d5a96a3913488"
+source = "git+https://github.com/fxbox/openzwave-rust?branch=demo-2016-04-19#b11bbcb9f38ed4f5534b990617fd3dabbc3936d2"
 dependencies = [
  "itertools 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "openzwave-sys 0.1.0 (git+https://github.com/fxbox/openzwave-rust)",
+ "openzwave-sys 0.1.0 (git+https://github.com/fxbox/openzwave-rust?branch=demo-2016-04-19)",
 ]
 
 [[package]]
 name = "openzwave-adapter"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-adapter#99e4291f19bab5d25dca56d370ec441d84893819"
+source = "git+https://github.com/fxbox/openzwave-adapter?branch=demo-2016-04-19#87d5af9742098e0f0af59e0d6780b78c2ce3284e"
 dependencies = [
- "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git)",
+ "foxbox_taxonomy 0.1.2 (git+https://github.com/fxbox/taxonomy.git?branch=demo-2016-04-19)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "openzwave-stateful 0.1.0 (git+https://github.com/fxbox/openzwave-stateful-rust)",
+ "openzwave-stateful 0.1.0 (git+https://github.com/fxbox/openzwave-stateful-rust?branch=demo-2016-04-19)",
  "transformable_channels 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "openzwave-stateful"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-stateful-rust#e89618787552763de6b43df51e3a5f19377754d6"
+source = "git+https://github.com/fxbox/openzwave-stateful-rust?branch=demo-2016-04-19#00b5faa829203a685365adc86cb49c684359a953"
 dependencies = [
- "openzwave 0.1.0 (git+https://github.com/fxbox/openzwave-rust)",
+ "openzwave 0.1.0 (git+https://github.com/fxbox/openzwave-rust?branch=demo-2016-04-19)",
 ]
 
 [[package]]
 name = "openzwave-sys"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-rust#3fdf6ee82161b786b54fddaea53d5a96a3913488"
+source = "git+https://github.com/fxbox/openzwave-rust?branch=demo-2016-04-19#b11bbcb9f38ed4f5534b990617fd3dabbc3936d2"
 dependencies = [
  "gcc 0.3.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
