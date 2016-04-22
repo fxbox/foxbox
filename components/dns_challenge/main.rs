@@ -2,19 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#![allow(dead_code)]
-
-// Needed to derive `Serialize` on ServiceProperties
-#![feature(custom_derive, plugin)]
-#![plugin(serde_macros)]
+#![feature(plugin)]
 
 // Make linter fail for every warning
 #![plugin(clippy)]
 #![deny(clippy)]
-// Needed for many #[derive(...)] macros
-#![allow(used_underscore_binding)]
-
-#![feature(associated_consts)]
 
 extern crate tls;
 
@@ -51,7 +43,6 @@ fn main() {
     if dns_api_result.is_err() {
         panic!("The DNS_API_ENDPOINT environment variable should be set");
     }
-
 
     let dns_api = dns_api_result.unwrap();
     let certificate_directory = certificate_directory_result.unwrap();

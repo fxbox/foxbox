@@ -3,14 +3,6 @@ name = "dns_challenge"
 version = "0.1.0"
 dependencies = [
  "clippy 0.0.63 (registry+https://github.com/rust-lang/crates.io-index)",
- "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "mktemp 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "openssl 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "openssl-sys 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_macros 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tls 0.1.0",
 ]
 

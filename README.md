@@ -97,12 +97,12 @@ Foxbox expects certain executables to be available in the `PATH` during its exec
 Some are third party, others are built as components found in the `components`
 directory.
 
-| Dependency     | Optional?                                      | Where to find it                                                       |
-| -------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| Dependency     | Optional?                                      | Where to find it                                                                                |
+| -------------- | ---------------------------------------------- |------------------------------------------------------------------------------------------------ |
 | `dnschallenge` | No (required for LetsEncrypt DNS-01 challenge) | Built as a binary with `cargo build`, see `components/dns_challenge/target/<profile>` directory |
-| `bash`         | No (required for LetsEncrypt client)           | System package manager                                                 |
-| `python`       | Yes (required to run `pagekite.py`)            | System package manager                                                 |
-| `pagekite.py`  | Yes (required to enable tunneling)             | https://pagekite.net/wiki/OpenSource/                                  |
+| `bash`         | No (required for LetsEncrypt client)           | System package manager                                                                          |
+| `python`       | Yes (required to run `pagekite.py`)            | System package manager                                                                          |
+| `pagekite.py`  | Yes (required to enable tunneling)             | https://pagekite.net/wiki/OpenSource/                                                           |
 
 ## Running the daemon
 
