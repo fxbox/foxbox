@@ -8,6 +8,9 @@ publish = false
 name = "dnschallenge"
 path = "main.rs"
 
+[replace]
+"iron:0.3.0" = { path = "../../iron-fork/" }
+
 [dependencies.tls]
 path = "../tls"
 
