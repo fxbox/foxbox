@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 use std::env;
 use std::fs;
 use std::io::Result as IoResult;
@@ -46,6 +50,23 @@ fn copy_shared_static_files() {
     }
 }
 
+// Looks for an environmental variable, defaulting to the empty string.
+fn get_env(key: &str) -> String {
+    env::var(key).unwrap_or("".to_owned())
+}
+
+// Returns the appropriate --target=XXX command line argument, or an empty string
+// if we are not cross compiling.
+fn get_target() -> String {
+    let target = get_env("TARGET");
+    let host = get_env("HOST");
+    if host != target {
+        return format!("--target={}", target);
+    }
+
+    format!("--target={}", target)
+}
+
 fn cargo_build_in_directory(directory: &str) -> IoResult<ExitStatus> {
     let current_dir = env::current_dir().unwrap();
     let mut run_in_dir = PathBuf::from(&current_dir);
@@ -53,6 +74,8 @@ fn cargo_build_in_directory(directory: &str) -> IoResult<ExitStatus> {
 
     Command::new("cargo")
             .arg("build")
+            .arg(format!("--{}", get_env("PROFILE")))
+            .arg(get_target())
             .current_dir(run_in_dir)
             .spawn()
             .unwrap()
