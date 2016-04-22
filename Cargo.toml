@@ -17,7 +17,7 @@ authentication = []
 [dependencies]
 foxbox_thinkerbell = { path = "components/thinkerbell/" }
 openzwave-adapter = { path = "components/openzwave-adapter/" }
-foxbox_taxonomy = { git = "https://github.com/fxbox/taxonomy.git" }
+foxbox_taxonomy = { path = "components/taxonomy/" }
 foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "1033e08" }
 multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
 iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "96ede73" }
