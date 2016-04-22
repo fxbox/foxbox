@@ -21,10 +21,12 @@ matrix:
   allow_failures:
     - rust: nightly
   include:
-    - sudo: required
-      os: linux
+    - os: linux
       rust: nightly-2016-04-10
       env: BUILD_ENV=-arm_cross_compile
+    - os: linux
+      rust: nightly
+      env: BUILD_ENV=-cargo_update
 
 addons:
   firefox: latest

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ev
 
 BUILD_TARGET='arm-linux-gnueabihf'
 RUST_TARGET='armv7-unknown-linux-gnueabihf'
