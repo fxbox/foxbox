@@ -8,8 +8,8 @@ use hyper::server::Server;
 use iron::{ Protocol, ServerFactory };
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tls::certificate_manager::CertificateManager;
-use tls::ssl_context::SslContextProvider;
+use certificate_manager::CertificateManager;
+use ssl_context::SslContextProvider;
 
 pub struct SniServerFactory<S: Ssl + Clone + Send> {
     ssl: S

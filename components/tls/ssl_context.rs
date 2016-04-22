@@ -11,7 +11,7 @@ use std::io::Error;
 use std::path::Path;
 use std::sync::{ Arc, RwLock };
 
-use tls::certificate_record::CertificateRecord;
+use certificate_record::CertificateRecord;
 
 pub trait SslContextProvider : Send + Sync {
     fn context(&self) -> Result<SslContext, Error>;

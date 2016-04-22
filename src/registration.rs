@@ -165,7 +165,6 @@ impl Registrar {
             let rx = get_san_cert_for(
                 domains.into_iter(),
                 self.certificate_manager.clone(),
-                self.certificate_manager.get_box_certificate().unwrap(),
                 self.dns_api_endpoint.clone()
             );
 
@@ -299,9 +298,10 @@ impl Registrar {
 describe! registrar {
 
     before_each {
-        use tls::CertificateManager;
+        use std::path::PathBuf;
+        use tls::{ CertificateManager, SniSslContextProvider };
         let registrar = Registrar::new(
-            CertificateManager::new_for_test(),
+            CertificateManager::new(PathBuf::from(current_dir!()), Box::new(SniSslContextProvider::new())),
             "box.knilxof.org".to_owned(),
             "http://knilxof.org:4242/".to_owned(),
             "https://knilxof.org:5300".to_owned()

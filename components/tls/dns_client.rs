@@ -9,7 +9,7 @@ use openssl::ssl::error::SslError;
 use serde_json;
 use std::collections::BTreeMap;
 use std::io;
-use tls::certificate_record::CertificateRecord;
+use certificate_record::CertificateRecord;
 
 const DNS_API_VERSION: &'static str = "v1";
 

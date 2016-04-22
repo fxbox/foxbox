@@ -10,13 +10,13 @@ use std::path::{ Path, PathBuf };
 use std::process::Command;
 use std::sync::mpsc::{ channel, Receiver };
 use std::thread;
-use tls::{ CertificateManager, CertificateRecord };
+use CertificateManager;
 
 const LETS_ENCRYPT_CLIENT: &'static str = include_str!("scripts/letsencrypt.sh");
 
 /// Get a SAN certificate from `LetsEncrypt` for a given list of names.
 pub fn get_san_cert_for<T>(names: T, certificate_manager: CertificateManager,
-                           box_certificate: CertificateRecord, dns_endpoint: String)
+                           dns_endpoint: String)
         -> Receiver<io::Result<()>>
     where T: Iterator<Item=String>,
           T: DoubleEndedIterator,
@@ -28,7 +28,7 @@ pub fn get_san_cert_for<T>(names: T, certificate_manager: CertificateManager,
         tx.send(
             _get_san_cert_for(
                 names, certificate_manager,
-                &box_certificate, &dns_endpoint)
+                &dns_endpoint)
           ).unwrap();
     });
 
@@ -36,8 +36,7 @@ pub fn get_san_cert_for<T>(names: T, certificate_manager: CertificateManager,
 }
 
 /// Blocking version of `get_san_cert_for`
-fn _get_san_cert_for<T>(names: T, certificate_manager: CertificateManager,
-                        box_certificate: &CertificateRecord, dns_endpoint: &str)
+fn _get_san_cert_for<T>(names: T, certificate_manager: CertificateManager, dns_endpoint: &str)
     -> io::Result<()>
     where T: Iterator<Item=String>,
           T: DoubleEndedIterator,
@@ -75,8 +74,7 @@ fn _get_san_cert_for<T>(names: T, certificate_manager: CertificateManager,
         try!(File::create(dns_challenge_file.clone()).and_then(|mut f| {
             f.write_all(
                 create_challenge_script(
-                    &box_certificate.cert_file,
-                    &box_certificate.private_key_file,
+                    &certificate_manager.get_certs_dir(),
                     &dns_endpoint
                 ).as_bytes()
             )
@@ -127,21 +125,15 @@ fn _get_san_cert_for<T>(names: T, certificate_manager: CertificateManager,
     Ok(())
 }
 
-fn create_challenge_script<T: AsRef<Path>>(cert_path: T, key_path: T, dns_endpoint: &str) -> String {
-    format!("#!/usr/bin/env sh
-URL_PATH=`echo $2 | perl -lpe '$_ = join \"/\", reverse split /\\./'`
-DATA=\"{{\\\"type\\\": \\\"TXT\\\", \\\"value\\\": \\\"$4\\\"}}\"
-UNAMESTR=`uname`
-if [[ \"$UNAMESTR\" == 'Darwin' ]]; then
-    openssl pkcs12 -export -inkey {key_path:?} -in {cert_path:?} -out pkcs_fmt.pkcs12 -password 'pass:nopass'
-    curl -k -v -E pkcs_fmt.pkcs12:nopass -XPOST -d\"$DATA\" {dns_endpoint}/v1/dns/$URL_PATH/_acme-challenge
-else
-    curl -k -v -E {cert_path:?} -XPOST -d\"$DATA\" {dns_endpoint}/v1/dns/$URL_PATH/_acme-challenge
+fn create_challenge_script<T: AsRef<Path>>(cert_path: T, dns_endpoint: &str) -> String {
+    format!("#!/usr/bin/env bash
+echo $@
+if [[ $1 == \"deploy_challenge\" ]];then
+    RUST_BACKTRACE=1 CERTIFICATE_DIRECTORY={cert_path:?} DNS_API_ENDPOINT={dns_endpoint:?} dnschallenge $2 \"$4\"
 fi
 ",
 
         cert_path=cert_path.as_ref(),
-        key_path=key_path.as_ref(),
         dns_endpoint=dns_endpoint
     )
 }

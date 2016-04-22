@@ -82,7 +82,7 @@ impl Controller for ControllerStub {
     }
 
     fn get_box_certificate(&self) -> io::Result<CertificateRecord> {
-        CertificateRecord::new_for_test("foxbox.local".to_owned(),
+        CertificateRecord::new_from_components("foxbox.local".to_owned(),
                                         PathBuf::from("a/file.pem"),
                                         PathBuf::from("b/file.pem"),
                                         "abcdef".to_owned())
