@@ -7,11 +7,13 @@ const assert = require('assert');
 const crypto = require('crypto');
 const ece = require('http_ece');
 const typer = require('media-typer');
+var urlBase64 = require('urlsafe-base64');
 var config = new Config('./test/integration/lib/config/foxbox.js');
 
 var webpush_server = (function() {
   var serverECDH = crypto.createECDH('prime256v1');
   var serverPublicKey = serverECDH.generateKeys('base64');
+  var userAuth = urlBase64.encode(crypto.randomBytes(16));
   var _server = express();
   
   var port = config.get('webpush.port');
@@ -26,6 +28,10 @@ var webpush_server = (function() {
 
   function getPublicKey() {
     return serverPublicKey;
+  }
+
+  function getUserAuth() {
+    return userAuth;
   }
 
   function getDecodedPushMsg() {
@@ -47,26 +53,48 @@ var webpush_server = (function() {
         });
     });
   
-    // Handles the incoming ECDH encrypted webpush message from foxbox
+    // Handles the incoming ECDH encrypted webpush message 
+    // (with the new webpush standard) from foxbox
     _server.post(endpoint, function (req, res) {
-      assert.equal(req.headers['content-encoding'], 
-        'aesgcm128', 'Content-Encoding header correct');
+      var encoding = req.headers['content-encoding'];
+      var keyfield, decrypted;
+
+      if (encoding == 'aesgcm128') {
+        keyfield = 'encryption-key';
+      }
+      else if (encoding == 'aesgcm') {
+        keyfield = 'crypto-key';
+      }
+      else { // unknown encoding
+        assert(false, 'unknown encoding');
+      }
+      
       // Collect salt, publickey, and the message
       var salt = req.headers.encryption.match('salt=(.*);')[1];
-      var pubkey = req.headers['encryption-key']
+      var pubkey = req.headers[keyfield]
       .match('keyid=p256dh;dh=(.*)')[1];
       var encryptedBuffer = new Buffer(req.data,'binary');
       
-      // compute shared secret using the provided public key of foxbox
-      var sharedSecret = serverECDH.computeSecret(pubkey,'base64');
-      ece.saveKey('webpushKey', sharedSecret);
-        
       // Decrypt the message using the shared secret and provided salt
-      var decrypted = ece.decrypt(encryptedBuffer, {
-              keyid: 'webpushKey',
+      if (encoding == 'aesgcm') {
+        ece.saveKey('receiver', serverECDH, 'P-256');  
+        decrypted = ece.decrypt(encryptedBuffer, {
+              keyid: 'receiver',
+              dh: pubkey,
               salt: salt,
-              padSize: 1,
+              authSecret: userAuth
             });
+      }
+      else if (encoding == 'aesgcm128') {
+        var sharedSecret = serverECDH.computeSecret(pubkey,'base64');
+        ece.saveKey('webpushKey', sharedSecret);
+        decrypted = ece.decrypt(encryptedBuffer, {
+          keyid: 'webpushKey',
+          salt: salt,
+          padSize: 1,
+        });
+      }
+      
       incomingPushMsg = decrypted.toString();        
       console.log('message: ' + incomingPushMsg);
       res.sendStatus(200);     
@@ -86,7 +114,8 @@ var webpush_server = (function() {
    });
   }
 
-  return {setup, stop, getEndpointURI, getPublicKey, getDecodedPushMsg};
+  return {setup, stop, getEndpointURI, getPublicKey, 
+    getUserAuth, getDecodedPushMsg};
 
   })();
 
