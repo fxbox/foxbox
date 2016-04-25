@@ -51,7 +51,7 @@ struct Ping;
 
 impl Handler for Ping {
     fn handle (&self, _: &mut Request) -> IronResult<Response> {
-        Ok(Response::with(Status::Ok))
+        Ok(Response::with(Status::NoContent))
     }
 }
 
@@ -133,11 +133,11 @@ describe! ping {
         mount.mount("/ping", Ping);
     }
 
-    it "should response 200 Ok" {
+    it "should response 204 NoContent" {
         let response = request::get("http://localhost:3000/ping",
                                     Headers::new(),
                                     &mount).unwrap();
-        assert_eq!(response.status.unwrap(), Status::Ok);
+        assert_eq!(response.status.unwrap(), Status::NoContent);
     }
 }
 
