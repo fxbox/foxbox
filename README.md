@@ -44,6 +44,7 @@ rustc 1.9.0-nightly (241a9d0dd 2016-04-05)
 | `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`  | `core/sqlite`      | `sqlite`        |
 | `libespeak`  | `libespeak-dev`       | `espeak-devel`  | `community/espeak` | `?`             |
 | `libdbus`    | `?`                   | `dbus-devel`    | `core/libdbus`     | `?`             |
+| `libudev`    | `libudev-dev`         | `?`             | `?`                | `n.a.`          |
 
 ### Node
 
