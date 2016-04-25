@@ -69,7 +69,7 @@ impl SniSslContextProvider {
         let requested_hostname = ssl.get_hostname();
 
         if requested_hostname.is_none() {
-            debug!("No SNI - ");
+            error!("No SNI information sent from client - client unsupported");
             return openssl_sys::SSL_TLSEXT_ERR_NOACK;
         }
 
@@ -81,6 +81,8 @@ impl SniSslContextProvider {
 
         if let Some(ctx)= ssl_context_for_hostname {
             ssl.set_context(ctx);
+        } else {
+            error!("No certificate available for requested hostname: {}", requested_hostname);
         }
 
         openssl_sys::SSL_TLSEXT_ERR_OK
