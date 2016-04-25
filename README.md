@@ -42,7 +42,7 @@ rustc 1.9.0-nightly (241a9d0dd 2016-04-05)
 | `libssl`     | `libssl-dev`          | `openssl-devel` | via `base-devel`   | `openssl`       |
 | `libavahi`   | `libavahi-client-dev` | `avahi-devel`   | `extra/avahi`      | `n.a.`          |
 | `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`  | `core/sqlite`      | `sqlite`        |
-| `libespeak`  | `libsespeak-dev`      | `espeak-devel`  | `community/espeak` | `?`             |
+| `libespeak`  | `libespeak-dev`       | `espeak-devel`  | `community/espeak` | `?`             |
 | `libdbus`    | `?`                   | `dbus-devel`    | `core/libdbus`     | `?`             |
 
 ### Node
