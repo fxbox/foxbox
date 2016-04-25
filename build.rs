@@ -1,8 +1,11 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 use std::env;
 use std::fs;
-use std::io::Result as IoResult;
 use std::path::{ Path, PathBuf };
-use std::process::{ Command, ExitStatus };
+use std::process::Command;
 
 fn update_local_git_hook() {
     let p = env::current_dir().unwrap();
@@ -46,21 +49,61 @@ fn copy_shared_static_files() {
     }
 }
 
-fn cargo_build_in_directory(directory: &str) -> IoResult<ExitStatus> {
+// Looks for an environmental variable, defaulting to the empty string.
+fn get_env(key: &str) -> String {
+    env::var(key).unwrap_or("".to_owned())
+}
+
+// Returns the appropriate --target=XXX command line argument, or None
+// if we are not cross compiling.
+fn get_target() -> Option<String> {
+    let target = get_env("TARGET");
+    let host = get_env("HOST");
+    if host != target {
+        return Some(format!("--target={}", target));
+    }
+
+    None
+}
+
+fn cargo_build_in_directory(directory: &str) {
     let current_dir = env::current_dir().unwrap();
     let mut run_in_dir = PathBuf::from(&current_dir);
     run_in_dir.push(directory);
 
-    Command::new("cargo")
-            .arg("build")
-            .current_dir(run_in_dir)
-            .spawn()
-            .unwrap()
-            .wait()
+    let mut exec = Command::new("cargo");
+    let mut command = exec.arg("build")
+                          .arg("--verbose"); // Ideally should reflect the --verbose flag of the main
+                                             // cargo command.
+
+    let target = get_target();
+    if target.is_some() {
+        let tmp = command;
+        command = tmp.arg(target.unwrap());
+    }
+
+    // $PROFILE is either `debug` (default value) or `release`.
+    if get_env("PROFILE") == "release" {
+        let tmp = command;
+        command = tmp.arg("--release");
+    }
+
+    command.current_dir(run_in_dir)
+           .spawn()
+           .unwrap()
+           .wait()
+           .unwrap();
+
+    /*if !output.status.success() {
+        println!("status: {}", output.status);
+        println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+        println!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+        panic!("debug"); // Forces the println!(...) to display.
+    }*/
 }
 
 fn main() {
     update_local_git_hook();
     copy_shared_static_files();
-    cargo_build_in_directory("./components/dns_challenge").unwrap();
+    cargo_build_in_directory("./components/dns_challenge");
 }
