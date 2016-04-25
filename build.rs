@@ -88,16 +88,18 @@ fn cargo_build_in_directory(directory: &str) {
         command = tmp.arg("--release");
     }
 
-    let output = command.current_dir(run_in_dir)
-                        .output()
-                        .unwrap();
+    command.current_dir(run_in_dir)
+           .spawn()
+           .unwrap()
+           .wait()
+           .unwrap();
 
-    if !output.status.success() {
+    /*if !output.status.success() {
         println!("status: {}", output.status);
         println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
         println!("stderr: {}", String::from_utf8_lossy(&output.stderr));
         panic!("debug"); // Forces the println!(...) to display.
-    }
+    }*/
 }
 
 fn main() {
