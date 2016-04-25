@@ -5,6 +5,7 @@ extern crate transformable_channels;
 extern crate log;
 
 mod id_map;
+mod watchers;
 
 
 use taxonomy::util::Id as TaxId;
@@ -24,10 +25,11 @@ use std::{ fs, io };
 use std::path::Path;
 use std::thread;
 use std::sync::mpsc;
-use std::sync::{ Arc, Mutex, Weak };
+use std::sync::{ Arc, Mutex };
 use std::collections::{ HashMap, HashSet };
 
 use id_map::IdMap;
+use watchers::Watchers;
 
 pub use self::OpenzwaveAdapter as Adapter;
 
@@ -119,58 +121,6 @@ impl RangeChecker for Range {
     }
 }
 
-type SyncSender = Mutex<Box<ExtSender<WatchEvent>>>;
-type WatchersMap = HashMap<usize, Arc<SyncSender>>;
-type RangedWeakSender = (Option<Range>, Weak<SyncSender>);
-type RangedSyncSender = (Option<Range>, Arc<SyncSender>);
-struct Watchers {
-    current_index: usize,
-    map: Arc<Mutex<WatchersMap>>,
-    getter_map: HashMap<TaxId<Getter>, Vec<RangedWeakSender>>,
-}
-
-impl Watchers {
-    fn new() -> Self {
-        Watchers {
-            current_index: 0,
-            map: Arc::new(Mutex::new(HashMap::new())),
-            getter_map: HashMap::new(),
-        }
-    }
-
-    fn push(&mut self, tax_id: TaxId<Getter>, range: Option<Range>, watcher: Arc<SyncSender>) -> WatcherGuard {
-        let index = self.current_index;
-        self.current_index += 1;
-        {
-            let mut map = self.map.lock().unwrap();
-            map.insert(index, watcher.clone());
-        }
-
-        let entry = self.getter_map.entry(tax_id).or_insert(Vec::new());
-        entry.push((range, Arc::downgrade(&watcher)));
-
-        WatcherGuard {
-            key: index,
-            map: self.map.clone()
-        }
-    }
-
-    fn get(&self, index: usize) -> Option<Arc<SyncSender>> {
-        let map = self.map.lock().unwrap();
-        map.get(&index).cloned()
-    }
-
-    fn get_from_tax_id(&self, tax_id: &TaxId<Getter>) -> Option<Vec<RangedSyncSender>> {
-        self.getter_map.get(tax_id).and_then(|vec| {
-            let vec: Vec<_> = vec.iter().filter_map(|&(ref range, ref weak_sender)| {
-                let range = range.clone();
-                weak_sender.upgrade().map(|sender| (range, sender))
-            }).collect();
-            if vec.len() == 0 { None } else { Some(vec) }
-        })
-    }
-}
-
 fn tax_kind_from_ozw_vid(vid: &ValueID) -> Option<ChannelKind> {
     match (vid.get_type(), vid.get_command_class(), vid.get_index()) {
         (ValueType::ValueType_Bool, Some(CommandClass::DoorLock),     0) => Some(ChannelKind::DoorLocked),
@@ -222,20 +172,6 @@ fn set_ozw_vid_from_tax_value(vid: &ValueID, value: Value) -> Result<(), TaxErro
 
     result.map_err(|e| TaxError::InternalError(InternalError::GenericError(format!("Error while setting a value: {}", e))))
 }
-
-struct WatcherGuard {
-    key: usize,
-    map: Arc<Mutex<WatchersMap>>,
-}
-
-impl Drop for WatcherGuard {
-    fn drop(&mut self) {
-        let mut map = self.map.lock().unwrap();
-        map.remove(&self.key);
-    }
-}
-
-impl AdapterWatchGuard for WatcherGuard {}
 
 type ValueCache = HashMap<TaxId<Getter>, Value>;
 
