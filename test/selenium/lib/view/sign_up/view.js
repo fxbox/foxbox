@@ -43,7 +43,7 @@ SetUpView.prototype = {
         .then(() => {
             return this.accessors.confirmPassword.sendKeys(confirmPassword);
         }).then(() => {
-            return this.accessors.submitButton.click();
+            return this.accessors.submitButton.sendKeys(webdriver.Key.RETURN);
         }).then(() => {
             return successfulPageView;
         });
