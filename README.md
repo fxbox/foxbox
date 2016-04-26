@@ -226,15 +226,16 @@ Cross compiling on Mac hasn't been documented. A PR is welcomed. :wink:
 You'll need some dependencies installed to build.
 
 ``` bash
-$ brew install openssl libupnp sqlite
+brew install openssl libupnp sqlite
 ```
 
 This is required to build/link the openssl crate and foxbox using homebrew's openssl:
 
 ``` bash
-$ export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
-$ export OPENSSL_LIB_DIR=/usr/local/opt/openssl/lib
-$ export EXTRA_LDFLAGS=-L/usr/local/opt/openssl/lib
+export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
+export OPENSSL_LIB_DIR=/usr/local/opt/openssl/lib
+
+export SQLITE3_LIB_DIR=/usr/local/opt/sqlite/lib
 ```
 
 Previous versions of these instructions described setting ```OPENSSL_INCLUDE_DIR```.
