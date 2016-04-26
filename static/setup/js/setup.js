@@ -32,7 +32,9 @@ var SetupUI = {
     SetupUI.elements.signupButton.addEventListener('click', SetupUI.signup);
   },
 
-  signup: function() {
+  signup: function(evt) {
+    evt.preventDefault();
+
     var pwd = SetupUI.elements.signupPwd1.value;
     if (pwd != SetupUI.elements.signupPwd2.value) {
       window.alert('Passwords don\'t match! Please try again.');
