@@ -6,6 +6,7 @@ use std::env;
 use std::fs;
 use std::path::{ Path, PathBuf };
 use std::process::Command;
+extern crate pkg_config;
 
 fn update_local_git_hook() {
     let p = env::current_dir().unwrap();
@@ -102,8 +103,13 @@ fn cargo_build_in_directory(directory: &str) {
     }*/
 }
 
+fn link_external_libs() {
+    pkg_config::probe_library("libupnp").unwrap();
+}
+
 fn main() {
     update_local_git_hook();
+    link_external_libs();
     copy_shared_static_files();
     cargo_build_in_directory("./components/dns_challenge");
 }
