@@ -52,7 +52,7 @@ impl FoxBox {
         let config = Arc::new(ConfigService::new(&profile_service.path_for("foxbox.conf")));
 
         let certificate_directory = PathBuf::from(
-            config.get_or_set_default("foxbox", "certificate_directory", "certs/"));
+            config.get_or_set_default("foxbox", "certificate_directory", &profile_service.path_for("certs/")));
 
         FoxBox {
             certificate_manager: CertificateManager::new(certificate_directory, Box::new(SniSslContextProvider::new())),
