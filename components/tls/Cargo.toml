@@ -8,14 +8,17 @@ publish = false
 name = "tls"
 path = "lib.rs"
 
+[replace]
+"iron:0.3.0" = { path = "../../iron-fork/" }
+
 [dependencies.iron]
-version = "0.2.6"
+version = "0.3.0"
 default-features = true
 features = ["ssl"]
 
 [dependencies]
 clippy = "0.0.63"
-hyper = "0.7.2"
+hyper = "0.8.1"
 log = "0.3"
 mktemp = "0.1.2"
 openssl = "0.7.6"
