@@ -114,7 +114,9 @@ var SessionUI = {
     this.loadElements(screen);
   },
 
-  signin: function() {
+  signin: function(evt) {
+    evt.preventDefault();
+
     var pwd = SessionUI.elements.signinPwd.value;
     if (!pwd || pwd.length < 8) {
       window.alert('Invalid password');
