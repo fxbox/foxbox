@@ -108,17 +108,17 @@ Foxbox expects certain executables to be available in the `PATH` during its exec
 Some are third party, others are built as components found in the `components`
 directory.
 
-| Dependency     | Optional?                                      | Where to find it                                                                                |
-| -------------- | ---------------------------------------------- |------------------------------------------------------------------------------------------------ |
-| `dnschallenge` | No (required for LetsEncrypt DNS-01 challenge) | Built as a binary with `cargo build`, see `components/dns_challenge/target/<profile>` directory |
-| `bash`         | No (required for LetsEncrypt client)           | System package manager                                                                          |
-| `python`       | Yes (required to run `pagekite.py`)            | System package manager                                                                          |
-| `pagekite.py`  | Yes (required to enable tunneling)             | https://pagekite.net/wiki/OpenSource/                                                           |
+| Dependency     | Optional?                                      | Where to find it                                                                                              |
+| -------------- | ---------------------------------------------- |-------------------------------------------------------------------------------------------------------------- |
+| `dnschallenge` | No (required for LetsEncrypt DNS-01 challenge) | Built as a binary with `cargo build` in the same target directory as foxbox, see `target/<profile>` directory |
+| `bash`         | No (required for LetsEncrypt client)           | System package manager                                                                                        |
+| `python`       | Yes (required to run `pagekite.py`)            | System package manager                                                                                        |
+| `pagekite.py`  | Yes (required to enable tunneling)             | https://pagekite.net/wiki/OpenSource/                                                                         |
 
 ## Running the daemon
 
 ```bash
-$ cargo run
+$ ./run.sh
 ```
 
 There are several command line options to start the daemon:
@@ -143,17 +143,20 @@ There are several command line options to start the daemon:
 Currently you would likely want to start the daemon like this:
 
 ```bash
-cargo run -- -r http://knilxof.org:4242 --disable-tls
+./run.sh -- -r http://knilxof.org:4242 --disable-tls
 ```
 
 That means that your foxbox will be using our dev [registration server](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Registration_Server) and you will be disabling [TLS](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/TLS) support. We hope to have out-of-the-box TLS support ready pretty soon, but for now disabling it is the easiest way to run foxbox.
+
+If you want to use TLS you'll likely want to add `target/<profile>` (eg:
+`target/debug`) to your PATH so that `dnschallenge` is found properly.
 
 ### Enable tunneling support
 
 If you want to access your foxbox from outside of the network where it is running, you'll need to enable [tunneling](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Tunneling) support. To do that you need to specify the address of the tunneling server that you want to use, the shared secret for this server (if any) and the remote name that you want to use to access to your foxbox from outside of your foxbox' local network.
 
 ```bash
-cargo run -- -r http://knilxof.org:4242 -t knilxof.org:443 -s secret --remote-name yourname.knilxof.org --disable-tls
+./run.sh -- -r http://knilxof.org:4242 -t knilxof.org:443 -s secret --remote-name yourname.knilxof.org --disable-tls
 ```
 
 In the example above, `knilxof.org:443` is the location of our tunneling dev server, which has a not-that-secret-anymore value that you'll need to ask for on [IRC](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link#IRC). You are supposed to substitute `<yourname>` by the subdomain of your choice, but take into account that you'll need to keep the domain name of the tunneling server, in this case `.knilxof.org`. Starting the daemon with the command line options above you should be able to access your foxbox through `http://yourname.knilxof.org`.
@@ -163,7 +166,7 @@ In the example above, `knilxof.org:443` is the location of our tunneling dev ser
 To run with custom local host name (eg. foxbox.local):
 
 ```bash
-$ cargo run -- -l foxbox
+$ ./run.sh -- -l foxbox
 ```
 
 __NOTE:__ currently changing of host name is done via ```avahi-daemon``` and therefore supported only on Linux platform. To be able to change local host machine name user must be either included into ```netdev``` group or allow any other suitable user group to manage host name by adding the following policy to ```/etc/dbus-1/system.d/avahi-dbus.conf```:
@@ -177,7 +180,7 @@ __NOTE:__ currently changing of host name is done via ```avahi-daemon``` and the
 ### Custom Philips Hue nUPNP server
 
 ```
-$ cargo run -- -c "philips_hue;nupnp_url;http://localhost:8002/"
+$ ./run.sh -- -c "philips_hue;nupnp_url;http://localhost:8002/"
 ```
 
 ## Interacting with the daemon
@@ -203,7 +206,7 @@ $ npm install
 Then you can run the Selenium tests via:
 
 ```bash
-$ cargo run -- --disable-tls
+$ ./run.sh -- --disable-tls
 $ npm run test-selenium
 ```
 

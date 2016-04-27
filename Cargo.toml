@@ -5,7 +5,7 @@ authors = ["fabrice <fabrice@desre.org>"]
 build = "build.rs"
 # Files that shouldn't retrigger a new rust build if they are changed
 exclude = [ "**/*.conf",
-            "node_modules/**/*", "test/**/*", "tools/**/*", # Non-rust scripts
+            "node_modules/**/*", "test/**/*", "tools/**/*", "*.sh", # Non-rust scripts
             "**/*.log", "**/*.sqlite", # Application generated data
             "**/*.md", "**/*.yml"      # e.g.: READMEs, Travis
           ]
