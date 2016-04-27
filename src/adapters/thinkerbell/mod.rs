@@ -200,15 +200,13 @@ impl ThinkerbellAdapter {
                 // The script has already been removed from ScriptManager at this point;
                 // we're just updating the Service-level bookkeeping.
                 ThinkAction::RemoveRuleService(script_id) => {
-                    for ref rule in &rules {
-                        if rule.script_id == script_id {
-                            match self.remove_rule_service(&rule) {
-                                Ok(_) => {},
-                                Err(e) => {
-                                    error!("[thinkerbell@link.mozilla.org] Unable to remove Thinkerbell Rule Service: {:?}", e)
-                                }
+                    if let Some(position) = rules.iter().position(|ref r| r.script_id == script_id) {
+                        let rule = rules.remove(position);
+                        match self.remove_rule_service(&rule) {
+                            Ok(_) => {},
+                            Err(e) => {
+                                error!("[thinkerbell@link.mozilla.org] Unable to remove Thinkerbell Rule Service: {:?}", e)
                             }
-                            break;
                         }
                     }
                 },
