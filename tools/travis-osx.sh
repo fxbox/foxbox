@@ -7,6 +7,7 @@ CURRENT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 install_dependencies() {
     brew update
+    brew install openssl libupnp sqlite
     source "$CURRENT_PATH/mac-os-x-setup.source.sh"
 }
 

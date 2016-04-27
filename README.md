@@ -87,6 +87,7 @@ $ cd foxbox
 Foxbox requires some up-to-date libraries (like OpenSSL). In order to make sure you have the correct packages and bindings, we recommend you to install brew and to run:
 
 ``` bash
+brew install openssl libupnp sqlite
 source tools/mac-os-x-setup.source.sh
 ```
 
