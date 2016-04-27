@@ -4,14 +4,10 @@ set -e
 
 CURRENT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
-export OPENSSL_LIB_DIR=/usr/local/opt/openssl/lib
-# TODO: Remove once we figure out a better fix https://github.com/fxbox/foxbox/issues/414
-export SQLITE3_LIB_DIR=/usr/local/opt/sqlite/lib
 
 install_dependencies() {
     brew update
-    brew install libupnp openssl sqlite
+    source "$CURRENT_PATH/mac-os-x-setup.source.sh"
 }
 
 build() {

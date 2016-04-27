@@ -82,6 +82,14 @@ $ git clone git@github.com:<username>/foxbox.git
 $ cd foxbox
 ```
 
+### Extra steps for Mac OS X
+
+Foxbox requires some up-to-date libraries (like OpenSSL). In order to make sure you have the correct packages and bindings, we recommend you to install brew and to run:
+
+``` bash
+source tools/mac-os-x-setup.source.sh
+```
+
 ## Build time options
 ### Disable authentication
 You may want to disable endpoints authentication to ease your development process. You can do that by removing `authentication` from the `default` feature in the `Cargo.toml` file.
@@ -219,25 +227,3 @@ For an extensive write-up about cross compiling Rust programs see:
 ### Mac OS X
 
 Cross compiling on Mac hasn't been documented. A PR is welcomed. :wink:
-
-
-## Notes for Mac OS X with Brew
-
-You'll need some dependencies installed to build.
-
-``` bash
-brew install openssl libupnp sqlite
-```
-
-This is required to build/link the openssl crate and foxbox using homebrew's openssl:
-
-``` bash
-export DEP_OPENSSL_INCLUDE=/usr/local/opt/openssl/include/
-export OPENSSL_LIB_DIR=/usr/local/opt/openssl/lib
-
-export SQLITE3_LIB_DIR=/usr/local/opt/sqlite/lib
-```
-
-Previous versions of these instructions described setting ```OPENSSL_INCLUDE_DIR```.
-Make sure it is unset. In fact, an obsolete value may have been cached by cargo
-which is fixed by ```cargo clean```.
