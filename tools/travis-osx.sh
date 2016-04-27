@@ -4,12 +4,11 @@ set -e
 
 CURRENT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-export OPENSSL_LIB_DIR=/usr/local/opt/openssl/lib
-export EXTRA_LDFLAGS=-L/usr/local/opt/openssl/lib
 
 install_dependencies() {
     brew update
-    brew install libupnp openssl sqlite
+    brew install openssl libupnp sqlite
+    source "$CURRENT_PATH/mac-os-x-setup.source.sh"
 }
 
 build() {
