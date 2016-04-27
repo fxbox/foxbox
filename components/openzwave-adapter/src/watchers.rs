@@ -1,4 +1,4 @@
-use taxonomy::util::Id as TaxId;
+use taxonomy::util::Id as TaxoId;
 use taxonomy::services::Getter;
 use taxonomy::values::*;
 use taxonomy::adapter::{ AdapterWatchGuard, WatchEvent };
@@ -16,7 +16,7 @@ pub type RangedSyncSender = (Option<Range>, Arc<SyncSender>);
 pub struct Watchers {
     current_index: usize,
     map: Arc<Mutex<WatchersMap>>,
-    getter_map: HashMap<TaxId<Getter>, Vec<RangedWeakSender>>,
+    getter_map: HashMap<TaxoId<Getter>, Vec<RangedWeakSender>>,
 }
 
 impl Watchers {
@@ -28,7 +28,7 @@ impl Watchers {
         }
     }
 
-    pub fn push(&mut self, tax_id: TaxId<Getter>, range: Option<Range>, watcher: Arc<SyncSender>) -> WatcherGuard {
+    pub fn push(&mut self, taxo_id: TaxoId<Getter>, range: Option<Range>, watcher: Arc<SyncSender>) -> WatcherGuard {
         let index = self.current_index;
         self.current_index += 1;
         {
@@ -36,7 +36,7 @@ impl Watchers {
             map.insert(index, watcher.clone());
         }
 
-        let entry = self.getter_map.entry(tax_id).or_insert(Vec::new());
+        let entry = self.getter_map.entry(taxo_id).or_insert(Vec::new());
         entry.push((range, Arc::downgrade(&watcher)));
 
         WatcherGuard {
@@ -50,8 +50,8 @@ impl Watchers {
         map.get(&index).cloned()
     }
 
-    pub fn get_from_tax_id(&self, tax_id: &TaxId<Getter>) -> Option<Vec<RangedSyncSender>> {
-        self.getter_map.get(tax_id).and_then(|vec| {
+    pub fn get_from_taxo_id(&self, taxo_id: &TaxoId<Getter>) -> Option<Vec<RangedSyncSender>> {
+        self.getter_map.get(taxo_id).and_then(|vec| {
             let vec: Vec<_> = vec.iter().filter_map(|&(ref range, ref weak_sender)| {
                 let range = range.clone();
                 weak_sender.upgrade().map(|sender| (range, sender))

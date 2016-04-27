@@ -8,10 +8,10 @@ mod id_map;
 mod watchers;
 
 
-use taxonomy::util::Id as TaxId;
+use taxonomy::util::Id as TaxoId;
 use taxonomy::services::{ Setter, Getter, AdapterId, ServiceId, Service, Channel, ChannelKind };
 use taxonomy::values::*;
-use taxonomy::api::{ ResultMap, Error as TaxError, InternalError, User };
+use taxonomy::api::{ ResultMap, Error as TaxoError, InternalError, User };
 use taxonomy::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
 use transformable_channels::mpsc::ExtSender;
 
@@ -35,14 +35,14 @@ pub use self::OpenzwaveAdapter as Adapter;
 
 #[derive(Debug)]
 pub enum Error {
-    TaxonomyError(TaxError),
+    TaxonomyError(TaxoError),
     IOError(io::Error),
     OpenzwaveError(openzwave::Error),
     UnknownError
 }
 
-impl From<TaxError> for Error {
-    fn from(err: TaxError) -> Self {
+impl From<TaxoError> for Error {
+    fn from(err: TaxoError) -> Self {
         Error::TaxonomyError(err)
     }
 }
@@ -121,7 +121,7 @@ impl RangeChecker for Range {
     }
 }
 
-fn tax_kind_from_ozw_vid(vid: &ValueID) -> Option<ChannelKind> {
+fn taxo_kind_from_ozw_vid(vid: &ValueID) -> Option<ChannelKind> {
     match (vid.get_type(), vid.get_command_class(), vid.get_index()) {
         (ValueType::ValueType_Bool, Some(CommandClass::DoorLock),     0) => Some(ChannelKind::DoorLocked),
         (ValueType::ValueType_Bool, Some(CommandClass::SensorBinary), _) => Some(ChannelKind::OpenClosed),
@@ -131,7 +131,7 @@ fn tax_kind_from_ozw_vid(vid: &ValueID) -> Option<ChannelKind> {
     }
 }
 
-fn ozw_vid_as_tax_value(vid: &ValueID) -> Option<Value> {
+fn ozw_vid_as_taxo_value(vid: &ValueID) -> Option<Value> {
     if vid.get_command_class().is_none() {
         return None;
     }
@@ -139,7 +139,7 @@ fn ozw_vid_as_tax_value(vid: &ValueID) -> Option<Value> {
     match vid.get_type() {
         ValueType::ValueType_Bool => {
             if let Ok(value) = vid.as_bool() {
-                match tax_kind_from_ozw_vid(vid) {
+                match taxo_kind_from_ozw_vid(vid) {
                     // Some(ChannelKind::OnOff)  => Some(Value::OnOff(if value {OnOff::On} else {OnOff::Off})), // TODO support switches
                     Some(ChannelKind::OpenClosed)  => Some(Value::OpenClosed(if value {OpenClosed::Open} else {OpenClosed::Closed})),
                     Some(ChannelKind::DoorLocked)  => Some(Value::DoorLocked(if value {DoorLocked::Locked} else {DoorLocked::Unlocked})),
@@ -153,9 +153,9 @@ fn ozw_vid_as_tax_value(vid: &ValueID) -> Option<Value> {
     }
 }
 
-fn set_ozw_vid_from_tax_value(vid: &ValueID, value: Value) -> Result<(), TaxError> {
+fn set_ozw_vid_from_taxo_value(vid: &ValueID, value: Value) -> Result<(), TaxoError> {
     if vid.get_command_class().is_none() {
-        return Err(TaxError::InternalError(InternalError::GenericError(format!("Unknown command class: {}", vid.get_command_class_id()))));
+        return Err(TaxoError::InternalError(InternalError::GenericError(format!("Unknown command class: {}", vid.get_command_class_id()))));
     }
 
     let result = match vid.get_type() {
@@ -164,19 +164,19 @@ fn set_ozw_vid_from_tax_value(vid: &ValueID, value: Value) -> Result<(), TaxErro
                 //Value::OnOff(onOff) => { vid.set_bool(onOff == OnOff::On) } // TODO support switches
                 Value::OpenClosed(open_closed) => { vid.set_bool(open_closed == OpenClosed::Open) }
                 Value::DoorLocked(locked_unlocked) => { vid.set_bool(locked_unlocked == DoorLocked::Locked) }
-                _ => { return Err(TaxError::InvalidValue(value)) } // TODO InvalidType would be better but we'll need to fix specific types for specific TaxIds
+                _ => { return Err(TaxoError::InvalidValue(value)) } // TODO InvalidType would be better but we'll need to fix specific types for specific TaxoIds
             }
         }
-        _ => { return Err(TaxError::InternalError(InternalError::GenericError(format!("Unsupported OZW type: {:?}", vid.get_type())))) }
+        _ => { return Err(TaxoError::InternalError(InternalError::GenericError(format!("Unsupported OZW type: {:?}", vid.get_type())))) }
     };
 
-    result.map_err(|e| TaxError::InternalError(InternalError::GenericError(format!("Error while setting a value: {}", e))))
+    result.map_err(|e| TaxoError::InternalError(InternalError::GenericError(format!("Error while setting a value: {}", e))))
 }
 
-type ValueCache = HashMap<TaxId<Getter>, Value>;
+type ValueCache = HashMap<TaxoId<Getter>, Value>;
 
 pub struct OpenzwaveAdapter {
-    id: TaxId<AdapterId>,
+    id: TaxoId<AdapterId>,
     name: String,
     vendor: String,
     version: [u32; 4],
@@ -231,7 +231,7 @@ impl OpenzwaveAdapter {
 
         let name = String::from("OpenZwave Adapter");
         let adapter = Arc::new(OpenzwaveAdapter {
-            id: TaxId::new(&name),
+            id: TaxoId::new(&name),
             name: name,
             vendor: String::from("Mozilla"),
             version: [1, 0, 0, 0],
@@ -268,7 +268,7 @@ impl OpenzwaveAdapter {
                     ZWaveNotification::NodeNew(_node)               => {}
                     ZWaveNotification::NodeAdded(node)              => {
                         let service_name = format!("OpenZWave-{:08x}-{:02x}", node.get_home_id(), node.get_id());
-                        let service_id = TaxId::new(&service_name);
+                        let service_id = TaxoId::new(&service_name);
                         node_map.push(service_id.clone(), node);
 
                         let mut service = Service::empty(service_id.clone(), adapter_id.clone());
@@ -292,17 +292,17 @@ impl OpenzwaveAdapter {
 
                         let value_id = format!("OpenZWave-{:08x}-{:016x} ({})", vid.get_home_id(), vid.get_id(), vid.get_label());
 
-                        let node_id = node_map.find_tax_id_from_ozw(&vid.get_node()).unwrap();
+                        let node_id = node_map.find_taxo_id_from_ozw(&vid.get_node()).unwrap();
 
                         let has_getter = !vid.is_write_only();
                         let has_setter = !vid.is_read_only();
 
-                        let kind = tax_kind_from_ozw_vid(&vid);
+                        let kind = taxo_kind_from_ozw_vid(&vid);
                         if kind.is_none() { continue }
                         let kind = kind.unwrap();
 
                         if has_getter {
-                            let getter_id = TaxId::new(&value_id);
+                            let getter_id = TaxoId::new(&value_id);
                             getter_map.push(getter_id.clone(), vid);
                             box_manager.add_getter(Channel {
                                 id: getter_id.clone(),
@@ -320,7 +320,7 @@ impl OpenzwaveAdapter {
                         }
 
                         if has_setter {
-                            let setter_id = TaxId::new(&value_id);
+                            let setter_id = TaxoId::new(&value_id);
                             setter_map.push(setter_id.clone(), vid);
                             box_manager.add_setter(Channel {
                                 id: setter_id.clone(),
@@ -343,34 +343,34 @@ impl OpenzwaveAdapter {
                             _ => continue // ignore non-bool vals for now
                         };
 
-                        let tax_id = match getter_map.find_tax_id_from_ozw(&vid) {
-                            Some(tax_id) => tax_id,
+                        let taxo_id = match getter_map.find_taxo_id_from_ozw(&vid) {
+                            Some(taxo_id) => taxo_id,
                             _ => continue
                         };
 
-                        let tax_value = match ozw_vid_as_tax_value(&vid) {
+                        let taxo_value = match ozw_vid_as_taxo_value(&vid) {
                             Some(value) => value,
                             _ => continue
                         };
 
                         let watchers = watchers.lock().unwrap();
 
-                        let watchers = match watchers.get_from_tax_id(&tax_id) {
+                        let watchers = match watchers.get_from_taxo_id(&taxo_id) {
                             Some(watchers) => watchers,
                             _ => continue
                         };
 
                         let previous_value = {
                             let mut cache = value_cache.lock().unwrap();
-                            let previous = cache.get(&tax_id).cloned();
-                            cache.insert(tax_id.clone(), tax_value.clone());
+                            let previous = cache.get(&taxo_id).cloned();
+                            cache.insert(taxo_id.clone(), taxo_value.clone());
                             previous
                         };
 
                         for &(ref range, ref sender) in &watchers {
-                            debug!("[OpenzwaveAdapter::ValueChanged] Iterating over watcher {:?} {:?}", tax_id, range);
+                            debug!("[OpenzwaveAdapter::ValueChanged] Iterating over watcher {:?} {:?}", taxo_id, range);
 
-                            let should_send_value = range.should_send(&tax_value, EventType::Enter);
+                            let should_send_value = range.should_send(&taxo_value, EventType::Enter);
 
                             if let Some(ref previous_value) = previous_value {
                                 let should_send_previous = range.should_send(previous_value, EventType::Exit);
@@ -379,23 +379,23 @@ impl OpenzwaveAdapter {
                                 if should_send_value && should_send_previous { continue }
 
                                 if should_send_previous {
-                                    debug!("Openzwave::Adapter::ValueChanged Sending event Exit {:?} {:?}", tax_id, tax_value);
+                                    debug!("Openzwave::Adapter::ValueChanged Sending event Exit {:?} {:?}", taxo_id, taxo_value);
                                     let sender = sender.lock().unwrap();
                                     sender.send(
-                                        WatchEvent::Exit { id: tax_id.clone(), value: tax_value.clone() }
+                                        WatchEvent::Exit { id: taxo_id.clone(), value: taxo_value.clone() }
                                     ).unwrap_or_else(|_| {
-                                        error!("Couldn't send the exit event {{ id: {:?}, value: {:?} }}", tax_id, tax_value);
+                                        error!("Couldn't send the exit event {{ id: {:?}, value: {:?} }}", taxo_id, taxo_value);
                                     });
                                 }
                             }
 
                             if should_send_value {
-                                debug!("[OpenzwaveAdapter::ValueChanged] Sending event Enter {:?} {:?}", tax_id, tax_value);
+                                debug!("[OpenzwaveAdapter::ValueChanged] Sending event Enter {:?} {:?}", taxo_id, taxo_value);
                                 let sender = sender.lock().unwrap();
                                 sender.send(
-                                    WatchEvent::Enter { id: tax_id.clone(), value: tax_value.clone() }
+                                    WatchEvent::Enter { id: taxo_id.clone(), value: taxo_value.clone() }
                                 ).unwrap_or_else(|_| {
-                                    error!("Couldn't send the enter event {{ id: {:?}, value: {:?} }}", tax_id, tax_value);
+                                    error!("Couldn't send the enter event {{ id: {:?}, value: {:?} }}", taxo_id, taxo_value);
                                 });
                             }
                         }
@@ -414,7 +414,7 @@ impl OpenzwaveAdapter {
 }
 
 impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
-    fn id(&self) -> TaxId<AdapterId> {
+    fn id(&self) -> TaxoId<AdapterId> {
         self.id.clone()
     }
 
@@ -430,31 +430,31 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
         &self.version
     }
 
-    fn fetch_values(&self, mut set: Vec<TaxId<Getter>>, _: User) -> ResultMap<TaxId<Getter>, Option<Value>, TaxError> {
+    fn fetch_values(&self, mut set: Vec<TaxoId<Getter>>, _: User) -> ResultMap<TaxoId<Getter>, Option<Value>, TaxoError> {
         set.drain(..).map(|id| {
-            let ozw_vid = self.getter_map.find_ozw_from_tax_id(&id);
+            let ozw_vid = self.getter_map.find_ozw_from_taxo_id(&id);
 
-            let tax_value: Option<Option<Value>> = ozw_vid.map(|ozw_vid: ValueID| {
+            let taxo_value: Option<Option<Value>> = ozw_vid.map(|ozw_vid: ValueID| {
                 if !ozw_vid.is_set() { return None }
 
-                ozw_vid_as_tax_value(&ozw_vid)
+                ozw_vid_as_taxo_value(&ozw_vid)
             });
-            let value_result: Result<Option<Value>, TaxError> = tax_value.ok_or(TaxError::InternalError(InternalError::NoSuchGetter(id.clone())));
+            let value_result: Result<Option<Value>, TaxoError> = taxo_value.ok_or(TaxoError::InternalError(InternalError::NoSuchGetter(id.clone())));
             (id, value_result)
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<TaxId<Setter>, Value>, _: User) -> ResultMap<TaxId<Setter>, (), TaxError> {
+    fn send_values(&self, mut values: HashMap<TaxoId<Setter>, Value>, _: User) -> ResultMap<TaxoId<Setter>, (), TaxoError> {
         values.drain().map(|(id, value)| {
-            if let Some(ozw_vid) = self.setter_map.find_ozw_from_tax_id(&id) {
-                (id, set_ozw_vid_from_tax_value(&ozw_vid, value))
+            if let Some(ozw_vid) = self.setter_map.find_ozw_from_taxo_id(&id) {
+                (id, set_ozw_vid_from_taxo_value(&ozw_vid, value))
             } else {
-                (id.clone(), Err(TaxError::InternalError(InternalError::NoSuchSetter(id))))
+                (id.clone(), Err(TaxoError::InternalError(InternalError::NoSuchSetter(id))))
             }
         }).collect()
     }
 
-    fn register_watch(&self, mut values: Vec<(TaxId<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) -> Vec<(TaxId<Getter>, Result<Box<AdapterWatchGuard>, TaxError>)> {
+    fn register_watch(&self, mut values: Vec<(TaxoId<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) -> Vec<(TaxoId<Getter>, Result<Box<AdapterWatchGuard>, TaxoError>)> {
         debug!("[OpenzwaveAdapter::register_watch] Should register some watchers");
         values.drain(..).map(|(id, range, sender)| {
             let sender = Arc::new(Mutex::new(sender)); // Mutex is necessary because cb is not Sync.
@@ -463,13 +463,13 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
                 let mut watchers = self.watchers.lock().unwrap();
                 watchers.push(id.clone(), range.clone(), sender.clone())
             };
-            let value_result: Result<Box<AdapterWatchGuard>, TaxError> = Ok(Box::new(watch_guard));
+            let value_result: Result<Box<AdapterWatchGuard>, TaxoError> = Ok(Box::new(watch_guard));
 
             // if there is a set value already, let's send it.
-            let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_tax_id(&id);
+            let ozw_value: Option<ValueID> = self.getter_map.find_ozw_from_taxo_id(&id);
             if let Some(value) = ozw_value {
                 if value.is_set() && value.get_type() == ValueType::ValueType_Bool {
-                    if let Some(value) = ozw_vid_as_tax_value(&value) {
+                    if let Some(value) = ozw_vid_as_taxo_value(&value) {
                         self.value_cache.lock().unwrap().insert(id.clone(), value.clone());
                         if range.should_send(&value, EventType::Enter) {
                             debug!("[OpenzwaveAdapter::register_watch] Sending event Enter {:?} {:?}", id, value);
