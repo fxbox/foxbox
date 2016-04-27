@@ -2,6 +2,9 @@
 
 set -e
 
+BUILD_TARGET='arm-linux-gnueabihf'
+RUST_TARGET='armv7-unknown-linux-gnueabihf'
+
 _install_arm_packages() {
     sudo tee -a /etc/apt/sources.list <<EOF
 deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty main
@@ -18,7 +21,7 @@ EOF
     set -e
 
     sudo apt-get install -y --no-install-recommends build-essential curl file \
-        g++-arm-linux-gnueabihf
+        "g++-$BUILD_TARGET"
 
     sudo apt-get install -y --no-install-recommends libasound2:armhf \
         libssl-dev:armhf libespeak-dev:armhf libupnp6-dev:armhf \
@@ -27,19 +30,22 @@ EOF
 
 _set_up_environment() {
     # open-zwave wants -cc and -c++ but no package seems to provid them.
-    sudo cp /usr/bin/arm-linux-gnueabihf-gcc /usr/bin/arm-linux-gnueabihf-cc
-    sudo cp /usr/bin/arm-linux-gnueabihf-g++ /usr/bin/arm-linux-gnueabihf-c++
+    sudo cp "/usr/bin/$BUILD_TARGET-gcc" "/usr/bin/$BUILD_TARGET-cc"
+    sudo cp "/usr/bin/$BUILD_TARGET-g++" "/usr/bin/$BUILD_TARGET-c++"
 
     # For rust-crypto
-    export CC=arm-linux-gnueabihf-gcc
+    export CC="$BUILD_TARGET-gcc"
 
     # For open-zwave
-    export CROSS_COMPILE=arm-linux-gnueabihf-
+    export CROSS_COMPILE="$BUILD_TARGET-"
 
     tee -a $HOME/.cargo/config << EOF
-[target.armv7-unknown-linux-gnueabihf]
-linker = "arm-linux-gnueabihf-gcc"
+[target.$RUST_TARGET]
+linker = "$BUILD_TARGET-gcc"
 EOF
+
+    export PKG_CONFIG_LIBDIR="/usr/lib/$BUILD_TARGET/pkgconfig"
+    export PKG_CONFIG_ALLOW_CROSS=1
 }
 
 _install_rust_for_arm() {
@@ -47,7 +53,7 @@ _install_rust_for_arm() {
     rm -rf ~/rust
 
     sh ~/rust-installer/rustup.sh --prefix=~/rust --spec="$TRAVIS_RUST_VERSION"\
-        -y --disable-sudo --with-target=armv7-unknown-linux-gnueabihf
+        -y --disable-sudo --with-target="$RUST_TARGET"
 }
 
 install_dependencies() {
@@ -59,9 +65,9 @@ install_dependencies() {
 build() {
     # Both target should be validated
     echo "build: Debug compilation"
-    cargo build --target=armv7-unknown-linux-gnueabihf
+    cargo build --target="$RUST_TARGET"
     echo "build: Release compilation"
-    cargo build --target=armv7-unknown-linux-gnueabihf --release
+    cargo build --target="$RUST_TARGET" --release
 }
 
 lint() {
