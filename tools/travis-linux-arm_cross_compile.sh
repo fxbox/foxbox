@@ -28,7 +28,18 @@ EOF
         libudev-dev:armhf libavahi-client-dev:armhf libsqlite3-dev:armhf
 }
 
+_set_up_cargo_config() {
+    mkdir -p "$HOME/.cargo"
+    touch "$HOME/.cargo/config"
+    tee -a "$HOME/.cargo/config" << EOF
+[target.$RUST_TARGET]
+linker = "$BUILD_TARGET-gcc"
+EOF
+}
+
 _set_up_environment() {
+    _set_up_cargo_config
+
     # open-zwave wants -cc and -c++ but no package seems to provid them.
     sudo cp "/usr/bin/$BUILD_TARGET-gcc" "/usr/bin/$BUILD_TARGET-cc"
     sudo cp "/usr/bin/$BUILD_TARGET-g++" "/usr/bin/$BUILD_TARGET-c++"
@@ -38,11 +49,6 @@ _set_up_environment() {
 
     # For open-zwave
     export CROSS_COMPILE="$BUILD_TARGET-"
-
-    tee -a $HOME/.cargo/config << EOF
-[target.$RUST_TARGET]
-linker = "$BUILD_TARGET-gcc"
-EOF
 
     export PKG_CONFIG_LIBDIR="/usr/lib/$BUILD_TARGET/pkgconfig"
     export PKG_CONFIG_ALLOW_CROSS=1
