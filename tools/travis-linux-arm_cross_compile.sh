@@ -1,7 +1,8 @@
 #!/bin/bash
 
-set -e
+set -ev
 
+# Global env $RELEASE
 BUILD_TARGET='arm-linux-gnueabihf'
 RUST_TARGET='armv7-unknown-linux-gnueabihf'
 
@@ -63,19 +64,11 @@ install_dependencies() {
 }
 
 build() {
-    # Both target should be validated
-    echo "build: Debug compilation"
-    cargo build --target="$RUST_TARGET"
-    echo "build: Release compilation"
-    cargo build --target="$RUST_TARGET" --release
-}
+    if [[ $RELEASE == "true" ]]; then
+        FLAGS='--release'
+    fi
 
-lint() {
-    echo "lint: No linting needed for cross-compilation. Skipping..."
-}
-
-set_up_tests() {
-    echo "set_up_tests: no set up required. Skipping..."
+    cargo build --target="$RUST_TARGET" $FLAGS
 }
 
 run_tests() {

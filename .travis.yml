@@ -1,30 +1,32 @@
-sudo: required
-
 env:
   global:
     # $BOX_HOST_NAME and $BOX_PORT are also used by Selenium tests.
     - BOX_LOCAL_NAME=foxbox BOX_PORT=3000
-
-os:
-  - osx
-  - linux
-
-dist: trusty
+    - BUILD_SCRIPT=general
 
 language: rust
-rust:
-  - nightly-2016-04-10
-  - nightly
+rust: nightly-2016-04-10
+os: linux
+dist: trusty
+sudo: required
 
 matrix:
   fast_finish: true
   allow_failures:
     - rust: nightly
   include:
-    - sudo: required
-      os: linux
-      rust: nightly-2016-04-10
-      env: BUILD_ENV=-arm_cross_compile
+    - os: osx
+    - rust: nightly
+    - env: BUILD_SCRIPT=arm_cross_compile RELEASE=true
+    - env: BUILD_SCRIPT=arm_cross_compile RELEASE=false
+
+    - env: BUILD_SCRIPT=coverage
+
+    - env: COMPONENT=taxonomy           BUILD_SCRIPT=component
+    - env: COMPONENT=thinkerbell        BUILD_SCRIPT=component
+    - env: COMPONENT=tls                BUILD_SCRIPT=component
+    - env: COMPONENT=dns_challenge      BUILD_SCRIPT=component
+    - env: COMPONENT=openzwave-adapter  BUILD_SCRIPT=component
 
 cache:
   directories:
@@ -44,11 +46,9 @@ addons:
       - libelf-dev
       - libdw-dev
 
-before_install: source $TRAVIS_BUILD_DIR/tools/travis-$TRAVIS_OS_NAME$BUILD_ENV.sh
+before_install: source $TRAVIS_BUILD_DIR/tools/travis-$TRAVIS_OS_NAME-$BUILD_SCRIPT.sh
 install: install_dependencies
 
-before_script: set_up_tests
 script:
   - build
-  - lint
   - run_tests

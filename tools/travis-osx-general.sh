@@ -15,14 +15,6 @@ build() {
     cargo build
 }
 
-lint() {
-    echo "lint: jshint is not installed on Mac. Skipping..."
-}
-
-set_up_tests() {
-    echo "set_up_tests: no set up required. Skipping..."
-}
-
 run_tests() {
     echo "run_tests: no selenium installed. Skipping..."
     echo "run_tests: no npm installed. Skipping integration tests..."
