@@ -209,6 +209,21 @@ pub enum ChannelKind {
     /// ```
     DoorLocked,
 
+    /// This kind is used when the user wants to include a new ZWave
+    /// device into the ZWave network.
+    /// # JSON
+    ///
+    /// This kind is represented by string "ZwaveInclude".
+    ///
+    /// ```
+    /// use foxbox_taxonomy::services::*;
+    /// use foxbox_taxonomy::parse::*;
+    ///
+    /// let parsed = ChannelKind::from_str("\"ZwaveInclude\"").unwrap();
+    /// assert_eq!(parsed, ChannelKind::ZwaveInclude);
+    /// ```
+    ZwaveInclude,
+
     //
     // # String
     //
@@ -473,6 +488,7 @@ impl Parser<ChannelKind> for ChannelKind {
                 "LightOn" => Ok(ChannelKind::LightOn),
                 "OpenClosed" => Ok(ChannelKind::OpenClosed),
                 "DoorLocked" => Ok(ChannelKind::DoorLocked),
+                "ZwaveInclude" => Ok(ChannelKind::ZwaveInclude),
                 "Username" => Ok(ChannelKind::Username),
                 "Password" => Ok(ChannelKind::Password),
                 "Countdown" => Ok(ChannelKind::Countdown),
@@ -521,6 +537,7 @@ impl ToJSON for ChannelKind {
             LightOn => JSON::String("LightOn".to_owned()),
             OpenClosed => JSON::String("OpenClosed".to_owned()),
             DoorLocked => JSON::String("DoorLocked".to_owned()),
+            ZwaveInclude => JSON::String("ZwaveInclude".to_owned()),
             Username => JSON::String("Username".to_owned()),
             Password => JSON::String("Password".to_owned()),
             CurrentTime => JSON::String("CurrentTime".to_owned()),
@@ -558,6 +575,7 @@ impl ChannelKind {
             LightOn => Type::OnOff,
             OpenClosed => Type::OpenClosed,
             DoorLocked => Type::DoorLocked,
+            ZwaveInclude => Type::IsSecure,
             CurrentTime => Type::TimeStamp,
             CurrentTimeOfDay | RemainingTime | Countdown | CountEveryInterval => Type::Duration,
             OvenTemperature => Type::Temperature,
