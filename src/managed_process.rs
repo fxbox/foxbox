@@ -7,7 +7,7 @@ use libc::{self,  c_int};
 
 use std::thread;
 use std::thread::JoinHandle;
-use std::sync::{ Arc, Mutex };
+use std::sync::{ Arc, Mutex, RwLock };
 use std::process::Child;
 use std::io::{ Error, ErrorKind, Result };
 use std::time::{ SystemTime, Duration, UNIX_EPOCH };
@@ -26,7 +26,53 @@ fn seconds_since_epoch() -> f64 {
 pub struct ManagedProcess {
     kill_signal: Arc<Mutex<u32>>,
     pid:         Arc<Mutex<Option<u32>>>,
-    thread:      JoinHandle<()>
+    thread:      JoinHandle<()>,
+    backoff:     Arc<RwLock<Backoff>>,
+}
+
+struct Backoff {
+    restart_count: u64,
+    restart_threshold: f64,
+    start_time: f64,
+    end_time: f64,
+    backoff: u64,
+}
+
+impl Backoff {
+
+    fn new(restart_threshold: f64) -> Self {
+        Backoff {
+            start_time: restart_threshold,
+            restart_threshold: restart_threshold,
+            end_time: 0.0_f64,
+            backoff: 0,
+            restart_count: 0,
+        }
+    }
+
+    fn next_backoff(&mut self) -> Duration {
+        self.end_time = seconds_since_epoch();
+
+        let seconds_to_backoff =
+            if (self.end_time - self.start_time) < self.restart_threshold {
+                self.backoff += 1;
+
+                // non-linear back off
+                (self.backoff * self.backoff) >> 1
+            } else {
+                self.backoff = 0;
+                0
+            };
+
+        self.restart_count += 1;
+        self.start_time = seconds_since_epoch();
+
+        Duration::new(seconds_to_backoff, 0)
+    }
+
+    pub fn get_restart_count(&self) -> u64 {
+        self.restart_count
+    }
 }
 
 impl ManagedProcess {
@@ -57,14 +103,12 @@ impl ManagedProcess {
         let kill_signal = Arc::new(Mutex::new(0));
 
         let shared_kill_signal  = kill_signal.clone();
+        let backoff = Arc::new(RwLock::new(Backoff::new(RESTART_TIME_THRESHOLD)));
         let shared_pid = pid.clone();
+        let shared_backoff = backoff.clone();
 
         let thread = thread::spawn(move || {
-            // Artificial start/end time for first run
-            let mut start_time = RESTART_TIME_THRESHOLD as f64;
-            let mut end_time = 0 as f64;
-            let mut backoff = 0;
-            let mut starts = 0;
+            let backoff = shared_backoff;
 
             loop {
                 let mut child_process;
@@ -79,34 +123,29 @@ impl ManagedProcess {
                         break;
                     }
 
-                    if (end_time - start_time) < RESTART_TIME_THRESHOLD {
-                       backoff += 1;
-                       let backoff_seconds = (backoff * backoff) / 2;
-                       info!("Backing off creating a new process for {} seconds", backoff_seconds);
-                       thread::sleep(Duration::new(backoff_seconds, 0));
-                    } else {
-                        backoff = 0;
-                    }
-
-                    info!("Starting process. Restarted {} times", starts);
-                    start_time = seconds_since_epoch();
+                    info!("Starting process. Restarted {} times", checklock!(backoff.read()).get_restart_count());
                     child_process = spawn().unwrap();
                     *pid = Some(child_process.id());
                 }
 
-                starts += 1;
-
-                info!("Started managed process pid: {}", child_process.id());
                 child_process.wait().unwrap();
-                end_time = seconds_since_epoch();
+
+                let backoff_duration = checklock!(backoff.write()).next_backoff();
+                thread::sleep(backoff_duration);
             }
         });
 
         Ok(ManagedProcess {
+            backoff: backoff,
             kill_signal: kill_signal,
             pid:  pid,
             thread: thread
         })
+    }
+
+    #[allow(dead_code)]
+    pub fn get_restart_count(&self) -> u64 {
+        checklock!(self.backoff.read()).get_restart_count()
     }
 
     /// Get the current process ID or None if no process is running
@@ -152,16 +191,30 @@ impl ManagedProcess {
         // if the process has finished, and therefore had waitpid called,
         // and we kill it, then on unix we might ending up killing a
         // newer process that happens to have a re-used id
-        let status = try_wait(pid);
+        let status_result = try_wait(pid);
+        let needs_kill = match status_result {
+            Ok(Some(_)) => {
+                // Process is already exited
+                false
+            },
+            Ok(None) => {
+                // Process is still alive
+                true
+            },
+            Err(e) => {
+                // Something went wrong probably at the OS level, warn and don't
+                // try and kill the process.
+                warn!("{}", e);
+                false
+            },
+        };
 
-        if status.is_some() {
-            // Process is already exited
-            self.join_thread();
-            return Ok(());
+        if needs_kill {
+            debug!("Sending SIGKILL to pid: {}", pid);
+            if let Err(e) = unsafe { c_rv(libc::kill(pid, libc::SIGKILL)) } {
+                warn!("{}", e);
+            }
         }
-
-        debug!("Sending SIGKILL to pid: {}", pid);
-        unsafe { try!(c_rv(libc::kill(pid, libc::SIGKILL))); }
 
         self.join_thread();
         Ok(())
@@ -175,16 +228,16 @@ impl ManagedProcess {
 
 
 /// A non-blocking 'wait' for a given process id.
-fn try_wait(id: i32) -> Option<ExitStatus> {
+fn try_wait(id: i32) -> Result<Option<ExitStatus>> {
     let mut status = 0 as c_int;
 
     match c_rv_retry(|| unsafe {
         libc::waitpid(id, &mut status, libc::WNOHANG)
     }) {
-        Ok(0)  => None,
-        Ok(n) if n == id => Some(ExitStatus(status)),
-        Ok(n)  => panic!("Unknown pid: {}", n),
-        Err(e) => panic!("Unknown waitpid error: {}", e)
+        Ok(0)  => Ok(None),
+        Ok(n) if n == id => Ok(Some(ExitStatus(status))),
+        Ok(n)  => Err(Error::new(ErrorKind::NotFound, format!("Unknown pid: {}", n))),
+        Err(e) => Err(Error::new(ErrorKind::Other, format!("Unknown waitpid error: {}", e)))
     }
 }
 
@@ -211,29 +264,72 @@ fn c_rv_retry<F>(mut f: F) -> Result<c_int>
     }
 }
 
-// TODO: Reactivate this test on mac os in https://github.com/fxbox/foxbox/issues/354
+#[cfg(test)]
+mod test {
+    use super::Backoff;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn test_backoff_immediate_if_failed_after_threshold() {
+
+        let mut backoff = Backoff::new(2.0);
+        assert_eq!(backoff.next_backoff().as_secs(), 0);
+
+        // Simulate process running
+        thread::sleep(Duration::new(4, 0));
+
+        assert_eq!(backoff.next_backoff().as_secs(), 0);
+    }
+
+    #[test]
+    fn test_backoff_wait_if_failed_before_threshold() {
+        let mut backoff = Backoff::new(1.0);
+        assert_eq!(backoff.next_backoff().as_secs(), 0);
+
+        assert_eq!(backoff.next_backoff().as_secs(), 0);
+        assert_eq!(backoff.next_backoff().as_secs(), 2);
+        assert_eq!(backoff.next_backoff().as_secs(), 4);
+        assert_eq!(backoff.next_backoff().as_secs(), 8);
+        assert_eq!(backoff.next_backoff().as_secs(), 12);
+        assert_eq!(backoff.next_backoff().as_secs(), 18);
+    }
+
+    #[test]
+    fn test_backoff_reset_if_running_for_more_than_threshold() {
+        let mut backoff = Backoff::new(1.0);
+        assert_eq!(backoff.next_backoff().as_secs(), 0);
+        assert_eq!(backoff.next_backoff().as_secs(), 0);
+        assert_eq!(backoff.next_backoff().as_secs(), 2);
+        assert_eq!(backoff.next_backoff().as_secs(), 4);
+
+        // Simulate process running
+        thread::sleep(Duration::new(3, 0));
+
+        assert_eq!(backoff.next_backoff().as_secs(), 0);
+    }
+}
+
 #[test]
-#[cfg_attr(target_os = "macos", ignore)]
 fn test_managed_process_restart() {
-    use std::sync::mpsc::channel;
     use std::process::Command;
 
-    let (counter_tx, counter_rx) = channel();
-
-    let process = ManagedProcess::start(move || {
-        counter_tx.send(1).unwrap();
-
+    let process = ManagedProcess::start(|| {
         Command::new("sleep")
                 .arg("0")
                 .spawn()
     }).unwrap();
 
-    let mut count = 0;
-
     // Maybe spin with try_recv and check a duration
     // to assert liveness?
-    while count < 2 {
-        count = count + counter_rx.recv().unwrap()
+    let mut spin_count = 0;
+    while process.get_restart_count() < 2 {
+        if spin_count > 2 {
+            panic!("Process has not restarted twice, within the expected amount of time");
+        } else {
+            spin_count += 1;
+            thread::sleep(Duration::new(3, 0));
+        }
     }
 
     process.shutdown().unwrap();
