@@ -7,6 +7,8 @@ var webdriver = require('selenium-webdriver'),
     assert    = require('assert'),
     util      = require('util');
 
+var Prepper = require('./lib/testPrepperSelenium.js');
+
 var HOST_URL = util.format(
     'http://%s:%s/',
     process.env.BOX_LOCAL_NAME && process.env.BOX_LOCAL_NAME != 'localhost' ?
@@ -14,9 +16,10 @@ var HOST_URL = util.format(
     process.env.BOX_PORT || '3000'
 );
 
+Prepper.makeSuite('Test set up UI',function(){
+
 describe('sessions ui', function() {
   var driver;
-  this.timeout(8000);
 
   const PASS = '12345678';
 
@@ -270,4 +273,5 @@ describe('sessions ui', function() {
     });
   });
 
+});
 });

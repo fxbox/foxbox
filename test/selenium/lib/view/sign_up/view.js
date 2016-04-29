@@ -49,6 +49,18 @@ SetUpView.prototype = {
         });
     },
 
+    successSignUpFromApp: function(password) {
+        return this.accessors.insertPassword.sendKeys(password)
+        .then(() => {
+            return this.accessors.confirmPassword.sendKeys(password);
+        }).then(() => {
+            return this.accessors.submitButton.click();
+        }).then(() => {
+            var ServicesView = require('../services/view');
+            return new ServicesView(this.driver);
+        });
+    },
+
     failureLogin: function(password, confirmPassword) {
         return this.accessors.insertPassword.sendKeys(password)
         .then(() => {
