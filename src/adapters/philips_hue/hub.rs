@@ -11,19 +11,18 @@
 //! The module spawns a management thread for every hub.
 
 use serde_json;
-use std::sync::Arc;
+use std::sync::{ Arc, Mutex };
 use std::thread;
 use std::time::Duration;
 use super::hub_api::HubApi;
 use super::{ HueAction, PhilipsHueAdapter, structs };
 use traits::Controller;
-use uuid::Uuid;
 
 pub struct Hub<C> {
     pub adapter: PhilipsHueAdapter<C>,
     pub id: String,
     pub ip: String,
-    pub api: Arc<HubApi>,
+    pub api: Arc<Mutex<HubApi>>,
 }
 
 impl<C: Controller> Hub<C> {
@@ -36,12 +35,12 @@ impl<C: Controller> Hub<C> {
         let token = adapter.controller.get_config().get_or_set_default(
             "philips_hue",
             &format!("token_{}", id),
-            &Uuid::new_v4().to_simple_string());
+            "unauthorized");
         Hub {
             adapter: adapter,
             id: id.to_owned(),
             ip: ip.to_owned(),
-            api: Arc::new(HubApi::new(id, ip, &token)),
+            api: Arc::new(Mutex::new(HubApi::new(id, ip, &token))),
         }
     }
     pub fn start(&self) {
@@ -54,14 +53,14 @@ impl<C: Controller> Hub<C> {
 
             // The main Hub management loop
             loop {
-                if !api.is_available() {
+                if !api.lock().unwrap().is_available() {
                     // Re-check availability every minute.
                     thread::sleep(Duration::from_millis(60*1000));
                     continue;
                 }
 
                 // If the Hub is not paired, try pairing.
-                if !api.is_paired() {
+                if !api.lock().unwrap().is_paired() {
                     warn!("Philips Hue detected but not paired. Please, push pairing \
                            button on Philips Hue Bridge ID {} to start using it.", id);
 
@@ -70,13 +69,28 @@ impl<C: Controller> Hub<C> {
                         adapter.controller.adapter_notification(
                             json_value!({ adapter: "philips_hue",
                                 message: "NeedsPairing", hub: id }));
-                        if api.try_pairing() {
-                            break;
+                        let pairing_result = api.lock().unwrap().try_pairing();
+                        match pairing_result {
+                            Ok(Some(new_token)) => {
+                                info!("Pairing success with Philips Hue Bridge {}", id);
+                                // Save the new token
+                                adapter.controller.get_config().set(
+                                    "philips_hue",
+                                    &format!("token_{}", id),
+                                    &new_token);
+                                api.lock().unwrap().update_token(&new_token);
+                                break;
+                            },
+                            Ok(None) => {
+                                warn!("Push pairing button on Philips Hue Bridge {}", id);
+                            },
+                            Err(_) => {
+                                error!("Error while pairing with Philips Hue Bridge {}", id);
+                            }
                         }
                         thread::sleep(Duration::from_millis(1000));
                     }
-
-                    if api.is_paired() {
+                    if api.lock().unwrap().is_paired() {
                         info!("Paired with Philips Hue Bridge ID {}", id);
                         adapter.controller.adapter_notification(
                             json_value!({ adapter: "philips_hue", message: "PairingSuccess",
@@ -95,14 +109,14 @@ impl<C: Controller> Hub<C> {
 
                 // We have a paired Hub, instantiate the lights services.
                 // Extract and log some info
-                let setting = api.get_settings();
+                let setting = api.lock().unwrap().get_settings();
                 let hs = structs::Settings::new(&setting).unwrap(); // TODO: no unwrap
                 info!(
                     "Connected to Philips Hue bridge model {}, ID {}, software version {}, IP address {}",
                     hs.config.modelid, hs.config.bridgeid, hs.config.swversion,
                     hs.config.ipaddress);
 
-                let light_ids = api.get_lights();
+                let light_ids = api.lock().unwrap().get_lights();
                 for light_id in light_ids {
                     debug!("Found light {} on hub {}", light_id, id);
                     adapter.send(HueAction::AddLight(id.to_owned(), light_id.to_owned()));
