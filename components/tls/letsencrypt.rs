@@ -84,7 +84,7 @@ fn _get_san_cert_for<T>(names: T, certificate_manager: CertificateManager, dns_e
     }
 
     let command = format!(
-        "chmod +x {} && bash {} --cron --challenge dns-01 --hook {} && cp -R {}/certs/* {}",
+        "unset DYLD_LIBRARY_PATH && chmod +x {} && bash {} --cron --challenge dns-01 --hook {} && cp -R {}/certs/* {}",
         dns_challenge_file.to_str().unwrap(),
         letsencrypt_file.to_str().unwrap(),
         dns_challenge_file.to_str().unwrap(),
