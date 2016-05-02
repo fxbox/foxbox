@@ -29,7 +29,15 @@ impl std::fmt::Display for HubApi {
 
 impl HubApi {
     pub fn new(id: &str, ip: &str, token: &str) -> HubApi {
-        HubApi { id: id.to_owned(), ip: ip.to_owned(), token: token.to_owned() }
+        HubApi {
+            id: id.to_owned(),
+            ip: ip.to_owned(),
+            token: token.to_owned(),
+        }
+    }
+
+    pub fn update_token(&mut self, token: &str) {
+        self.token = token.to_owned();
     }
 
     pub fn get(&self, cmd: &str) -> Result<String, Box<Error>> {
@@ -88,13 +96,56 @@ impl HubApi {
         !settings.contains("unauthorized user")
     }
 
-    pub fn try_pairing(&self) -> bool {
-        // [{"success":{"username":"foxboxb-001788fffe25681a"}}]
-        // [{"error":{"type":101,"address":"/","description":"link button not pressed"}}]
+    pub fn try_pairing(&self) -> Result<Option<String>, ()> {
+        #[derive(Deserialize, Debug)]
+        struct PairingResponse {
+            success: Option<SuccessResponse>,
+            error: Option<ErrorResponse>
+        }
+        #[derive(Deserialize, Debug)]
+        struct SuccessResponse {
+            username: String
+        }
+        #[derive(Deserialize, Debug)]
+        struct ErrorResponse {
+            #[serde(rename="type")]
+            error_type: u32,
+            address: String,
+            description: String
+        }
         let url = "api";
-        let req = json!({ username: self.token, devicetype: "foxbox_hub"});
-        let response = self.post_unauth(&url, &req).unwrap_or("".to_owned()); // TODO: no unwrap
-        response.contains("success")
+        let req = json!({ devicetype: "foxbox_hub"});
+        let response = self.post_unauth(&url, &req).unwrap_or("[]".to_owned());
+        let mut response: Vec<PairingResponse> =
+            structs::parse_json(&response).unwrap_or(Vec::new());
+        if response.len() != 1 {
+            error!("Pairing request to Philips Hue bridge {} yielded unexpected response",
+                self.id);
+            return Err(())
+        }
+        let response = match response.pop() {
+            Some(response) => { response },
+            None => { return Err(()) }
+        };
+        if let Some(success) = response.success {
+            Ok(Some(success.username))
+        } else {
+            if let Some(error) = response.error {
+                if error.description.contains("link button not pressed") {
+                    debug!("Push pairing button on Philips Hue bridge {}",
+                        self.id);
+                    Ok(None)
+                } else {
+                    error!("Error while pairing with Philips Hue bridge {}: {}",
+                        self.id, error.description);
+                    Err(())
+                }
+            } else {
+                error!("Pairing request to Philips Hue bridge {} \
+                    yielded unexpected response", self.id);
+                Err(())
+            }
+        }
     }
 
     pub fn get_lights(&self) -> Vec<String> {

@@ -15,7 +15,7 @@ use foxbox_taxonomy::values::{ Type };
 use super::*;
 use super::hub_api::HubApi;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{ Arc, Mutex };
 
 const CUSTOM_PROPERTY_MANUFACTURER: &'static str = "manufacturer";
 const CUSTOM_PROPERTY_MODEL: &'static str = "model";
@@ -24,7 +24,7 @@ const CUSTOM_PROPERTY_TYPE: &'static str = "type";
 
 #[derive(Clone)]
 pub struct Light {
-    api: Arc<HubApi>,
+    api: Arc<Mutex<HubApi>>,
     hub_id: String,
     light_id: String,
     service_id: Id<ServiceId>,
@@ -34,7 +34,7 @@ pub struct Light {
 }
 
 impl Light {
-    pub fn new(api: Arc<HubApi>, hub_id: &str, light_id: &str)
+    pub fn new(api: Arc<Mutex<HubApi>>, hub_id: &str, light_id: &str)
         -> Self
     {
         Light {
@@ -57,7 +57,7 @@ impl Light {
         services: LightServiceMap) -> Result<(), Error>
     {
         let adapter_id = create_adapter_id();
-        let status = self.api.get_light_status(&self.light_id);
+        let status = self.api.lock().unwrap().get_light_status(&self.light_id);
         if status.lighttype == "Extended color light" {
             info!("New Philips Hue Extended Color Light service for light {} on bridge {}",
                 self.light_id, self.hub_id);
@@ -132,17 +132,17 @@ impl Light {
     }
 
     pub fn get_available(&self) -> bool {
-        let status = self.api.get_light_status(&self.light_id);
+        let status = self.api.lock().unwrap().get_light_status(&self.light_id);
         status.state.reachable
     }
 
     pub fn get_power(&self) -> bool {
-        let status = self.api.get_light_status(&self.light_id);
+        let status = self.api.lock().unwrap().get_light_status(&self.light_id);
         status.state.on
     }
 
     pub fn set_power(&self, on: bool) {
-        self.api.set_light_power(&self.light_id, on);
+        self.api.lock().unwrap().set_light_power(&self.light_id, on);
     }
 
 }
