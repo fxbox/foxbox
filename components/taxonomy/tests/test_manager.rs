@@ -4,12 +4,18 @@ extern crate transformable_channels;
 #[macro_use]
 extern crate assert_matches;
 
-use foxbox_taxonomy::manager::*;
-use foxbox_taxonomy::fake_adapter::*;
-use foxbox_taxonomy::api::{ API, Error, InternalError, TargetMap, Targetted, User, WatchEvent as Event };
-use foxbox_taxonomy::selector::*;
-use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::*;
+use foxbox_taxonomy::adapters::adapter::Signature;
+use foxbox_taxonomy::adapters::manager::*;
+use foxbox_taxonomy::adapters::fake_adapter::*;
+use foxbox_taxonomy::api::native::{ API, Targetted, User };
+use foxbox_taxonomy::api::error::*;
+use foxbox_taxonomy::api::selector::*;
+use foxbox_taxonomy::api::services::*;
+use foxbox_taxonomy::io::parse::*;
+use foxbox_taxonomy::io::range::*;
+use foxbox_taxonomy::io::serialize::*;
+use foxbox_taxonomy::io::types::*;
+use foxbox_taxonomy::misc::util::Description;
 
 use transformable_channels::mpsc::*;
 
@@ -18,10 +24,37 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 
-// Trivial utility function to convert the old TargetMap format to the newer one, to avoid
-// having to rewrite the tests.
-fn target_map<K, T>(mut source: Vec<(Vec<K>, T)>) -> TargetMap<K, T> where K: Clone, T: Clone {
-    source.drain(..).map(|(v, t)| Targetted::new(v, t)).collect()
+#[derive(PartialEq, PartialOrd, Debug)]
+struct IsOn(bool);
+impl Into<Value> for IsOn {
+    fn into(self) -> Value {
+        Value {
+            data: Arc::new(self)
+        }
+    }
+}
+impl Format for IsOn {
+    fn description(&self) -> String {
+        "bool".to_owned()
+    }
+    fn serialize(&self, value: &Value, _: &SerializeSupport) -> Result<JSON, SerializeError> {
+        match value.cast::<Self>() {
+            None => Err(SerializeError::ExpectedType(self.description())),
+            Some(value) => {
+                if value.0 {
+                    Ok(JSON::Bool(true))
+                } else {
+                    Ok(JSON::Bool(false))
+                }
+            }
+        }
+    }
+    fn deserialize(&self, path: Path, data: &JSON, _: &DeserializeSupport) -> Result<Value, ParseError> {
+        match *data {
+            JSON::Bool(ref b) => Ok(IsOn(*b).into()),
+            _ => Err(ParseError::TypeError { expected: self.description(), at: path.to_string(), name: "IsOn".to_owned()})
+        }
+    }
 }
 
 pub fn get_db_environment() -> PathBuf {
@@ -56,8 +89,7 @@ fn test_tags_in_db() {
 
     let id_1 = Id::<AdapterId>::new("adapter id 1");
     let service_id_1 = Id::<ServiceId>::new("service id 1");
-    let getter_id_1 = Id::<Getter>::new("getter id 1");
-    let setter_id_1 = Id::<Setter>::new("setter id 1");
+    let feature_id_1 = Id::<FeatureId>::new("feature id 1");
 
     let tag_id_1 = Id::<TagId>::new("tag id 1");
     let tag_id_2 = Id::<TagId>::new("tag id 2");
@@ -67,62 +99,41 @@ fn test_tags_in_db() {
     let service_1 = Service {
         id: service_id_1.clone(),
         adapter: id_1.clone(),
-        tags: HashSet::new(),
-        properties: HashMap::new(),
-        getters: HashMap::new(),
-        setters: HashMap::new(),
+        tags: vec![],
+        properties: vec![],
     };
 
-    let getter_1 = Channel {
-        id: getter_id_1.clone(),
-        service: service_id_1.clone(),
-        adapter: id_1.clone(),
-        last_seen: None,
-        tags: HashSet::new(),
-        mechanism: Getter {
-            updated: None,
-            kind: ChannelKind::LightOn,
-        },
-    };
-
-    let setter_1 = Channel {
-        id: setter_id_1.clone(),
-        service: service_id_1.clone(),
-        adapter: id_1.clone(),
-        last_seen: None,
-        tags: HashSet::new(),
-        mechanism: Setter {
-            updated: None,
-            kind: ChannelKind::LightOn,
-        },
+    let feature_1 : Feature = Feature {
+        implements: vec!["light-on", "x-light-on"],
+        fetch: None,
+        send: None,
+        ..Feature::empty(&feature_id_1, &service_id_1)
     };
 
     // Fist "session", starting from an empty state.
     {
+        println!("* Create an adapter manager, a service, a feature, add tags. They should be persisted to the database.");
         let manager = AdapterManager::new(Some(get_db_environment()));
         manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
         manager.add_service(service_1.clone()).unwrap();
-        manager.add_getter(getter_1.clone()).unwrap();
-        manager.add_setter(setter_1.clone()).unwrap();
+        manager.add_feature(feature_1.clone()).unwrap();
 
         manager.add_service_tags(vec![ServiceSelector::new().with_id(service_id_1.clone())],
                                  vec![tag_id_1.clone(), tag_id_2.clone()]);
 
-        manager.add_getter_tags(vec![GetterSelector::new().with_id(getter_id_1.clone())],
-                                vec![tag_id_2.clone(), tag_id_3.clone()]);
+        manager.add_feature_tags(vec![FeatureSelector::new().with_id(feature_id_1.clone())],
+                                 vec![tag_id_2.clone(), tag_id_3.clone()]);
 
-        manager.add_setter_tags(vec![SetterSelector::new().with_id(setter_id_1.clone())],
-                                vec![tag_id_1.clone(), tag_id_4.clone(), tag_id_3.clone()]);
+        println!("* Remove the service and the feature. The data should still be in the database.");
 
-        manager.remove_getter(&getter_id_1).unwrap();
-        manager.remove_setter(&setter_id_1).unwrap();
+        manager.remove_feature(&feature_id_1).unwrap();
         manager.remove_service(&service_id_1).unwrap();
         assert_eq!(manager.get_services(vec![]).len(), 0);
 
-        // Re-add the same service, getter and setter to check if we persisted the tags.
+        println!("* Re-add the service. The data should be restored from the database.");
+
+        // Re-add the same service and feature to check if we persisted the tags.
         manager.add_service(service_1.clone()).unwrap();
-        manager.add_getter(getter_1.clone()).unwrap();
-        manager.add_setter(setter_1.clone()).unwrap();
 
         let services = manager.get_services(vec![]);
         assert_eq!(services.len(), 1);
@@ -132,55 +143,48 @@ fn test_tags_in_db() {
         assert_eq!(service.tags.contains(&tag_id_1), true);
         assert_eq!(service.tags.contains(&tag_id_2), true);
 
-        let getters = manager.get_getter_channels(vec![GetterSelector::new()]);
-        assert_eq!(getters.len(), 1);
-        let ref getter = getters[0];
-        assert_eq!(getter.tags.len(), 2);
-        assert_eq!(getter.tags.contains(&tag_id_2), true);
-        assert_eq!(getter.tags.contains(&tag_id_3), true);
+        println!("* Re-add the feature. The data should be restored from the database.");
 
-        let setters = manager.get_setter_channels(vec![SetterSelector::new()]);
-        assert_eq!(setters.len(), 1);
-        let ref setter = setters[0];
-        assert_eq!(setter.tags.len(), 3);
-        assert_eq!(setter.tags.contains(&tag_id_1), true);
-        assert_eq!(setter.tags.contains(&tag_id_3), true);
-        assert_eq!(setter.tags.contains(&tag_id_4), true);
+        manager.add_feature(feature_1.clone()).unwrap();
 
+        let features = manager.get_features(vec![FeatureSelector::new()]);
+        assert_eq!(features.len(), 1);
+        let ref feature = features[0];
+        assert_eq!(feature.tags.len(), 2);
+        assert_eq!(feature.tags.contains(&tag_id_2), true);
+        assert_eq!(feature.tags.contains(&tag_id_3), true);
+
+        println!("* Terminate the manager. The data should still exist on the disk.");
         manager.remove_adapter(&id_1).unwrap();
         manager.stop();
     }
 
     // Second "session", starting with content added in session 1.
     {
+        println!("* Start a new manager, reconfigure it as previously.");
         let manager = AdapterManager::new(Some(get_db_environment()));
         manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
         manager.add_service(service_1.clone()).unwrap();
-        manager.add_getter(getter_1.clone()).unwrap();
-        manager.add_setter(setter_1.clone()).unwrap();
+        manager.add_feature(feature_1.clone()).unwrap();
 
         let services = manager.get_services(vec![]);
         assert_eq!(services.len(), 1);
 
+        println!("* The service should have the same tags.");
         let ref service = services[0];
         assert_eq!(service.tags.len(), 2);
         assert_eq!(service.tags.contains(&tag_id_1), true);
         assert_eq!(service.tags.contains(&tag_id_2), true);
 
-        let getters = manager.get_getter_channels(vec![GetterSelector::new()]);
-        assert_eq!(getters.len(), 1);
-        let ref getter = getters[0];
-        assert_eq!(getter.tags.len(), 2);
-        assert_eq!(getter.tags.contains(&tag_id_2), true);
-        assert_eq!(getter.tags.contains(&tag_id_3), true);
+        println!("* The features should have the same tags.");
+        let features = manager.get_features(vec![FeatureSelector::new()]);
+        assert_eq!(features.len(), 1);
+        let ref feature = features[0];
+        assert_eq!(feature.tags.len(), 2);
+        assert_eq!(feature.tags.contains(&tag_id_2), true);
+        assert_eq!(feature.tags.contains(&tag_id_3), true);
 
-        let setters = manager.get_setter_channels(vec![SetterSelector::new()]);
-        assert_eq!(setters.len(), 1);
-        let ref setter = setters[0];
-        assert_eq!(setter.tags.len(), 3);
-        assert_eq!(setter.tags.contains(&tag_id_1), true);
-        assert_eq!(setter.tags.contains(&tag_id_3), true);
-        assert_eq!(setter.tags.contains(&tag_id_4), true);
+        println!("* Clear the tags, this should be remembered.");
 
         // Remove all the tags, to check in session 3 if we start empty again.
         manager.remove_service_tags(vec![ServiceSelector::new().with_id(service_id_1.clone())],
@@ -189,17 +193,12 @@ fn test_tags_in_db() {
         assert_eq!(services.len(), 1);
         assert_eq!(services[0].tags.len(), 0);
 
-        manager.remove_getter_tags(vec![GetterSelector::new().with_id(getter_id_1.clone())],
+        manager.remove_feature_tags(vec![FeatureSelector::new().with_id(feature_id_1.clone())],
                                 vec![tag_id_2.clone(), tag_id_3.clone()]);
-        let getters = manager.get_getter_channels(vec![GetterSelector::new()]);
-        assert_eq!(getters.len(), 1);
-        assert_eq!(getters[0].tags.len(), 0);
-
-        manager.remove_setter_tags(vec![SetterSelector::new().with_id(setter_id_1.clone())],
-                                vec![tag_id_1.clone(), tag_id_4.clone(), tag_id_3.clone()]);
-        let setters = manager.get_setter_channels(vec![SetterSelector::new()]);
-        assert_eq!(setters.len(), 1);
-        assert_eq!(setters[0].tags.len(), 0);
+        let features = manager.get_features(vec![FeatureSelector::new()]);
+        assert_eq!(features.len(), 1);
+        let ref feature = features[0];
+        assert_eq!(feature.tags.len(), 0);
 
         manager.remove_adapter(&id_1).unwrap();
         manager.stop();
@@ -207,23 +206,23 @@ fn test_tags_in_db() {
 
     // Third "session", checking that we have no tags anymore.
     {
+        println!("* Start a new manager, reconfigure it as previously.");
+
         let manager = AdapterManager::new(Some(get_db_environment()));
         manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
         manager.add_service(service_1.clone()).unwrap();
-        manager.add_getter(getter_1.clone()).unwrap();
-        manager.add_setter(setter_1.clone()).unwrap();
+        manager.add_feature(feature_1.clone()).unwrap();
 
+        println!("* The service should have no tags.");
         let services = manager.get_services(vec![]);
         assert_eq!(services.len(), 1);
         assert_eq!(services[0].tags.len(), 0);
 
-        let getters = manager.get_getter_channels(vec![GetterSelector::new()]);
-        assert_eq!(getters.len(), 1);
-        assert_eq!(getters[0].tags.len(), 0);
-
-        let setters = manager.get_setter_channels(vec![SetterSelector::new()]);
-        assert_eq!(setters.len(), 1);
-        assert_eq!(setters[0].tags.len(), 0);
+        println!("* The feature should have no tags.");
+        let features = manager.get_features(vec![FeatureSelector::new()]);
+        assert_eq!(features.len(), 1);
+        let ref feature = features[0];
+        assert_eq!(feature.tags.len(), 0);
 
         manager.remove_adapter(&id_1).unwrap();
         manager.stop();
@@ -233,7 +232,7 @@ fn test_tags_in_db() {
 #[test]
 fn test_add_remove_adapter() {
     for clear in vec![false, true] {
-		println!("# Starting with test with clear {}.\n", clear);
+        println!("\n # Starting test with clear: {}\n", clear);
 
         let manager = AdapterManager::new(None);
         let id_1 = Id::new("id 1");
@@ -270,142 +269,75 @@ fn test_add_remove_adapter() {
         }
 
         if clear {
-            println!("* Clearing does not break the manager.\n");
+            println!("* Clearing does not need break the manager.");
             manager.stop();
         } else {
-            println!("* Not clearing does not break the manager.\n");
+            println!("* Not clearing does not need break the manager.");
         }
     }
 }
 
 #[test]
 fn test_add_remove_services() {
-    println!("");
     for clear in vec![false, true] {
-		println!("# Starting with test with clear {}.", clear);
+        println!("\n # Starting test with clear: {}\n", clear);
 
         let manager = AdapterManager::new(None);
+        let api = API::new(&manager);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
-        let id_3 = Id::<AdapterId>::new("adapter id 3");
 
-
-        let getter_id_1 = Id::<Getter>::new("getter id 1");
-        let getter_id_2 = Id::<Getter>::new("getter id 2");
-        let getter_id_3 = Id::<Getter>::new("getter id 3");
-
-        let setter_id_1 = Id::<Setter>::new("setter id 1");
-        let setter_id_2 = Id::<Setter>::new("setter id 2");
-        let setter_id_3 = Id::<Setter>::new("setter id 3");
+        let feature_id_1 = Id::<FeatureId>::new("feature id 1");
+        let feature_id_2 = Id::<FeatureId>::new("feature id 2");
+        let feature_id_3 = Id::<FeatureId>::new("feature id 3");
 
         let service_id_1 = Id::<ServiceId>::new("service id 1");
         let service_id_2 = Id::<ServiceId>::new("service id 2");
         let service_id_3 = Id::<ServiceId>::new("service id 3");
 
-        let getter_1 = Channel {
-            id: getter_id_1.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
-        };
+        let is_on : Arc<Format> = Arc::new(IsOn(false));
+        let returns_is_on = Some(Signature {
+            returns: Expects::Requires(is_on.clone()),
+            ..Signature::default()
+        });
+        let expects_is_on = Some(Signature {
+            accepts: Expects::Requires(is_on.clone()),
+            ..Signature::default()
+        });
 
-        let setter_1 = Channel {
-            id: setter_id_1.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
-        };
-
-        let getter_1_with_bad_service = Channel {
-            id: getter_id_1.clone(),
-            service: service_id_3.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
-        };
-
-        let setter_1_with_bad_service = Channel {
-            id: setter_id_1.clone(),
-            service: service_id_3.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
-        };
-
-        let getter_2_with_bad_adapter = Channel {
-            adapter: id_3.clone(),
-            .. getter_1.clone()
-        };
-
-        let setter_2_with_bad_adapter = Channel {
-            adapter: id_3.clone(),
-            .. setter_1.clone()
+        let feature_1 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            fetch: returns_is_on.clone(),
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_1, &service_id_1)
         };
 
         let service_1 = Service {
             id: service_id_1.clone(),
             adapter: id_1.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
-        };
-
-        let getter_2 = Channel {
-            id: getter_id_2.clone(),
-            service: service_id_2.clone(),
-            adapter: id_2.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
-        };
-
-        let setter_2 = Channel {
-            id: setter_id_2.clone(),
-            service: service_id_2.clone(),
-            adapter: id_2.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+            tags: vec![],
+            properties: vec![],
         };
 
         let service_2 = Service {
             id: service_id_2.clone(),
-            adapter: id_2.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            adapter: id_1.clone(),
+            tags: vec![],
+            properties: vec![],
         };
 
-        let service_2_with_channels = Service {
-            getters: vec![(getter_id_2.clone(), getter_2.clone())].iter().cloned().collect(),
-            setters: vec![(setter_id_2.clone(), setter_2.clone())].iter().cloned().collect(),
-            ..service_2.clone()
+        let feature_2 : Feature = Feature {
+            implements: vec!["light-color"],
+            fetch: returns_is_on.clone(),
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_2, &service_id_2)
+        };
+
+        let feature_3_no_such_service : Feature = Feature {
+            implements: vec!["light-color"],
+            fetch: returns_is_on.clone(),
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_3, &service_id_3)
         };
 
         println!("* Adding a service should fail if there is no adapter.");
@@ -421,27 +353,17 @@ fn test_add_remove_services() {
             other => panic!("Unexpected result {:?}", other)
         }
 
-        println!("* Adding a service should fail if the service is not empty.");
-        match manager.add_service(service_2_with_channels.clone()) {
-            Err(Error::InternalError(InternalError::InvalidInitialService)) => {},
-            other => panic!("Unexpected result {:?}", other)
-        }
-
-        println!("* We shouldn't have any channels.");
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 0);
-
         println!("* Make sure that none of the services has been added.");
-        assert_eq!(manager.get_services(vec![ServiceSelector::new()]).len(), 0);
+        assert_eq!(api.get_services(vec![ServiceSelector::new()]).len(), 0);
 
         println!("* Adding a service can succeed.");
         manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
         manager.add_service(service_1.clone()).unwrap();
-        assert_eq!(manager.get_services(vec![ServiceSelector::new()]).len(), 1);
+        assert_eq!(api.get_services(vec![ServiceSelector::new()]).len(), 1);
 
         println!("* Make sure that we are finding the right service.");
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_id(service_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_id(service_id_2.clone())]).len(), 0);
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_id(service_id_1.clone())]).len(), 1);
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_id(service_id_2.clone())]).len(), 0);
 
         println!("* Adding a second service with the same id should fail.");
         match manager.add_service(service_1.clone()) {
@@ -449,147 +371,144 @@ fn test_add_remove_services() {
             other => panic!("Unexpected result {:?}", other)
         }
 
-        println!("* Adding channels should fail if the service doesn't exist.");
-        match manager.add_getter(getter_1_with_bad_service.clone()) {
-            Err(Error::InternalError(InternalError::NoSuchService(ref err))) if *err == service_id_3 => {},
-            other => panic!("Unexpected result {:?}", other)
-        }
-        match manager.add_setter(setter_1_with_bad_service.clone()) {
+        println!("* Adding features should fail if the service doesn't exist.");
+        match manager.add_feature(feature_3_no_such_service.clone()) {
             Err(Error::InternalError(InternalError::NoSuchService(ref err))) if *err == service_id_3 => {},
             other => panic!("Unexpected result {:?}", other)
         }
 
         println!("* The attempt shouldn't let any channel lying around.");
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new()]).len(), 0);
 
-        println!("* Adding channels should fail if the adapter doesn't match that of its service.");
-        match manager.add_getter(getter_2_with_bad_adapter) {
-            Err(Error::InternalError(InternalError::ConflictingAdapter(ref err_1, ref err_2)))
-                if *err_1 == id_3 && *err_2 == id_1 => {},
-            Err(Error::InternalError(InternalError::ConflictingAdapter(ref err_1, ref err_2)))
-                if *err_1 == id_1 && *err_2 == id_3 => {},
+        println!("* Adding features can succeed.");
+        manager.add_feature(feature_1.clone()).unwrap();
+
+        println!("* We can find the features that have been added.");
+        assert_eq!(api.get_features(vec![FeatureSelector::new()]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_1.clone())]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_2.clone())]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_1.clone())
+        ])]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_3.clone())
+        ])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-on"))]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-off"))]).len(), 0);
+
+        println!("* Removing a non existent-feature fails.");
+        match manager.remove_feature(&feature_id_3) {
+            Err(Error::InternalError(InternalError::NoSuchFeature(ref err))) if *err == feature_id_3 => {},
             other => panic!("Unexpected result {:?}", other)
         }
-        match manager.add_setter(setter_2_with_bad_adapter) {
-            Err(Error::InternalError(InternalError::ConflictingAdapter(ref err_1, ref err_2)))
-                if *err_1 == id_3 && *err_2 == id_1 => {},
-            Err(Error::InternalError(InternalError::ConflictingAdapter(ref err_1, ref err_2)))
-                if *err_1 == id_1 && *err_2 == id_3 => {},
-            other => panic!("Unexpected result {:?}", other)
-        }
 
-        println!("* The attempt shouldn't let any channel lying around.");
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 0);
+        println!("* Removing a non existent-feature has no effect.");
+        assert_eq!(api.get_features(vec![FeatureSelector::new()]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_1.clone())]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_2.clone())]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_1.clone())
+        ])]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_3.clone())
+        ])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-on"))]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-off"))]).len(), 0);
 
-        println!("* Adding getter channels can succeed.");
-        manager.add_getter(getter_1.clone()).unwrap();
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 0);
+        println!("* Removing an installed feature can succeed.");
+        manager.remove_feature(&feature_id_1).unwrap();
 
-        println!("* Adding setter channels can succeed.");
-        manager.add_setter(setter_1.clone()).unwrap();
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 1);
+        println!("* We can observe taht the features have been removed.");
+        assert_eq!(api.get_features(vec![FeatureSelector::new()]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_1.clone())]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_2.clone())]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_1.clone())
+        ])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_3.clone())
+        ])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-on"))]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-off"))]).len(), 0);
 
-        println!("* Removing getter channels can succeed.");
-        manager.remove_getter(&getter_id_1).unwrap();
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 1);
-
-        println!("* Removing setter channels can succeed.");
-        manager.remove_setter(&setter_id_1).unwrap();
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 0);
-
-        println!("* We can remove a service without channels.");
+        println!("* We can remove a service without features.");
         manager.remove_service(&service_id_1).unwrap();
 
-        println!("* We can add several services, then several channels.");
+        println!("* We can add several services, then several features.");
         manager.add_service(service_1.clone()).unwrap();
         manager.add_service(service_2.clone()).unwrap();
-        manager.add_getter(getter_1.clone()).unwrap();
-        manager.add_setter(setter_1.clone()).unwrap();
-        manager.add_getter(getter_2.clone()).unwrap();
-        manager.add_setter(setter_2.clone()).unwrap();
-        assert_eq!(manager.get_services(vec![ServiceSelector::new()]).len(), 2);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_id(service_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_id(service_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_id(service_id_3.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 2);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 2);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_3.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_3.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_1.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_3.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_3.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 2);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 2);
+        manager.add_feature(feature_1.clone()).unwrap();
+        manager.add_feature(feature_2.clone()).unwrap();
 
-        println!("* We can remove a service with channels.");
+
+        println!("* These features are detected.");
+        assert_eq!(api.get_features(vec![FeatureSelector::new()]).len(), 2);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_1.clone())]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_2.clone())]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_1.clone())
+        ])]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_2.clone())
+        ])]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_3.clone())
+        ])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-on"))]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-color"))]).len(), 1);
+        assert_eq!(api.get_features(vec![
+            FeatureSelector::new().with_implements(Id::new("light-on")),
+            FeatureSelector::new().with_implements(Id::new("light-color"))
+        ]).len(), 2);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-off"))]).len(), 0);
+
+        println!("* A feature that matches several selectors is only returned once.");
+        assert_eq!(api.get_features(vec![
+            FeatureSelector::new().with_implements(Id::new("light-on")),
+            FeatureSelector::new().with_implements(Id::new("x-light-on")),
+            FeatureSelector::new().with_id(feature_id_1.clone()),
+            FeatureSelector::new().with_service(vec![
+                ServiceSelector::new().with_id(service_id_1.clone())
+            ])
+        ]).len(), 1);
+
+        println!("* We can remove a service with features.");
         manager.remove_service(&service_id_1).unwrap();
-        assert_eq!(manager.get_services(vec![ServiceSelector::new()]).len(), 1);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_id(service_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_id(service_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_id(service_id_3.clone())]).len(), 0);
+        assert_eq!(api.get_services(vec![ServiceSelector::new()]).len(), 1);
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_id(service_id_1.clone())]).len(), 0);
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_id(service_id_2.clone())]).len(), 1);
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_id(service_id_3.clone())]).len(), 0);
 
-        println!("* Removing a service with channels also removes its channels.");
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new()]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new()]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_1.clone())]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_kind(ChannelKind::LightOn)]).len(), 1);
 
-        println!("* Removing a service with channels doesn't remove other channels.");
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_id(getter_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_id(setter_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_2.clone())]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_parent(service_id_3.clone())]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_parent(service_id_3.clone())]).len(), 0);
+        println!("* Removing a service with features also removes its features.");
+        assert_eq!(api.get_features(vec![FeatureSelector::new()]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_1.clone())]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_1.clone())
+        ])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-on"))]).len(), 0);
+
+        println!("* Removing a service with features also removes other features.");
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_id(feature_id_2.clone())]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_2.clone())
+        ])]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_id(service_id_3.clone())
+        ])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-color"))]).len(), 1);
+        assert_eq!(api.get_features(vec![
+            FeatureSelector::new().with_implements(Id::new("light-on")),
+            FeatureSelector::new().with_implements(Id::new("light-color"))
+        ]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_implements(Id::new("light-off"))]).len(), 0);
+
 
         if clear {
-            println!("* Clearing does not break the manager.
-");
+            println!("* Clearing does not need break the manager.");
             manager.stop();
         } else {
-            println!("* Not clearing does not break the manager.
-");
+            println!("* Not clearing does not need break the manager.");
         }
     }
 }
@@ -598,302 +517,224 @@ fn test_add_remove_services() {
 fn test_add_remove_tags() {
     println!("");
     for clear in vec![false, true] {
-		println!("# Starting with test with clear {}.
-", clear);
+        println!("\n # Starting test with clear: {}\n", clear);
 
         let manager = AdapterManager::new(None);
+        let api = API::new(&manager);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
 
-        let getter_id_1 = Id::<Getter>::new("getter id 1");
-        let getter_id_2 = Id::<Getter>::new("getter id 2");
-
-        let setter_id_1 = Id::<Setter>::new("setter id 1");
-        let setter_id_2 = Id::<Setter>::new("setter id 2");
+        let feature_id_1 = Id::<FeatureId>::new("feature id 1");
+        let feature_id_2 = Id::<FeatureId>::new("feature id 2");
 
         let service_id_1 = Id::<ServiceId>::new("service id 1");
         let service_id_2 = Id::<ServiceId>::new("service id 2");
 
-        let getter_1 = Channel {
-            id: getter_id_1.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
-        };
+        let is_on : Arc<Format> = Arc::new(IsOn(false));
+        let returns_is_on = Some(Signature {
+            returns: Expects::Requires(is_on.clone()),
+            ..Signature::default()
+        });
+        let expects_is_on = Some(Signature {
+            accepts: Expects::Requires(is_on.clone()),
+            ..Signature::default()
+        });
 
-        let setter_1 = Channel {
-            id: setter_id_1.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let feature_1 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            fetch: returns_is_on.clone(),
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_1, &service_id_1)
         };
 
         let service_1 = Service {
             id: service_id_1.clone(),
             adapter: id_1.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
-        };
-
-        let getter_2 = Channel {
-            id: getter_id_2.clone(),
-            service: service_id_2.clone(),
-            adapter: id_2.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
-        };
-
-        let setter_2 = Channel {
-            id: setter_id_2.clone(),
-            service: service_id_2.clone(),
-            adapter: id_2.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+            tags: vec![],
+            properties: vec![],
         };
 
         let service_2 = Service {
             id: service_id_2.clone(),
-            adapter: id_2.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            adapter: id_1.clone(),
+            tags: vec![],
+            properties: vec![],
+        };
+
+        let feature_2 : Feature = Feature {
+            implements: vec!["light-color"],
+            fetch: returns_is_on.clone(),
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_2, &service_id_2)
         };
 
         let tag_1 = Id::<TagId>::new("tag_1");
         let tag_2 = Id::<TagId>::new("tag_2");
-        let tag_3 = Id::<TagId>::new("tag_3");
+        let tag_3_service = Id::<TagId>::new("tag_3 (for the service)");
+        let tag_4_feature = Id::<TagId>::new("tag_4 (for the feature)");
 
         println!("* Initially, there are no tags.");
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_tags(&vec![tag_1.clone()])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_tags(&vec![tag_1.clone()])]).len(), 0);
 
-        println!("* After adding an adapter, service, getter, setter, still no tags.");
+        println!("* After adding an adapter, service, feature, still no tags.");
         manager.add_adapter(Arc::new(FakeAdapter::new(&id_1))).unwrap();
         manager.add_service(service_1.clone()).unwrap();
-        manager.add_getter(getter_1.clone()).unwrap();
-        manager.add_setter(setter_1.clone()).unwrap();
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
+        manager.add_feature(feature_1.clone()).unwrap();
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_tags(&vec![tag_1.clone()])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_tags(&vec![tag_1.clone()])]).len(), 0);
 
-        println!("* Removing tags from non-existent services and channels doesn't hurt and returns 0.");
+        println!("* Removing tags from non-existent services and features doesn't hurt and returns 0.");
         assert_eq!(manager
             .remove_service_tags(
-                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
+                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_2.clone(), tag_3_service.clone()]
             ),
             0);
         assert_eq!(manager
-            .remove_getter_tags(
-                vec![GetterSelector::new().with_id(getter_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
-            ),
-            0);
-        assert_eq!(manager
-            .remove_setter_tags(
-                vec![SetterSelector::new().with_id(setter_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
+            .remove_feature_tags(
+                vec![FeatureSelector::new().with_id(feature_id_2.clone())], vec![tag_2.clone(), tag_4_feature.clone()]
             ),
             0);
 
         println!("* Adding tags to non-existent services and channels doesn't hurt and returns 0.");
         assert_eq!(manager
             .add_service_tags(
-                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
+                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_2.clone(), tag_3_service.clone()]
             ),
             0);
         assert_eq!(manager
-            .add_getter_tags(
-                vec![GetterSelector::new().with_id(getter_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
-            ),
-            0);
-        assert_eq!(manager
-            .add_setter_tags(
-                vec![SetterSelector::new().with_id(setter_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
+            .add_feature_tags(
+                vec![FeatureSelector::new().with_id(feature_id_2.clone())], vec![tag_2.clone(), tag_4_feature.clone()]
             ),
             0);
 
         println!("* There are still no tags.");
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_tags(vec![tag_2.clone()])]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_tags(vec![tag_2.clone()])]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_tags(vec![tag_2.clone()])]).len(), 0);
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_tags(&vec![tag_1.clone()])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_tags(&vec![tag_1.clone()])]).len(), 0);
 
-        println!("* Removing non-added tags from existent services and channels doesn't hurt and returns 1.");
+        println!("* Removing non-added tags from existent services and features doesn't hurt and returns 1.");
         manager.add_adapter(Arc::new(FakeAdapter::new(&id_2))).unwrap();
         manager.add_service(service_2.clone()).unwrap();
-        manager.add_getter(getter_2.clone()).unwrap();
-        manager.add_setter(setter_2.clone()).unwrap();
+        manager.add_feature(feature_2.clone()).unwrap();
         assert_eq!(manager
             .remove_service_tags(
-                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
+                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_2.clone(), tag_3_service.clone()]
             ),
             1);
         assert_eq!(manager
-            .remove_getter_tags(
-                vec![GetterSelector::new().with_id(getter_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
-            ),
-            1);
-        assert_eq!(manager
-            .remove_setter_tags(
-                vec![SetterSelector::new().with_id(setter_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
+            .remove_feature_tags(
+                vec![FeatureSelector::new().with_id(feature_id_2.clone())], vec![tag_2.clone(), tag_4_feature.clone()]
             ),
             1);
 
-        println!("* We can add tags tags to services and channels, this returns 1.");
+        println!("* We can add tags tags to services and features, this returns 1.");
         assert_eq!(manager
             .add_service_tags(
-                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
+                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_2.clone(), tag_3_service.clone()]
             ),
             1);
         assert_eq!(manager
-            .add_getter_tags(
-                vec![GetterSelector::new().with_id(getter_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
-            ),
-            1);
-        assert_eq!(manager
-            .add_setter_tags(
-                vec![SetterSelector::new().with_id(setter_id_2.clone())], vec![tag_2.clone(), tag_3.clone()]
+            .add_feature_tags(
+                vec![FeatureSelector::new().with_id(feature_id_2.clone())], vec![tag_2.clone(), tag_4_feature.clone()]
             ),
             1);
 
         println!("* We can select using these tags.");
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_tags(vec![tag_1.clone()])]).len(), 0);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_tags(vec![tag_2.clone()])]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_tags(vec![tag_2.clone()])]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_tags(vec![tag_2.clone()])]).len(), 1);
-        assert_eq!(manager.get_services(vec![ServiceSelector::new().with_tags(vec![tag_3.clone()])]).len(), 1);
-        assert_eq!(manager.get_getter_channels(vec![GetterSelector::new().with_tags(vec![tag_3.clone()])]).len(), 1);
-        assert_eq!(manager.get_setter_channels(vec![SetterSelector::new().with_tags(vec![tag_3.clone()])]).len(), 1);
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_tags(&vec![tag_1.clone()])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_tags(&vec![tag_1.clone()])]).len(), 0);
 
-        println!("* The tags are only applied to the right services/getters.");
-        assert_eq!(manager.get_services(vec![
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_tags(&vec![tag_2.clone()])]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_tags(&vec![tag_2.clone()])]).len(), 1);
+
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_tags(&vec![tag_3_service.clone()])]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_tags(&vec![tag_3_service.clone()])]).len(), 0);
+
+        assert_eq!(api.get_services(vec![ServiceSelector::new().with_tags(&vec![tag_4_feature.clone()])]).len(), 0);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_tags(&vec![tag_4_feature.clone()])]).len(), 1);
+
+        println!("* We can select a feature using service tags.");
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_tags(&vec![tag_3_service.clone()])
+        ])]).len(), 1);
+        assert_eq!(api.get_features(vec![FeatureSelector::new().with_service(vec![
+            ServiceSelector::new().with_tags(&vec![tag_4_feature.clone()])
+        ])]).len(), 0);
+
+        println!("* The tags are only applied to the right services/features.");
+        assert_eq!(api.get_services(vec![
             ServiceSelector::new()
-                .with_tags(vec![tag_2.clone()])
+                .with_tags(&vec![tag_2.clone()])
                 .with_id(service_id_1.clone())
             ]).len(), 0
         );
-        assert_eq!(manager.get_getter_channels(vec![
-            GetterSelector::new()
-                .with_tags(vec![tag_2.clone()])
-                .with_id(getter_id_1.clone())
-            ]).len(), 0
-        );
-        assert_eq!(manager.get_setter_channels(vec![
-            SetterSelector::new()
-                .with_tags(vec![tag_2.clone()])
-                .with_id(setter_id_1.clone())
+        assert_eq!(api.get_features(vec![
+            FeatureSelector::new()
+                .with_tags(&vec![tag_2.clone()])
+                .with_id(feature_id_1.clone())
             ]).len(), 0
         );
 
-        println!("* The tags are applied to the right services/getters.");
-        let selection = manager.get_services(vec![
+        println!("* The tags are applied to the expected services/getters.");
+        let selection = api.get_services(vec![
             ServiceSelector::new()
-                .with_tags(vec![tag_2.clone()])
+                .with_tags(&vec![tag_2.clone()])
                 .with_id(service_id_2.clone())
             ]);
         assert_eq!(selection.len(), 1);
         assert_eq!(selection[0].id, service_id_2);
         assert_eq!(selection[0].tags.len(), 2);
         assert!(selection[0].tags.contains(&tag_2));
-        assert!(selection[0].tags.contains(&tag_3));
+        assert!(selection[0].tags.contains(&tag_3_service));
 
-        let selection = manager.get_getter_channels(vec![
-            GetterSelector::new()
-                .with_tags(vec![tag_2.clone()])
-                .with_id(getter_id_2.clone())
+        let selection = api.get_features(vec![
+            FeatureSelector::new()
+                .with_tags(&vec![tag_2.clone()])
+                .with_id(feature_id_2.clone())
         ]);
         assert_eq!(selection.len(), 1);
-        assert_eq!(selection[0].id, getter_id_2);
+        assert_eq!(selection[0].id, feature_id_2);
         assert_eq!(selection[0].tags.len(), 2);
         assert!(selection[0].tags.contains(&tag_2));
-        assert!(selection[0].tags.contains(&tag_3));
+        assert!(selection[0].tags.contains(&tag_4_feature));
 
-        let selection = manager.get_setter_channels(vec![
-            SetterSelector::new()
-                .with_tags(vec![tag_2.clone()])
-                .with_id(setter_id_2.clone())
-        ]);
-        assert_eq!(selection.len(), 1);
-        assert_eq!(selection[0].id, setter_id_2);
-        assert_eq!(selection[0].tags.len(), 2);
-        assert!(selection[0].tags.contains(&tag_2));
-        assert!(selection[0].tags.contains(&tag_3));
-
-        let selection = manager.get_services(vec![
+        let selection = api.get_services(vec![
             ServiceSelector::new()
-                .with_tags(vec![tag_3.clone()])
+                .with_tags(&vec![tag_3_service.clone()])
                 .with_id(service_id_2.clone())
             ]);
         assert_eq!(selection.len(), 1);
         assert_eq!(selection[0].id, service_id_2);
         assert_eq!(selection[0].tags.len(), 2);
         assert!(selection[0].tags.contains(&tag_2));
-        assert!(selection[0].tags.contains(&tag_3));
+        assert!(selection[0].tags.contains(&tag_3_service));
 
-        let selection = manager.get_getter_channels(vec![
-            GetterSelector::new()
-                .with_tags(vec![tag_3.clone()])
-                .with_id(getter_id_2.clone())
+        let selection = api.get_features(vec![
+            FeatureSelector::new()
+                .with_tags(&vec![tag_4_feature.clone()])
+                .with_id(feature_id_2.clone())
         ]);
         assert_eq!(selection.len(), 1);
-        assert_eq!(selection[0].id, getter_id_2);
+        assert_eq!(selection[0].id, feature_id_2);
         assert_eq!(selection[0].tags.len(), 2);
         assert!(selection[0].tags.contains(&tag_2));
-        assert!(selection[0].tags.contains(&tag_3));
-
-        let selection = manager.get_setter_channels(vec![
-            SetterSelector::new()
-                .with_tags(vec![tag_3.clone()])
-                .with_id(setter_id_2.clone())
-        ]);
-        assert_eq!(selection.len(), 1);
-        assert_eq!(selection[0].id, setter_id_2);
-        assert_eq!(selection[0].tags.len(), 2);
-        assert!(selection[0].tags.contains(&tag_2));
-        assert!(selection[0].tags.contains(&tag_3));
+        assert!(selection[0].tags.contains(&tag_4_feature));
 
         println!("* We can remove tags, both existent and non-existent.");
         assert_eq!(manager
             .remove_service_tags(
-                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_1.clone(), tag_3.clone()]
+                vec![ServiceSelector::new().with_id(service_id_2.clone())], vec![tag_1.clone(), tag_3_service.clone()]
             ),
             1);
         assert_eq!(manager
-            .remove_getter_tags(
-                vec![GetterSelector::new().with_id(getter_id_2.clone())], vec![tag_1.clone(), tag_3.clone()]
-            ),
-            1);
-        assert_eq!(manager
-            .remove_setter_tags(
-                vec![SetterSelector::new().with_id(setter_id_2.clone())], vec![tag_1.clone(), tag_3.clone()]
+            .remove_feature_tags(
+                vec![FeatureSelector::new().with_id(feature_id_2.clone())], vec![tag_1.clone(), tag_4_feature.clone()]
             ),
             1);
 
         println!("* Looking by tags has been updated.");
-        let selection = manager.get_services(vec![
+        let selection = api.get_services(vec![
             ServiceSelector::new()
-                .with_tags(vec![tag_2.clone()])
+                .with_tags(&vec![tag_2.clone()])
                 .with_id(service_id_2.clone())
             ]);
         assert_eq!(selection.len(), 1);
@@ -901,54 +742,35 @@ fn test_add_remove_tags() {
         assert_eq!(selection[0].tags.len(), 1);
         assert!(selection[0].tags.contains(&tag_2));
 
-        let selection = manager.get_getter_channels(vec![
-            GetterSelector::new()
-                .with_tags(vec![tag_2.clone()])
-                .with_id(getter_id_2.clone())
+        let selection = api.get_features(vec![
+            FeatureSelector::new()
+                .with_tags(&vec![tag_2.clone()])
+                .with_id(feature_id_2.clone())
         ]);
         assert_eq!(selection.len(), 1);
-        assert_eq!(selection[0].id, getter_id_2);
+        assert_eq!(selection[0].id, feature_id_2);
         assert_eq!(selection[0].tags.len(), 1);
         assert!(selection[0].tags.contains(&tag_2));
 
-        let selection = manager.get_setter_channels(vec![
-            SetterSelector::new()
-                .with_tags(vec![tag_2.clone()])
-                .with_id(setter_id_2.clone())
-        ]);
-        assert_eq!(selection.len(), 1);
-        assert_eq!(selection[0].id, setter_id_2);
-        assert_eq!(selection[0].tags.len(), 1);
-        assert!(selection[0].tags.contains(&tag_2));
-
-        let selection = manager.get_services(vec![
+        let selection = api.get_services(vec![
             ServiceSelector::new()
-                .with_tags(vec![tag_3.clone()])
+                .with_tags(&vec![tag_3_service.clone()])
                 .with_id(service_id_2.clone())
             ]);
         assert_eq!(selection.len(), 0);
 
-        let selection = manager.get_getter_channels(vec![
-            GetterSelector::new()
-                .with_tags(vec![tag_3.clone()])
-                .with_id(getter_id_2.clone())
-        ]);
-        assert_eq!(selection.len(), 0);
-
-        let selection = manager.get_setter_channels(vec![
-            SetterSelector::new()
-                .with_tags(vec![tag_3.clone()])
-                .with_id(setter_id_2.clone())
+        let selection = api.get_features(vec![
+            FeatureSelector::new()
+                .with_tags(&vec![tag_4_feature.clone()])
+                .with_id(feature_id_2.clone())
         ]);
         assert_eq!(selection.len(), 0);
 
         if clear {
-            println!("* Clearing does not break the manager.
-");
+            println!("* Clearing does not need break the manager.");
             manager.stop();
         } else {
-            println!("* Not clearing does not break the manager.
-");
+            println!("* Not clearing does not need break the manager.");
         }
     }
 
@@ -960,195 +782,214 @@ fn test_fetch() {
     println!("");
 
     for clear in vec![false, true] {
-		println!("# Starting with test with clear {}.
-", clear);
+        println!("\n # Starting test with clear: {}\n", clear);
 
         let manager = AdapterManager::new(None);
+        let api = API::new(&manager);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
 
-
-        let getter_id_1_1 = Id::<Getter>::new("getter id 1.1");
-        let getter_id_1_2 = Id::<Getter>::new("getter id 1.2");
-        let getter_id_1_3 = Id::<Getter>::new("getter id 1.3");
-        let getter_id_2 = Id::<Getter>::new("getter id 2");
+        let feature_id_1_1 = Id::<FeatureId>::new("feature id 1.1");
+        let feature_id_1_2 = Id::<FeatureId>::new("feature id 1.2");
+        let feature_id_1_3 = Id::<FeatureId>::new("feature id 1.3");
+        let feature_id_1_4 = Id::<FeatureId>::new("feature id 1.4");
+        let feature_id_2 = Id::<FeatureId>::new("feature id 2");
 
         let service_id_1 = Id::<ServiceId>::new("service id 1");
         let service_id_2 = Id::<ServiceId>::new("service id 2");
 
-        let getter_1_1 = Channel {
-            id: getter_id_1_1.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let is_on : Arc<Format> = Arc::new(IsOn(false));
+        let returns_is_on = Some(Signature {
+            returns: Expects::Requires(is_on.clone()),
+            ..Signature::default()
+        });
+
+        let feature_1_1 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            fetch: returns_is_on.clone(),
+            ..Feature::empty(&feature_id_1_1, &service_id_1)
         };
 
-        let getter_1_2 = Channel {
-            id: getter_id_1_2.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let feature_1_2 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            fetch: returns_is_on.clone(),
+            ..Feature::empty(&feature_id_1_2, &service_id_1)
         };
 
-        let getter_1_3 = Channel {
-            id: getter_id_1_3.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let feature_1_3 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            fetch: returns_is_on.clone(),
+            ..Feature::empty(&feature_id_1_3, &service_id_1)
         };
 
-        let getter_2 = Channel {
-            id: getter_id_2.clone(),
-            service: service_id_2.clone(),
-            adapter: id_2.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let feature_1_4 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            fetch: None,
+            ..Feature::empty(&feature_id_1_4, &service_id_1)
+        };
+
+        let feature_2 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            fetch: returns_is_on.clone(),
+            ..Feature::empty(&feature_id_2, &service_id_1)
         };
 
         let service_1 = Service {
             id: service_id_1.clone(),
             adapter: id_1.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            tags: vec![],
+            properties: vec![],
         };
 
         let service_2 = Service {
             id: service_id_2.clone(),
-            adapter: id_2.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            adapter: id_1.clone(),
+            tags: vec![],
+            properties: vec![],
         };
+
+        let tag_1 = Id::<TagId>::new("tag_1");
+        let tag_2 = Id::<TagId>::new("tag_2");
 
         let adapter_1 = FakeAdapter::new(&id_1);
         let adapter_2 = FakeAdapter::new(&id_2);
         let tweak_1 = adapter_1.get_tweak();
         println!("* Without adapters, fetching values from a selector that has no channels returns an empty vector.");
-        assert_eq!(manager.fetch_values(vec![GetterSelector::new()], User::None).len(), 0);
+        assert_eq!(api.place_method_call(MethodCall::Fetch, vec![Targetted::new(vec![FeatureSelector::new()], None)], User::None).len(), 0);
 
-        println!("* With adapters, fetching values from a selector that has no channels returns an empty vector.");
+        println!("* With adapters, fetching values from a selector that has no features returns an empty vector.");
         manager.add_adapter(Arc::new(adapter_1)).unwrap();
         manager.add_adapter(Arc::new(adapter_2)).unwrap();
         manager.add_service(service_1.clone()).unwrap();
         manager.add_service(service_2.clone()).unwrap();
-        assert_eq!(manager.fetch_values(vec![GetterSelector::new()], User::None).len(), 0);
+        assert_eq!(api.place_method_call(MethodCall::Fetch, vec![Targetted::new(vec![FeatureSelector::new()], None)], User::None).len(), 0);
 
-        println!("* Fetching empty values from a selector that has channels returns a vector of empty values.");
-        manager.add_getter(getter_1_1.clone()).unwrap();
-        manager.add_getter(getter_1_2.clone()).unwrap();
-        manager.add_getter(getter_1_3.clone()).unwrap();
-        manager.add_getter(getter_2.clone()).unwrap();
-        let data = manager.fetch_values(vec![GetterSelector::new()], User::None);
+        println!("* Fetching empty values from a selector that has channels returns a type error if the adapter cannot provide the values.");
+        manager.add_feature(feature_1_1.clone()).unwrap();
+        manager.add_feature(feature_1_2.clone()).unwrap();
+        manager.add_feature(feature_1_3.clone()).unwrap();
+        manager.add_feature(feature_1_4.clone()).unwrap();
+        manager.add_feature(feature_2.clone()).unwrap();
+        let mut data = api.place_method_call(MethodCall::Fetch, vec![Targetted::new(vec![FeatureSelector::new()], None)], User::None);
         assert_eq!(data.len(), 4);
 
-        for result in data.values() {
-            if let Ok(None) = *result {
+        for result in data.drain(..) {
+            if let (_, Err(Error::TypeError(_))) = result {
                 // We're good.
             } else {
                 panic!("Unexpected result {:?}", result)
             }
         }
 
-        println!("* Fetching values returns the right values.");
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_2.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));
-        let data = manager.fetch_values(vec![GetterSelector::new()], User::None);
+        println!("* Fetching values from the universal selector returns the right values.");
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_1.clone(), Ok(Some(Value::new(true)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_2.clone(), Ok(Some(Value::new(false)))));
+        let mut data = api.place_method_call(MethodCall::Fetch, vec![Targetted::new(vec![FeatureSelector::new()], None)], User::None);
+        let data : HashMap<_, _> = data.drain(..).collect();
         assert_eq!(data.len(), 4);
-        match data.get(&getter_id_1_1) {
-            Some(&Ok(Some(Value::OnOff(OnOff::On)))) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_1_1) {
+            Some(&Ok(Some(ref value))) if *value.cast::<bool>().unwrap() => {},
+            other => panic!("Unexpected result {:?}", other)
         }
-        match data.get(&getter_id_1_2) {
-            Some(&Ok(Some(Value::OnOff(OnOff::Off)))) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_1_2) {
+            Some(&Ok(Some(ref value))) if !*value.cast::<bool>().unwrap() => {},
+            other => panic!("Unexpected result {:?}", other)
         }
-        match data.get(&getter_id_1_3) {
-            Some(&Ok(None)) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_1_3) {
+            Some(&Err(Error::TypeError(_))) => {},
+            other => panic!("Unexpected result {:?}", other)
         }
-        match data.get(&getter_id_2) {
-            Some(&Ok(None)) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_2) {
+            Some(&Err(Error::TypeError(_))) => {},
+            other => panic!("Unexpected result {:?}", other)
         }
 
-        println!("* Fetching values returns the right errors.");
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Err(Error::InternalError(InternalError::NoSuchGetter(getter_id_1_1.clone())))));
-        let data = manager.fetch_values(vec![GetterSelector::new()], User::None);
+        println!("* Fetching values from feature tag returns the right values.");
+        assert_eq!(api.add_feature_tags(vec![FeatureSelector::new().with_id(feature_id_1_1.clone())],
+            vec![tag_1.clone()]), 1);
+        assert_eq!(api.add_feature_tags(vec![
+            FeatureSelector::new().with_id(feature_id_1_2.clone()),
+            FeatureSelector::new().with_id(feature_id_1_3.clone()),
+            FeatureSelector::new().with_id(feature_id_2.clone()),
+        ], vec![tag_2.clone()]), 3);
+        let mut data = api.place_method_call(MethodCall::Fetch, vec![
+            Targetted::new(vec![FeatureSelector::new().with_tags(&vec![tag_1.clone()])], None),
+            Targetted::new(vec![FeatureSelector::new().with_tags(&vec![tag_2.clone()])], None),
+        ], User::None);
+        let data : HashMap<_, _> = data.drain(..).collect();
         assert_eq!(data.len(), 4);
-        match data.get(&getter_id_1_1) {
-            Some(&Err(Error::InternalError(InternalError::NoSuchGetter(ref id)))) if *id == getter_id_1_1 => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_1_1) {
+            Some(&Ok(Some(ref value))) if *value.cast::<bool>().unwrap() => {},
+            other => panic!("Unexpected result {:?}", other)
         }
-        match data.get(&getter_id_1_2) {
-            Some(&Ok(Some(Value::OnOff(OnOff::Off)))) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_1_2) {
+            Some(&Ok(Some(ref value))) if !*value.cast::<bool>().unwrap() => {},
+            other => panic!("Unexpected result {:?}", other)
         }
-        match data.get(&getter_id_1_3) {
-            Some(&Ok(None)) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_1_3) {
+            Some(&Err(Error::TypeError(_))) => {},
+            other => panic!("Unexpected result {:?}", other)
         }
-        match data.get(&getter_id_2) {
-            Some(&Ok(None)) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_2) {
+            Some(&Err(Error::TypeError(_))) => {},
+            other => panic!("Unexpected result {:?}", other)
         }
 
-        println!("* Fetching a value that causes an internal type error returns that error.");
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OpenClosed(OpenClosed::Open)))));
-        let data = manager.fetch_values(vec![GetterSelector::new()], User::None);
+        println!("* Fetching values from id returns the right errors.");
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_1.clone(), Err(Error::InternalError(InternalError::NoSuchFeature(feature_id_1_1.clone())))));
+        let mut data = api.place_method_call(MethodCall::Fetch, vec![Targetted::new(vec![FeatureSelector::new()], None)], User::None);
+        let data : HashMap<_, _> = data.drain(..).collect();
+
         assert_eq!(data.len(), 4);
-        match data.get(&getter_id_1_1) {
-            Some(&Err(Error::TypeError(TypeError {
-                got: Type::OpenClosed,
-                expected: Type::OnOff,
-            }))) => {},
+        match data.get(&feature_id_1_1) {
+            Some(&Err(Error::InternalError(InternalError::NoSuchFeature(ref id)))) if *id == feature_id_1_1 => {},
             other => panic!("Unexpected result, {:?}", other)
         }
-        match data.get(&getter_id_1_2) {
-            Some(&Ok(Some(Value::OnOff(OnOff::Off)))) => {},
+        match data.get(&feature_id_1_2) {
+            Some(&Ok(Some(ref value))) if !*value.cast::<bool>().unwrap() => {},
+            other => panic!("Unexpected result {:?}", other)
+        }
+        match data.get(&feature_id_1_3) {
+            Some(&Err(Error::TypeError(_))) => {},
+            other => panic!("Unexpected result {:?}", other)
+        }
+        match data.get(&feature_id_2) {
+            Some(&Err(Error::TypeError(_))) => {},
+            other => panic!("Unexpected result {:?}", other)
+        }
+
+        println!("* Fetching values from tags returns the right errors.");
+        let mut data = api.place_method_call(MethodCall::Fetch, vec![
+            Targetted::new(vec![FeatureSelector::new().with_tags(&vec![tag_1.clone()])], None),
+            Targetted::new(vec![FeatureSelector::new().with_tags(&vec![tag_2.clone()])], None),
+        ], User::None);
+        let data : HashMap<_, _> = data .drain(..).collect();
+        assert_eq!(data.len(), 4);
+
+        match data.get(&feature_id_1_1) {
+            Some(&Err(Error::InternalError(InternalError::NoSuchFeature(ref id)))) if *id == feature_id_1_1 => {},
             other => panic!("Unexpected result, {:?}", other)
         }
-        match data.get(&getter_id_1_3) {
-            Some(&Ok(None)) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_1_2) {
+            Some(&Ok(Some(ref value))) if !*value.cast::<bool>().unwrap() => {},
+            other => panic!("Unexpected result {:?}", other)
         }
-        match data.get(&getter_id_2) {
-            Some(&Ok(None)) => {},
-            other => panic!("Unexpected result, {:?}", other)
+        match data.get(&feature_id_1_3) {
+            Some(&Err(Error::TypeError(_))) => {},
+            other => panic!("Unexpected result {:?}", other)
+        }
+        match data.get(&feature_id_2) {
+            Some(&Err(Error::TypeError(_))) => {},
+            other => panic!("Unexpected result {:?}", other)
         }
 
         if clear {
-            println!("* Clearing does not break the manager.
-");
+            println!("* Clearing does not need break the manager.");
             manager.stop();
         } else {
-            println!("* Not clearing does not break the manager.
-");
+            println!("* Not clearing does not need break the manager.");
         }
     }
-
-    // FIXME: Should test fetching with tags.
 
     println!("");
 }
@@ -1158,85 +999,69 @@ fn test_send() {
     println!("");
 
     for clear in vec![false, true] {
-		println!("# Starting with test with clear {}.
-", clear);
-
+        println!("\n # Starting test with clear: {}\n", clear);
         let manager = AdapterManager::new(None);
+        let api = API::new(&manager);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
 
-        let setter_id_1_1 = Id::<Setter>::new("setter id 1.1");
-        let setter_id_1_2 = Id::<Setter>::new("setter id 1.2");
-        let setter_id_1_3 = Id::<Setter>::new("setter id 1.3");
-        let setter_id_2 = Id::<Setter>::new("setter id 2");
+        let feature_id_1_1 = Id::<FeatureId>::new("feature id 1.1");
+        let feature_id_1_2 = Id::<FeatureId>::new("feature id 1.2");
+        let feature_id_1_3 = Id::<FeatureId>::new("feature id 1.3");
+        let feature_id_1_4 = Id::<FeatureId>::new("feature id 1.4");
+        let feature_id_2 = Id::<FeatureId>::new("feature id 2");
 
         let service_id_1 = Id::<ServiceId>::new("service id 1");
         let service_id_2 = Id::<ServiceId>::new("service id 2");
 
-        let setter_1_1 = Channel {
-            id: setter_id_1_1.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                kind: ChannelKind::LightOn,
-                updated: None,
-            },
-        };
-
-        let setter_1_2 = Channel {
-            id: setter_id_1_2.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                kind: ChannelKind::LightOn,
-                updated: None,
-            },
-        };
-
-        let setter_1_3 = Channel {
-            id: setter_id_1_3.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                kind: ChannelKind::LightOn,
-                updated: None,
-            },
-        };
-
-        let setter_2 = Channel {
-            id: setter_id_2.clone(),
-            service: service_id_2.clone(),
-            adapter: id_2.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                kind: ChannelKind::LightOn,
-                updated: None,
-            },
-        };
-
         let service_1 = Service {
             id: service_id_1.clone(),
             adapter: id_1.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            tags: vec![],
+            properties: vec![],
         };
 
         let service_2 = Service {
             id: service_id_2.clone(),
             adapter: id_2.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            tags: vec![],
+            properties: vec![],
+        };
+
+        let is_on : Arc<Format> = Arc::new(IsOn(false));
+        let expects_is_on = Some(Signature {
+            accepts: Expects::Requires(is_on.clone()),
+            ..Signature::default()
+        });
+
+        let feature_1_1 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_1_1, &service_id_1)
+        };
+
+        let feature_1_2 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_1_2, &service_id_1)
+        };
+
+        let feature_1_3 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_1_3, &service_id_1)
+        };
+
+        let feature_1_4_no_send : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            send: None,
+            ..Feature::empty(&feature_id_1_4, &service_id_1)
+        };
+
+        let feature_2 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            send: expects_is_on.clone(),
+            ..Feature::empty(&feature_id_2, &service_id_2)
         };
 
         let adapter_1 = FakeAdapter::new(&id_1);
@@ -1246,8 +1071,7 @@ fn test_send() {
         let rx_adapter_2 = adapter_2.take_rx();
 
         println!("* Without adapters, sending values to a selector that has no channels returns an empty vector.");
-        let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]), User::None);
-
+        let data = api.place_method_call(MethodCall::Send, vec![Targetted::new(vec![FeatureSelector::new()], Some(Value::new(true)))], User::None);
         assert_eq!(data.len(), 0);
 
         println!("* With adapters, sending values to a selector that has no channels returns an empty vector.");
@@ -1255,19 +1079,21 @@ fn test_send() {
         manager.add_adapter(Arc::new(adapter_2)).unwrap();
         manager.add_service(service_1.clone()).unwrap();
         manager.add_service(service_2.clone()).unwrap();
-        let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]), User::None);
+        let data = api.place_method_call(MethodCall::Send, vec![Targetted::new(vec![FeatureSelector::new()], Some(Value::new(true)))], User::None);
         assert_eq!(data.len(), 0);
 
         println!("* Sending well-typed values to channels succeeds if the adapter succeeds.");
-        manager.add_setter(setter_1_1.clone()).unwrap();
-        manager.add_setter(setter_1_2.clone()).unwrap();
-        manager.add_setter(setter_1_3.clone()).unwrap();
-        manager.add_setter(setter_2.clone()).unwrap();
+        manager.add_feature(feature_1_1.clone()).unwrap();
+        manager.add_feature(feature_1_2.clone()).unwrap();
+        manager.add_feature(feature_1_3.clone()).unwrap();
+        manager.add_feature(feature_1_4_no_send.clone()).unwrap();
+        manager.add_feature(feature_2.clone()).unwrap();
 
-        let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]), User::None);
+        let mut data = api.place_method_call(MethodCall::Send, vec![Targetted::new(vec![FeatureSelector::new()], Some(Value::new(true)))], User::None);
+        let data : HashMap<_, _> = data.drain(..).collect();
         assert_eq!(data.len(), 4);
         for result in data.values() {
-            if let Ok(()) = *result {
+            if let Ok(_) = *result {
                 // We're good.
             } else {
                 panic!("Unexpected result {:?}", result)
@@ -1283,65 +1109,29 @@ fn test_send() {
         assert_eq!(data.len(), 3);
 
         let value = rx_adapter_2.recv().unwrap();
-        if let Effect::ValueSent(id, Value::OnOff(OnOff::On)) = value {
-            assert_eq!(id, setter_id_2);
-        } else {
-            panic!("Unexpected value {:?}", value)
-        }
+        let Effect::ValueSent(id, value) = value;
+        assert_eq!(*value.unwrap().cast::<bool>().unwrap(), true);
+        assert_eq!(id, feature_id_2);
 
         println!("* No further value should have been received.");
-        assert_matches!(rx_adapter_1.try_recv(), Err(_));
-        assert_matches!(rx_adapter_2.try_recv(), Err(_));
-
-        println!("* Sending ill-typed values to channels will cause type errors.");
-        let data = manager.send_values(target_map(vec![
-            (vec![
-                SetterSelector::new().with_id(setter_id_1_1.clone()),
-                SetterSelector::new().with_id(setter_id_1_2.clone()),
-                SetterSelector::new().with_id(setter_id_2.clone()),
-            ], Value::OpenClosed(OpenClosed::Closed)),
-            (vec![
-                SetterSelector::new().with_id(setter_id_1_3.clone()).clone()
-            ], Value::OnOff(OnOff::On))
-        ]), User::None);
-        assert_eq!(data.len(), 4);
-        for id in vec![&setter_id_1_1, &setter_id_1_2, &setter_id_2] {
-            match data.get(id) {
-                Some(&Err(Error::TypeError(TypeError {
-                    got: Type::OpenClosed,
-                    expected: Type::OnOff
-                }))) => {},
-                other => panic!("Unexpected result for {:?}: {:?}", id, other)
-            }
-        }
-        match data.get(&setter_id_1_3) {
-            Some(&Ok(())) => {},
-            other => panic!("Unexpected result for {:?}: {:?}", setter_id_1_3, other)
-        }
-
-        println!("* All the well-typed values should have been received.");
-        match rx_adapter_1.try_recv().unwrap() {
-            Effect::ValueSent(ref id, Value::OnOff(OnOff::On)) if *id == setter_id_1_3 => {},
-            effect => panic!("Unexpected effect {:?}", effect)
-        }
-
-        println!("* No further value should have been received.");
-        assert_matches!(rx_adapter_1.try_recv(), Err(_));
-        assert_matches!(rx_adapter_2.try_recv(), Err(_));
+        assert!(rx_adapter_1.try_recv().is_err());
+        assert!(rx_adapter_2.try_recv().is_err());
 
         println!("* Sending values that cause channel errors will propagate the errors.");
-        tweak_1(Tweak::InjectSetterError(setter_id_1_1.clone(), Some(Error::InternalError(InternalError::InvalidInitialService))));
+        tweak_1(Tweak::InjectSetterError(feature_id_1_1.clone(), Some(Error::InternalError(InternalError::InvalidInitialService))));
 
-        let data = manager.send_values(target_map(vec![(vec![SetterSelector::new()], Value::OnOff(OnOff::On))]), User::None);
+        let mut data = api
+            .place_method_call(MethodCall::Send, vec![Targetted::new(vec![FeatureSelector::new()], Some(Value::new(true)))], User::None);
+        let data : HashMap<_, _> = data.drain(..).collect();
         assert_eq!(data.len(), 4);
-        for id in vec![&setter_id_2, &setter_id_1_2, &setter_id_2] {
+        for id in vec![&feature_id_2, &feature_id_1_2, &feature_id_2] {
             match data.get(id) {
-                Some(&Ok(())) => {},
+                Some(&Ok(_)) => {},
                 other => panic!("Unexpected result for {:?}: {:?}", id, other)
             }
         }
 
-        for id in vec![&setter_id_1_1] {
+        for id in vec![&feature_id_1_1] {
             match data.get(id) {
                 Some(&Err(Error::InternalError(InternalError::InvalidInitialService))) => {},
                 other => panic!("Unexpected result for {:?}: {:?}", id, other)
@@ -1351,135 +1141,113 @@ fn test_send() {
         println!("* All the non-errored values should have been received.");
         for _ in 0..2 {
             match rx_adapter_1.try_recv().unwrap() {
-                Effect::ValueSent(ref id, Value::OnOff(OnOff::On)) if *id != setter_id_1_1 => {},
+                Effect::ValueSent(ref id, ref value)
+                    if *id != feature_id_1_1 && *value.clone().unwrap().cast::<bool>().unwrap() => {},
                 effect => panic!("Unexpected effect {:?}", effect)
             }
         }
         match rx_adapter_2.try_recv().unwrap() {
-            Effect::ValueSent(ref id, Value::OnOff(OnOff::On)) if *id == setter_id_2 => {},
+            Effect::ValueSent(ref id, ref value)
+                if *id == feature_id_2 && *value.clone().unwrap().cast::<bool>().unwrap() => {},
             effect => panic!("Unexpected effect {:?}", effect)
         }
 
         println!("* No further value should have been received.");
-        assert_matches!(rx_adapter_1.try_recv(), Err(_));
-        assert_matches!(rx_adapter_2.try_recv(), Err(_));
-        tweak_1(Tweak::InjectSetterError(setter_id_1_1.clone(), None));
+        assert!(rx_adapter_1.try_recv().is_err());
+        assert!(rx_adapter_2.try_recv().is_err());
+        tweak_1(Tweak::InjectSetterError(feature_id_1_1.clone(), None));
 
         if clear {
-            println!("* Clearing does not break the manager.
-");
+            println!("* Clearing does not need break the manager.");
             manager.stop();
         } else {
-            println!("* Not clearing does not break the manager.
-");
+            println!("* Not clearing does not need break the manager.");
         }
     }
 
     println!("");
 }
 
-
 #[test]
 fn test_watch() {
     println!("");
 
     for clear in vec![false, true] {
-		println!("# Starting with test with clear {}.
-", clear);
+        println!("\n # Starting test with clear: {}\n", clear);
 
         let manager = AdapterManager::new(None);
+        let api = API::new(&manager);
         let id_1 = Id::<AdapterId>::new("adapter id 1");
         let id_2 = Id::<AdapterId>::new("adapter id 2");
 
-
-        let getter_id_1_1 = Id::<Getter>::new("getter id 1.1");
-        let getter_id_1_2 = Id::<Getter>::new("getter id 1.2");
-        let getter_id_1_3 = Id::<Getter>::new("getter id 1.3");
-        let getter_id_1_4 = Id::<Getter>::new("getter id 1.4");
-        let getter_id_2 = Id::<Getter>::new("getter id 2");
+        let feature_id_1_1 = Id::<FeatureId>::new("feature id 1.1");
+        let feature_id_1_2 = Id::<FeatureId>::new("feature id 1.2");
+        let feature_id_1_3 = Id::<FeatureId>::new("feature id 1.3");
+        let feature_id_1_4_no_watch = Id::<FeatureId>::new("feature id 1.4 (does not support watch)");
+        let feature_id_1_5 = Id::<FeatureId>::new("feature id 1.5");
+        let feature_id_2 = Id::<FeatureId>::new("feature id 2");
 
         let service_id_1 = Id::<ServiceId>::new("service id 1");
         let service_id_2 = Id::<ServiceId>::new("service id 2");
 
-        let getter_1_1 = Channel {
-            id: getter_id_1_1.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let is_on : Arc<Format> = Arc::new(IsOn(false));
+        let watch_is_on = Some(Signature {
+            accepts: Expects::Requires(is_on.clone()),
+            returns: Expects::Requires(is_on.clone()),
+        });
+
+        let feature_1_1 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            watch: watch_is_on.clone(),
+            ..Feature::empty(&feature_id_1_1, &service_id_1)
         };
 
-        let getter_1_2 = Channel {
-            id: getter_id_1_2.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let feature_1_2 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            watch: watch_is_on.clone(),
+            ..Feature::empty(&feature_id_1_2, &service_id_1)
         };
 
-        let getter_1_3 = Channel {
-            id: getter_id_1_3.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let feature_1_3 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            watch: watch_is_on.clone(),
+            ..Feature::empty(&feature_id_1_3, &service_id_1)
         };
 
-        let getter_1_4 = Channel {
-            id: getter_id_1_4.clone(),
-            service: service_id_1.clone(),
-            adapter: id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let feature_1_4_no_watch : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            watch: None,
+            ..Feature::empty(&feature_id_1_4_no_watch, &service_id_1)
         };
 
-        let getter_2 = Channel {
-            id: getter_id_2.clone(),
-            service: service_id_2.clone(),
-            adapter: id_2.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            },
+        let feature_1_5 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            watch: watch_is_on.clone(),
+            ..Feature::empty(&feature_id_1_5, &service_id_1)
+        };
+
+        let feature_2 : Feature = Feature {
+            implements: vec!["light-on", "x-light-on"],
+            watch: watch_is_on.clone(),
+            ..Feature::empty(&feature_id_2, &service_id_2)
         };
 
         let service_1 = Service {
             id: service_id_1.clone(),
             adapter: id_1.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            tags: vec![],
+            properties: vec![],
         };
 
         let service_2 = Service {
             id: service_id_2.clone(),
             adapter: id_2.clone(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            tags: vec![],
+            properties: vec![],
         };
 
         let tag_1 = Id::<TagId>::new("tag 1");
+        let tag_2_service = Id::<TagId>::new("tag 2");
 
         let adapter_1 = FakeAdapter::new(&id_1);
         let adapter_2 = FakeAdapter::new(&id_2);
@@ -1495,197 +1263,289 @@ fn test_watch() {
                 panic!("We should not have received any message {:?}", msg);
             }
         });
-        guards.push(manager.watch_values(target_map(vec![(
-            vec![GetterSelector::new().with_id(Id::new("No such getter"))],
+        guards.push(api.register_watch(vec![Targetted::new(
+            vec![FeatureSelector::new().with_id(Id::new("No such getter"))],
             Exactly::Always
-        )]), Box::new(tx_watch_1)));
+        )], Box::new(tx_watch_1)));
 
         println!("* With adapters, watching values from a selector that has no channels does nothing.");
         manager.add_adapter(Arc::new(adapter_1)).unwrap();
         manager.add_adapter(Arc::new(adapter_2)).unwrap();
         manager.add_service(service_1.clone()).unwrap();
         manager.add_service(service_2.clone()).unwrap();
+        api.add_service_tags(vec![
+            ServiceSelector::new().with_id(service_id_1.clone())
+        ], vec![tag_2_service.clone()]);
         let (tx_watch, rx_watch) = channel();
         thread::spawn(move || {
             for msg in rx_watch {
                 panic!("We should not have received any message {:?}", msg);
             }
         });
-        guards.push(manager.watch_values(target_map(vec![(
-            vec![GetterSelector::new().with_id(Id::new("No such getter"))],
+        guards.push(api.register_watch(vec![Targetted::new(
+            vec![FeatureSelector::new().with_id(Id::new("No such feature"))],
             Exactly::Always
-        )]), Box::new(tx_watch)));
+        )], Box::new(tx_watch)));
 
-        println!("* We can observe channels being added.");
+        println!("* We can observe features being added, regardless of supports_watch.");
         let (tx_watch, rx_watch) = channel();
-        let guard = manager.watch_values(target_map(vec![(
-            vec![GetterSelector::new()],
+        let guard = api.register_watch(vec![Targetted::new(
+            vec![FeatureSelector::new()],
             Exactly::Always
-        )]), Box::new(tx_watch)); // We keep `guard` out of `guards` to drop it manually later.
+        )], Box::new(tx_watch)); // We keep `guard` out of `guards` to drop it manually later.
 
-        manager.add_getter(getter_1_1.clone()).unwrap();
-        manager.add_getter(getter_1_2.clone()).unwrap();
-        manager.add_getter(getter_1_3.clone()).unwrap();
-        manager.add_getter(getter_2.clone()).unwrap();
+        manager.add_feature(feature_1_1.clone()).unwrap();
+        manager.add_feature(feature_1_2.clone()).unwrap();
+        manager.add_feature(feature_1_3.clone()).unwrap();
+        manager.add_feature(feature_1_4_no_watch.clone()).unwrap();
+        manager.add_feature(feature_2.clone()).unwrap();
 
-        let events : HashSet<_> = (0..4).map(|_| {
+        let events : HashSet<_> = (0..5).map(|_| {
             match rx_watch.recv().unwrap() {
-                Event::GetterAdded(id) => id,
+                GenericWatchEvent::FeatureAdded {id, connection: true} => id,
                 other => panic!("Unexpected event {:?}", other)
             }
         }).collect();
 
-        assert_eq!(events.len(), 4);
+        assert_eq!(events.len(), 5);
 
-        assert_matches!(rx_watch.try_recv(), Err(_));
+        assert!(rx_watch.try_recv().is_err());
 
-        println!("* We can observe channels being removed.");
+        println!("* We can observe features being removed, regardless of supports_watch.");
 
-        manager.remove_getter(&getter_id_1_2).unwrap();
+        manager.remove_feature(&feature_id_1_2).unwrap();
         match rx_watch.recv().unwrap() {
-            Event::GetterRemoved(ref id) if *id == getter_id_1_2 => {}
+            GenericWatchEvent::FeatureRemoved{ ref id, connection: true } if *id == feature_id_1_2 => {}
             other => panic!("Unexpected event {:?}", other)
         }
-        assert_matches!(rx_watch.try_recv(), Err(_));
+        assert!(rx_watch.try_recv().is_err());
 
         println!("* We can observe value changes.");
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_2.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_3.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_1.clone(), Ok(Some(Value::new(true)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_2.clone(), Ok(Some(Value::new(true)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_3.clone(), Ok(Some(Value::new(false)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_4_no_watch.clone(), Ok(Some(Value::new(false)))));
+
         let events : HashMap<_, _> = (0..2).map(|_| {
             match rx_watch.recv().unwrap() {
-                Event::EnterRange {
-                    from,
+                GenericWatchEvent::EnterRange {
+                    id,
                     value
-                } => (from, value),
+                } => (id, value),
                 other => panic!("Unexpected event {:?}", other)
             }
         }).collect();
-        assert_eq!(events.get(&getter_id_1_1).unwrap(), &Value::OnOff(OnOff::On));
-        assert_eq!(events.get(&getter_id_1_3).unwrap(), &Value::OnOff(OnOff::Off));
+        assert_eq!(events.get(&feature_id_1_1).unwrap().cast::<bool>().unwrap(), &true);
+        assert_eq!(events.get(&feature_id_1_3).unwrap().cast::<bool>().unwrap(), &false);
 
-        println!("* We only observe channels that still exist.");
-        assert_matches!(rx_watch.try_recv(), Err(_));
+        println!("* We do not receive Enter/Exit events for channels that have been removed or do not support watch.");
+        assert!(rx_watch.try_recv().is_err());
 
-        println!("* We can have several watchers at once");
-        assert_eq!(manager.add_getter_tags(vec![
-            GetterSelector::new().with_id(getter_id_1_3.clone()),
-            GetterSelector::new().with_id(getter_id_2.clone()),
+        println!("* We can have several watchers at once.");
+        assert_eq!(api.add_feature_tags(vec![
+            FeatureSelector::new().with_id(feature_id_1_3.clone()),
+            FeatureSelector::new().with_id(feature_id_2.clone()),
         ], vec![tag_1.clone()]), 2);
 
         let (tx_watch_2, rx_watch_2) = channel();
-        guards.push(manager.watch_values(target_map(vec![(
+        guards.push(api.register_watch(vec![Targetted::new(
             vec![
-                GetterSelector::new()
-                    .with_tags(vec![tag_1.clone()])
+                FeatureSelector::new()
+                    .with_tags(&vec![tag_1.clone()])
             ],
-            Exactly::Exactly(Range::Eq(Value::OnOff(OnOff::On)))
-        )]), Box::new(tx_watch_2)));
+            Exactly::Exactly(Value::new(Range::Eq(Value::new(true))))
+        )], Box::new(tx_watch_2)));
 
-        println!("* Value changes are observed on both watchers");
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_2.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_3.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));
-        tweak_2(Tweak::InjectGetterValue(getter_id_2.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));
-        tweak_2(Tweak::InjectGetterValue(getter_id_2.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
+        let (tx_watch_3, rx_watch_3) = channel();
+        guards.push(api.register_watch(vec![Targetted::new(
+            vec![
+                FeatureSelector::new()
+                    .with_service(vec![
+                        ServiceSelector::new()
+                            .with_tags(&vec![
+                                tag_2_service.clone()
+                            ])
+                    ]),
+            ], Exactly::Always
+        )], Box::new(tx_watch_3)));
 
+        println!("* Triggering value changes that should be observed on all watchers.");
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_1.clone(), Ok(Some(Value::new(false)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_2.clone(), Ok(Some(Value::new(false))))); // This feature has been removed.
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_3.clone(), Ok(Some(Value::new(false)))));
+        tweak_2(Tweak::InjectGetterValue(feature_id_2.clone(), Ok(Some(Value::new(false)))));
+        tweak_2(Tweak::InjectGetterValue(feature_id_2.clone(), Ok(Some(Value::new(true)))));
+
+        println!("* Value changes are observed by the universal observer.");
         let mut events : HashMap<_, _> = (0..4).map(|_| {
             match rx_watch.recv().unwrap() {
-                Event::EnterRange { from, value } => (from, value),
+                GenericWatchEvent::EnterRange { id, value } => {
+                    (id, *value.cast::<bool>().unwrap())
+                }
                 other => panic!("Unexpected event {:?}", other)
             }
         }).collect();
+
+        println!("* Value changes are observed by the feature tags observer.");
         match rx_watch_2.recv().unwrap() {
-            Event::EnterRange { from, value } => {
-                events.insert(from, value);
+            GenericWatchEvent::EnterRange { id, value } => {
+                events.insert(id, *value.cast::<bool>().unwrap());
             }
             other => panic!("Unexpected event {:?}", other)
         }
+
+        println!("* Value changes are observed by the service tags observer.");
+        for _ in 0..2 {
+            match rx_watch_3.recv().unwrap() {
+                GenericWatchEvent::EnterRange { id, value } => {
+                    events.insert(id, *value.cast::<bool>().unwrap());
+                }
+                other => panic!("Unexpected event {:?}", other)
+            }
+        }
+
         assert_eq!(events.len(), 3);
-        assert_matches!(rx_watch.try_recv(), Err(_));
-        assert_matches!(rx_watch_2.try_recv(), Err(_));
+
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        assert!(rx_watch_3.try_recv().is_err());
 
         println!("* Watchers with ranges emit both EnterRange and ExitRange");
 
-        tweak_2(Tweak::InjectGetterValue(getter_id_2.clone(), Ok(Some(Value::OnOff(OnOff::Off)))));
+        tweak_2(Tweak::InjectGetterValue(feature_id_2.clone(), Ok(Some(Value::new(false)))));
         match rx_watch_2.recv().unwrap() {
-            Event::ExitRange { ref from, .. } if *from == getter_id_2 => { }
+            GenericWatchEvent::ExitRange { ref id, .. } if *id == feature_id_2 => { }
             other => panic!("Unexpected event {:?}", other)
         }
         match rx_watch.recv().unwrap() {
-            Event::EnterRange { ref from, .. } if *from == getter_id_2 => { }
+            GenericWatchEvent::EnterRange { ref id, .. } if *id == feature_id_2 => { }
             other => panic!("Unexpected event {:?}", other)
         }
-        assert_matches!(rx_watch.try_recv(), Err(_));
-        assert_matches!(rx_watch_2.try_recv(), Err(_));
-
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        assert!(rx_watch_3.try_recv().is_err());
 
         println!("* We stop receiving value change notifications once we have dropped the guard.");
         drop(guard);
-        assert_matches!(rx_watch.try_recv(), Err(_));
+        assert!(rx_watch.try_recv().is_err());
 
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_1.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_2.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
-        tweak_1(Tweak::InjectGetterValue(getter_id_1_3.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
-        tweak_2(Tweak::InjectGetterValue(getter_id_2.clone(), Ok(Some(Value::OnOff(OnOff::On)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_1.clone(), Ok(Some(Value::new(true)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_2.clone(), Ok(Some(Value::new(true)))));
+        tweak_1(Tweak::InjectGetterValue(feature_id_1_3.clone(), Ok(Some(Value::new(true)))));
+        tweak_2(Tweak::InjectGetterValue(feature_id_2.clone(), Ok(Some(Value::new(true)))));
 
         let events : HashSet<_> = (0..2).map(|_| {
                 match rx_watch_2.recv().unwrap() {
-                    Event::EnterRange { from, .. } => from,
+                    GenericWatchEvent::EnterRange { id, .. } => id,
                     other => panic!("Unexpected event {:?}", other)
                 }
         }).collect();
         assert_eq!(events.len(), 2);
-        assert!(events.contains(&getter_id_1_3));
-        assert!(events.contains(&getter_id_2));
+        assert!(events.contains(&feature_id_1_3));
+        assert!(events.contains(&feature_id_2));
 
-        assert_matches!(rx_watch_2.try_recv(), Err(_));
-        assert_matches!(rx_watch.try_recv(), Err(_));
+        let events : HashSet<_> = (0..2).map(|_| {
+                match rx_watch_3.recv().unwrap() {
+                    GenericWatchEvent::EnterRange { id, .. } => id,
+                    other => panic!("Unexpected event {:?}", other)
+                }
+        }).collect();
+        assert_eq!(events.len(), 2);
+        assert!(events.contains(&feature_id_1_1));
+        assert!(events.contains(&feature_id_1_3));
+
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        assert!(rx_watch_3.try_recv().is_err());
 
         println!("* We stop receiving connection notifications once we have dropped the guard.");
-        manager.add_getter(getter_1_4.clone()).unwrap();
-        assert_matches!(rx_watch.try_recv(), Err(_));
+        manager.add_feature(feature_1_5.clone()).unwrap();
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        match rx_watch_3.recv().unwrap() {
+            GenericWatchEvent::FeatureAdded { id, connection: true } => assert_eq!(id, feature_id_1_5),
+            other => panic!("Unexpected event {:?}", other)
+        }
+        assert!(rx_watch_3.try_recv().is_err());
 
         println!("* We stop receiving disconnection notifications once we have dropped the guard.");
-        manager.remove_getter(&getter_id_1_4).unwrap();
-        assert_matches!(rx_watch.try_recv(), Err(_));
+        manager.remove_feature(&feature_id_1_5).unwrap();
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        match rx_watch_3.recv().unwrap() {
+            GenericWatchEvent::FeatureRemoved { id, connection: true } => assert_eq!(id, feature_id_1_5),
+            other => panic!("Unexpected event {:?}", other)
+        }
+        assert!(rx_watch_3.try_recv().is_err());
 
-        println!("* We are notified when a getter is added to a watch by changing a tag.");
+        println!("* We are notified when a feature is removed from a watch by changing a service tag.");
+        api.remove_service_tags(vec![
+            ServiceSelector::new().with_id(service_id_1.clone())
+        ], vec![tag_2_service.clone()]);
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        let events : HashSet<_> = (0..3).map(|_| {
+            match rx_watch_3.recv().unwrap() {
+                GenericWatchEvent::FeatureRemoved { id, connection: false } => id,
+                other => panic!("Unexpected event {:?}", other)
+            }
+        }).collect();
+        assert_eq!(events.len(), 3);
+        assert!(events.contains(&feature_id_1_1));
+        assert!(events.contains(&feature_id_1_3));
+        assert!(events.contains(&feature_id_1_4_no_watch));
 
-        assert_eq!(manager.add_getter_tags(vec![
-            GetterSelector::new().with_id(getter_id_1_1.clone()),
-            GetterSelector::new().with_id(getter_id_2.clone()),
+        assert!(rx_watch_3.try_recv().is_err());
+
+        println!("* We stop receiving connection notifications from a watch-by-service-tag once the service has lost the tag.");
+        manager.add_feature(feature_1_5.clone()).unwrap();
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        assert!(rx_watch_3.try_recv().is_err());
+
+        println!("* We stop receiving disconnection notifications from a watch-by-service-tag once the service has lost the tag.");
+        manager.remove_feature(&feature_id_1_5).unwrap();
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        assert!(rx_watch_3.try_recv().is_err());
+
+        println!("* We are notified when a feature is added to a watch by changing a tag.");
+
+        assert_eq!(api.add_feature_tags(vec![
+            FeatureSelector::new().with_id(feature_id_1_1.clone()),
+            FeatureSelector::new().with_id(feature_id_2.clone()),
         ], vec![tag_1.clone()]), 2);
         match rx_watch_2.recv().unwrap() {
-            Event::GetterAdded(ref id) if *id == getter_id_1_1 => { }
+            GenericWatchEvent::FeatureAdded { ref id, connection: false } if *id == feature_id_1_1 => { }
             other => panic!("Unexpected event {:?}", other)
         }
-        assert_matches!(rx_watch_2.try_recv(), Err(_));
+        assert!(rx_watch_2.try_recv().is_err());
+        assert!(rx_watch_3.try_recv().is_err());
 
 
-        println!("* We are notified when a getter is removed from a watch by changing a tag.");
+        println!("* We are notified when a feature is removed from a watch by changing a tag.");
 
-        assert_eq!(manager.remove_getter_tags(vec![
-            GetterSelector::new().with_id(getter_id_1_1.clone()),
+        assert_eq!(api.remove_feature_tags(vec![
+            FeatureSelector::new().with_id(feature_id_1_1.clone()),
         ], vec![tag_1.clone()]), 1);
         match rx_watch_2.recv().unwrap() {
-            Event::GetterRemoved(ref id) if *id == getter_id_1_1 => { }
+            GenericWatchEvent::FeatureRemoved { ref id, connection: false } if *id == feature_id_1_1 => { }
             other => panic!("Unexpected event {:?}", other)
         }
-        assert_matches!(rx_watch_2.try_recv(), Err(_));
+        assert!(rx_watch_2.try_recv().is_err());
+        assert!(rx_watch_3.try_recv().is_err());
 
-        println!("* Make sure that we havne't forgotten to eat a message.");
+        println!("* Make sure that we haven't forgotten to eat a message.");
         thread::sleep(std::time::Duration::new(1, 0));
-        assert_matches!(rx_watch.try_recv(), Err(_));
-        assert_matches!(rx_watch_2.try_recv(), Err(_));
+        assert!(rx_watch.try_recv().is_err());
+        assert!(rx_watch_2.try_recv().is_err());
+        assert!(rx_watch_3.try_recv().is_err());
 
         if clear {
-            println!("* Clearing does not break the manager.
-");
+            println!("* Clearing does not need break the manager.");
             manager.stop();
         } else {
-            println!("* Not clearing does not break the manager.
-");
+            println!("* Not clearing does not need break the manager.");
         }
     }
 

@@ -5,11 +5,11 @@ authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
 chrono = "0.2.19"
-clippy = "0.0.63"
-#clippy = {git = "https://github.com/Manishearth/rust-clippy.git", rev = "c1c935d"}
+clippy = "0.0.64"
 lazy_static = "^0.1"
 libc = "0.2.9"
 log = "0.3"
+mopa = "*"
 rusqlite = "0.6.0"
 serde = "0.7.0"
 serde_json = "0.7.0"
