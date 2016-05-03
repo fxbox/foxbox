@@ -48,7 +48,7 @@ impl TagStorage {
             return;
         }
 
-        info!("Opening taxonomy tags database at {}", self.path.display());
+        debug!("Opening taxonomy tags database at {}", self.path.display());
         let db = Connection::open(self.path.clone()).unwrap_or_else(|err| {
             panic!("Unable to open taxonomy tags database: {}", err);
         });
