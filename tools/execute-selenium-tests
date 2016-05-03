@@ -13,17 +13,7 @@ DEBUG_PROFILE="$HOME/.local/share/foxbox-debug"
 # clean up residual profile
 rm -rf "${DEBUG_PROFILE}"
 
-# build and launch foxbox daemon
-pushd "${PROJECT_HOME}"
-cargo build
-if [ "$(uname)" == "Darwin" ]; then
-    # Do not use hostname flag on Mac since it is only implemented in Linux ATM.
-    "$FOXBOX_BINARY" --port ${DEBUG_PORT} --disable-tls --profile "${DEBUG_PROFILE}" &
-else
-    "$FOXBOX_BINARY" --local-name ${DEBUG_HOST} --port ${DEBUG_PORT} --disable-tls --profile "${DEBUG_PROFILE}" &
-fi
-FOXBOX_PID=$!
-popd
+
 
 # run tests
 BOX_PORT=${DEBUG_PORT} "${PROJECT_HOME}/node_modules/.bin/mocha" "${PROJECT_HOME}/test/selenium/*_test.js"
