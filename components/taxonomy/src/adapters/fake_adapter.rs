@@ -1,11 +1,12 @@
 //! An adapter to a non-existing device, whose state is entirely controlled programmatically.
 //! Used for testing.
-use adapter::*;
+use adapters::adapter::*;
 
-use api::{ Error, User };
-use selector::*;
-use services::*;
-use values::*;
+use api::error::*;
+use api::native::User;
+use api::services::*;
+use io::range::*;
+use io::types::*;
 
 use transformable_channels::mpsc::*;
 
@@ -13,24 +14,24 @@ use std::cell::RefCell;
 use std::collections::HashMap ;
 use std::collections::hash_map::Entry::*;
 use std::sync::{ Arc, Mutex };
-use std::sync::atomic::{ AtomicBool, Ordering} ;
+use std::sync::atomic::{ AtomicBool, Ordering } ;
 use std::thread;
 
 /// A tweak sent to the virtual device, to set a value, inject an error, ...
 #[allow(enum_variant_names)]
 pub enum Tweak {
     /// Inject a value in a virtual getter.
-    InjectGetterValue(Id<Getter>, Result<Option<Value>, Error>),
+    InjectGetterValue(Id<FeatureId>, Result<Option<Value>, Error>),
 
     /// Inject an error in a virtual setter. All operations on this setter will
     /// raise the error until `None` is injected instead.
-    InjectSetterError(Id<Setter>, Option<Error>)
+    InjectSetterError(Id<FeatureId>, Option<Error>)
 }
 
 /// Something that happened to the virtual device, e.g. a value was sent.
 #[derive(Debug)]
 pub enum Effect {
-    ValueSent(Id<Setter>, Value)
+    ValueSent(Id<FeatureId>, Option<Value>)
 }
 
 fn dup<T>(t: T) -> (T, T) where T: Clone {
@@ -59,9 +60,9 @@ pub struct FakeAdapter {
     tweak: Arc<Fn(Tweak) + Sync + Send>,
     tx_effect: Mutex<Box<ExtSender<Effect>>>,
     rx_effect: Mutex<Option<Receiver<Effect>>>,
-    values: SyncMap<Id<Getter>, Result<Value, Error>>,
-    senders: SyncMap<Id<Setter>, Error>,
-    watchers: SyncMap<Id<Getter>, Vec<WatcherState>>
+    values: SyncMap<Id<FeatureId>, Result<Value, Error>>,
+    senders: SyncMap<Id<FeatureId>, Error>,
+    watchers: SyncMap<Id<FeatureId>, Vec<WatcherState>>
 }
 
 impl FakeAdapter {
@@ -182,9 +183,11 @@ impl Adapter for FakeAdapter {
 
     /// Request a value from a channel. The `FoxBox` (not the adapter)
     /// is in charge of keeping track of the age of values.
-    fn fetch_values(&self, mut channels: Vec<Id<Getter>>, _: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self, mut source: PerFeature<Option<Value>>, _: User)
+        -> PerFeatureResult<Option<Value>>
+    {
         let map = self.values.lock().unwrap();
-        channels.drain(..).map(|id| {
+        source.drain(..).map(|(id, _)| {
             let result = match map.get(&id) {
                 None => Ok(None),
                 Some(&Ok(ref value)) => Ok(Some(value.clone())),
@@ -195,13 +198,15 @@ impl Adapter for FakeAdapter {
     }
 
     /// Request that a value be sent to a channel.
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, _: User) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self, mut values: PerFeature<Option<Value>>, _: User)
+        -> PerFeatureResult<Option<Value>>
+    {
         let map = self.senders.lock().unwrap();
-        values.drain().map(|(id, value)| {
+        values.drain(..).map(|(id, value)| {
             let result = match map.get(&id) {
                 None => {
                     self.tx_effect.lock().unwrap().send(Effect::ValueSent(id.clone(), value)).unwrap();
-                    Ok(())
+                    Ok(None)
                 }
                 Some(error) => Err(error.clone())
             };
@@ -209,9 +214,18 @@ impl Adapter for FakeAdapter {
         }).collect()
     }
 
-    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult {
+    fn register_watch(&self, mut watches: PerFeature<(Option<Value>, Box<ExtSender<WatchEvent>>)>) ->
+        PerFeatureResult<Box<AdapterWatchGuard>>
+    {
         let mut watchers = self.watchers.lock().unwrap();
-        watch.drain(..).map(|(id, filter, on_event)| {
+        watches.drain(..).map(|(id, (filter, on_event))| {
+            let filter = match filter {
+                None => None,
+                Some(value) => match value.cast::<Range>() {
+                    None => return (id, Err(Error::TypeError("Invalid filter: expected a Range".to_owned()))),
+                    Some(range) => Some(range.clone())
+                }
+            };
             let is_dropped = Arc::new(AtomicBool::new(false));
             let watcher = WatcherState {
                 filter: filter,

@@ -6,9 +6,16 @@
 ///! It provides an api to manage Id <-> tags relationships.
 ///! All users share the same tags for objects.
 
-use rusqlite::{ Connection, Result };
+use api::services::TagId;
+use misc::util::Id;
+
 use std::path::PathBuf;
-use util::{ Id, TagId };
+
+use rusqlite::{ Connection, Result };
+
+// FIXME: We should differentiate between tags for Features and for Services, as a Service and
+// a Feature could have the same id.
+
 
 fn escape<T>(string: &Id<T>) -> String {
     // http://www.sqlite.org/faq.html#q14
@@ -48,7 +55,7 @@ impl TagStorage {
             return;
         }
 
-        debug!("Opening taxonomy tags database at {}", self.path.display());
+        info!("Opening taxonomy tags database at {}", self.path.display());
         let db = Connection::open(self.path.clone()).unwrap_or_else(|err| {
             panic!("Unable to open taxonomy tags database: {}", err);
         });
@@ -151,7 +158,7 @@ pub fn remove_test_db() {
 
 #[test]
 fn test_keys() {
-    use util::ServiceId;
+    use api::services::ServiceId;
 
     let key1 = create_key(&Id::<ServiceId>::new("abc"), &Id::<TagId>::new("defgh"));
     let key1_1 = create_key(&Id::<ServiceId>::new("abc"), &Id::<TagId>::new("defgh"));
@@ -164,7 +171,7 @@ fn test_keys() {
 #[test]
 #[allow(unused_variables)]
 fn storage_test() {
-    use util::ServiceId;
+    use api::services::ServiceId;
 
     // Simple RAII style struct to delete the test db.
     struct AutoDeleteDb { };

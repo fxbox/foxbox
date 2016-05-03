@@ -15,7 +15,7 @@ use std::hash::Hash;
 ///
 /// ```
 /// use std::collections::HashMap;
-/// use foxbox_taxonomy::transact::InsertInMap;
+/// use foxbox_taxonomy::misc::transact::InsertInMap;
 ///
 /// let mut map = HashMap::new();
 ///
