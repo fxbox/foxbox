@@ -54,7 +54,7 @@ impl<C: Controller> Discovery<C> {
                 "philips_hue", "nupnp_enabled", "true");
             if nupnp_enabled == "true" {
                 let nupnp_url = controller.get_config().get_or_set_default(
-                    "philips_hue", "nupnp_url", "http://www.meethue.com/api/nupnp");
+                    "philips_hue", "nupnp_url", "https://www.meethue.com/api/nupnp");
                 let nupnp_hubs = nupnp_query(&nupnp_url);
                 for nupnp in nupnp_hubs {
                     let _ = tx.lock().unwrap().send(HueAction::AddHub(nupnp.id.to_owned(),

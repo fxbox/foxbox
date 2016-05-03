@@ -51,7 +51,7 @@ pub fn put(url: &str, data: &str) -> Result<String, Box<Error>> {
 describe! philips_hue_http {
 
     before_each {
-        let good_url = "http://www.meethue.com/api/nupnp";
+        let good_url = "https://www.meethue.com/api/nupnp";
     }
 
     // TODO: This test fails on travis (not locally) for unknown reasons:
