@@ -31,7 +31,7 @@ Prepper.makeSuite('Test to open web app', function() {
     driver.quit();
   });
 
-  describe('open the web app', function() {
+  describe.skip('open the web app', function() {
 
     beforeEach(function() {
       setUpWebapp = new SetUpWebapp(driver);

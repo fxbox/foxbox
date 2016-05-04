@@ -35,7 +35,7 @@ set_up_tests() {
 }
 
 run_tests() {
-    #npm run test-selenium
+    npm run test-selenium
     npm run test-integration-travis
     # TODO: Currently unit tests are executed twice. We need a way to filter out
     # tests with `cargo test` depending on where they are defined in the tree
