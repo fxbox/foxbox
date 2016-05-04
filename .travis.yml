@@ -13,7 +13,7 @@ dist: trusty
 
 language: rust
 rust:
-  - nightly-2016-04-10
+  - nightly-2016-04-29
   - nightly
 
 matrix:
