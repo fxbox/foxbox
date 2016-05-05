@@ -18,6 +18,9 @@ mod ip_camera;
 /// An adapter dedicated to the Philips Hue
 mod philips_hue;
 
+/// An adapter for Sonos speakers.
+mod sonos;
+
 /// An adapter providing access to Thinkerbell.
 mod thinkerbell;
 
@@ -68,6 +71,7 @@ impl<T: Controller> AdapterManager<T> {
         let profile_openzwave = &self.controller.get_profile().path_for("openzwave");
         let openzwave_device = self.controller.clone().get_config().get("openzwave", "device");
         OpenzwaveAdapter::init(manager, profile_openzwave, openzwave_device).unwrap();
+        sonos::SonosAdapter::init(manager, self.controller.clone()).unwrap();
 
         self.start_tts(manager);
     }
