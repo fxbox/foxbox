@@ -142,7 +142,7 @@ impl Adapter for ThinkerbellAdapter {
     }
 }
 
-/// ThinkerbellAdapter's main loop handles messages of these types.
+/// `ThinkerbellAdapter`'s main loop handles messages of these types.
 enum ThinkAction {
     AddRuleService(Id<ScriptId>),
     RemoveRuleService(Id<ScriptId>),
