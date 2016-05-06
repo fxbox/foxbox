@@ -10,7 +10,8 @@ var philipsHue_server = (function() {
 
   // this represents the simulated lights
   var light_status = api_resp.lights; 
-  var last_received_cmd = null;   
+  var last_received_cmd = null;  
+  var last_commanded_light; 
   var _server = express();
   var instance;
 
@@ -24,6 +25,10 @@ var philipsHue_server = (function() {
 
   function lastCmd() { 
     return last_received_cmd;
+  }
+
+  function lastLight() { 
+    return last_commanded_light;
   }
 
   function lightResponse(light_id,result) {
@@ -42,6 +47,26 @@ var philipsHue_server = (function() {
   function turnOffLight(id) {
     _setLight(id,'on',false);
     console.log('light ' + id + ' status: ' + light_status[id].state.on);
+  }
+
+  function turnOffAllLights(ids) {
+    ids.forEach(id => {
+      turnOffLight(id);
+    });
+  }
+
+  function getHSB(id){
+    var h,s,b;
+    h = light_status[id].state.hue;
+    s = light_status[id].state.sat;
+    b = light_status[id].state.bri;
+    return {'h':h,'s':s,'b':b};
+  }
+
+  function setHSB(id,h,s,b) {
+    light_status[id].state.hue = h;
+    light_status[id].state.sat = s;
+    light_status[id].state.bri = b; 
   }
 
   function lightStatus(id) {
@@ -99,16 +124,23 @@ var philipsHue_server = (function() {
 
     _server.put('/api/:foxboxId/lights/:light_id/state', 
       bodyParser.json(),function (req, res) {
-        if (req.body.on) {
+        if (req.body.hue !== undefined && 
+          req.body.sat !== undefined && 
+          req.body.bri !== undefined) {
+          setHSB(req.params.light_id,req.body.hue,req.body.sat,req.body.bri);
+        }
+        
+        if (req.body.on === true) {
           turnOnLight(req.params.light_id); 
         }
-        else {
+        else if (req.body.on === false) {
           turnOffLight(req.params.light_id);      
         }
         
         var response = lightResponse(req.params.light_id,
           light_status[req.params.light_id]);
         last_received_cmd += ':' + JSON.stringify(req.body);
+        last_commanded_light = req.params.light_id;
         res.status(200).json(response);     
       });
 
@@ -126,8 +158,8 @@ var philipsHue_server = (function() {
    });
   }
 
-  return {setup, stop, lastCmd, lightResponse, turnOnLight, 
-    turnOffLight, lightStatus, areAllLightsOn};
+  return {setup, stop, lastCmd, lastLight, getHSB, lightResponse, turnOnLight, 
+    turnOffLight, turnOffAllLights, lightStatus, areAllLightsOn};
 
   })();
 

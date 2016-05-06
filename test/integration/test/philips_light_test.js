@@ -25,9 +25,7 @@ Prepper.makeSuite('Control lights locally',function(){
   describe('manipulate lights', function () {
     before(function() {
       // turn off all lights in the simulator
-      Prepper.philipshue_server.turnOffLight(1);
-      Prepper.philipshue_server.turnOffLight(2);
-      Prepper.philipshue_server.turnOffLight(3);
+      Prepper.philipshue_server.turnOffAllLights([1,2,3]);
 
       return chakram.put(Prepper.foxboxManager.getterURL,getterPayload)
       .then(function(listResponse) {
