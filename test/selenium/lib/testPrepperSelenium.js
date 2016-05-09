@@ -16,7 +16,7 @@ var testPrepperSelenium = (function() {
       test();
       after(function() {
         foxboxManager.killFoxBox();
-        foxboxManager.removeUsersDB();
+        return foxboxManager.cleanData();
       });
     });
   }
