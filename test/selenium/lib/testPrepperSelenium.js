@@ -1,12 +1,12 @@
 'use strict';
 
-var foxboxManager = require('./foxboxHelperSelenium.js');
+var foxboxProcessManager = require('./foxbox_process_manager');
 
 var testPrepperSelenium = (function() {
 
   function beforeTest(done) {
     console.log('test started');
-    foxboxManager.fullOptionStart(done);
+    foxboxProcessManager.fullOptionStart(done);
   }
 
   function makeSuite(desc, test) {
@@ -15,13 +15,13 @@ var testPrepperSelenium = (function() {
       before(beforeTest);
       test();
       after(function() {
-        foxboxManager.killFoxBox();
-        return foxboxManager.cleanData();
+        foxboxProcessManager.killFoxBox();
+        return foxboxProcessManager.cleanData();
       });
     });
   }
 
-  return { makeSuite, foxboxManager};
+  return { makeSuite, foxboxProcessManager };
 })();
 
 module.exports = testPrepperSelenium;

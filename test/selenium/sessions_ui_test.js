@@ -7,7 +7,7 @@ var webdriver = require('selenium-webdriver'),
     assert    = require('assert');
 
 var Prepper = require('./lib/testPrepperSelenium.js');
-const HOST_URL =  require('./lib/foxboxHelperSelenium.js').HOST_URL;
+const HOST_URL =  require('./lib/foxbox_process_manager').HOST_URL;
 
 Prepper.makeSuite('Test set up UI',function(){
 

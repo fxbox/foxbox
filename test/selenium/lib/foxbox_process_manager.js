@@ -10,7 +10,7 @@ const PROFILE_PATH = path.join(process.env.HOME, '.local/share/foxbox-tests/');
 var FOXBOX_STARTUP_WAIT_TIME_IN_MS = 5000;
 var foxboxInstance;
 
-var helper = (function() {
+var foxboxProcessManager = (function() {
 
   const FOXBOX_PORT = 3331;
   const HOST_URL = util.format('http://localhost:%d/', FOXBOX_PORT);
@@ -53,4 +53,4 @@ var helper = (function() {
   };
 })();
 
-module.exports = helper;
+module.exports = foxboxProcessManager;
