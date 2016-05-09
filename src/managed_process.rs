@@ -16,11 +16,11 @@ use std::time::{ SystemTime, Duration, UNIX_EPOCH };
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct ExitStatus(c_int);
 
-const RESTART_TIME_THRESHOLD: f64 = 5.0; // seconds
+const RESTART_TIME_THRESHOLD: u64 = 5; // seconds
 
-fn seconds_since_epoch() -> f64 {
+fn duration_since_epoch() -> Duration {
     let now = SystemTime::now();
-    now.duration_since(UNIX_EPOCH).unwrap().as_secs() as f64
+    now.duration_since(UNIX_EPOCH).unwrap()
 }
 
 pub struct ManagedProcess {
@@ -32,42 +32,46 @@ pub struct ManagedProcess {
 
 struct Backoff {
     restart_count: u64,
-    restart_threshold: f64,
-    start_time: f64,
-    end_time: f64,
+    restart_threshold: Duration,
+    start_time: Duration,
+    end_time: Duration,
     backoff: u64,
 }
 
 impl Backoff {
 
-    fn new(restart_threshold: f64) -> Self {
+    fn new(restart_threshold: Duration) -> Self {
         Backoff {
-            start_time: restart_threshold,
-            restart_threshold: restart_threshold,
-            end_time: 0.0_f64,
-            backoff: 0,
             restart_count: 0,
+            restart_threshold: restart_threshold,
+            start_time: restart_threshold,
+            end_time: Duration::from_secs(0),
+            backoff: 1,
         }
     }
 
-    fn next_backoff(&mut self) -> Duration {
-        self.end_time = seconds_since_epoch();
+    fn from_secs(restart_threshold_secs: u64) -> Self {
+        Backoff::new(Duration::from_secs(restart_threshold_secs))
+    }
 
-        let seconds_to_backoff =
+    fn next_backoff(&mut self) -> Duration {
+        self.end_time = duration_since_epoch();
+
+        let duration_to_backoff =
             if (self.end_time - self.start_time) < self.restart_threshold {
                 self.backoff += 1;
 
                 // non-linear back off
-                (self.backoff * self.backoff) >> 1
+                Duration::from_secs((self.backoff * self.backoff) >> 1)
             } else {
-                self.backoff = 0;
-                0
+                self.backoff = 1;
+                Duration::from_secs(0)
             };
 
         self.restart_count += 1;
-        self.start_time = seconds_since_epoch();
+        self.start_time = duration_since_epoch();
 
-        Duration::new(seconds_to_backoff, 0)
+        duration_to_backoff
     }
 
     pub fn get_restart_count(&self) -> u64 {
@@ -103,7 +107,7 @@ impl ManagedProcess {
         let kill_signal = Arc::new(Mutex::new(0));
 
         let shared_kill_signal  = kill_signal.clone();
-        let backoff = Arc::new(RwLock::new(Backoff::new(RESTART_TIME_THRESHOLD)));
+        let backoff = Arc::new(RwLock::new(Backoff::from_secs(RESTART_TIME_THRESHOLD)));
         let shared_pid = pid.clone();
         let shared_backoff = backoff.clone();
 
@@ -273,7 +277,7 @@ mod test {
     #[test]
     fn test_backoff_immediate_if_failed_after_threshold() {
 
-        let mut backoff = Backoff::new(2.0);
+        let mut backoff = Backoff::from_secs(2);
         assert_eq!(backoff.next_backoff().as_secs(), 0);
 
         // Simulate process running
@@ -284,24 +288,24 @@ mod test {
 
     #[test]
     fn test_backoff_wait_if_failed_before_threshold() {
-        let mut backoff = Backoff::new(1.0);
+        let mut backoff = Backoff::from_secs(1);
         assert_eq!(backoff.next_backoff().as_secs(), 0);
 
-        assert_eq!(backoff.next_backoff().as_secs(), 0);
         assert_eq!(backoff.next_backoff().as_secs(), 2);
         assert_eq!(backoff.next_backoff().as_secs(), 4);
         assert_eq!(backoff.next_backoff().as_secs(), 8);
         assert_eq!(backoff.next_backoff().as_secs(), 12);
         assert_eq!(backoff.next_backoff().as_secs(), 18);
+        assert_eq!(backoff.next_backoff().as_secs(), 24);
     }
 
     #[test]
     fn test_backoff_reset_if_running_for_more_than_threshold() {
-        let mut backoff = Backoff::new(1.0);
-        assert_eq!(backoff.next_backoff().as_secs(), 0);
+        let mut backoff = Backoff::from_secs(1);
         assert_eq!(backoff.next_backoff().as_secs(), 0);
         assert_eq!(backoff.next_backoff().as_secs(), 2);
         assert_eq!(backoff.next_backoff().as_secs(), 4);
+        assert_eq!(backoff.next_backoff().as_secs(), 8);
 
         // Simulate process running
         thread::sleep(Duration::new(3, 0));
