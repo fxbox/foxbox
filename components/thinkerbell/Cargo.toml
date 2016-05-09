@@ -4,13 +4,13 @@ version = "0.1.2"
 authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
+chrono = "0.2.19"
+foxbox_taxonomy = { path = "../taxonomy/" }
 log = "0.3"
+rusqlite = "0.6.0"
 serde = "0.7.0"
 serde_json = "0.7.0"
 serde_macros = "0.7.2"
-chrono = "0.2.19"
-foxbox_taxonomy = { path = "../taxonomy/" }
-rusqlite = "0.6.0"
 transformable_channels = "*"
 
 [dev-dependencies]

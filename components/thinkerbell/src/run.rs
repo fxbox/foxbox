@@ -5,11 +5,10 @@ use compile::{ Compiler, CompiledCtx, ExecutableDevEnv } ;
 pub use compile::{ Error as CompileError, SourceError, TypeError };
 use compile;
 
-use foxbox_taxonomy::api;
-use foxbox_taxonomy::api::{ API, Error as APIError, Targetted, User, WatchEvent };
-use foxbox_taxonomy::services::{ Getter, Setter };
-use foxbox_taxonomy::util::{ Exactly, Id };
-use foxbox_taxonomy::values::Duration;
+use foxbox_taxonomy::adapters::manager::ManagerWatchEvent;
+use foxbox_taxonomy::api::error::{ Error as APIError };
+use foxbox_taxonomy::api::services::*;
+use foxbox_taxonomy::api::native::{ API, Targetted, User };
 
 use transformable_channels::mpsc::*;
 
@@ -19,6 +18,8 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::thread;
 use std::sync::Mutex;
+
+use chrono::Duration;
 
 /// Running and controlling a single script.
 pub struct Execution<Env> where Env: ExecutableDevEnv + Debug + 'static {
@@ -141,7 +142,7 @@ pub enum ExecutionEvent {
     Sent {
         rule_index: usize,
         statement_index: usize,
-        result: Vec<(Id<Setter>, Result<(), Error>)>
+        result: Vec<(Id<FeatureId>, Result<(), Error>)>
     },
     TimerStart {
         rule_index: usize,
@@ -152,7 +153,7 @@ pub enum ExecutionEvent {
         condition_index: usize,
     },
     ChannelError {
-        id: Id<Getter>,
+        id: Id<FeatureId>,
         error: APIError,
     }
 }
@@ -161,7 +162,7 @@ enum ExecutionOp {
     /// We have received an update from the AdapterManager.
     Update {
         /// The individual event.
-        event: WatchEvent,
+        event: ManagerWatchEvent,
 
         /// The rule to which this event applies.
         rule_index: usize,
@@ -174,7 +175,7 @@ enum ExecutionOp {
     /// have waited long enough to trigger the consequences.
     UpdateCondition {
         /// The channel that has changed state.
-        id: Id<Getter>,
+        id: Id<FeatureId>,
 
         /// `true` if the condition is now met, `false` otherwise.
         is_met: bool,
@@ -205,7 +206,7 @@ struct ConditionState {
     match_is_met: bool,
 
     /// The set of getters for which the condition is met.
-    per_getter: HashSet<Id<Getter>>,
+    per_getter: HashSet<Id<FeatureId>>,
 
     /// If `None`, a duration is attached to this condition and we need to make sure that the
     /// condition remains true for at least `duration` before we decide whether to proceed with
@@ -308,7 +309,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                 }
                 ExecutionOp::Update { event, rule_index, condition_index } => {
                     match event {
-                        WatchEvent::InitializationError {
+                        ManagerWatchEvent::InitializationError {
                             channel,
                             error
                         } => {
@@ -318,7 +319,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                                 error: error,
                             });
                         },
-                        WatchEvent::GetterRemoved(id) => {
+                        ManagerWatchEvent::GetterRemoved(id) => {
                             debug!("[Recipe '{}'] Removed getter {}, resetting condition to `false`", self.script.name, id);
                             // A getter was removed. Its condition is therefore not met anymore.
                             let msg = ExecutionOp::UpdateCondition {
@@ -330,11 +331,11 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                             // This send will fail only if the thread is already down.
                             let _ = self.tx.send(msg);
                         },
-                        WatchEvent::GetterAdded(id) => {
+                        ManagerWatchEvent::GetterAdded(id) => {
                             debug!("[Recipe '{}'] Added getter {}.", self.script.name, id);
                             // An getter was added. Nothing to do.
                         }
-                        WatchEvent::EnterRange { from: id, value } => {
+                        ManagerWatchEvent::EnterRange { from: id, value } => {
                             debug!("[Recipe '{}'] Getter {} has entered the range for rule {}, condition {}: {:?}", self.script.name, id, rule_index, condition_index, value);
                             // We have entered a range. If there is a
                             // timer, start it, otherwise update conditions.
@@ -370,7 +371,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                                 condition_index: condition_index,
                             });
                         }
-                        WatchEvent::ExitRange { from: id, value } => {
+                        ManagerWatchEvent::ExitRange { from: id, value } => {
                             debug!("[Recipe '{}'] Getter {} has left the range for rule {}, condition {}: {:?}", self.script.name, id, rule_index, condition_index, value);
                             if per_rule[rule_index].ongoing_timer.is_some() {
                                 debug!("[Recipe '{}'] I need to cancel the timer for rule {}, condition {}", self.script.name, id, rule_index);
@@ -398,7 +399,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
 
     /// A getter just entered/left a range. Update the conditions to determine whether
     /// we now need to fire the statements.
-    fn update_conditions<S>(&self, name: &str, id: Id<Getter>, getter_is_met: bool,
+    fn update_conditions<S>(&self, name: &str, id: Id<FeatureId>, getter_is_met: bool,
             per_rule: &mut Vec<RuleState<Env>>, rule_index: usize, condition_index: usize,
             api: &Env::API, on_event: &S)
             where S: ExtSender<ExecutionEvent> + Clone
@@ -481,7 +482,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
 
 
 impl<Env> Statement<CompiledCtx<Env>> where Env: ExecutableDevEnv {
-    fn eval(&self, api: &Env::API, owner: &User) ->  Vec<(Id<Setter>, Result<(), Error>)> {
+    fn eval(&self, owner: &User) ->  Vec<(Id<FeatureId>, Result<(), Error>)> {
         api.send_values(vec![Targetted {
             select: self.destination.clone(),
             payload: self.value.clone()

@@ -1,10 +1,9 @@
 [package]
 name = "foxbox_taxonomy"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["David Rajchenbach-Teller <dteller@mozilla.com>"]
 
 [dependencies]
-chrono = "0.2.19"
 clippy = "0.0.64"
 lazy_static = "^0.1"
 libc = "0.2.9"
@@ -13,7 +12,7 @@ mopa = "*"
 rusqlite = "0.6.0"
 serde = "0.7.0"
 serde_json = "0.7.0"
-serde_macros = "0.7.0" 
+serde_macros = "0.7.0"
 string_cache = "^0.2"
 sublock = "^0.1"
 transformable_channels = "^0.1"

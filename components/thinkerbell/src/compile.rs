@@ -20,29 +20,26 @@
 use ast::{ Script, Rule, Statement, Match, Context, UncheckedCtx };
 use util::*;
 
-use foxbox_taxonomy::api::API;
-use foxbox_taxonomy::values::Duration;
+use foxbox_taxonomy::api::native::API;
 
 use transformable_channels::mpsc::*;
 
 use std::fmt::{ Debug, Formatter, Error as FmtError };
 use std::marker::PhantomData;
 
+use chrono::Duration;
+
 /// The environment in which the code is meant to be executed.  This
 /// can typically be instantiated either with actual bindings to
 /// devices, or with a unit-testing framework. // FIXME: Move this to run.rs
 pub trait ExecutableDevEnv: Send {
     type WatchGuard;
-    type API: API<WatchGuard = Self::WatchGuard>;
-
-    /// Return a handle to the API.
-    fn api(&self) -> &Self::API;
 
     /// A guard returned by `start_timer`. When the guard is dropped, the timer is cancelled.
     type TimerGuard;
     fn start_timer(&self, duration: Duration, timer: Box<ExtSender<()>>) -> Self::TimerGuard;
 }
-impl<W, A, T> Debug for ExecutableDevEnv<WatchGuard=W, API=A, TimerGuard=T> {
+impl<W, T> Debug for ExecutableDevEnv<WatchGuard=W, TimerGuard=T> {
     fn fmt(&self, _: &mut Formatter) -> Result<(), FmtError> {
         Ok(())
     }

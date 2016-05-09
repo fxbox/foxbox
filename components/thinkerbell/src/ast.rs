@@ -4,11 +4,14 @@
 //! objects. Rather, they will use module `parse` to parse a script
 //! and module `run` to execute it.
 
-use foxbox_taxonomy::selector::*;
-use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::*;
+use foxbox_taxonomy::api::json::*;
+use foxbox_taxonomy::api::selector::*;
+use foxbox_taxonomy::api::services::*;
+use foxbox_taxonomy::io::parse::*;
 
 use std::marker::PhantomData;
+
+use chrono::Duration;
 
 /// A thinkerbell scrip"t.
 #[derive(Debug)]
@@ -117,7 +120,7 @@ impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
 ///
 /// A match is represented as an object with the following fields:
 ///
-/// - source (array of GetterSelector) - the selector for getters that will
+/// - source (array of FeatureSelector) - the selector for getters that will
 ///   provide the data;
 /// - kind (ChannelKind) - the kind of getters;
 /// - range (Range) - the condition in whih the match is considered met –
@@ -151,24 +154,22 @@ pub struct Match<Ctx> where Ctx: Context {
     /// The set of getters to watch. Note that the set of getters may
     /// change (e.g. when devices are added/removed) without rebooting
     /// the script.
-    pub source: Vec<GetterSelector>,
+    pub source: Vec<FeatureSelector>,
 
     /// The kind of channel expected from `source`, e.g. "the current
     /// time of day", "is the door opened?", etc. During compilation,
     /// we make sure that we restrict to the elements of `source` that
     /// offer `kind`.
-    pub kind: ChannelKind,
+    pub implements: Id<ImplementId>,
 
     /// The range of values for which the condition is considered met.
-    /// During compilation, we check that the type of `range` is
-    /// compatible with that of `getter`.
-    pub range: Range,
+    pub condition: Request,
 
     /// If specified, the values must remain in the `range` for at least
     /// `duration` before the match is considered valid. This is useful
     /// for sensors that may oscillate around a threshold or for detecting
     /// e.g. that a door has been forgotten open.
-    pub duration: Option<Duration>,
+    pub duration: Option<Duration>, // FIXME: Hey, we don't have a notion of duration anymore.
 
     pub phantom: PhantomData<Ctx>,
 }
@@ -177,15 +178,15 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
         "Match".to_owned()
     }
 
-    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+    fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
         let sources = try!(path.push("source",
-            |path| GetterSelector::take_vec(path, source, "source"))
+            |path| FeatureSelector::take_vec(path, source, "source"))
         );
-        let kind = try!(path.push("kind",
-            |path| ChannelKind::take(path, source, "kind"))
+        let kind = try!(path.push("implements",
+            |implements| Id::take(path, source, "implements"))
         );
         let range = try!(path.push("range",
-            |path| Range::take(path, source, "range"))
+            |path| JSON::take(path, source, "range"))
         );
         let duration = match path.push("range",
             |path| Duration::take(path, source, "duration"))
@@ -209,7 +210,7 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
 /// # JSON
 ///
 /// A statement is represented as an object with the following fields:
-/// - destination (array of SetterSelector);
+/// - destination (array of FeatureSelector);
 /// - value (Value);
 /// - kind (ChannelKind);
 ///
@@ -239,7 +240,7 @@ pub struct Statement<Ctx> where Ctx: Context {
     /// The set of setters to which to send a command. Note that the
     /// set of setters may change (e.g. when devices are
     /// added/removed) without rebooting the script.
-    pub destination: Vec<SetterSelector>,
+    pub destination: Vec<FeatureSelector>,
 
     /// Data to send to the resource. During compilation, we check
     /// that the type of `value` is compatible with that of
@@ -261,7 +262,7 @@ impl Parser<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
 
     fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
         let destination = try!(path.push("destination",
-            |path| SetterSelector::take_vec(path, source, "destination"))
+            |path| FeatureSelector::take_vec(path, source, "destination"))
         );
         let kind = try!(path.push("kind",
             |path| ChannelKind::take(path, source, "kind"))
