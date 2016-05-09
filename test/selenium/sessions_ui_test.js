@@ -16,8 +16,6 @@ makeSuite('Test set up UI', (setUpWebapp) => {
 
 describe('sessions ui', function() {
 
-  const PASS = '12345678';
-
   var setUpPage;
   var signedInPage;
   var elements;
@@ -94,7 +92,7 @@ describe('sessions ui', function() {
         });
 
       it('should accept matching, long-enough passwords', function() {
-          return setUpPage.successLogin(12345678, 12345678)
+          return setUpPage.successLogin()
           .then(function(successfulPageView) {
               return successfulPageView.loginMessage();
           }).then(function(text) {
@@ -221,7 +219,8 @@ describe('sessions ui', function() {
     });
 
     it('should accept matching, long-enough passwords', function () {
-      return elements.signinPwd.sendKeys(PASS).then(function() {
+
+      return elements.signinPwd.sendKeys('12345678').then(function() {
         return elements.signinButton.click();
       }).then(function() {
         return driver.wait(webdriver.until.elementIsVisible(screens.signedin),

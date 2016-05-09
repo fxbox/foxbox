@@ -29,46 +29,31 @@ SetUpView.prototype = {
         return this.accessors.isSubmitButtonPresent;
     },
 
-    typePassword: function(text) {
-        return this.accessors.insertPassword.sendKeys(text);
-    },
-
-    confirmTypePassword: function(text) {
-        return this.accessors.confirmPassword.sendKeys(text);
-    },
-
-    successLogin: function(password, confirmPassword) {
-        return this.accessors.insertPassword.sendKeys(password)
-        .then(() => {
-            return this.accessors.confirmPassword.sendKeys(confirmPassword);
-        }).then(() => {
-            return this.accessors.submitButton.sendKeys(webdriver.Key.RETURN);
-        }).then(() => {
-            return successfulPageView;
-        });
+    successLogin: function(password) {
+      return this._submitPassword(password)
+        .then(() => successfulPageView);
     },
 
     successSignUpFromApp: function(password) {
-        return this.accessors.insertPassword.sendKeys(password)
+      return this._submitPassword(password)
         .then(() => {
-            return this.accessors.confirmPassword.sendKeys(password);
-        }).then(() => {
-            return this.accessors.submitButton.click();
-        }).then(() => {
-            var ServicesView = require('../services/view');
-            return new ServicesView(this.driver);
+          var ServicesView = require('../services/view');
+          return new ServicesView(this.driver);
         });
     },
 
     failureLogin: function(password, confirmPassword) {
-        return this.accessors.insertPassword.sendKeys(password)
-        .then(() => {
-            return this.accessors.confirmPassword.sendKeys(confirmPassword);
-        }).then(() => {
-            return this.accessors.submitButton.click();
-        }).then(() => {
-            return this.alertMessage();
-        });
+      return this._submitPassword(password, confirmPassword)
+        .then(() => this.alertMessage());
+    },
+
+    _submitPassword: function(password, confirmPassword) {
+      password = password !== undefined ? password : 12345678;
+      confirmPassword = confirmPassword !== undefined ? confirmPassword : password;
+
+      return this.accessors.insertPassword.sendKeys(password)
+        .then(() => this.accessors.confirmPassword.sendKeys(confirmPassword))
+        .then(() => this.accessors.submitButton.click());
     },
 
     alertMessage: function() {
