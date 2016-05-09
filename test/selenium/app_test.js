@@ -1,15 +1,14 @@
 'use strict';
 
-var Prepper = require('./lib/testPrepperSelenium.js');
 var webdriver = require('selenium-webdriver');
+var makeSuite = require('./lib/make_suite');
+var SetUpWebapp = require('./lib/setup_webapp.js');
 
 var HOST_URL = 'http://fxbox.github.io/app';
-
-var SetUpWebapp = require('./lib/setup_webapp.js');
 var webAppMainPage;
 var setUpWebapp;
 
-Prepper.makeSuite('Github.io webapp', function() {
+makeSuite('Github.io webapp', function() {
 
   var driver;
   const PASSWORD = '12345678';

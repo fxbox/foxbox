@@ -6,10 +6,10 @@
 var webdriver = require('selenium-webdriver'),
     assert    = require('assert');
 
-var Prepper = require('./lib/testPrepperSelenium.js');
+var makeSuite = require('./lib/make_suite');
 const HOST_URL =  require('./lib/foxbox_process_manager').HOST_URL;
 
-Prepper.makeSuite('Test set up UI',function(){
+makeSuite('Test set up UI',function(){
 
 describe('sessions ui', function() {
   var driver;
