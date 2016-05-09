@@ -23,7 +23,6 @@ describe('sessions ui', function() {
   var shortPasswordErrorMessage
     = 'Please use a password of at least 8 characters.';
   var errorPasswordDoNotMatch = 'Passwords don\'t match! Please try again.';
-  var successMessage = 'Thank you!';
 
 
   describe('Foxbox index', function() {
@@ -85,11 +84,8 @@ describe('sessions ui', function() {
 
       it('should accept matching, long-enough passwords', function() {
           return setUpPage.successLogin()
-          .then(function(successfulPageView) {
-              return successfulPageView.loginMessage();
-          }).then(function(text) {
-              assert.equal(text, successMessage);
-          });
+            .then(successfulPageView => successfulPageView.loginMessage)
+            .then(text => { assert.equal(text, 'Thank you!'); });
       });
     });
   });
