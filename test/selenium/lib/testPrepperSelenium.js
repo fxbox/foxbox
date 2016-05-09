@@ -1,21 +1,17 @@
 'use strict';
 
-var foxboxProcessManager = require('./foxbox_process_manager');
+const FoxboxProcessManager = require('./foxbox_process_manager');
+var foxboxProcessManager = new FoxboxProcessManager();
 
 var testPrepperSelenium = (function() {
-
-  function beforeTest(done) {
-    console.log('test started');
-    foxboxProcessManager.fullOptionStart(done);
-  }
 
   function makeSuite(desc, test) {
     describe(desc, function () {
       this.timeout(30000);
-      before(beforeTest);
+      before(() => foxboxProcessManager.start());
       test();
-      after(function() {
-        foxboxProcessManager.killFoxBox();
+      after(() => {
+        foxboxProcessManager.kill();
         return foxboxProcessManager.cleanData();
       });
     });

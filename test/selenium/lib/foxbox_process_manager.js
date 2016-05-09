@@ -7,32 +7,41 @@ const spawn = require('child_process').spawn;
 const util = require('util');
 
 const PROFILE_PATH = path.join(process.env.HOME, '.local/share/foxbox-tests/');
-var FOXBOX_STARTUP_WAIT_TIME_IN_MS = 5000;
-var foxboxInstance;
+const STARTUP_WAIT_TIME_IN_MS = 5000;
 
-var foxboxProcessManager = (function() {
+function FoxboxManager() {
+  this._foxboxInstance = null;
+}
 
-  const FOXBOX_PORT = 3331;
-  const HOST_URL = util.format('http://localhost:%d/', FOXBOX_PORT);
+FoxboxManager.PORT = 3331;
+FoxboxManager.HOST_URL = util.format('http://localhost:%d/', FoxboxManager.PORT);
 
-  function fullOptionStart(callback) {
-    foxboxInstance = spawn('./target/debug/foxbox', [
+FoxboxManager.prototype = {
+  start: function() {
+    this._foxboxInstance = spawn('./target/debug/foxbox', [
       '--disable-tls',
-      '--port', FOXBOX_PORT,
+      '--port', FoxboxManager.PORT,
       '--profile', PROFILE_PATH,
-    ], {stdio: 'inherit'});
-    setTimeout(callback, FOXBOX_STARTUP_WAIT_TIME_IN_MS);
-  }
+    ], { stdio: 'inherit' });
 
-  function killFoxBox() {
-    foxboxInstance.kill('SIGINT');
-  }
+    return new Promise(resolve => {
+      setTimeout(resolve, STARTUP_WAIT_TIME_IN_MS);
+    });
+  },
+
+  kill: function() {
+    this._foxboxInstance.kill('SIGINT');
+  },
+
+  cleanData: function() {
+    return this._deleteAllProfileButCertificates();
+  },
 
   /* Keeping certificates allows foxbox to have the same public domain name.
    * As a consequence, tests don't fail because many foxboxes are detected on
    * github.io.
    */
-  function _deleteAllProfileButCertificates() {
+  _deleteAllProfileButCertificates: function() {
     return new Promise(resolve => {
       find.file(/^((?!\.pem).)*$/, PROFILE_PATH, files => {
         var promises = files.map(file => new Promise(res => {
@@ -43,14 +52,6 @@ var foxboxProcessManager = (function() {
       });
     });
   }
+};
 
-  function cleanData() {
-    return _deleteAllProfileButCertificates();
-  }
-
-  return {
-    fullOptionStart, killFoxBox, cleanData, HOST_URL
-  };
-})();
-
-module.exports = foxboxProcessManager;
+module.exports = FoxboxManager;
