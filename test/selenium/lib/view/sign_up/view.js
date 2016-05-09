@@ -61,7 +61,7 @@ SetUpView.prototype = {
     },
 
     dismissAlert: function() {
-       this.driver.switchTo().alert().accept();
+       return this.driver.switchTo().alert().accept();
     },
 
 };

@@ -67,28 +67,20 @@ describe('sessions ui', function() {
 
       it('should reject non-matching passwords', function() {
           return setUpPage.failureLogin(12345678, 1234)
-          .then(function(text) {
-              assert.equal(text, errorPasswordDoNotMatch);
-          }).then(function(){
-              return setUpPage.dismissAlert();
-          });
+            .then(text => { assert.equal(text, errorPasswordDoNotMatch); })
+            .then(() => setUpPage.dismissAlert());
       });
 
       it('should reject short passwords', function () {
           return setUpPage.failureLogin(1234, 1234)
-          .then(function(text) {
-              assert.equal(text, shortPasswordErrorMessage);
-          }).then(function() {
-              return setUpPage.dismissAlert();
-          });
+            .then(text => { assert.equal(text, shortPasswordErrorMessage); })
+            .then(() => setUpPage.dismissAlert());
         });
 
       it('should fail if password is not set', function() {
-          return setUpPage.failureLogin('', '').then(function(text){
-              assert.equal(text, shortPasswordErrorMessage);
-          }).then(function(){
-              return setUpPage.dismissAlert();
-          });
+          return setUpPage.failureLogin('', '')
+            .then(text => { assert.equal(text, shortPasswordErrorMessage); })
+            .then(() => setUpPage.dismissAlert());
         });
 
       it('should accept matching, long-enough passwords', function() {
