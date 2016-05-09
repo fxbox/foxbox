@@ -4,17 +4,10 @@
 'use strict';
 
 var webdriver = require('selenium-webdriver'),
-    assert    = require('assert'),
-    util      = require('util');
+    assert    = require('assert');
 
 var Prepper = require('./lib/testPrepperSelenium.js');
-
-var HOST_URL = util.format(
-    'http://%s:%s/',
-    process.env.BOX_LOCAL_NAME && process.env.BOX_LOCAL_NAME != 'localhost' ?
-        (process.env.BOX_LOCAL_NAME + '.local.') : 'localhost',
-    process.env.BOX_PORT || '3000'
-);
+const HOST_URL =  require('./lib/foxboxHelperSelenium.js').HOST_URL;
 
 Prepper.makeSuite('Test set up UI',function(){
 
@@ -29,7 +22,7 @@ describe('sessions ui', function() {
   var signedInPage;
   var elements;
 
-  var shortPasswordErrorMessage 
+  var shortPasswordErrorMessage
     = 'Please use a password of at least 8 characters.';
   var errorPasswordDoNotMatch = 'Passwords don\'t match! Please try again.';
   var successMessage = 'Thank you!';

@@ -1,10 +1,5 @@
 sudo: required
 
-env:
-  global:
-    # $BOX_HOST_NAME and $BOX_PORT are also used by Selenium tests.
-    - BOX_LOCAL_NAME=foxbox BOX_PORT=3000
-
 os:
   - osx
   - linux
