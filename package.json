@@ -6,7 +6,7 @@
     "node": ">=4.0.0"
   },
   "scripts": {
-    "test-selenium": "./tools/execute-selenium-tests",
+    "test-selenium": "./tools/execute-selenium-tests.sh",
     "test-integration": "npm run clean && ./node_modules/.bin/mocha test/integration/test/*.js && ./node_modules/.bin/mocha test/integration/test/no_travis/*.js",
     "test-integration-travis": "npm run clean && ./node_modules/.bin/mocha test/integration/test/*.js",
     "clean": "npm run clean_db && npm run clean_picture",
@@ -42,8 +42,5 @@
     "media-typer": "^0.3.0",
     "raw-body": "^2.1.6",
     "urlsafe-base64": "^1.0.0"
-  },
-  "dependencies": {
-    
   }
 }
