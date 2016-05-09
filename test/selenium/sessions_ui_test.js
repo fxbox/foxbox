@@ -6,18 +6,18 @@
 var webdriver = require('selenium-webdriver'),
     assert    = require('assert');
 
-var makeSuite = require('./lib/make_suite');
+const makeSuite = require('./lib/make_suite');
 const HOST_URL =  require('./lib/foxbox_process_manager').HOST_URL;
 
-makeSuite('Test set up UI',function(){
+makeSuite('Test set up UI', (setUpWebapp) => {
+  // TODO: Clean up this work around by not using the driver anywhere
+  // in this file
+  var driver = setUpWebapp.driver;
 
 describe('sessions ui', function() {
-  var driver;
 
   const PASS = '12345678';
 
-  var SetUpWebapp = require('./lib/setup_webapp.js');
-  var setUpWebapp;
   var setUpPage;
   var signedInPage;
   var elements;
@@ -27,20 +27,6 @@ describe('sessions ui', function() {
   var errorPasswordDoNotMatch = 'Passwords don\'t match! Please try again.';
   var successMessage = 'Thank you!';
 
-
-  before(function() {
-    driver = new webdriver.Builder().
-      forBrowser('firefox').
-      build();
-  });
-
-  beforeEach(function() {
-    driver.get(HOST_URL);
-  });
-
-  after(function() {
-    driver.quit();
-  });
 
   describe('Foxbox index', function() {
     it('should be titled FoxBox', function () {
@@ -58,7 +44,6 @@ describe('sessions ui', function() {
             pwd2: driver.findElement(webdriver.By.id('signup-pwd2')),
             set: driver.findElement(webdriver.By.id('signup-button'))
           };
-          setUpWebapp = new SetUpWebapp(driver);
           setUpPage = setUpWebapp.getSetUpView();
           return setUpPage;
         });
@@ -248,8 +233,6 @@ describe('sessions ui', function() {
 
         before(function() {
           driver.navigate().refresh();
-          setUpWebapp = new SetUpWebapp(driver);
-
         });
         beforeEach(function(){
           return driver.wait(webdriver.until.titleIs('FoxBox'), 5000).then(
