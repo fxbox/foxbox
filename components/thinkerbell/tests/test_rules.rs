@@ -98,7 +98,7 @@ fn test_run() {
                 conditions: vec![
                     Match {
                         source: vec![
-                            GetterSelector::new()
+                            ChannelSelector::new()
                         ],
                         kind: ChannelKind::LightOn,
                         range: Range::Eq(Value::OnOff(OnOff::On)),
@@ -109,7 +109,7 @@ fn test_run() {
                 execute: vec![
                     Statement {
                         destination: vec![
-                            SetterSelector::new()
+                            ChannelSelector::new()
                         ],
                         value: Value::OnOff(OnOff::Off),
                         kind: ChannelKind::LightOn,
@@ -124,11 +124,11 @@ fn test_run() {
 
     let adapter_id_1 = Id::<AdapterId>::new("Adapter 1");
     let service_id_1 = Id::<ServiceId>::new("Service 1");
-    let getter_id_1 = Id::<Getter>::new("Getter 1");
-    let getter_id_2 = Id::<Getter>::new("Getter 2");
-    let setter_id_1 = Id::<Setter>::new("Setter 1");
-    let setter_id_2 = Id::<Setter>::new("Setter 2");
-    let setter_id_3 = Id::<Setter>::new("Setter 3");
+    let getter_id_1 = Id::<Channel>::new("Getter 1");
+    let getter_id_2 = Id::<Channel>::new("Getter 2");
+    let setter_id_1 = Id::<Channel>::new("Setter 1");
+    let setter_id_2 = Id::<Channel>::new("Setter 2");
+    let setter_id_3 = Id::<Channel>::new("Setter 3");
 
     println!("* We can start executing a trivial rule.");
     exec.start(env.clone(), script_1, User::None, tx_run).unwrap();
@@ -155,11 +155,7 @@ fn test_run() {
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
             tags: HashSet::new(),
-            last_seen: None,
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            kind: ChannelKind::LightOn,
         }
     ]));
     rx_done.recv().unwrap();
@@ -169,12 +165,8 @@ fn test_run() {
             id: setter_id_1.clone(),
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
             tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            kind: ChannelKind::LightOn,
         }
     ]));
     rx_done.recv().unwrap();
@@ -225,11 +217,7 @@ fn test_run() {
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
             tags: HashSet::new(),
-            last_seen: None,
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            kind: ChannelKind::LightOn,
         }
     ]));
     rx_done.recv().unwrap();
@@ -313,12 +301,8 @@ fn test_run() {
             id: setter_id_2.clone(),
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
             tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            kind: ChannelKind::LightOn,
         }
     ]));
     rx_done.recv().unwrap();
@@ -349,12 +333,8 @@ fn test_run() {
             id: setter_id_3.clone(),
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
             tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::Ready,
-            }
+            kind: ChannelKind::Ready,
         }
     ]));
     rx_done.recv().unwrap();
@@ -434,12 +414,8 @@ fn test_run() {
             id: setter_id_1.clone(),
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
             tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            kind: ChannelKind::LightOn,
         }
     ]));
     rx_done.recv().unwrap();
@@ -474,7 +450,7 @@ fn test_run() {
 }
 
 
-fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Setter>, Value)>, rx_timer: &Receiver<T>)
+fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Channel>, Value)>, rx_timer: &Receiver<T>)
     where T: Debug {
     thread::sleep(std::time::Duration::from_millis(100));
     rx_send.try_recv().unwrap_err();
@@ -523,7 +499,7 @@ fn test_run_with_delay() {
                 conditions: vec![
                     Match {
                         source: vec![
-                            GetterSelector::new()
+                            ChannelSelector::new()
                         ],
                         kind: ChannelKind::LightOn,
                         range: Range::Eq(Value::OnOff(OnOff::On)),
@@ -534,7 +510,7 @@ fn test_run_with_delay() {
                 execute: vec![
                     Statement {
                         destination: vec![
-                            SetterSelector::new()
+                            ChannelSelector::new()
                         ],
                         value: Value::OnOff(OnOff::Off),
                         kind: ChannelKind::LightOn,
@@ -549,9 +525,9 @@ fn test_run_with_delay() {
 
     let adapter_id_1 = Id::<AdapterId>::new("Adapter 1");
     let service_id_1 = Id::<ServiceId>::new("Service 1");
-    let getter_id_1 = Id::<Getter>::new("Getter 1");
-    let getter_id_2 = Id::<Getter>::new("Getter 2");
-    let setter_id_1 = Id::<Setter>::new("Setter 1");
+    let getter_id_1 = Id::<Channel>::new("Getter 1");
+    let getter_id_2 = Id::<Channel>::new("Getter 2");
+    let setter_id_1 = Id::<Channel>::new("Setter 1");
 
     sleep(&rx_done, &rx_send, &rx_timer);
 	println!("* We can start executing a trivial rule.");
@@ -580,11 +556,7 @@ fn test_run_with_delay() {
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
             tags: HashSet::new(),
-            last_seen: None,
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            kind: ChannelKind::LightOn,
         }
     ]));
     rx_done.recv().unwrap();
@@ -594,12 +566,8 @@ fn test_run_with_delay() {
             id: setter_id_1.clone(),
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
             tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            kind: ChannelKind::LightOn,
         }
     ]));
     rx_done.recv().unwrap();
@@ -716,11 +684,7 @@ fn test_run_with_delay() {
             adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
             tags: HashSet::new(),
-            last_seen: None,
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            kind: ChannelKind::LightOn,
         }
     ]));
     rx_done.recv().unwrap();
