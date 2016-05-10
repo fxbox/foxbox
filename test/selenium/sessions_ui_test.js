@@ -17,7 +17,7 @@ suite.build((setUpWebapp) => {
 
 describe('sessions ui', function() {
 
-  var setUpPage;
+  var setUpView;
   var signedInPage;
   var elements;
 
@@ -27,6 +27,7 @@ describe('sessions ui', function() {
 
 
   describe('Foxbox index', function() {
+
     it('should be titled FoxBox', function () {
       return driver.wait(webdriver.until.titleIs('FoxBox'), 5000)
         .then(function(value) {
@@ -36,60 +37,46 @@ describe('sessions ui', function() {
 
     describe('signup', function() {
 
-        beforeEach(function() {
-          return suite.browserRefresh().then(() => {
-            elements = {
-              pwd1: driver.findElement(webdriver.By.id('signup-pwd1')),
-              pwd2: driver.findElement(webdriver.By.id('signup-pwd2')),
-              set: driver.findElement(webdriver.By.id('signup-button'))
-            };
-            setUpPage = setUpWebapp.getSetUpView();
-          });
+      beforeEach(function() {
+        return suite.browserRefresh().then(() => {
+          setUpView = setUpWebapp.getSetUpView();
         });
-
-      after(() => suite.restartFromScratch());
+      });
 
       it('should show the signup screen by default', function() {
-          return setUpPage.isSetUpView();
-        });
-
-      it('should have the rights fields', function() {
-          var types = {
-          pwd1: 'password',
-          pwd2: 'password',
-          set: 'submit'
-        };
-        var promises = Object.keys(elements).map(function(key) {
-          return elements[key].getAttribute('type')
-          .then(function(value) {
-            assert.equal(value, types[key]);
-          });
-        });
-        return Promise.all(promises);
+        return setUpView.isSetUpView();
       });
 
-      it('should reject non-matching passwords', function() {
-          return setUpPage.failureLogin(12345678, 1234)
-            .then(text => { assert.equal(text, errorPasswordDoNotMatch); })
-            .then(() => setUpPage.dismissAlert());
+      describe('failures', function() {
+        afterEach(function() {
+          return setUpView.dismissAlert();
+        })
+
+        it('should reject non-matching passwords', function() {
+          return setUpView.failureLogin(12345678, 1234)
+            .then(text => { assert.equal(text, errorPasswordDoNotMatch); });
+        });
+
+        it('should reject short passwords', function () {
+          return setUpView.failureLogin(1234, 1234)
+            .then(text => { assert.equal(text, shortPasswordErrorMessage); });
+        });
+
+        it('should fail if password is not set', function() {
+          return setUpView.failureLogin('', '')
+            .then(text => { assert.equal(text, shortPasswordErrorMessage); });
+        });
       });
 
-      it('should reject short passwords', function () {
-          return setUpPage.failureLogin(1234, 1234)
-            .then(text => { assert.equal(text, shortPasswordErrorMessage); })
-            .then(() => setUpPage.dismissAlert());
-        });
+      describe('success', function() {
 
-      it('should fail if password is not set', function() {
-          return setUpPage.failureLogin('', '')
-            .then(text => { assert.equal(text, shortPasswordErrorMessage); })
-            .then(() => setUpPage.dismissAlert());
-        });
+        after(() => suite.restartFromScratch());
 
-      it('should accept matching, long-enough passwords', function() {
-          return setUpPage.successLogin()
+        it('should accept matching, long-enough passwords', function() {
+          return setUpView.successLogin()
             .then(successfulPageView => successfulPageView.loginMessage)
             .then(text => { assert.equal(text, 'Thank you!'); });
+        });
       });
     });
   });
@@ -99,7 +86,7 @@ describe('sessions ui', function() {
 
     before(() => {
       return setUpWebapp.init()
-        .then(setUpPage => setUpPage.successLogin())
+        .then(setUpView => setUpView.successLogin())
         .then(successfulView => successfulView.goToSignedIn())
         .then(view => signedInView = view);
     });
