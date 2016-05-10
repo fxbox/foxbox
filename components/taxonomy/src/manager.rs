@@ -11,7 +11,7 @@ use backend::*;
 use selector::*;
 use services::*;
 use util::is_sync;
-use values::{ Range, TypeError, Value };
+use values::{ TypeError, Value };
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -345,7 +345,7 @@ impl API for AdapterManager {
     }
 
     /// Watch for any change
-    fn watch_values(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
+    fn watch_values(&self, watch: TargetMap<GetterSelector, Exactly<Value>>,
         on_event: Box<ExtSender<api::WatchEvent>>) -> Self::WatchGuard
     {
         let (request, watch_key, is_dropped) =

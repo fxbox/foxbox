@@ -96,6 +96,7 @@ pub enum Type {
 
     ExtBool,
     ExtNumeric,
+    Range,
 }
 impl Parser<Type> for Type {
     fn description() -> String {
@@ -120,6 +121,7 @@ impl Parser<Type> for Type {
                 "Binary" => Ok(Binary),
                 "ExtBool" => Ok(ExtBool),
                 "ExtNumeric" => Ok(ExtNumeric),
+                "Range" => Ok(Range),
                 _ => Err(ParseError::unknown_constant(string, &path))
             },
             _ => Err(ParseError::type_error("Type", &path, "string"))
@@ -145,6 +147,7 @@ impl ToJSON for Type {
             Binary => "Binary",
             ExtBool => "ExtBool",
             ExtNumeric => "ExtNumeric",
+            Range => "Range",
         };
         JSON::String(key.to_owned())
     }
@@ -160,6 +163,7 @@ impl Type {
             Duration | TimeStamp | Temperature | ExtNumeric | Color | ThinkerbellRule => false,
             WebPushNotify | Unit | String | Json | Binary | OnOff | OpenClosed |
             DoorLocked | ExtBool => true,
+            Range => false,
         }
     }
 
@@ -1423,6 +1427,7 @@ pub enum Value {
     /// # }
     /// ```
     Binary(Binary),
+    Range(Box<Range>)
 }
 
 
@@ -1490,6 +1495,10 @@ lazy_static! {
             let value = try!(path.push("Binary", |path| self::Binary::parse(path, v)));
             Ok(Binary(value))
         }));
+        map.insert("Range", Box::new(|path, v| {
+            let value = try!(path.push("Range", |path| self::Range::parse(path, v)));
+            Ok(Range(Box::new(value)))
+        }));
         map
     };
     static ref VALUE_KEYS: String = {
@@ -1538,6 +1547,7 @@ impl ToJSON for Value {
             WebPushNotify(ref val) => ("WebPushNotify", val.to_json()),
             ExtBool(ref val) => ("ExtBool", val.to_json()),
             ExtNumeric(ref val) => ("ExtNumeric", val.to_json()),
+            Range(ref val) => ("Range", val.to_json()),
         };
         let source = vec![(key.to_owned(), value)];
         JSON::Object(source.iter().cloned().collect())
@@ -1563,6 +1573,7 @@ impl Value {
             Value::ExtNumeric(_) => Type::ExtNumeric,
             Value::ThinkerbellRule(_) => Type::ThinkerbellRule,
             Value::WebPushNotify(_) => Type::WebPushNotify,
+            Value::Range(_) => Type::Range,
         }
     }
 
@@ -1634,6 +1645,9 @@ impl PartialOrd for Value {
             (&Binary(self::Binary {mimetype: ref a_mimetype, data: ref a_data}),
              &Binary(self::Binary {mimetype: ref b_mimetype, data: ref b_data})) if a_mimetype == b_mimetype => a_data.partial_cmp(b_data),
             (&Binary(_), _) => None,
+
+            (&Range(_), &Range(_)) => None,
+            (&Range(_), _) => None,
         }
     }
 }

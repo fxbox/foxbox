@@ -169,21 +169,7 @@ pub trait Adapter: Send + Sync {
     /// devices, possibly with distinct `Option<Range>` options.
     ///
     /// If a `Range` option is set, the watcher expects to receive `EnterRange`/`ExitRange` events
-    /// whenever the value available on the device enters/exits the range. If the `Range` is
-    /// a `Range::Eq(x)`, the adapter may decide to reject the request or to interpret it as
-    /// a `Range::BetweenEq { min: x, max: x }`.
-    ///
-    /// If no `Range` option is set, the watcher expects to receive `EnterRange` events whenever
-    /// a new value is available on the device. The adapter may decide to reject the request if
-    /// this is clearly not the expected usage for a device, or to throttle it.
-    ///
-    /// # Edge cases
-    ///
-    /// Note that the same `Id<Getter>` may appear several times. This is by design and adapters
-    /// should handle this case, optimizing it if possible.
-    ///
-    /// Similarly, successive calls to `register_watch` may end up watching the same getter. The
-    /// adapter should handle this case, optimizing it if possible.
+    /// whenever the value available on the device enters/exits the range.
     fn register_watch(&self, Vec<WatchTarget>) ->
             WatchResult;
 
@@ -195,5 +181,5 @@ pub trait Adapter: Send + Sync {
     }
 }
 
-pub type WatchTarget = (Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>);
+pub type WatchTarget = (Id<Getter>, Option<Value>, Box<ExtSender<WatchEvent>>);
 pub type WatchResult = Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)>;

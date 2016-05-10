@@ -48,7 +48,7 @@ impl Drop for TestWatchGuard {
 type SyncMap<K, V> = Arc<Mutex<HashMap<K, V>>>;
 
 struct WatcherState {
-    filter: Option<Range>,
+    filter: Option<Box<Range>>,
     on_event: Box<ExtSender<WatchEvent>>,
     is_met: RefCell<bool>, /* is_met*/
     is_dropped: Arc<AtomicBool>, /* is_dropped */
@@ -211,10 +211,19 @@ impl Adapter for FakeAdapter {
 
     fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult {
         let mut watchers = self.watchers.lock().unwrap();
-        watch.drain(..).map(|(id, filter, on_event)| {
+        watch.drain(..).filter_map(|(id, filter, on_event)| {
             let is_dropped = Arc::new(AtomicBool::new(false));
+            let range = match filter {
+                None => None,
+                Some(Value::Range(range)) => Some(range),
+                Some(_) => {
+                    // Ignore.
+                    // FIXME: Log?
+                    return None
+                }
+            };
             let watcher = WatcherState {
-                filter: filter,
+                filter: range,
                 on_event: on_event,
                 is_met: RefCell::new(false),
                 is_dropped: is_dropped.clone()
@@ -228,7 +237,7 @@ impl Adapter for FakeAdapter {
                 }
             }
             let guard = Box::new(TestWatchGuard(is_dropped.clone())) as Box<AdapterWatchGuard>;
-            (id, Ok(guard))
+            Some((id, Ok(guard)))
         }).collect()
     }
 }
