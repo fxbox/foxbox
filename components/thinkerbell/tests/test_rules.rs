@@ -63,7 +63,9 @@ fn test_compile() {
     println!("");
 }
 
-#[test]
+// #[test]
+// FIXME: Intermittent failure, oftentimes breaking the build.
+// See https://github.com/fxbox/foxbox/issues/439
 fn test_run() {
     println!("* Starting test_run.");
     let (tx, rx) : (_, Receiver<Event>) = channel();
