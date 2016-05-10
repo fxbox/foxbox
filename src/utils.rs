@@ -73,6 +73,17 @@ macro_rules! current_dir {
     };
 }
 
+macro_rules! checklock (
+    ($e: expr) => {
+        match $e {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                warn!("lock was poisoned - using anyway..");
+                poisoned.into_inner()
+            },
+        }
+    }
+);
 
 #[cfg(test)]
 #[macro_use]
