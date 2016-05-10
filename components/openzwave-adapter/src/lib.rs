@@ -106,7 +106,7 @@ trait RangeChecker {
     fn should_send(&self, &Value, EventType) -> bool;
 }
 
-impl RangeChecker for Option<Range> {
+impl RangeChecker for Option<Box<Range>> {
     fn should_send(&self, value: &Value, event_type: EventType) -> bool {
         match *self {
             None => event_type == EventType::Enter, // no range means we send only Enter events
@@ -454,11 +454,20 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
         }).collect()
     }
 
-    fn register_watch(&self, mut values: Vec<(TaxoId<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) -> Vec<(TaxoId<Getter>, Result<Box<AdapterWatchGuard>, TaxoError>)> {
+    fn register_watch(&self, mut values: Vec<(TaxoId<Getter>, Option<Value>, Box<ExtSender<WatchEvent>>)>) -> Vec<(TaxoId<Getter>, Result<Box<AdapterWatchGuard>, TaxoError>)> {
         debug!("[OpenzwaveAdapter::register_watch] Should register some watchers");
-        values.drain(..).map(|(id, range, sender)| {
+        values.drain(..).filter_map(|(id, range, sender)| {
             let sender = Arc::new(Mutex::new(sender)); // Mutex is necessary because cb is not Sync.
             debug!("[OpenzwaveAdapter::register_watch] Should register a watcher for {:?} {:?}", id, range);
+            let range = match range {
+                None => None,
+                Some(Value::Range(range)) => Some(range),
+                Some(_) => {
+                    // Ignore.
+                    // FIXME: Log?
+                    return None
+                }
+            };
             let watch_guard = {
                 let mut watchers = self.watchers.lock().unwrap();
                 watchers.push(id.clone(), range.clone(), sender.clone())
@@ -484,7 +493,7 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
                 }
             }
 
-            (id, value_result)
+            Some((id, value_result))
         }).collect()
     }
 

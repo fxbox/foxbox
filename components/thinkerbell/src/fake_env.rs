@@ -38,7 +38,7 @@ struct TestSharedAdapterBackend {
     timers: BinaryHeap<Timer>,
     trigger_timers_until: Option<DateTime<UTC>>,
 
-    watchers: HashMap<usize, (Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>,
+    watchers: HashMap<usize, (Id<Getter>, Option<Box<Range>>, Box<ExtSender<WatchEvent>>)>,
 }
 
 impl TestSharedAdapterBackend {
@@ -83,14 +83,19 @@ impl TestSharedAdapterBackend {
         }).collect()
     }
 
-    fn register_watch(&mut self, mut source: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) ->
+    fn register_watch(&mut self, mut source: Vec<(Id<Getter>, Option<Value>, Box<ExtSender<WatchEvent>>)>) ->
             Vec<(Id<Getter>, Result<usize, Error>)>
     {
-        let results = source.drain(..).map(|(id, range, tx)| {
+        let results = source.drain(..).filter_map(|(id, range, tx)| {
+            let range = match range {
+                Some(Value::Range(range)) => Some(range),
+                None => None,
+                _ => return None, // FIXME: Log
+            };
             let result = (id.clone(), Ok(self.counter));
             self.watchers.insert(self.counter, (id, range, tx));
             self.counter += 1;
-            result
+            Some(result)
         }).collect();
         results
     }
@@ -315,7 +320,7 @@ impl Adapter for TestAdapter {
     /// If no `Range` option is set, the watcher expects to receive `EnterRange` events whenever
     /// a new value is available on the device. The adapter may decide to reject the request if
     /// this is clearly not the expected usage for a device, or to throttle it.
-    fn register_watch(&self, source: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>) ->
+    fn register_watch(&self, source: Vec<(Id<Getter>, Option<Value>, Box<ExtSender<WatchEvent>>)>) ->
             Vec<(Id<Getter>, Result<Box<AdapterWatchGuard>, Error>)>
     {
         let (tx, rx) = channel();
@@ -556,7 +561,7 @@ enum AdapterOp {
         tx: Box<ExtSender<ResultMap<Id<Setter>, (), Error>>>
     },
     Watch {
-        source: Vec<(Id<Getter>, Option<Range>, Box<ExtSender<WatchEvent>>)>,
+        source: Vec<(Id<Getter>, Option<Value>, Box<ExtSender<WatchEvent>>)>,
         tx: Box<ExtSender<Vec<(Id<Getter>, Result<usize, Error>)>>>
     },
     AddTimer(Timer),

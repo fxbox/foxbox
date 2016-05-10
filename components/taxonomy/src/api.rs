@@ -16,7 +16,7 @@
 use services::*;
 use selector::*;
 pub use util::{ ResultMap, TargetMap, Targetted };
-use values::{ Value, Range, TypeError };
+use values::{ Value, TypeError };
 
 use transformable_channels::mpsc::*;
 
@@ -44,9 +44,6 @@ pub enum Error {
 
     /// Attempting to send a value with a wrong type.
     TypeError(TypeError),
-
-    /// Attempting to use an inconsistent range. For instance, one with `min > max`.
-    RangeError(Range),
 
     /// Attempting to send an invalid value. For instance, a time of day larger than 24h.
     InvalidValue(Value),
@@ -76,7 +73,6 @@ impl fmt::Display for Error {
             Error::GetterDoesNotSupportWatching(ref getter) |
             Error::GetterRequiresThresholdForWatching(ref getter) => write!(f, "{}: {}", self.description(), getter),
             Error::TypeError(ref err) => write!(f, "{}: {}", self.description(), err),
-            Error::RangeError(ref range) => write!(f, "{}: {:?}", self.description(), range),
             Error::InvalidValue(ref value) => write!(f, "{}: {:?}",self.description(), value),
             Error::InternalError(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for InternalError as well
         }
@@ -90,7 +86,6 @@ impl error::Error for Error {
             Error::GetterDoesNotSupportWatching(_) => "Attempting to watch a value from a Channel<Getter> that doesn't support this operation",
             Error::GetterRequiresThresholdForWatching(_) => "Attempting to watch all value from a Channel<Getter> that requires a filter",
             Error::TypeError(_) => "Attempting to send a value with a wrong type",
-            Error::RangeError(_) => "Attempting to use an inconsistent range",
             Error::InvalidValue(_) => "Attempting to send an invalid value",
             Error::InternalError(_) => "Internal Error" // TODO implement Error for InternalError as well
         }
@@ -225,7 +220,7 @@ impl<K> Parser<Targetted<K, Value>> for Targetted<K, Value> where K: Parser<K> +
     }
 }
 
-impl<K> Parser<Targetted<K, Exactly<Range>>> for Targetted<K, Exactly<Range>> where K: Parser<K> + Clone {
+impl<K> Parser<Targetted<K, Exactly<Value>>> for Targetted<K, Exactly<Value>> where K: Parser<K> + Clone {
     fn description() -> String {
         format!("Targetted<{}, Value>", K::description())
     }
@@ -239,7 +234,7 @@ impl<K> Parser<Targetted<K, Exactly<Range>>> for Targetted<K, Exactly<Range>> wh
                 })
             }
         }
-        let payload = match path.push("range", |path| Exactly::<Range>::take_opt(path, source, "range")) {
+        let payload = match path.push("range", |path| Exactly::<Value>::take_opt(path, source, "range")) {
             Some(result) => try!(result),
             None => Exactly::Always
         };
@@ -699,7 +694,7 @@ pub trait API: Send {
     /// # `WebSocket` API
     ///
     /// `/api/v1/channels/watch`
-    fn watch_values(& self, watch: TargetMap<GetterSelector, Exactly<Range>>,
+    fn watch_values(& self, watch: TargetMap<GetterSelector, Exactly<Value>>,
             on_event: Box<ExtSender<WatchEvent>>) -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.

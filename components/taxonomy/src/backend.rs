@@ -45,7 +45,7 @@ pub type FetchRequest = AdapterRequest<HashMap<Id<Getter>, Type>>;
 pub type SendRequest = AdapterRequest<(HashMap<Id<Setter>, Value>, ResultMap<Id<Setter>, (), Error>)>;
 
 /// A request to an adapter, for performing a `watch` operation.
-pub type WatchRequest = AdapterRequest<Vec<(Id<Getter>, Option<Range>, Weak<WatcherData>)>>;
+pub type WatchRequest = AdapterRequest<Vec<(Id<Getter>, Option<Value>, Weak<WatcherData>)>>;
 
 pub type WatchGuardCommit = Vec<(Weak<WatcherData>, Vec<(Id<Getter>, Box<AdapterWatchGuard>)>)>;
 
@@ -278,7 +278,7 @@ impl Deref for SetterData {
 /// yet. The `WatcherData` is materialized as a `WatchGuard` in userland.
 pub struct WatcherData {
     /// The criteria for watching.
-    watch: TargetMap<GetterSelector, Exactly<Range>>,
+    watch: TargetMap<GetterSelector, Exactly<Value>>,
 
     /// The listener for this watch.
     on_event: Mutex<Box<ExtSender<WatchEvent>>>,
@@ -309,7 +309,7 @@ impl PartialEq for WatcherData {
 }
 
 impl WatcherData {
-    fn new(liveness: &Arc<Liveness>, key: WatchKey, watch:TargetMap<GetterSelector, Exactly<Range>>, on_event: Box<ExtSender<WatchEvent>>) -> Self {
+    fn new(liveness: &Arc<Liveness>, key: WatchKey, watch:TargetMap<GetterSelector, Exactly<Value>>, on_event: Box<ExtSender<WatchEvent>>) -> Self {
         WatcherData {
             key: key,
             on_event: Mutex::new(on_event),
@@ -346,7 +346,7 @@ impl WatchMap {
             liveness: liveness.clone()
         }
     }
-    fn create(&mut self, watch:TargetMap<GetterSelector, Exactly<Range>>, on_event: Box<ExtSender<WatchEvent>>) -> Arc<WatcherData> {
+    fn create(&mut self, watch:TargetMap<GetterSelector, Exactly<Value>>, on_event: Box<ExtSender<WatchEvent>>) -> Arc<WatcherData> {
         let id = WatchKey(self.counter);
         self.counter += 1;
         let watcher = Arc::new(WatcherData::new(&self.liveness, id, watch, on_event));
@@ -1114,7 +1114,7 @@ impl State {
 
     fn aux_start_channel_watch(watcher: &mut Arc<WatcherData>,
         getter_data: &mut GetterData,
-        filter: &Exactly<Range>,
+        filter: &Exactly<Value>,
         adapter_by_id: &HashMap<Id<AdapterId>, AdapterData>,
         per_adapter: &mut WatchRequest)
     {
@@ -1163,7 +1163,7 @@ impl State {
         insert_in_getter.commit();
     }
 
-    pub fn prepare_channel_watch(&mut self, mut watch: TargetMap<GetterSelector, Exactly<Range>>,
+    pub fn prepare_channel_watch(&mut self, mut watch: TargetMap<GetterSelector, Exactly<Value>>,
         on_event: Box<ExtSender<WatchEvent>>) -> (WatchRequest, WatchKey, Arc<AtomicBool>)
     {
         // Prepare the watcher and store it. Once we leave the lock, every time a channel is

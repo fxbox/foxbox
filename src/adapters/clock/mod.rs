@@ -119,15 +119,15 @@ impl Adapter for Clock {
                 }
             });
             (id.clone(), match filter {
-                None => Err(Error::GetterRequiresThresholdForWatching(id)),
-                Some(range) => self.aux_register_watch(&id, range, Box::new(tx.clone()))
+                Some(Value::Range(range)) => self.aux_register_watch(&id, &*range, Box::new(tx.clone())),
+                _ => Err(Error::GetterRequiresThresholdForWatching(id)),
             })
         }).collect()
     }
 }
 
 impl Clock {
-    fn aux_register_watch(&self, id: &Id<Getter>, range: Range, tx: Box<ExtSender<Op>>)
+    fn aux_register_watch(&self, id: &Id<Getter>, range: &Range, tx: Box<ExtSender<Op>>)
         -> Result<Box<AdapterWatchGuard>, Error>
     {
         match () {
@@ -138,7 +138,7 @@ impl Clock {
         }
     }
 
-    fn aux_register_watch_interval(&self, id: &Id<Getter>, range: Range, tx: Box<ExtSender<Op>>)
+    fn aux_register_watch_interval(&self, id: &Id<Getter>, range: &Range, tx: Box<ExtSender<Op>>)
         -> Result<Box<AdapterWatchGuard>, Error>
     {
         use foxbox_taxonomy::values::Range::*;
@@ -148,13 +148,13 @@ impl Clock {
         try!(Type::Duration.ensure_eq(&typ).map_err(Error::TypeError));
 
         // Now determine when to call the trigger.
-        let duration = match range {
+        let duration = match *range {
             Eq (ref val) | Geq (ref val) => {
                 // Equivalent to BetweenEq { min: val, max: 0am }
                 try!(val.as_duration().map_err(Error::TypeError))
                     .clone().into()
             }
-            _ => return Err(Error::RangeError(range))
+            _ => return Err(Error::InvalidValue(Value::Range(Box::new(range.clone()))))
         };
 
         debug!(target: "clock@link.mozilla.org", "[clock@link.mozilla.org] Scheduling a repeating watch with a duration of {}", duration);
@@ -171,7 +171,7 @@ impl Clock {
         Ok(Box::new(Guard(vec![guard])))
     }
 
-    fn aux_register_watch_timeofday(&self, id: &Id<Getter>, range: Range, tx: Box<ExtSender<Op>>)
+    fn aux_register_watch_timeofday(&self, id: &Id<Getter>, range: &Range, tx: Box<ExtSender<Op>>)
         -> Result<Box<AdapterWatchGuard>, Error>
     {
         use foxbox_taxonomy::values::Range::*;
@@ -181,7 +181,7 @@ impl Clock {
         try!(Type::Duration.ensure_eq(&typ).map_err(Error::TypeError));
 
         // Now determine when to call the trigger. Repeat duration is always one day.
-        let mut thresholds = match range {
+        let mut thresholds = match *range {
             Leq (ref val) => {
                 // Equivalent to BetweenEq { min: 0am, max: val }
                 let ts : chrono::Duration = try!(val.as_duration().map_err(Error::TypeError))
@@ -263,7 +263,7 @@ impl Clock {
         }
     }
 
-    fn aux_register_watch_timestamp(&self, id: &Id<Getter>, range: Range, tx: Box<ExtSender<Op>>)
+    fn aux_register_watch_timestamp(&self, id: &Id<Getter>, range: &Range, tx: Box<ExtSender<Op>>)
         -> Result<Box<AdapterWatchGuard>, Error>
     {
         use foxbox_taxonomy::values::Range::*;
@@ -273,7 +273,7 @@ impl Clock {
         try!(Type::TimeStamp.ensure_eq(&typ).map_err(Error::TypeError));
 
         // Now determine when/if to call the trigger.
-        let mut thresholds = match range {
+        let mut thresholds = match *range {
             Leq (_) => {
                 // This variant doesn't make sense.
                 return Ok(Box::new(Guard(vec![])))

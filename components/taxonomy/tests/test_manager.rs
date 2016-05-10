@@ -1579,7 +1579,7 @@ fn test_watch() {
                 GetterSelector::new()
                     .with_tags(vec![tag_1.clone()])
             ],
-            Exactly::Exactly(Range::Eq(Value::OnOff(OnOff::On)))
+            Exactly::Exactly(Value::Range(Box::new(Range::Eq(Value::OnOff(OnOff::On)))))
         )]), Box::new(tx_watch_2)));
 
         println!("* Value changes are observed on both watchers");

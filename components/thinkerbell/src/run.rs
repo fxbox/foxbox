@@ -9,7 +9,7 @@ use foxbox_taxonomy::api;
 use foxbox_taxonomy::api::{ API, Error as APIError, Targetted, User, WatchEvent };
 use foxbox_taxonomy::services::{ Getter, Setter };
 use foxbox_taxonomy::util::{ Exactly, Id };
-use foxbox_taxonomy::values::Duration;
+use foxbox_taxonomy::values::{ Duration, Value };
 
 use transformable_channels::mpsc::*;
 
@@ -268,7 +268,7 @@ impl<Env> ExecutionTask<Env> where Env: ExecutableDevEnv + Debug {
                     api.watch_values(
                         vec![Targetted {
                             select: condition.source.clone(),
-                            payload: Exactly::Exactly(condition.range.clone())
+                            payload: Exactly::Exactly(Value::Range(Box::new(condition.range.clone())))
                         }],
                         Box::new(self.tx.map(move |event| {
                             ExecutionOp::Update {
