@@ -10,18 +10,13 @@ use std::thread::JoinHandle;
 use std::sync::{ Arc, Mutex, RwLock };
 use std::process::Child;
 use std::io::{ Error, ErrorKind, Result };
-use std::time::{ SystemTime, Duration, UNIX_EPOCH };
+use std::time::{ Duration, Instant };
 
 /// Unix exit statuses
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct ExitStatus(c_int);
 
 const RESTART_TIME_THRESHOLD: u64 = 5; // seconds
-
-fn duration_since_epoch() -> Duration {
-    let now = SystemTime::now();
-    now.duration_since(UNIX_EPOCH).unwrap()
-}
 
 pub struct ManagedProcess {
     kill_signal: Arc<Mutex<u32>>,
@@ -33,8 +28,7 @@ pub struct ManagedProcess {
 struct Backoff {
     restart_count: u64,
     restart_threshold: Duration,
-    start_time: Duration,
-    end_time: Duration,
+    start_time: Option<Instant>,
     backoff: u64,
 }
 
@@ -44,8 +38,7 @@ impl Backoff {
         Backoff {
             restart_count: 0,
             restart_threshold: restart_threshold,
-            start_time: restart_threshold,
-            end_time: Duration::from_secs(0),
+            start_time: None,
             backoff: 1,
         }
     }
@@ -55,21 +48,25 @@ impl Backoff {
     }
 
     fn next_backoff(&mut self) -> Duration {
-        self.end_time = duration_since_epoch();
+        let end_time = Instant::now();
 
         let duration_to_backoff =
-            if (self.end_time - self.start_time) < self.restart_threshold {
-                self.backoff += 1;
+            if let Some(start_time) = self.start_time {
+                if (end_time - start_time) < self.restart_threshold {
+                    self.backoff += 1;
 
-                // non-linear back off
-                Duration::from_secs((self.backoff * self.backoff) >> 1)
+                    // non-linear back off
+                    Duration::from_secs((self.backoff * self.backoff) >> 1)
+                } else {
+                    self.backoff = 1;
+                    Duration::from_secs(0)
+                }
             } else {
-                self.backoff = 1;
                 Duration::from_secs(0)
             };
 
         self.restart_count += 1;
-        self.start_time = duration_since_epoch();
+        self.start_time = Some(Instant::now());
 
         duration_to_backoff
     }
@@ -229,7 +226,6 @@ impl ManagedProcess {
         self.thread.join().unwrap();
     }
 }
-
 
 /// A non-blocking 'wait' for a given process id.
 fn try_wait(id: i32) -> Result<Option<ExitStatus>> {
