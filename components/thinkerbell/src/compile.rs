@@ -20,8 +20,8 @@
 use ast::{ Script, Rule, Statement, Match, Context, UncheckedCtx };
 use util::*;
 
-use foxbox_taxonomy::api::native::API;
-
+use foxbox_taxonomy::api::native::API as NativeAPI;
+use foxbox_taxonomy::api::json::API as JsonAPI;
 use transformable_channels::mpsc::*;
 
 use std::fmt::{ Debug, Formatter, Error as FmtError };
@@ -34,6 +34,8 @@ use chrono::Duration;
 /// devices, or with a unit-testing framework. // FIXME: Move this to run.rs
 pub trait ExecutableDevEnv: Send {
     type WatchGuard;
+
+    fn api(&self) -> &JsonAPI;
 
     /// A guard returned by `start_timer`. When the guard is dropped, the timer is cancelled.
     type TimerGuard;
