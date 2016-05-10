@@ -20,13 +20,23 @@ SetUpWebapp.prototype = {
         .then(() => this.defaultView);
     },
 
+    clear() {
+      // Session data is not stored in cookies, but in local storage
+      return this._clearLocalStorage()
+        .then(() => this.init());
+    },
+
+    _clearLocalStorage() {
+      return this.driver.executeScript('localStorage.clear();');
+    },
+
     stop() {
       return this.driver.quit()
         .then(() => { this.driver = null; });
     },
 
     get defaultView() {
-      return this.getSignInPage();
+      return this.getSetUpView();
     },
 
     getSignInPage : function() {

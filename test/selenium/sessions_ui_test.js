@@ -6,9 +6,11 @@
 var webdriver = require('selenium-webdriver'),
     assert    = require('assert');
 
-const makeSuite = require('./lib/make_suite');
+const Suite = require('./lib/make_suite');
 
-makeSuite('Test set up UI', (setUpWebapp) => {
+var suite = new Suite('Test set up UI');
+
+suite.build((setUpWebapp) => {
   // TODO: Clean up this work around by not using the driver anywhere
   // in this file
   var driver = setUpWebapp.driver;
@@ -35,14 +37,17 @@ describe('sessions ui', function() {
     describe('signup', function() {
 
         beforeEach(function() {
-          elements = {
-            pwd1: driver.findElement(webdriver.By.id('signup-pwd1')),
-            pwd2: driver.findElement(webdriver.By.id('signup-pwd2')),
-            set: driver.findElement(webdriver.By.id('signup-button'))
-          };
-          setUpPage = setUpWebapp.getSetUpView();
-          return setUpPage;
+          return suite.browserRefresh().then(() => {
+            elements = {
+              pwd1: driver.findElement(webdriver.By.id('signup-pwd1')),
+              pwd2: driver.findElement(webdriver.By.id('signup-pwd2')),
+              set: driver.findElement(webdriver.By.id('signup-button'))
+            };
+            setUpPage = setUpWebapp.getSetUpView();
+          });
         });
+
+      after(() => suite.restartFromScratch());
 
       it('should show the signup screen by default', function() {
           return setUpPage.isSetUpView();
@@ -90,44 +95,19 @@ describe('sessions ui', function() {
   });
 
   describe('signedin page', function() {
-    var elements;
-    var screens;
+    var signedInView;
 
-    before(function() {
-      driver.navigate().refresh();
+    before(() => {
+      return setUpWebapp.init()
+        .then(setUpPage => setUpPage.successLogin())
+        .then(successfulView => successfulView.goToSignedIn())
+        .then(view => signedInView = view);
     });
 
-    beforeEach(function() {
-      return driver.wait(webdriver.until.titleIs('FoxBox'), 5000).then(
-        function() {
-        screens = {
-          signin: driver.findElement(webdriver.By.id('signin')),
-          signedin: driver.findElement(webdriver.By.id('signedin'))
-        };
-        elements = {
-          signoutButton: driver.findElement(webdriver.By.id('signout-button'))
-        };
-      });
+    it('should sign out', function() {
+      return signedInView.signOut();
     });
 
-    it('should show the signedin screen', function() {
-      return driver.wait(webdriver.until.elementIsVisible(screens.signedin),
-                         3000);
-    });
-
-    it('should not show the signin screen', function(done) {
-      screens.signin.isDisplayed().then(function(visible) {
-        assert.equal(visible, false);
-        done();
-      });
-    });
-
-    it('should show signin screen after signing out', function() {
-      return elements.signoutButton.click().then(function() {
-        return driver.wait(webdriver.until.elementIsVisible(screens.signin),
-                           5000);
-      });
-    });
   });
 
   describe('signin page', function() {
@@ -139,17 +119,18 @@ describe('sessions ui', function() {
     });
 
     beforeEach(function() {
-      return driver.wait(webdriver.until.titleIs('FoxBox'), 5000).then(
-        function() {
-        screens = {
-          signin: driver.findElement(webdriver.By.id('signin')),
-          signedin: driver.findElement(webdriver.By.id('signedin'))
-        };
-        elements = {
-          signinPwd: driver.findElement(webdriver.By.id('signin-pwd')),
-          signinButton: driver.findElement(webdriver.By.id('signin-button'))
-        };
-      });
+      return suite.browserRefresh()
+        .then(() => driver.wait(webdriver.until.titleIs('FoxBox'), 5000))
+        .then(function() {
+          screens = {
+            signin: driver.findElement(webdriver.By.id('signin')),
+            signedin: driver.findElement(webdriver.By.id('signedin'))
+          };
+          elements = {
+            signinPwd: driver.findElement(webdriver.By.id('signin-pwd')),
+            signinButton: driver.findElement(webdriver.By.id('signin-button'))
+          };
+        });
     });
 
     it('should show the signin screen', function() {
@@ -213,25 +194,6 @@ describe('sessions ui', function() {
         return driver.wait(webdriver.until.elementIsVisible(screens.signedin),
                            5000);
       });
-    });
-
-    describe('tests changing views', function(){
-
-        before(function() {
-          driver.navigate().refresh();
-        });
-        beforeEach(function(){
-          return driver.wait(webdriver.until.titleIs('FoxBox'), 5000).then(
-            function() {
-          return setUpWebapp.getSignInPage();
-          }).then(function(signedInPageView) {
-             signedInPage = signedInPageView;
-          });
-        });
-
-        it('should go to sign out page' , function() {
-          return signedInPage.signOut();
-        });
     });
   });
 

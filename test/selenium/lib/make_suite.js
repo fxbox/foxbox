@@ -3,33 +3,50 @@
 const FoxboxProcessManager = require('./foxbox_process_manager');
 const App = require('./setup_webapp');
 
-function makeSuite(description, hostUrl, subSuite) {
+function Suite(description, hostUrl) {
+  hostUrl = hostUrl || FoxboxProcessManager.HOST_URL;
+  this.app = new App(hostUrl);
 
-  if (typeof hostUrl === 'function') {
-    subSuite = hostUrl;
-    hostUrl = FoxboxProcessManager.HOST_URL;
-  }
+  this.description = description;
+  this.foxboxProcessManager = new FoxboxProcessManager();
+}
 
-  var foxboxProcessManager = new FoxboxProcessManager();
-  var app = new App(hostUrl);
+Suite.prototype = {
+  build(subSuite) {
+    var self = this;
 
-  describe(description, function () {
-    this.timeout(30000);
+    describe(this.description, function() {
+      this.timeout(30000);
 
-    before(() => foxboxProcessManager.start());
+      before(() => {
+        return self.foxboxProcessManager.start()
+          .then(() => self.app.init());
+      });
 
-    beforeEach(() => app.init());
+      subSuite(self.app);
 
-    subSuite(app);
-
-    after(() => {
-      return app.stop().then(() => {
-        foxboxProcessManager.kill();
-        return foxboxProcessManager.cleanData();
+      after(() => {
+        return self.app.stop()
+          .then(() => self.foxboxProcessManager.kill())
+          .then(() => self.foxboxProcessManager.cleanData())
       });
     });
-  });
+  },
+
+  browserRefresh() {
+    return this.app.clear()
+      .then(() => this.app.init(),
+            () => this.app.init());
+  },
+
+  restartFromScratch() {
+    return this.app.clear()
+      .then(() => this.foxboxProcessManager.kill())
+      .then(() => this.foxboxProcessManager.cleanData())
+      .then(() => this.foxboxProcessManager.start())
+      .then(() => this.app.init())
+  }
 }
 
 
-module.exports = makeSuite;
+module.exports = Suite;
