@@ -5,13 +5,13 @@ var SignedInPageView = require('./view/signed_in/view.js');
 var SetUpView = require('./view/sign_up/view.js');
 var MainView = require('./view/app_main/view.js');
 
-const TITLE = 'FoxBox';
-const DriverBuilder = new webdriver.Builder().forBrowser('firefox')
+const driverBuilder = new webdriver.Builder().forBrowser('firefox');
+
 
 function SetUpWebapp(url) {
   console.log('started driver', url);
   this.url = url;
-  this.driver = this.driver = DriverBuilder.build();
+  this.driver = this.driver = driverBuilder.build();
 }
 
 SetUpWebapp.prototype = {
@@ -22,11 +22,11 @@ SetUpWebapp.prototype = {
 
     stop() {
       return this.driver.quit()
-        .then(() => { this.driver = null });
+        .then(() => { this.driver = null; });
     },
 
     get defaultView() {
-      return this.getSignInPage()
+      return this.getSignInPage();
     },
 
     getSignInPage : function() {

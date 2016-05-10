@@ -4,7 +4,7 @@ const find = require('find');
 const fs = require('fs');
 const path = require('path');
 const spawn = require('child_process').spawn;
-const util = require('util');
+const format = require('util').format;
 
 const PROFILE_PATH = path.join(process.env.HOME, '.local/share/foxbox-tests/');
 const STARTUP_WAIT_TIME_IN_MS = 5000;
@@ -14,7 +14,7 @@ function FoxboxManager() {
 }
 
 FoxboxManager.PORT = 3331;
-FoxboxManager.HOST_URL = util.format('http://localhost:%d/', FoxboxManager.PORT);
+FoxboxManager.HOST_URL = format('http://localhost:%d/', FoxboxManager.PORT);
 
 FoxboxManager.prototype = {
   start: function() {

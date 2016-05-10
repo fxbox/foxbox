@@ -7,7 +7,6 @@ var webdriver = require('selenium-webdriver'),
     assert    = require('assert');
 
 const makeSuite = require('./lib/make_suite');
-const HOST_URL =  require('./lib/foxbox_process_manager').HOST_URL;
 
 makeSuite('Test set up UI', (setUpWebapp) => {
   // TODO: Clean up this work around by not using the driver anywhere

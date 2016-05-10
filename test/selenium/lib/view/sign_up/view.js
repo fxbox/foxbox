@@ -1,6 +1,5 @@
 'use strict';
 
-var webdriver = require('selenium-webdriver');
 var SetUpAccessor = require('./accessors.js');
 
 var SuccessfulPageView = require('../successful_page/view.js');
@@ -49,7 +48,8 @@ SetUpView.prototype = {
 
     _submitPassword: function(password, confirmPassword) {
       password = password !== undefined ? password : 12345678;
-      confirmPassword = confirmPassword !== undefined ? confirmPassword : password;
+      confirmPassword = confirmPassword !== undefined ?
+        confirmPassword : password;
 
       return this.accessors.insertPassword.sendKeys(password)
         .then(() => this.accessors.confirmPassword.sendKeys(confirmPassword))
