@@ -1,3 +1,5 @@
+'use strict';
+
 var View = require('../view');
 var MainAccessors = require('./accessors');
 
@@ -5,7 +7,7 @@ var MainAccessors = require('./accessors');
 function MainView() {
   [].push.call(arguments, MainAccessors);
   View.apply(this, arguments);
-  
+
   this.accessors.connectToFoxBoxButton;
 }
 

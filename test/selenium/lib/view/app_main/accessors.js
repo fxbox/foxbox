@@ -1,3 +1,5 @@
+'use strict';
+
 var By = require('selenium-webdriver').By;
 var Accessors = require('../accessors');
 

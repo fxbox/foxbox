@@ -5,13 +5,12 @@ var SetUpAccessor = require('./accessors.js');
 
 var SuccessfulPageView = require('../successful_page/view.js');
 var successfulPageView;
-var isAlertPresent = false;
 
 function SetUpView(driver) {
     this.driver = driver;
     this.accessors = new SetUpAccessor(this.driver);
     successfulPageView = new SuccessfulPageView(this.driver);
-};
+}
 
 SetUpView.prototype = {
     isSetUpView: function() {
@@ -75,7 +74,7 @@ SetUpView.prototype = {
     alertMessage: function() {
         return this.driver.switchTo().alert().getText();
     },
-    
+
     dismissAlert: function() {
        this.driver.switchTo().alert().accept();
     },
