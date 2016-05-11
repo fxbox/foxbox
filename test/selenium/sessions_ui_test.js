@@ -18,7 +18,6 @@ suite.build((setUpWebapp) => {
 describe('sessions ui', function() {
 
   var setUpView;
-  var signedInPage;
   var elements;
 
   var shortPasswordErrorMessage
@@ -81,7 +80,7 @@ describe('sessions ui', function() {
     });
   });
 
-  describe('signedin page', function() {
+  describe('once registred', function() {
     var signedInView;
 
     before(() => {
@@ -91,98 +90,98 @@ describe('sessions ui', function() {
         .then(view => signedInView = view);
     });
 
-    it('should sign out', function() {
-      return signedInView.signOut();
-    });
-
-  });
-
-  describe('signin page', function() {
-    var elements;
-    var screens;
-
-    before(function() {
-      driver.navigate().refresh();
-    });
-
-    beforeEach(function() {
-      return suite.browserRefresh()
-        .then(() => driver.wait(webdriver.until.titleIs('FoxBox'), 5000))
-        .then(function() {
-          screens = {
-            signin: driver.findElement(webdriver.By.id('signin')),
-            signedin: driver.findElement(webdriver.By.id('signedin'))
-          };
-          elements = {
-            signinPwd: driver.findElement(webdriver.By.id('signin-pwd')),
-            signinButton: driver.findElement(webdriver.By.id('signin-button'))
-          };
-        });
-    });
-
-    it('should show the signin screen', function() {
-      return driver.wait(webdriver.until.elementIsVisible(screens.signin),
-                         3000);
-    });
-
-    it('should not show the signedIn screen', function(done) {
-      screens.signedin.isDisplayed().then(function(visible) {
-        assert.equal(visible, false);
-        done();
+    describe('signedin page', function() {
+      it('should sign out', function() {
+        return signedInView.signOut();
       });
     });
 
-    [{
-      test: 'should reject short passwords',
-      pass: 'short',
-      error: 'Invalid password'
-    }, {
-      test: 'should reject not matching passwords',
-      pass: 'longEnoughButInvalid',
-      error: 'Signin error Unauthorized'
-    }].forEach(function(config) {
-      it(config.test, function () {
-        return elements.signinPwd.sendKeys(config.pass).then(function() {
+    describe('signin page', function() {
+      var elements;
+      var screens;
+
+      before(function() {
+        driver.navigate().refresh();
+      });
+
+      beforeEach(function() {
+        return suite.browserRefresh()
+          .then(() => driver.wait(webdriver.until.titleIs('FoxBox'), 5000))
+          .then(function() {
+            screens = {
+              signin: driver.findElement(webdriver.By.id('signin')),
+              signedin: driver.findElement(webdriver.By.id('signedin'))
+            };
+            elements = {
+              signinPwd: driver.findElement(webdriver.By.id('signin-pwd')),
+              signinButton: driver.findElement(webdriver.By.id('signin-button'))
+            };
+          });
+      });
+
+      it('should show the signin screen', function() {
+        return driver.wait(webdriver.until.elementIsVisible(screens.signin),
+                           3000);
+      });
+
+      it('should not show the signedIn screen', function(done) {
+        screens.signedin.isDisplayed().then(function(visible) {
+          assert.equal(visible, false);
+          done();
+        });
+      });
+
+      [{
+        test: 'should reject short passwords',
+        pass: 'short',
+        error: 'Invalid password'
+      }, {
+        test: 'should reject not matching passwords',
+        pass: 'longEnoughButInvalid',
+        error: 'Signin error Unauthorized'
+      }].forEach(function(config) {
+        it(config.test, function () {
+          return elements.signinPwd.sendKeys(config.pass).then(function() {
+            return elements.signinButton.click();
+          }).then(function() {
+            return driver.wait(webdriver.until.alertIsPresent(), 5000);
+          }).then(function() {
+            return driver.switchTo().alert();
+          }).then(function(alert) {
+            return alert.getText().then(function(text) {
+              assert.equal(text, config.error);
+            }).then(function() {
+              alert.dismiss();
+            });
+          });
+        });
+      });
+
+      it('should fail if password is not typed', function() {
+        return  elements.signinButton.click().then(function() {
+            return driver.wait(webdriver.until.alertIsPresent(), 5000);
+          }).then(function() {
+            return driver.switchTo().alert();
+          }).then(function(alert) {
+            return alert.getText().then(function(text) {
+              assert.equal(text,
+                           'Invalid password');
+            }).then(function() {
+              alert.dismiss();
+            });
+          });
+      });
+
+      it('should accept matching, long-enough passwords', function () {
+
+        return elements.signinPwd.sendKeys('12345678').then(function() {
           return elements.signinButton.click();
         }).then(function() {
-          return driver.wait(webdriver.until.alertIsPresent(), 5000);
-        }).then(function() {
-          return driver.switchTo().alert();
-        }).then(function(alert) {
-          return alert.getText().then(function(text) {
-            assert.equal(text, config.error);
-          }).then(function() {
-            alert.dismiss();
-          });
+          return driver.wait(webdriver.until.elementIsVisible(screens.signedin),
+                             5000);
         });
-      });
-    });
-
-    it('should fail if password is not typed', function() {
-      return  elements.signinButton.click().then(function() {
-          return driver.wait(webdriver.until.alertIsPresent(), 5000);
-        }).then(function() {
-          return driver.switchTo().alert();
-        }).then(function(alert) {
-          return alert.getText().then(function(text) {
-            assert.equal(text,
-                         'Invalid password');
-          }).then(function() {
-            alert.dismiss();
-          });
-        });
-    });
-
-    it('should accept matching, long-enough passwords', function () {
-
-      return elements.signinPwd.sendKeys('12345678').then(function() {
-        return elements.signinButton.click();
-      }).then(function() {
-        return driver.wait(webdriver.until.elementIsVisible(screens.signedin),
-                           5000);
       });
     });
   });
-
 });
 });
