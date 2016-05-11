@@ -78,8 +78,7 @@ impl ConfigStore {
         }
     }
 
-    fn load(file_name: &str) -> ConfigTree {
-        let empty_config = BTreeMap::new();
+    fn try_load(file_name: &str) -> Result<Option<ConfigTree>, ()> {
         let file = match File::open(&Path::new(file_name)) {
             Ok(file) => {
                 file
@@ -87,7 +86,7 @@ impl ConfigStore {
             Err(error) => {
                 debug!("Unable to open configuration file {}: {}",
                     file_name, error.to_string());
-                return empty_config;
+                return Err(());
             }
         };
         let parsed_config: ConfigTree = match serde_json::from_reader(&file) {
@@ -95,12 +94,57 @@ impl ConfigStore {
             Err(error) => {
                 error!("Unable to generate JSON from config file {}: {}",
                     file_name, error.to_string());
-                    empty_config
+                return Ok(None);
             }
         };
-
         debug!("Parsed config file: {:?}", parsed_config);
-        parsed_config
+        Ok(Some(parsed_config))
+    }
+
+    fn backup_broken_config(file_name: &str) {
+        let mut backup_name = file_name.to_owned();
+        backup_name.push_str("_BROKEN");
+        match fs::rename(file_name, &backup_name) {
+            Ok(_) => {
+                warn!("Moved broken config file to {}", backup_name);
+            },
+            Err(error) => {
+                error!("Error while writing config backup to {}: {}",
+                    backup_name, error.to_string());
+            }
+        }
+    }
+
+    fn load(file_name: &str) -> ConfigTree {
+        let empty_config = BTreeMap::new();
+
+        // Try loading the regular config file
+        match ConfigStore::try_load(file_name) {
+            Ok(Some(config)) => {
+                info!("Using configuration in {}", file_name);
+                return config;
+            },
+            Ok(None) => { ConfigStore::backup_broken_config(file_name); },
+            Err(_) => { }
+        };
+
+        // Something went wrong. Try fallback recovery.
+        let mut fallback_name = file_name.to_owned();
+        fallback_name.push_str(".updated");
+        match ConfigStore::try_load(&fallback_name) {
+            Ok(Some(config)) => {
+                warn!("Using fallback config {}", fallback_name);
+                config
+            },
+            Ok(None) => {
+                warn!("Unparsable fallback config. Continuing with empty config.");
+                empty_config
+            },
+            Err(_) => {
+                warn!("Unreadable fallback config. Continuing with empty config.");
+                empty_config
+            }
+        }
     }
 
     fn save(&self) {
@@ -117,7 +161,7 @@ impl ConfigStore {
             .and_then(|_| { fs::copy(&update_path, &file_path) })
             .and_then(|_| { fs::remove_file(&update_path) }) {
                 Ok(_) => debug!("Wrote configuration file {}", self.file_name),
-                Err(error) => error!("While writing configuration file{}: {}",
+                Err(error) => error!("While writing configuration file {}: {}",
                     self.file_name, error.to_string())
             };
     }
@@ -268,6 +312,29 @@ describe! config {
                 let config = ConfigService::new(&config_file_name);
                 let foo_bar = config.get("foo", "bar").unwrap();
                 assert_eq!(foo_bar, "baz");
+            };
+        }
+
+        it "ConfigService should back-up broken config files" {
+            use std::io::{ Read, Write };
+            use std::path::Path;
+            // Create broken config file
+            let broken_conf = "{\"foo\":\"bar\",}".to_owned();
+            let mut file = fs::File::create(&Path::new(&config_file_name)).ok().unwrap();
+            let _ = file.write_all(&broken_conf.as_bytes());
+            // Block to make `config` go out of scope
+            {
+                let config = ConfigService::new(&config_file_name);
+                config.set("foo", "bar", "baz");
+            }
+            // `config` should now be out of scope and dropped
+            {
+                let mut backup_name = config_file_name.clone();
+                backup_name.push_str("_BROKEN");
+                let mut file = fs::File::open(&Path::new(&backup_name)).ok().unwrap();
+                let mut moved_conf = String::new();
+                let _ = file.read_to_string(&mut moved_conf);
+                assert_eq!(moved_conf, broken_conf);
             };
         }
     }
