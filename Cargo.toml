@@ -26,9 +26,9 @@ openzwave-adapter = { path = "components/openzwave-adapter/" }
 foxbox_taxonomy = { path = "components/taxonomy/" }
 tls = { path = "components/tls/" }
 
-foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "44e2919" }
+foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "d4e5277" }
 multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
-iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "e12b71c" }
+iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "f397cd2" }
 
 chrono = "0.2.19"
 clippy = "0.0.65"
