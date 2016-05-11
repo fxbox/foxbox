@@ -2,7 +2,7 @@
 
 const chakram = require('chakram'), expect = chakram.expect;
 
-var Prepper = require('../lib/testPrepper.js');
+var Prepper = require('../lib/make_suite.js');
 
 Prepper.makeSuite('Test Push Service locally',function(){
   var pushURI = Prepper.webPush_server.getEndpointURI();
@@ -44,6 +44,8 @@ Prepper.makeSuite('Test Push Service locally',function(){
     payload: newWebPushSubscriptionPayload
   }];
 
+  before(Prepper.turnOnAllSimulators);
+  before(Prepper.turnOnFoxbox);
   before(Prepper.foxboxManager.foxboxLogin);
 
   testParams.forEach(testParam => {

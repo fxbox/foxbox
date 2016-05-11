@@ -1,7 +1,7 @@
 'use strict';
 
 const chakram = require('chakram'), expect = chakram.expect;
-var Prepper = require('../lib/testPrepper.js');
+var Prepper = require('../lib/make_suite.js');
 
 var source = {'name': 'Hellooo, Thinkerbell', 'rules':
           [{'conditions':
@@ -39,6 +39,8 @@ function generateThinkerbellDeletionPayload(recipeName) {
 
 Prepper.makeSuite('Add/Remove recipe',function(){
 
+  before(Prepper.turnOnAllSimulators);
+  before(Prepper.turnOnFoxbox);
   before(Prepper.foxboxManager.foxboxLogin);
 
   it('Check service list for recipe',function(){        

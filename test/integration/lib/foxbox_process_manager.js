@@ -10,7 +10,7 @@ var config = new Config('./test/integration/lib/config/foxbox.js');
 var FOXBOX_STARTUP_WAIT_TIME_IN_MS = 5000;
 var foxboxInstance;
 
-var helper = (function() {
+var foxbox_process_manager = (function() {
 
   var setupURL = config.get('foxbox.url') + '/users/setup';
   var loginURL = config.get('foxbox.url') + '/users/login';
@@ -37,13 +37,16 @@ var helper = (function() {
       'webpush DB not found!');
   }
 
-  function fullOptionStart(callback) {
-  foxboxInstance = spawn('./target/debug/foxbox',
-    ['-c',  config.get('nupnp_server.param')+';'+
-    config.get('nupnp_server.url')+':'+
-    config.get('nupnp_server.port')+'/',
-    '--disable-tls']/*, {stdio: 'inherit'}*/ ); // TODO TLS not yet supported
-  setTimeout(callback, FOXBOX_STARTUP_WAIT_TIME_IN_MS);
+  function fullOptionStart() {
+    foxboxInstance = spawn('./target/debug/foxbox',
+      ['-c',  config.get('nupnp_server.param')+';'+
+      config.get('nupnp_server.url')+':'+
+      config.get('nupnp_server.port')+'/',
+      '--disable-tls'], {stdio: 'inherit'} ); // TODO TLS not yet supported
+
+    return new Promise(resolve => {
+      setTimeout(resolve, FOXBOX_STARTUP_WAIT_TIME_IN_MS);
+    });
   }
 
   function foxboxLogin() {
@@ -89,4 +92,4 @@ var helper = (function() {
     getLatestIPFromPingSrv};
 })();
 
-module.exports = helper;
+module.exports = foxbox_process_manager;

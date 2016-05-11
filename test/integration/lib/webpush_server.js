@@ -99,10 +99,13 @@ var webpush_server = (function() {
       console.log('message: ' + incomingPushMsg);
       res.sendStatus(200);     
     });
-
-    serverInstance = _server.listen(port, function () {
+    
+    return new Promise(resolve => {
+     serverInstance = _server.listen(port, function () {
       console.log('Webpush server listening on port ' + port);
-    });
+       resolve();
+     });
+   });
   }
 
   function stop() {

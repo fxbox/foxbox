@@ -5,14 +5,15 @@ const Config = require('config-js');
 const isoDate = require('iso-date');
 
 var config = new Config('./test/integration/lib/config/foxbox.js');
-var Prepper = require('../lib/testPrepper.js');
+var Prepper = require('../lib/make_suite.js');
 
 Prepper.makeSuite('Control camera locally',function(){
 
   var cameraService;
-
+  before(Prepper.turnOnAllSimulators);
+  before(Prepper.turnOnFoxbox);
   before(Prepper.foxboxManager.foxboxLogin);
-
+  
   it('check simulated camera is registered',function(){        
     return chakram.get(Prepper.foxboxManager.serviceListURL)
     .then(function(listResponse) {
