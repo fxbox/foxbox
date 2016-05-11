@@ -9,7 +9,7 @@ var SELECTORS = Object.freeze({
 
 function SignedOutAccessor(driver) {
   this.driver = driver;
-};
+}
 
 SignedOutAccessor.prototype = {
    get root() {

@@ -1,3 +1,5 @@
+'use strict';
+
 var View = require('../view');
 var ServicesAccessors = require('./accessors');
 

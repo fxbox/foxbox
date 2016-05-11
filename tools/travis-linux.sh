@@ -11,7 +11,9 @@ build() {
 }
 
 lint() {
-    jshint static/main/js/*.js static/setup/js/*.js test/selenium/*.js test/integration/lib/*.js test/integration/test/*.js
+    jshint test/**/*.js \
+        static/main/js/*.js static/setup/js/*.js
+        # There is a minified js in static/**/shared which breaks jshint
 }
 
 _set_up_unit_tests() {

@@ -1,5 +1,5 @@
 'use strict';
-var webdriver = require('selenium-webdriver');
+
 var By = require('selenium-webdriver').By;
 
 var SELECTORS = Object.freeze({
@@ -8,7 +8,7 @@ var SELECTORS = Object.freeze({
 
 function SignedInPageAccessor(driver) {
   this.driver = driver;
-};
+}
 
 SignedInPageAccessor.prototype = {
    get getSignOutButton() {

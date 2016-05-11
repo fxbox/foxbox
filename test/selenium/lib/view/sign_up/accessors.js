@@ -1,4 +1,5 @@
 'use strict';
+
 var webdriver = require('selenium-webdriver');
 var By = require('selenium-webdriver').By;
 
@@ -12,7 +13,7 @@ var SELECTORS = Object.freeze({
 
 function SetUpAccessor(driver) {
   this.driver = driver;
-};
+}
 
 SetUpAccessor.prototype = {
     get root() {

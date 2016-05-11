@@ -1,4 +1,5 @@
 'use strict';
+
 var webdriver = require('selenium-webdriver');
 var By = require('selenium-webdriver').By;
 
@@ -8,7 +9,7 @@ var SELECTORS = Object.freeze({
 
 function SuccessfulPageAccessor(driver) {
   this.driver = driver;
-};
+}
 
 SuccessfulPageAccessor.prototype = {
    get successMessageLocator() {
