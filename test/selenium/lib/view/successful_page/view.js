@@ -3,16 +3,14 @@
 var SuccessfulPageAccessor = require('./accessors.js');
 
 function SuccessfulPageView(driver) {
-    this.driver = driver;
-    this.accessors = new SuccessfulPageAccessor(this.driver);
+  this.driver = driver;
+  this.accessors = new SuccessfulPageAccessor(this.driver);
 }
 
 SuccessfulPageView.prototype = {
-    loginMessage: function() {
-        return this.accessors.successMessageLocator.then((element) => {
-            return element.getText();
-        });
-    }
+  get loginMessage() {
+    return this.accessors.successMessageLocator.getText();
+  }
 };
 
 module.exports = SuccessfulPageView;

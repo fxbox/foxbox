@@ -6,18 +6,15 @@
 var webdriver = require('selenium-webdriver'),
     assert    = require('assert');
 
-var Prepper = require('./lib/testPrepperSelenium.js');
-const HOST_URL =  require('./lib/foxboxHelperSelenium.js').HOST_URL;
+const makeSuite = require('./lib/make_suite');
 
-Prepper.makeSuite('Test set up UI',function(){
+makeSuite('Test set up UI', (setUpWebapp) => {
+  // TODO: Clean up this work around by not using the driver anywhere
+  // in this file
+  var driver = setUpWebapp.driver;
 
 describe('sessions ui', function() {
-  var driver;
 
-  const PASS = '12345678';
-
-  var SetUpWebapp = require('./lib/setup_webapp.js');
-  var setUpWebapp;
   var setUpPage;
   var signedInPage;
   var elements;
@@ -25,22 +22,7 @@ describe('sessions ui', function() {
   var shortPasswordErrorMessage
     = 'Please use a password of at least 8 characters.';
   var errorPasswordDoNotMatch = 'Passwords don\'t match! Please try again.';
-  var successMessage = 'Thank you!';
 
-
-  before(function() {
-    driver = new webdriver.Builder().
-      forBrowser('firefox').
-      build();
-  });
-
-  beforeEach(function() {
-    driver.get(HOST_URL);
-  });
-
-  after(function() {
-    driver.quit();
-  });
 
   describe('Foxbox index', function() {
     it('should be titled FoxBox', function () {
@@ -58,7 +40,6 @@ describe('sessions ui', function() {
             pwd2: driver.findElement(webdriver.By.id('signup-pwd2')),
             set: driver.findElement(webdriver.By.id('signup-button'))
           };
-          setUpWebapp = new SetUpWebapp(driver);
           setUpPage = setUpWebapp.getSetUpView();
           return setUpPage;
         });
@@ -84,37 +65,26 @@ describe('sessions ui', function() {
 
       it('should reject non-matching passwords', function() {
           return setUpPage.failureLogin(12345678, 1234)
-          .then(function(text) {
-              assert.equal(text, errorPasswordDoNotMatch);
-          }).then(function(){
-              return setUpPage.dismissAlert();
-          });
+            .then(text => { assert.equal(text, errorPasswordDoNotMatch); })
+            .then(() => setUpPage.dismissAlert());
       });
 
       it('should reject short passwords', function () {
           return setUpPage.failureLogin(1234, 1234)
-          .then(function(text) {
-              assert.equal(text, shortPasswordErrorMessage);
-          }).then(function() {
-              return setUpPage.dismissAlert();
-          });
+            .then(text => { assert.equal(text, shortPasswordErrorMessage); })
+            .then(() => setUpPage.dismissAlert());
         });
 
       it('should fail if password is not set', function() {
-          return setUpPage.failureLogin('', '').then(function(text){
-              assert.equal(text, shortPasswordErrorMessage);
-          }).then(function(){
-              return setUpPage.dismissAlert();
-          });
+          return setUpPage.failureLogin('', '')
+            .then(text => { assert.equal(text, shortPasswordErrorMessage); })
+            .then(() => setUpPage.dismissAlert());
         });
 
       it('should accept matching, long-enough passwords', function() {
-          return setUpPage.successLogin(12345678, 12345678)
-          .then(function(successfulPageView) {
-              return successfulPageView.loginMessage();
-          }).then(function(text) {
-              assert.equal(text, successMessage);
-          });
+          return setUpPage.successLogin()
+            .then(successfulPageView => successfulPageView.loginMessage)
+            .then(text => { assert.equal(text, 'Thank you!'); });
       });
     });
   });
@@ -236,7 +206,8 @@ describe('sessions ui', function() {
     });
 
     it('should accept matching, long-enough passwords', function () {
-      return elements.signinPwd.sendKeys(PASS).then(function() {
+
+      return elements.signinPwd.sendKeys('12345678').then(function() {
         return elements.signinButton.click();
       }).then(function() {
         return driver.wait(webdriver.until.elementIsVisible(screens.signedin),
@@ -248,8 +219,6 @@ describe('sessions ui', function() {
 
         before(function() {
           driver.navigate().refresh();
-          setUpWebapp = new SetUpWebapp(driver);
-
         });
         beforeEach(function(){
           return driver.wait(webdriver.until.titleIs('FoxBox'), 5000).then(
