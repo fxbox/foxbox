@@ -4,14 +4,16 @@ const chakram = require('chakram'), expect = chakram.expect;
 const Config = require('config-js');
 
 var config = new Config('./test/integration/lib/config/foxbox.js');
-var Prepper = require('../../lib/testPrepper.js');
+var Prepper = require('../../lib/make_suite.js');
 
 Prepper.makeSuite('Verify validity of pagekite ping endpoint', function(){
-  var local_url,tunnel_url;
-  var header = new Config('./test/integration/lib/config/header.js');
+  var local_url;
   var credential = config.get('credential'); 
   var pingUrl = config.get('pagekite.r') + '/ping';
   
+  before(Prepper.turnOnAllSimulators);
+  before(Prepper.turnOnFoxbox);
+
   it('get address from pagekite ping endpoint', function() {  
     var pick;
     var timestamp = 0;
@@ -30,6 +32,8 @@ Prepper.makeSuite('Verify validity of pagekite ping endpoint', function(){
     expect(pingResp).to.have.status(200);
     expect(pingResp.body[pick].timestamp).to.match(/\d+/);
     expect(pingResp.body[pick].public_ip).to.match(/\d+.\d+.\d+.\d+/);
+    // Since tls is disabled, there is no tunnel address
+    expect(pingResp.body[pick].tunnel_origin).equals(undefined);  
     });
   });
   
@@ -41,7 +45,6 @@ Prepper.makeSuite('Verify validity of pagekite ping endpoint', function(){
         var originList = JSON.parse(pingResp.body[entry].message);
       
         local_url = originList.local_origin;
-        tunnel_url = originList.tunnel_origin;   
       });
     });
 
@@ -49,18 +52,6 @@ Prepper.makeSuite('Verify validity of pagekite ping endpoint', function(){
       return chakram.post(local_url + '/users/setup', credential)
       .then(function(setupResp) {
         expect(setupResp).to.have.status(201);
-      });
-    });
-
-    it('login via the tunnel_origin',function(){  
-      var encoded_cred = new Buffer(credential.username+
-        ':'+credential.password).toString('base64');
-
-      // supply the credential used in previous test
-      header.Authorization = 'Basic ' + encoded_cred;   
-      return chakram.post(tunnel_url,null,{'headers' : header})
-      .then(function(loginResp) {
-        expect(loginResp).to.have.status(200);
       });
     });
   });

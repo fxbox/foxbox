@@ -2,7 +2,7 @@
 
 const chakram = require('chakram'), expect = chakram.expect;
 
-var Prepper = require('../lib/testPrepper.js');
+var Prepper = require('../lib/make_suite.js');
 
 function translateHSB(h,s,b) {
   var transHue = parseInt(65536 * (h % 360 / 360));
@@ -17,6 +17,8 @@ Prepper.makeSuite('Control lights locally',function(){
   var lights;
   var getterPayload = [{'kind': 'LightOn'}];
 
+  before(Prepper.turnOnAllSimulators);
+  before(Prepper.turnOnFoxbox);
   before(Prepper.foxboxManager.foxboxLogin);
 
   // collect all getters for the lightbulbs

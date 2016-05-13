@@ -49,32 +49,35 @@ var ipCamera_server = (function() {
        '<presentationURL>http://' + ip + ':' + port + '</presentationURL>' +
        '</device>' +
        '</root>'
-      );
+       );
     });
-    
+
     _server.get('/image/jpeg.cgi', function (req, res) {
-        //send a jpeg
-        console.log('Camera: snapshot request received');
-        res.status(200).sendFile(
-          path.join(__dirname,'colville.jpg'));
+      //send a jpeg
+      console.log('Camera: snapshot request received');
+      res.status(200).sendFile(
+        path.join(__dirname,'colville.jpg'));
     });
 
-    instance = _server.listen(parseInt(port), function () {
-      // start the upnp broadcast
-      cameraUPnPServer.startServer('Dlink IP Camera');
-    });
-  }
-
-  function stop() {
     return new Promise(resolve => {
-      // Stopping cameraUPnPServer causes socket error on next script. disabled.
-      // Also, Wireshark does not show additional traffic even when not stopped.
-     instance.close(function(){
-        console.log('Dlink IP Camera off');
-       resolve();
+      instance = _server.listen(parseInt(port), function () {
+      // start the upnp broadcast
+        cameraUPnPServer.startServer('Dlink IP Camera');
+        resolve();
       });
     });
-  }
+}
+
+function stop() {
+  return new Promise(resolve => {
+      // Stopping cameraUPnPServer causes socket error on next script. disabled.
+      // Also, Wireshark does not show additional traffic even when not stopped.
+      instance.close(function(){
+        console.log('Dlink IP Camera off');
+        resolve();
+      });
+    });
+}
 
 return {setup,stop};
 

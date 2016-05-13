@@ -2,13 +2,15 @@
 
 const chakram = require('chakram'), expect = chakram.expect;
 
-var Prepper = require('../lib/testPrepper.js');
+var Prepper = require('../lib/make_suite.js');
 
 Prepper.makeSuite('Control lights locally',function(){
 
   var getterPayload = [{'kind': 'LightOn'}];
   var lights;
   
+  before(Prepper.turnOnAllSimulators);
+  before(Prepper.turnOnFoxbox);
   before(Prepper.foxboxManager.foxboxLogin);
 
   it('check 3 bulbs are registered',function(){
@@ -77,6 +79,7 @@ Prepper.makeSuite('Control lights locally',function(){
 
     it('Turn off all lights at once', function() {
       
+  
       var payload = {'select': {'kind': 'LightOn'}, 'value': {'OnOff':'Off'}};
 
       return chakram.put(Prepper.foxboxManager.setterURL,payload)

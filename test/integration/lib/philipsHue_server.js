@@ -144,9 +144,12 @@ var philipsHue_server = (function() {
         res.status(200).json(response);     
       });
 
-    instance = _server.listen(port, function () {
+    return new Promise(resolve => {
+     instance = _server.listen(port, function () {
       console.log('Hue simulator listening on port ' + port);
-    });
+       resolve(); // it's like if you called `callback()`
+     });
+   });
   }
 
   function stop() {
