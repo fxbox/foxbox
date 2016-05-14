@@ -471,7 +471,7 @@ impl Parser<ChannelKind> for ChannelKind {
         "ChannelKind".to_owned()
     }
     /// Parse a single value from JSON, consuming as much as necessary from JSON.
-    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+    fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
         if let Some(str) = source.as_string() {
             return match str {
                 "Ready" => Ok(ChannelKind::Ready),
