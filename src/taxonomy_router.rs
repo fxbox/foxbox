@@ -235,11 +235,11 @@ impl Handler for TaxonomyRouter {
         payload_api2!(add_getter_tags,
                       getters => Vec<ChannelSelector>,
                       tags => Vec<Id<TagId>>,
-                      ["channels", "getter", "tags"], Method::Post);
+                      ["channels", "getters", "tags"], Method::Post);
         payload_api2!(add_setter_tags,
                       setters => Vec<ChannelSelector>,
                       tags => Vec<Id<TagId>>,
-                      ["channels", "setter", "tags"], Method::Post);
+                      ["channels", "setters", "tags"], Method::Post);
 
         // Removing tags.
         payload_api2!(remove_service_tags,
@@ -249,11 +249,11 @@ impl Handler for TaxonomyRouter {
         payload_api2!(remove_getter_tags,
                       getters => Vec<ChannelSelector>,
                       tags => Vec<Id<TagId>>,
-                      ["channels", "getter", "tags"], Method::Delete);
+                      ["channels", "getters", "tags"], Method::Delete);
         payload_api2!(remove_setter_tags,
                       setters => Vec<ChannelSelector>,
                       tags => Vec<Id<TagId>>,
-                      ["channels", "setter", "tags"], Method::Delete);
+                      ["channels", "setters", "tags"], Method::Delete);
 
         // Fallthrough, returning a 404.
         Ok(Response::with((Status::NotFound,
@@ -275,8 +275,8 @@ pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
             AuthEndpoint(vec![Method::Get, Method::Post], "channels/setters".to_owned()),
             AuthEndpoint(vec![Method::Get], "channels/get".to_owned()),
             AuthEndpoint(vec![Method::Put], "channels/set".to_owned()),
-            AuthEndpoint(vec![Method::Post, Method::Delete], "channel/getters/tags".to_owned()),
-            AuthEndpoint(vec![Method::Post, Method::Delete], "channel/setters/tags".to_owned())
+            AuthEndpoint(vec![Method::Post, Method::Delete], "channels/getters/tags".to_owned()),
+            AuthEndpoint(vec![Method::Post, Method::Delete], "channels/setters/tags".to_owned())
         ]
     } else {
         vec![]
