@@ -35,6 +35,8 @@ Suite.prototype = {
 
   browserCleanUp() {
     return this.app.clear()
+    // init() should run even if clear() failed. This is useful at the initial
+    // start up, when there is nothing to clear
     .then(() => this.app.init(),
           () => this.app.init());
   },
