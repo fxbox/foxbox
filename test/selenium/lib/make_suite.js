@@ -33,7 +33,7 @@ Suite.prototype = {
     });
   },
 
-  browserRefresh() {
+  browserCleanUp() {
     return this.app.clear()
       .then(() => this.app.init(),
             () => this.app.init());

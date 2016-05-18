@@ -37,7 +37,7 @@ describe('sessions ui', function() {
     describe('signup', function() {
 
       beforeEach(function() {
-        return suite.browserRefresh().then(() => {
+        return suite.browserCleanUp().then(() => {
           setUpView = setUpWebapp.getSetUpView();
         });
       });
@@ -105,7 +105,7 @@ describe('sessions ui', function() {
       });
 
       beforeEach(function() {
-        return suite.browserRefresh()
+        return suite.browserCleanUp()
           .then(() => driver.wait(webdriver.until.titleIs('FoxBox'), 5000))
           .then(function() {
             screens = {
