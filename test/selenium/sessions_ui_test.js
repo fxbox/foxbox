@@ -3,41 +3,22 @@
 
 'use strict';
 
-var webdriver = require('selenium-webdriver'),
-    assert    = require('assert');
+const assert= require('assert');
+const SuiteBuilder = require('./lib/make_suite');
 
-const Suite = require('./lib/make_suite');
+var suiteBuilder = new SuiteBuilder('Test set up UI');
 
-var suite = new Suite('Test set up UI');
-
-suite.build((setUpWebapp) => {
-  // TODO: Clean up this work around by not using the driver anywhere
-  // in this file
-  var driver = setUpWebapp.driver;
+suiteBuilder.build((setUpWebapp) => {
 
 describe('sessions ui', function() {
 
-  var setUpView;
-  var elements;
-
-  var shortPasswordErrorMessage
-    = 'Please use a password of at least 8 characters.';
-  var errorPasswordDoNotMatch = 'Passwords don\'t match! Please try again.';
-
-
   describe('Foxbox index', function() {
 
-    it('should be titled FoxBox', function () {
-      return driver.wait(webdriver.until.titleIs('FoxBox'), 5000)
-        .then(function(value) {
-          assert.equal(value, true);
-        });
-    });
-
     describe('signup', function() {
+      var setUpView;
 
       beforeEach(function() {
-        return suite.browserCleanUp().then(() => {
+        return suiteBuilder.browserCleanUp().then(() => {
           setUpView = setUpWebapp.getSetUpView();
         });
       });
@@ -47,34 +28,40 @@ describe('sessions ui', function() {
       });
 
       describe('failures', function() {
+
+        const SHORT_PASSWORD_ERROR_MESSAGE =
+          'Please use a password of at least 8 characters.';
+
         afterEach(function() {
           return setUpView.dismissAlert();
-        })
+        });
 
         it('should reject non-matching passwords', function() {
           return setUpView.failureLogin(12345678, 1234)
-            .then(text => { assert.equal(text, errorPasswordDoNotMatch); });
+          .then(text => {
+            assert.equal(text, 'Passwords don\'t match! Please try again.');
+          });
         });
 
         it('should reject short passwords', function () {
           return setUpView.failureLogin(1234, 1234)
-            .then(text => { assert.equal(text, shortPasswordErrorMessage); });
+          .then(text => { assert.equal(text, SHORT_PASSWORD_ERROR_MESSAGE); });
         });
 
         it('should fail if password is not set', function() {
           return setUpView.failureLogin('', '')
-            .then(text => { assert.equal(text, shortPasswordErrorMessage); });
+          .then(text => { assert.equal(text, SHORT_PASSWORD_ERROR_MESSAGE); });
         });
       });
 
       describe('success', function() {
 
-        after(() => suite.restartFromScratch());
+        after(() => suiteBuilder.restartFromScratch());
 
         it('should accept matching, long-enough passwords', function() {
           return setUpView.successLogin()
-            .then(successfulPageView => successfulPageView.loginMessage)
-            .then(text => { assert.equal(text, 'Thank you!'); });
+          .then(successfulPageView => successfulPageView.loginMessage)
+          .then(text => { assert.equal(text, 'Thank you!'); });
         });
       });
     });
@@ -85,9 +72,9 @@ describe('sessions ui', function() {
 
     before(() => {
       return setUpWebapp.init()
-        .then(setUpView => setUpView.successLogin())
-        .then(successfulView => successfulView.goToSignedIn())
-        .then(view => signedInView = view);
+      .then(setUpView => setUpView.successLogin())
+      .then(successfulView => successfulView.goToSignedIn())
+      .then(view => { signedInView = view; });
     });
 
     describe('signedin page', function() {
@@ -100,10 +87,8 @@ describe('sessions ui', function() {
       var signInView;
 
       beforeEach(function() {
-        return suite.browserCleanUp()
-          .then(() => {
-            signInView = setUpWebapp.getSignInPage();
-          });
+        return suiteBuilder.browserCleanUp()
+        .then(() => { signInView = setUpWebapp.getSignInPage(); });
       });
 
       [{
@@ -121,9 +106,7 @@ describe('sessions ui', function() {
       }].forEach(config => {
         it(config.test, function() {
           return signInView.failureLogin(config.pass)
-            .then(alertMessage => {
-              assert.equal(alertMessage, config.error);
-            });
+          .then(alertMessage => { assert.equal(alertMessage, config.error); });
         });
       });
 

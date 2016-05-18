@@ -20,33 +20,33 @@ Suite.prototype = {
 
       before(() => {
         return self.foxboxProcessManager.start()
-          .then(() => self.app.init());
+        .then(() => self.app.init());
       });
 
       subSuite(self.app);
 
       after(() => {
         return self.app.stop()
-          .then(() => self.foxboxProcessManager.kill())
-          .then(() => self.foxboxProcessManager.cleanData())
+        .then(() => self.foxboxProcessManager.kill())
+        .then(() => self.foxboxProcessManager.cleanData());
       });
     });
   },
 
   browserCleanUp() {
     return this.app.clear()
-      .then(() => this.app.init(),
-            () => this.app.init());
+    .then(() => this.app.init(),
+          () => this.app.init());
   },
 
   restartFromScratch() {
     return this.app.clear()
-      .then(() => this.foxboxProcessManager.kill())
-      .then(() => this.foxboxProcessManager.cleanData())
-      .then(() => this.foxboxProcessManager.start())
-      .then(() => this.app.init())
+    .then(() => this.foxboxProcessManager.kill())
+    .then(() => this.foxboxProcessManager.cleanData())
+    .then(() => this.foxboxProcessManager.start())
+    .then(() => this.app.init());
   }
-}
+};
 
 
 module.exports = Suite;
