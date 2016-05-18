@@ -1,10 +1,9 @@
 'use strict';
 
-var SignInAccessor = require('./accessors.js');
 var View = require('../view');
 
+
 function SignInView() {
-  [].push.call(arguments, SignInAccessor);
   View.apply(this, arguments);
 }
 

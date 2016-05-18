@@ -1,11 +1,9 @@
 'use strict';
 
-var SignedInPageAccessor = require('./accessors.js');
 var View = require('../view.js')
 
 
 function SignedInPageView() {
-  [].push.call(arguments, SignedInPageAccessor);
   View.apply(this, arguments);
 
   this.accessors.signOutButton; // Wait until button is displayed

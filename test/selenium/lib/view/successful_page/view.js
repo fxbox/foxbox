@@ -1,10 +1,9 @@
 'use strict';
 
-var SuccessfulPageAccessor = require('./accessors.js');
 var View = require('../view');
 
+
 function SuccessfulPageView() {
-  [].push.call(arguments, SuccessfulPageAccessor);
   View.apply(this, arguments);
 
   this.accessors.successMessageLocator; // Wait until message is displayed

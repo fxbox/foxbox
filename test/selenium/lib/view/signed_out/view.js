@@ -1,10 +1,11 @@
 'use strict';
 
-var SignedOutPageAccessor = require('./accessors.js');
+var View = require('../view.js');
 
 function SignedOutPageView() {
-    this.driver = driver;
-    this.accessors = new SignedOutPageAccessor(this.driver);
+  View.apply(this, arguments);
+
+  this.accessors.root
 }
 
 SignedOutPageView.prototype = {

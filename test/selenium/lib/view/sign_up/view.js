@@ -1,11 +1,9 @@
 'use strict';
 
 var View = require('../view');
-var SetUpAccessor = require('./accessors.js');
 
 
 function SetUpView() {
-  [].push.call(arguments, SetUpAccessor);
   View.apply(this, arguments);
 }
 
