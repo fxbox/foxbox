@@ -1,14 +1,15 @@
 'use strict';
 
+var View = require('../view');
 var SetUpAccessor = require('./accessors.js');
 
 
-function SetUpView(driver) {
-    this.driver = driver;
-    this.accessors = new SetUpAccessor(this.driver);
+function SetUpView() {
+  [].push.call(arguments, SetUpAccessor);
+  View.apply(this, arguments);
 }
 
-SetUpView.prototype = {
+SetUpView.prototype = Object.assign({
     isSetUpView: function() {
         return this.accessors.root;
     },
@@ -27,18 +28,12 @@ SetUpView.prototype = {
 
     successLogin: function(password) {
       return this._submitPassword(password)
-        .then(() => {
-          const SuccessfulPageView = require('../successful_page/view.js');
-          return new SuccessfulPageView(this.driver);
-        });
+      .then(() => this.instanciateNextView('successful_page'));
     },
 
     successSignUpFromApp: function(password) {
       return this._submitPassword(password)
-        .then(() => {
-          var ServicesView = require('../services/view');
-          return new ServicesView(this.driver);
-        });
+      .then(() => this.instanciateNextView('services'));
     },
 
     failureLogin: function(password, confirmPassword) {
@@ -64,6 +59,6 @@ SetUpView.prototype = {
        return this.driver.switchTo().alert().accept();
     },
 
-};
+}, View.prototype);
 
 module.exports = SetUpView;

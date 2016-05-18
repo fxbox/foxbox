@@ -14,10 +14,8 @@ function MainView() {
 MainView.prototype = Object.assign({
 
   connectToFoxBox: function() {
-    return this.accessors.connectToFoxBoxButton.click().then(() => {
-     var SetUpView = require('../sign_up/view');
-     return new SetUpView(this.driver);
-    });
+    return this.accessors.connectToFoxBoxButton.click()
+    .then(() => this.instanciateNextView('sign_up'));
   }
 
 }, View.prototype);

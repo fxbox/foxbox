@@ -2,7 +2,7 @@
 
 var SignedOutPageAccessor = require('./accessors.js');
 
-function SignedOutPageView(driver) {
+function SignedOutPageView() {
     this.driver = driver;
     this.accessors = new SignedOutPageAccessor(this.driver);
 }

@@ -5,4 +5,11 @@ function View(driver, Accessors) {
   this.accessors = new Accessors(driver);
 }
 
+View.prototype = {
+  instanciateNextView(viewFolderName) {
+    const NextView = require('./' + viewFolderName + '/view.js');
+    return new NextView(this.driver);
+  }
+};
+
 module.exports = View;

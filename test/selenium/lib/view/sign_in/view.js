@@ -3,19 +3,16 @@
 var SignInAccessor = require('./accessors.js');
 var View = require('../view');
 
-function SignInView(driver) {
+function SignInView() {
   [].push.call(arguments, SignInAccessor);
   View.apply(this, arguments);
 }
 
-SignInView.prototype = {
+SignInView.prototype = Object.assign({
   successLogin: function(password) {
     password = password !== undefined ? password : 12345678;
     return this._submitPassword(password)
-    .then(() => {
-      const SignedInView = require('../signed_in/view.js');
-      return new SignedInView(this.driver);
-    });
+    .then(() => this.instanciateNextView('signed_in'));
   },
 
   failureLogin: function(password) {
@@ -35,6 +32,6 @@ SignInView.prototype = {
   dismissAlert: function() {
     return this.driver.switchTo().alert().accept();
   },
-};
+}, View.prototype);
 
 module.exports = SignInView;

@@ -1,22 +1,21 @@
 'use strict';
 
 var SignedInPageAccessor = require('./accessors.js');
-var SignedOutPageView = require('../signed_out/view.js');
+var View = require('../view.js')
 
-var signedOutPageView;
 
-function SignedInPageView(driver) {
-    this.driver = driver;
-    this.accessors = new SignedInPageAccessor(this.driver);
-    signedOutPageView = new SignedOutPageView(this.driver);
-    this.accessors.signOutButton; // Wait until button is displayed
+function SignedInPageView() {
+  [].push.call(arguments, SignedInPageAccessor);
+  View.apply(this, arguments);
+
+  this.accessors.signOutButton; // Wait until button is displayed
 }
 
-SignedInPageView.prototype = {
+SignedInPageView.prototype = Object.assign({
   signOut: function() {
     return this.accessors.signOutButton.click()
-    .then(() => signedOutPageView.hasSignedOut());
+    .then(() => this.instanciateNextView('signed_out'));
   }
-};
+}, View.prototype);
 
 module.exports = SignedInPageView;
