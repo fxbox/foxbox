@@ -1,17 +1,16 @@
 'use strict';
 
-var By = require('selenium-webdriver').By;
 var Accessor = require('../accessor');
 
 
 var SELECTORS = Object.freeze({
   // Make sure these field are not plain text
-  passwordField: By.css('#signup-pwd1[type="password"]'),
-  confirmPasswordField: By.css('#signup-pwd2[type="password"]'),
+  passwordField: '#signup-pwd1[type="password"]',
+  confirmPasswordField: '#signup-pwd2[type="password"]',
 
-  submit: By.id('signup-button'),
-  successMessage: By.id('thank-you'),
-  page: By.id('signup')
+  submit: '#signup-button',
+  successMessage: '#thank-you',
+  page: '#signup'
 });
 
 

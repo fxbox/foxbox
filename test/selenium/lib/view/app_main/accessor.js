@@ -1,6 +1,5 @@
 'use strict';
 
-var By = require('selenium-webdriver').By;
 var Accessor = require('../accessor');
 
 
@@ -11,7 +10,7 @@ function MainAccessor() {
 MainAccessor.prototype = Object.assign({
 
   get connectToFoxBoxButton() {
-    return this.waitForElement(By.css('.user-login__login-button'));
+    return this.waitForElement('.user-login__login-button');
   }
 
 }, Accessor.prototype);

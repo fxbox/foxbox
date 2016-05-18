@@ -1,6 +1,5 @@
 'use strict';
 
-var By = require('selenium-webdriver').By;
 var Accessor = require('../accessor');
 
 
@@ -10,7 +9,7 @@ function SignedOutAccessor() {
 
 SignedOutAccessor.prototype = Object.assign({
   get root() {
-    return this.waitForElement(By.id('signin'));
+    return this.waitForElement('#signin');
   }
 }, Accessor.prototype);
 
