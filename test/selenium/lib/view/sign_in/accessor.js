@@ -9,7 +9,7 @@ function SignInAccessor() {
 
 SignInAccessor.prototype = Object.assign({
 
-  get password() {
+  get passwordField() {
     // Make sure this field is not plain text
     return this.waitForElement('#signin-pwd[type="password"]');
   },

@@ -20,7 +20,7 @@ SignInView.prototype = Object.assign({
   },
 
   _submitPassword: function(password) {
-    return this.accessor.password.sendKeys(password)
+    return this.accessor.passwordField.sendKeys(password)
     .then(() => this.accessor.submitButton.click());
   },
 

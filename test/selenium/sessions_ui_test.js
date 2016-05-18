@@ -23,10 +23,6 @@ describe('sessions ui', function() {
         });
       });
 
-      it('should show the signup screen by default', function() {
-        return setUpView.isSetUpView();
-      });
-
       describe('failures', function() {
 
         const SHORT_PASSWORD_ERROR_MESSAGE =

@@ -8,7 +8,7 @@ function SuccessfulPageAccessor() {
 }
 
 SuccessfulPageAccessor.prototype = Object.assign({
-  get successMessageLocator() {
+  get successMessageElement() {
     return this.waitForElement('#thank-you');
   }
 }, Accessor.prototype);
