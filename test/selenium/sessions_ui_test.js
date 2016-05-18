@@ -97,38 +97,13 @@ describe('sessions ui', function() {
     });
 
     describe('signin page', function() {
-      var elements;
-      var screens;
-
-      before(function() {
-        driver.navigate().refresh();
-      });
+      var signInView;
 
       beforeEach(function() {
         return suite.browserCleanUp()
-          .then(() => driver.wait(webdriver.until.titleIs('FoxBox'), 5000))
-          .then(function() {
-            screens = {
-              signin: driver.findElement(webdriver.By.id('signin')),
-              signedin: driver.findElement(webdriver.By.id('signedin'))
-            };
-            elements = {
-              signinPwd: driver.findElement(webdriver.By.id('signin-pwd')),
-              signinButton: driver.findElement(webdriver.By.id('signin-button'))
-            };
+          .then(() => {
+            signInView = setUpWebapp.getSignInPage();
           });
-      });
-
-      it('should show the signin screen', function() {
-        return driver.wait(webdriver.until.elementIsVisible(screens.signin),
-                           3000);
-      });
-
-      it('should not show the signedIn screen', function(done) {
-        screens.signedin.isDisplayed().then(function(visible) {
-          assert.equal(visible, false);
-          done();
-        });
       });
 
       [{
@@ -139,47 +114,21 @@ describe('sessions ui', function() {
         test: 'should reject not matching passwords',
         pass: 'longEnoughButInvalid',
         error: 'Signin error Unauthorized'
-      }].forEach(function(config) {
-        it(config.test, function () {
-          return elements.signinPwd.sendKeys(config.pass).then(function() {
-            return elements.signinButton.click();
-          }).then(function() {
-            return driver.wait(webdriver.until.alertIsPresent(), 5000);
-          }).then(function() {
-            return driver.switchTo().alert();
-          }).then(function(alert) {
-            return alert.getText().then(function(text) {
-              assert.equal(text, config.error);
-            }).then(function() {
-              alert.dismiss();
+      }, {
+        test: 'should fail if password is not typed',
+        pass: '',
+        error: 'Invalid password'
+      }].forEach(config => {
+        it(config.test, function() {
+          return signInView.failureLogin(config.pass)
+            .then(alertMessage => {
+              assert.equal(alertMessage, config.error);
             });
-          });
         });
       });
 
-      it('should fail if password is not typed', function() {
-        return  elements.signinButton.click().then(function() {
-            return driver.wait(webdriver.until.alertIsPresent(), 5000);
-          }).then(function() {
-            return driver.switchTo().alert();
-          }).then(function(alert) {
-            return alert.getText().then(function(text) {
-              assert.equal(text,
-                           'Invalid password');
-            }).then(function() {
-              alert.dismiss();
-            });
-          });
-      });
-
-      it('should accept matching, long-enough passwords', function () {
-
-        return elements.signinPwd.sendKeys('12345678').then(function() {
-          return elements.signinButton.click();
-        }).then(function() {
-          return driver.wait(webdriver.until.elementIsVisible(screens.signedin),
-                             5000);
-        });
+      it('should accept matching, long-enough passwords', function() {
+        return signInView.successLogin();
       });
     });
   });
