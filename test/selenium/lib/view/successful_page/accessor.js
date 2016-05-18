@@ -3,6 +3,7 @@
 var By = require('selenium-webdriver').By;
 var Accessor = require('../accessor');
 
+
 function SuccessfulPageAccessor() {
   Accessor.apply(this, arguments);
 }

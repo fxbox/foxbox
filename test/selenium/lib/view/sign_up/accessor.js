@@ -1,7 +1,8 @@
 'use strict';
 
-var webdriver = require('selenium-webdriver');
 var By = require('selenium-webdriver').By;
+var Accessor = require('../accessor');
+
 
 var SELECTORS = Object.freeze({
   // Make sure these field are not plain text
@@ -13,43 +14,43 @@ var SELECTORS = Object.freeze({
   page: By.id('signup')
 });
 
-function SetUpAccessor(driver) {
-  this.driver = driver;
+
+function SetUpAccessor() {
+  Accessor.apply(this, arguments);
 }
 
-SetUpAccessor.prototype = {
-    get root() {
-    var signUpPage = this.driver.findElement(SELECTORS.page);
-    return this.driver.wait(webdriver.until.elementIsVisible(signUpPage));
-   },
+SetUpAccessor.prototype = Object.assign({
+  get root() {
+    return this.waitForElement(SELECTORS.page)
+  },
 
-   get isPasswordFieldPresent() {
-        return this.driver.isElementPresent(SELECTORS.passwordField);
-   },
+  get isPasswordFieldPresent() {
+    return this.driver.isElementPresent(SELECTORS.passwordField);
+  },
 
-   get isConfirmPasswordFieldPresent() {
-        return this.driver.isElementPresent(SELECTORS.confirmPasswordField);
-   },
+  get isConfirmPasswordFieldPresent() {
+    return this.driver.isElementPresent(SELECTORS.confirmPasswordField);
+  },
 
-   get isSubmitButtonPresent() {
-        return this.driver.isElementPresent(SELECTORS.submit);
-   },
+  get isSubmitButtonPresent() {
+    return this.driver.isElementPresent(SELECTORS.submit);
+  },
 
-   get insertPassword() {
-        return this.driver.findElement(SELECTORS.passwordField);
-    },
+  get insertPassword() {
+    return this.waitForElement(SELECTORS.passwordField);
+  },
 
-    get confirmPassword() {
-        return this.driver.findElement(SELECTORS.confirmPasswordField);
-    },
+  get confirmPassword() {
+    return this.waitForElement(SELECTORS.confirmPasswordField);
+  },
 
-    get submitButton() {
-        return this.driver.findElement(SELECTORS.submit);
-    },
+  get submitButton() {
+    return this.waitForElement(SELECTORS.submit);
+  },
 
-   get successMessageLocator() {
-        return this.driver.findElement(SELECTORS.successMessage);
-   }
-};
+  get successMessageLocator() {
+    return this.waitForElement(SELECTORS.successMessage);
+  }
+}, Accessor.prototype);
 
 module.exports = SetUpAccessor;
