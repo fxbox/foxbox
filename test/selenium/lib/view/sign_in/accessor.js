@@ -1,10 +1,10 @@
 'use strict';
 
 var By = require('selenium-webdriver').By;
-var Accessors = require('../accessors');
+var Accessor = require('../accessor');
 
 function SignInAccessor() {
-  Accessors.apply(this, arguments);
+  Accessor.apply(this, arguments);
 }
 
 SignInAccessor.prototype = Object.assign({
@@ -17,6 +17,6 @@ SignInAccessor.prototype = Object.assign({
   get submitButton() {
     return this.waitForElement(By.id('signin-button'));
   }
-}, Accessors.prototype);
+}, Accessor.prototype);
 
 module.exports = SignInAccessor;

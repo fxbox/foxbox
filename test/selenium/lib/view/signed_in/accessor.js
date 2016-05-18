@@ -1,17 +1,17 @@
 'use strict';
 
 var By = require('selenium-webdriver').By;
-var Accessors = require('../accessors');
+var Accessor = require('../accessor');
 
 
 function SignedInPageAccessor() {
-  Accessors.apply(this, arguments);
+  Accessor.apply(this, arguments);
 }
 
 SignedInPageAccessor.prototype = Object.assign({
   get signOutButton() {
     return this.waitForElement(By.id('signout-button'));
   }
-}, Accessors.prototype);
+}, Accessor.prototype);
 
 module.exports = SignedInPageAccessor;

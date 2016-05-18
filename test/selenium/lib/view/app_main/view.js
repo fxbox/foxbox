@@ -6,13 +6,13 @@ var View = require('../view');
 function MainView() {
   View.apply(this, arguments);
 
-  this.accessors.connectToFoxBoxButton;
+  this.accessor.connectToFoxBoxButton;
 }
 
 MainView.prototype = Object.assign({
 
   connectToFoxBox: function() {
-    return this.accessors.connectToFoxBoxButton.click()
+    return this.accessor.connectToFoxBoxButton.click()
     .then(() => this.instanciateNextView('sign_up'));
   }
 

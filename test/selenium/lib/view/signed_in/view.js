@@ -6,12 +6,12 @@ var View = require('../view.js')
 function SignedInPageView() {
   View.apply(this, arguments);
 
-  this.accessors.signOutButton; // Wait until button is displayed
+  this.accessor.signOutButton; // Wait until button is displayed
 }
 
 SignedInPageView.prototype = Object.assign({
   signOut: function() {
-    return this.accessors.signOutButton.click()
+    return this.accessor.signOutButton.click()
     .then(() => this.instanciateNextView('signed_out'));
   }
 }, View.prototype);

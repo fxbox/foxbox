@@ -9,19 +9,19 @@ function SetUpView() {
 
 SetUpView.prototype = Object.assign({
     isSetUpView: function() {
-        return this.accessors.root;
+        return this.accessor.root;
     },
 
     passwordField: function() {
-        return this.accessors.isPasswordFieldPresent;
+        return this.accessor.isPasswordFieldPresent;
     },
 
     passwordConfirmField: function() {
-        return this.accessors.isConfirmPasswordFieldPresent;
+        return this.accessor.isConfirmPasswordFieldPresent;
     },
 
     submitButtonPresent: function() {
-        return this.accessors.isSubmitButtonPresent;
+        return this.accessor.isSubmitButtonPresent;
     },
 
     successLogin: function(password) {
@@ -44,9 +44,9 @@ SetUpView.prototype = Object.assign({
       confirmPassword = confirmPassword !== undefined ?
         confirmPassword : password;
 
-      return this.accessors.insertPassword.sendKeys(password)
-        .then(() => this.accessors.confirmPassword.sendKeys(confirmPassword))
-        .then(() => this.accessors.submitButton.click());
+      return this.accessor.insertPassword.sendKeys(password)
+        .then(() => this.accessor.confirmPassword.sendKeys(confirmPassword))
+        .then(() => this.accessor.submitButton.click());
     },
 
     alertMessage: function() {

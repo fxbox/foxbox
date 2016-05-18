@@ -1,16 +1,16 @@
 'use strict';
 
 var By = require('selenium-webdriver').By;
-var Accessors = require('../accessors');
+var Accessor = require('../accessor');
 
 function SuccessfulPageAccessor() {
-  Accessors.apply(this, arguments);
+  Accessor.apply(this, arguments);
 }
 
 SuccessfulPageAccessor.prototype = Object.assign({
   get successMessageLocator() {
     return this.waitForElement(By.id('thank-you'));
   }
-}, Accessors.prototype);
+}, Accessor.prototype);
 
 module.exports = SuccessfulPageAccessor;

@@ -6,12 +6,12 @@ var View = require('../view');
 function SuccessfulPageView() {
   View.apply(this, arguments);
 
-  this.accessors.successMessageLocator; // Wait until message is displayed
+  this.accessor.successMessageLocator; // Wait until message is displayed
 }
 
 SuccessfulPageView.prototype = Object.assign({
   get loginMessage() {
-    return this.accessors.successMessageLocator.getText();
+    return this.accessor.successMessageLocator.getText();
   },
 
   goToSignedIn() {

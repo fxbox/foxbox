@@ -6,7 +6,7 @@ var View = require('../view');
 function ServicesView() {
   View.apply(this, arguments);
 
-  this.accessors.logOutButton;  // Wait until it appears
+  this.accessor.logOutButton;  // Wait until it appears
 }
 
 ServicesView.prototype = Object.assign({

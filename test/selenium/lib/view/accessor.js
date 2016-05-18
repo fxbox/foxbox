@@ -2,11 +2,11 @@
 
 var until = require('selenium-webdriver').until;
 
-function Accessors(driver) {
+function Accessor(driver) {
   this.driver = driver;
 }
 
-Accessors.prototype = {
+Accessor.prototype = {
   waitForElement: function(locator) {
     var element = this.driver.wait(until.elementLocated(locator));
     return this.driver.wait(until.elementIsVisible(element));
@@ -14,4 +14,4 @@ Accessors.prototype = {
 
 };
 
-module.exports = Accessors;
+module.exports = Accessor;

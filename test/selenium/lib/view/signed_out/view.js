@@ -5,12 +5,12 @@ var View = require('../view.js');
 function SignedOutPageView() {
   View.apply(this, arguments);
 
-  this.accessors.root
+  this.accessor.root
 }
 
 SignedOutPageView.prototype = {
     hasSignedOut: function() {
-        return this.accessors.root;
+        return this.accessor.root;
     }
 };
 
