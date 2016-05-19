@@ -5,13 +5,21 @@ const SetUpView = require('./view/set_up/view.js');
 const SignInPageView = require('./view/sign_in/view.js');
 const MainView = require('./view/app_main/view.js');
 
-const driverBuilder = new webdriver.Builder().forBrowser('firefox');
+var Capabilities = require('selenium-webdriver/lib/capabilities').Capabilities;
+
+var cap = Capabilities.firefox();
+cap.set('marionette', true)
+cap.set('binary', '/Applications/Firefox.app/Contents/MacOS/firefox-bin');
+
+const driverBuilder = new webdriver.Builder().withCapabilities(cap);
+
+console.log(driverBuilder.getCapabilities());
 
 
 function SetUpWebapp(url) {
   console.log('started driver', url);
   this.url = url;
-  this.driver = this.driver = driverBuilder.build();
+  this.driver = driverBuilder.build();
 }
 
 SetUpWebapp.prototype = {

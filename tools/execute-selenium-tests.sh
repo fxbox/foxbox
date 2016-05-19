@@ -10,4 +10,4 @@ pushd "${PROJECT_HOME}"
 cargo build
 
 # run tests
-"${PROJECT_HOME}/node_modules/.bin/mocha" "${PROJECT_HOME}/test/selenium/*_test.js"
+"${PROJECT_HOME}/node_modules/.bin/mocha" "${PROJECT_HOME}/test/selenium/app_test.js"
