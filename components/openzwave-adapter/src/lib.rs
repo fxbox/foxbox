@@ -26,7 +26,7 @@ use std::path::Path;
 use std::thread;
 use std::sync::mpsc;
 use std::sync::{ Arc, Mutex };
-use std::collections::{ HashMap, HashSet };
+use std::collections::HashMap;
 
 use id_map::IdMap;
 use watchers::Watchers;
@@ -292,7 +292,7 @@ impl OpenzwaveAdapter {
                         let service_id = TaxoId::new(&service_name);
                         controller_map.push(service_id.clone(), controller);
 
-                        let mut service = Service::empty(service_id.clone(), adapter_id.clone());
+                        let mut service = Service::empty(&service_id, &adapter_id);
                         service.properties.insert(String::from("name"), format!("Service for controller {:08x}", home_id));
 
                         box_manager.add_service(service).unwrap_or_else(|e| {
@@ -303,12 +303,10 @@ impl OpenzwaveAdapter {
                         let include_setter_id = TaxoId::new(&include_setter_name);
                         include_map.push(include_setter_id.clone(), controller);
 
-                        box_manager.add_setter(Channel {
-                            id: include_setter_id.clone(),
-                            service: service_id.clone(),
-                            adapter: adapter_id.clone(),
-                            tags: HashSet::new(),
+                        box_manager.add_channel(Channel {
                             kind: ChannelKind::ZwaveInclude,
+                            supports_send: true,
+                            ..Channel::empty(&include_setter_id, &service_id, &adapter_id)
                         }).unwrap_or_else(|e| {
                             error!("Couldn't add the setter {}: {}", include_setter_id, e);
                         });
@@ -319,7 +317,7 @@ impl OpenzwaveAdapter {
                         let service_id = TaxoId::new(&service_name);
                         node_map.push(service_id.clone(), node);
 
-                        let mut service = Service::empty(service_id.clone(), adapter_id.clone());
+                        let mut service = Service::empty(&service_id, &adapter_id);
                         service.properties.insert(String::from("name"), node.get_name());
                         service.properties.insert(String::from("product_name"), node.get_product_name());
                         service.properties.insert(String::from("manufacturer_name"), node.get_manufacturer_name());
@@ -352,12 +350,10 @@ impl OpenzwaveAdapter {
                         if has_getter {
                             let getter_id = TaxoId::<Channel>::new(&value_id);
                             getter_map.push(getter_id.clone(), vid);
-                            box_manager.add_getter(Channel {
-                                id: getter_id.clone(),
-                                service: node_id.clone(),
-                                adapter: adapter_id.clone(),
-                                tags: HashSet::new(),
+                            box_manager.add_channel(Channel {
                                 kind: kind.clone(),
+                                supports_fetch: true,
+                                ..Channel::empty(&getter_id, &node_id, &adapter_id)
                             }).unwrap_or_else(|e| {
                                 error!("Couldn't add the getter {}: {}", value_id, e);
                             });
@@ -366,12 +362,10 @@ impl OpenzwaveAdapter {
                         if has_setter {
                             let setter_id = TaxoId::<Channel>::new(&value_id);
                             setter_map.push(setter_id.clone(), vid);
-                            box_manager.add_setter(Channel {
-                                id: setter_id.clone(),
-                                service: node_id.clone(),
-                                adapter: adapter_id.clone(),
-                                tags: HashSet::new(),
-                                kind: kind,
+                            box_manager.add_channel(Channel {
+                                kind: kind.clone(),
+                                supports_send: true,
+                                ..Channel::empty(&setter_id, &node_id, &adapter_id)
                             }).unwrap_or_else(|e| {
                                 error!("Couldn't add the setter {}: {}", value_id, e);
                             });

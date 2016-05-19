@@ -10,8 +10,8 @@ use parse::*;
 use values::*;
 pub use util::{ Exactly, Id, AdapterId, ServiceId, KindId, TagId, VendorId };
 
-use serde::ser::{ Serialize, Serializer };
-use serde::de::{ Deserialize, Deserializer, Error };
+use serde::ser::Serializer;
+use serde::de::{ Deserializer, Error };
 
 use std::hash::{ Hash, Hasher };
 use std::collections::{ HashSet, HashMap };
@@ -72,11 +72,8 @@ pub struct Service {
     /// For instance, these can be device manufacturer, model, etc.
     pub properties: HashMap<String, String>,
 
-    /// Getter channels connected directly to this service.
-    pub getters: HashMap<Id<Channel>, Channel>,
-
-    /// Setter channels connected directly to this service.
-    pub setters: HashMap<Id<Channel>, Channel>,
+    /// Channels connected directly to this service.
+    pub channels: HashMap<Id<Channel>, Channel>,
 
     /// Identifier of the adapter for this service.
     pub adapter: Id<AdapterId>,
@@ -84,33 +81,26 @@ pub struct Service {
 
 impl Service {
     /// Create an empty service.
-    pub fn empty(id: Id<ServiceId>, adapter: Id<AdapterId>) -> Self {
+    pub fn empty(id: &Id<ServiceId>, adapter: &Id<AdapterId>) -> Self {
         Service {
             tags: HashSet::new(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
+            channels: HashMap::new(),
             properties: HashMap::new(),
-            id: id,
-            adapter: adapter,
+            id: id.clone(),
+            adapter: adapter.clone(),
         }
     }
 }
 
 impl ToJSON for Service {
     fn to_json(&self) -> JSON {
-        let mut source = vec![
+        vec![
             ("id", self.id.to_json()),
             ("adapter", self.adapter.to_json()),
             ("tags", self.tags.to_json()),
             ("properties", self.properties.to_json()),
-            ("getters", self.getters.to_json()),
-            ("setters", self.setters.to_json()),
-        ];
-
-        let map = source.drain(..)
-            .map(|(key, value)| (key.to_owned(), value))
-            .collect();
-        JSON::Object(map)
+            ("channels", self.channels.to_json()),
+        ].to_json()
     }
 }
 
@@ -618,22 +608,38 @@ pub struct Channel {
     pub adapter: Id<AdapterId>,
 
     pub kind: ChannelKind,
+
+    pub supports_send: bool,
+    pub supports_fetch: bool,
+    pub supports_watch: bool,
+}
+
+impl Channel {
+    pub fn empty(id: &Id<Channel>, service: &Id<ServiceId>, adapter: &Id<AdapterId>) -> Self {
+        Channel {
+            tags: HashSet::new(),
+            id: id.clone(),
+            service: service.clone(),
+            adapter: adapter.clone(),
+            kind: ChannelKind::Ready,
+            supports_send: false,
+            supports_fetch: false,
+            supports_watch: false
+        }
+    }
 }
 
 impl ToJSON for Channel {
     fn to_json(&self) -> JSON {
-        let mut source = vec![
+        vec![
             ("id", self.id.to_json()),
             ("adapter", self.adapter.to_json()),
             ("tags", self.tags.to_json()),
             ("service", self.service.to_json()),
             ("kind", self.kind.to_json()),
-        ];
-
-        let map = source.drain(..)
-            .map(|(key, value)| (key.to_owned(), value))
-            .collect();
-        JSON::Object(map)
+            ("supports_send", self.supports_send.to_json()),
+            ("supports_fetch", self.supports_fetch.to_json()),
+        ].to_json()
     }
 }
 
