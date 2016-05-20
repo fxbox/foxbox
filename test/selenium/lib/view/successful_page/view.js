@@ -16,7 +16,7 @@ SuccessfulPageView.prototype = Object.assign({
 
   goToSignedIn() {
     return this.driver.navigate().to('http://localhost:3331')
-    .then(() => this.instanciateNextView('signed_in'));
+      .then(() => this.instanciateNextView('signed_in'));
   }
 }, View.prototype);
 

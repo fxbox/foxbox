@@ -11,17 +11,17 @@ SetUpView.prototype = Object.assign({
 
   successLogin(password) {
     return this._submitPassword(password)
-    .then(() => this.instanciateNextView('successful_page'));
+      .then(() => this.instanciateNextView('successful_page'));
   },
 
   successSignUpFromApp(password) {
     return this._submitPassword(password)
-    .then(() => this.instanciateNextView('services'));
+      .then(() => this.instanciateNextView('services'));
   },
 
   failureLogin(password, confirmPassword) {
     return this._submitPassword(password, confirmPassword)
-    .then(() => this.alertMessage());
+      .then(() => this.alertMessage());
   },
 
   _submitPassword(password, confirmPassword) {
@@ -30,8 +30,8 @@ SetUpView.prototype = Object.assign({
       confirmPassword : password;
 
     return this.accessor.passwordField.sendKeys(password)
-    .then(() => this.accessor.confirmPasswordField.sendKeys(confirmPassword))
-    .then(() => this.accessor.submitButton.click());
+      .then(() => this.accessor.confirmPasswordField.sendKeys(confirmPassword))
+      .then(() => this.accessor.submitButton.click());
   },
 
   alertMessage() {

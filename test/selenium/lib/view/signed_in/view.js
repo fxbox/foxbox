@@ -12,7 +12,7 @@ function SignedInPageView() {
 SignedInPageView.prototype = Object.assign({
   signOut() {
     return this.accessor.signOutButton.click()
-    .then(() => this.instanciateNextView('signed_out'));
+      .then(() => this.instanciateNextView('signed_out'));
   }
 }, View.prototype);
 

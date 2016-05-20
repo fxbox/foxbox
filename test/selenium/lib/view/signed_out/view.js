@@ -9,9 +9,9 @@ function SignedOutPageView() {
 }
 
 SignedOutPageView.prototype = {
-    hasSignedOut() {
-        return this.accessor.root;
-    }
+  hasSignedOut() {
+    return this.accessor.root;
+  }
 };
 
 module.exports = SignedOutPageView;

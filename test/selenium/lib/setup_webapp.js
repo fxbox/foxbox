@@ -15,41 +15,41 @@ function SetUpWebapp(url) {
 }
 
 SetUpWebapp.prototype = {
-    init() {
-      return this.driver.get(this.url)
-        .then(() => this.defaultView);
-    },
+  init() {
+    return this.driver.get(this.url)
+      .then(() => this.defaultView);
+  },
 
-    clear() {
-      // Session data is not stored in cookies, but in local storage
-      return this._clearLocalStorage()
-        .then(() => this.init());
-    },
+  clear() {
+    // Session data is not stored in cookies, but in local storage
+    return this._clearLocalStorage()
+      .then(() => this.init());
+  },
 
-    _clearLocalStorage() {
-      return this.driver.executeScript('localStorage.clear();');
-    },
+  _clearLocalStorage() {
+    return this.driver.executeScript('localStorage.clear();');
+  },
 
-    stop() {
-      return this.driver.quit()
-        .then(() => { this.driver = null; });
-    },
+  stop() {
+    return this.driver.quit()
+      .then(() => { this.driver = null; });
+  },
 
-    get defaultView() {
-      return this.setUpView;
-    },
+  get defaultView() {
+    return this.setUpView;
+  },
 
-    get signInPage() {
-      return new SignInPageView(this.driver);
-    },
+  get signInPage() {
+    return new SignInPageView(this.driver);
+  },
 
-    get setUpView() {
-      return new SetUpView(this.driver);
-    },
+  get setUpView() {
+    return new SetUpView(this.driver);
+  },
 
-    get appMainView() {
-      return new MainView(this.driver);
-    }
+  get appMainView() {
+    return new MainView(this.driver);
+  }
 };
 
 module.exports = SetUpWebapp;

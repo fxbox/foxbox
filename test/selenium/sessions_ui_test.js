@@ -33,20 +33,21 @@ describe('sessions ui', function() {
         });
 
         it('should reject non-matching passwords', function() {
-          return setUpView.failureLogin(12345678, 1234)
-          .then(text => {
+          return setUpView.failureLogin(12345678, 1234).then(text => {
             assert.equal(text, 'Passwords don\'t match! Please try again.');
           });
         });
 
-        it('should reject short passwords', function () {
-          return setUpView.failureLogin(1234, 1234)
-          .then(text => { assert.equal(text, SHORT_PASSWORD_ERROR_MESSAGE); });
+        it('should reject short passwords', function() {
+          return setUpView.failureLogin(1234, 1234).then(text => {
+            assert.equal(text, SHORT_PASSWORD_ERROR_MESSAGE);
+          });
         });
 
         it('should fail if password is not set', function() {
-          return setUpView.failureLogin('', '')
-          .then(text => { assert.equal(text, SHORT_PASSWORD_ERROR_MESSAGE); });
+          return setUpView.failureLogin('', '').then(text => {
+            assert.equal(text, SHORT_PASSWORD_ERROR_MESSAGE);
+          });
         });
       });
 
@@ -56,8 +57,8 @@ describe('sessions ui', function() {
 
         it('should accept matching, long-enough passwords', function() {
           return setUpView.successLogin()
-          .then(successfulPageView => successfulPageView.loginMessage)
-          .then(text => { assert.equal(text, 'Thank you!'); });
+            .then(successfulPageView => successfulPageView.loginMessage)
+            .then(text => { assert.equal(text, 'Thank you!'); });
         });
       });
     });
@@ -68,9 +69,9 @@ describe('sessions ui', function() {
 
     before(() => {
       return setUpWebapp.init()
-      .then(setUpView => setUpView.successLogin())
-      .then(successfulView => successfulView.goToSignedIn())
-      .then(view => { signedInView = view; });
+        .then(setUpView => setUpView.successLogin())
+        .then(successfulView => successfulView.goToSignedIn())
+        .then(view => { signedInView = view; });
     });
 
     describe('signedin page', function() {
@@ -84,7 +85,7 @@ describe('sessions ui', function() {
 
       beforeEach(function() {
         return suiteBuilder.browserCleanUp()
-        .then(() => { signInView = setUpWebapp.signInPage; });
+          .then(() => { signInView = setUpWebapp.signInPage; });
       });
 
       [{
@@ -101,8 +102,9 @@ describe('sessions ui', function() {
         error: 'Invalid password'
       }].forEach(config => {
         it(config.test, function() {
-          return signInView.failureLogin(config.pass)
-          .then(alertMessage => { assert.equal(alertMessage, config.error); });
+          return signInView.failureLogin(config.pass).then(alertMessage => {
+            assert.equal(alertMessage, config.error);
+          });
         });
       });
 
