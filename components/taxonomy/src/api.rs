@@ -593,6 +593,7 @@ pub trait API: Send {
     /// # extern crate foxbox_taxonomy;
     /// # use foxbox_taxonomy::selector::*;
     /// # use foxbox_taxonomy::api::*;
+    /// # use foxbox_taxonomy::io::*;
     /// # use foxbox_taxonomy::values::*;
     ///
     /// # fn main() {
@@ -604,7 +605,7 @@ pub trait API: Send {
     ///   "value": {"OnOff": "On"}
     /// }"#;
     ///
-    /// # TargetMap::<ChannelSelector, Value>::from_str(&source).unwrap();
+    /// # TargetMap::<ChannelSelector, Payload>::from_str(&source).unwrap();
     ///
     /// // The following argument will send `On` to two setters and `Unit` to everything
     /// // that supports `Ready`.
@@ -617,7 +618,7 @@ pub trait API: Send {
     ///   "value": {"Unit": null}
     /// }]"#;
     ///
-    /// # TargetMap::<ChannelSelector, Value>::from_str(&source).unwrap();
+    /// # TargetMap::<ChannelSelector, Payload>::from_str(&source).unwrap();
     ///
     /// # }
     /// ```
