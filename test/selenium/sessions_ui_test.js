@@ -3,7 +3,7 @@
 
 'use strict';
 
-const assert= require('assert');
+const assert = require('assert');
 const SuiteBuilder = require('./lib/make_suite');
 const PASSWORDS = require('./lib/passwords.json');
 

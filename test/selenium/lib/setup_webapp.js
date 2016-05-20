@@ -1,9 +1,9 @@
 'use strict';
 
-var webdriver = require('selenium-webdriver');
-var SetUpView = require('./view/set_up/view.js');
-var SignInPageView = require('./view/sign_in/view.js');
-var MainView = require('./view/app_main/view.js');
+const webdriver = require('selenium-webdriver');
+const SetUpView = require('./view/set_up/view.js');
+const SignInPageView = require('./view/sign_in/view.js');
+const MainView = require('./view/app_main/view.js');
 
 const driverBuilder = new webdriver.Builder().forBrowser('firefox');
 

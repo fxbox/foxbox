@@ -1,6 +1,6 @@
 'use strict';
 
-var View = require('../view');
+const View = require('../view');
 
 
 function MainView() {

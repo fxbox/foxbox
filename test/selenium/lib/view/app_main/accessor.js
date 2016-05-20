@@ -1,6 +1,6 @@
 'use strict';
 
-var Accessor = require('../accessor');
+const Accessor = require('../accessor');
 
 
 function MainAccessor() {
