@@ -9,9 +9,4 @@ function ServicesView() {
   this.accessor.logOutButton;  // Wait until it appears
 }
 
-ServicesView.prototype = Object.assign({
-
- // To add functions here
-
-}, View.prototype);
 module.exports = ServicesView;

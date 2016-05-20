@@ -8,10 +8,4 @@ function SignedOutPageView() {
   this.accessor.root
 }
 
-SignedOutPageView.prototype = {
-  hasSignedOut() {
-    return this.accessor.root;
-  }
-};
-
 module.exports = SignedOutPageView;
