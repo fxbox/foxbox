@@ -5,7 +5,7 @@ const View = require('../view.js');
 function SignedOutPageView() {
   View.apply(this, arguments);
 
-  this.accessor.root
+  this.accessor.root;
 }
 
 module.exports = SignedOutPageView;

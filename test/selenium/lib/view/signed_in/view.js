@@ -1,6 +1,6 @@
 'use strict';
 
-const View = require('../view.js')
+const View = require('../view.js');
 
 
 function SignedInPageView() {

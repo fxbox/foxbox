@@ -52,7 +52,7 @@ describe('sessions ui', function() {
       describe('success', function() {
 
         after(function() {
-          return suiteBuilder.restartFromScratch()
+          return suiteBuilder.restartFromScratch();
         });
 
         it('should accept matching, long-enough passwords', function() {
