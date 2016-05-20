@@ -53,7 +53,9 @@ describe('sessions ui', function() {
 
       describe('success', function() {
 
-        after(() => suiteBuilder.restartFromScratch());
+        after(function() {
+          return suiteBuilder.restartFromScratch()
+        });
 
         it('should accept matching, long-enough passwords', function() {
           return setUpView.successLogin()
@@ -67,7 +69,7 @@ describe('sessions ui', function() {
   describe('once registred', function() {
     var signedInView;
 
-    before(() => {
+    before(function() {
       return setUpWebapp.init()
         .then(setUpView => setUpView.successLogin())
         .then(successfulView => successfulView.goToSignedIn())

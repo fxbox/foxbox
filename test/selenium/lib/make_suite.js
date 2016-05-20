@@ -18,14 +18,14 @@ Suite.prototype = {
     describe(this.description, function() {
       this.timeout(30000);
 
-      before(() => {
+      before(function() {
         return self.foxboxProcessManager.start()
           .then(() => self.app.init());
       });
 
       subSuite(self.app);
 
-      after(() => {
+      after(function() {
         return self.app.stop()
           .then(() => self.foxboxProcessManager.kill())
           .then(() => self.foxboxProcessManager.cleanData());
