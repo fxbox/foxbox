@@ -4,14 +4,11 @@ const webdriver = require('selenium-webdriver');
 const SetUpView = require('./view/set_up/view.js');
 const SignInPageView = require('./view/sign_in/view.js');
 const MainView = require('./view/app_main/view.js');
+const Capabilities = require('selenium-webdriver/lib/capabilities').Capabilities;
 
-var Capabilities = require('selenium-webdriver/lib/capabilities').Capabilities;
-
-var cap = Capabilities.firefox();
-cap.set('marionette', true)
-cap.set('binary', '/Applications/Firefox.app/Contents/MacOS/firefox-bin');
-
-const driverBuilder = new webdriver.Builder().withCapabilities(cap);
+var capabilities = Capabilities.firefox();
+capabilities.set('marionette', true);
+const driverBuilder = new webdriver.Builder().withCapabilities(capabilities);
 
 console.log(driverBuilder.getCapabilities());
 
