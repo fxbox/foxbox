@@ -13,7 +13,7 @@ MainView.prototype = Object.assign({
 
   connectToFoxBox: function() {
     return this.accessor.connectToFoxBoxButton.click()
-      .then(() => this.instanciateNextView('sign_up'));
+      .then(() => this.instanciateNextView('set_up'));
   }
 
 }, View.prototype);
