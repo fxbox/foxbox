@@ -1,6 +1,7 @@
 'use strict';
 
 var View = require('../view');
+const PASSWORDS = require('../../passwords.json');
 
 
 function SignInView() {
@@ -9,7 +10,7 @@ function SignInView() {
 
 SignInView.prototype = Object.assign({
   successLogin(password) {
-    password = password !== undefined ? password : 12345678;
+    password = password !== undefined ? password : PASSWORDS.valid;
     return this._submitPassword(password)
       .then(() => this.instanciateNextView('signed_in'));
   },

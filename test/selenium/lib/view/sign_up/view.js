@@ -1,6 +1,7 @@
 'use strict';
 
 var View = require('../view');
+const PASSWORDS = require('../../passwords.json');
 
 
 function SetUpView() {
@@ -25,7 +26,7 @@ SetUpView.prototype = Object.assign({
   },
 
   _submitPassword(password, confirmPassword) {
-    password = password !== undefined ? password : 12345678;
+    password = password !== undefined ? password : PASSWORDS.valid;
     confirmPassword = confirmPassword !== undefined ?
       confirmPassword : password;
 

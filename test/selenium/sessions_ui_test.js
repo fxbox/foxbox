@@ -5,6 +5,7 @@
 
 const assert= require('assert');
 const SuiteBuilder = require('./lib/make_suite');
+const PASSWORDS = require('./lib/passwords.json');
 
 var suiteBuilder = new SuiteBuilder('Test set up UI');
 
@@ -25,28 +26,25 @@ describe('sessions ui', function() {
 
       describe('failures', function() {
 
-        const SHORT_PASSWORD_ERROR_MESSAGE =
-          'Please use a password of at least 8 characters.';
-
         afterEach(function() {
           return setUpView.dismissAlert();
+        });
+
+        PASSWORDS.invalids.forEach((invalidPassword) => {
+          it('should reject ' + invalidPassword.reason + ' passwords',
+          function() {
+            return setUpView
+              .failureLogin(invalidPassword.value, invalidPassword.value)
+              .then(text => {
+                assert.equal(text,
+                  'Please use a password of at least 8 characters.');
+              });
+          });
         });
 
         it('should reject non-matching passwords', function() {
           return setUpView.failureLogin(12345678, 1234).then(text => {
             assert.equal(text, 'Passwords don\'t match! Please try again.');
-          });
-        });
-
-        it('should reject short passwords', function() {
-          return setUpView.failureLogin(1234, 1234).then(text => {
-            assert.equal(text, SHORT_PASSWORD_ERROR_MESSAGE);
-          });
-        });
-
-        it('should fail if password is not set', function() {
-          return setUpView.failureLogin('', '').then(text => {
-            assert.equal(text, SHORT_PASSWORD_ERROR_MESSAGE);
           });
         });
       });
@@ -90,24 +88,21 @@ describe('sessions ui', function() {
           .then(() => { signInView = setUpWebapp.signInPage; });
       });
 
-      [{
-        test: 'should reject short passwords',
-        pass: 'short',
-        error: 'Invalid password'
-      }, {
-        test: 'should reject not matching passwords',
-        pass: 'longEnoughButInvalid',
-        error: 'Signin error Unauthorized'
-      }, {
-        test: 'should fail if password is not typed',
-        pass: '',
-        error: 'Invalid password'
-      }].forEach(config => {
-        it(config.test, function() {
-          return signInView.failureLogin(config.pass).then(alertMessage => {
-            assert.equal(alertMessage, config.error);
-          });
+      PASSWORDS.invalids.forEach(invalidPassword => {
+        it('should reject ' + invalidPassword.reason + ' passwords',
+        function() {
+          return signInView.failureLogin(invalidPassword.value)
+            .then(alertMessage => {
+              assert.equal(alertMessage, 'Invalid password');
+            });
         });
+      });
+
+      it('should reject not matching passwords', function() {
+        return signInView.failureLogin('longEnoughButInvalid')
+          .then(alertMessage => {
+            assert.equal(alertMessage, 'Signin error Unauthorized');
+          });
       });
 
       it('should accept matching, long-enough passwords', function() {
