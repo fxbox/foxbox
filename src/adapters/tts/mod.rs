@@ -12,7 +12,7 @@ use foxbox_taxonomy::manager::AdapterManager;
 use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::services::{ AdapterId, Channel, ChannelKind, Id, Service, ServiceId };
 use foxbox_taxonomy::values::{ Type, Value };
-use std::collections::{ HashMap, HashSet };
+use std::collections::HashMap;
 use std::sync::Arc;
 use transformable_channels::mpsc::*;
 
@@ -67,13 +67,6 @@ impl<T: TtsEngine> Adapter for TtsAdapter<T> {
                 }
             }
             (id.clone(), Err(Error::InternalError(InternalError::NoSuchChannel(id))))
-        }).collect()
-    }
-
-    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult
-    {
-        watch.drain(..).map(|(id, _, _)| {
-            (id.clone(), Err(Error::GetterDoesNotSupportWatching(id)))
         }).collect()
     }
 }
