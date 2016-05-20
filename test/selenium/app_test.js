@@ -12,7 +12,7 @@ suiteBuilder.build((app) => {
     var webAppMainPage;
 
     beforeEach(() => {
-      webAppMainPage = app.getAppMainView();
+      webAppMainPage = app.appMainView;
     });
 
     it('should log in from web app', () => {

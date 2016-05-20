@@ -15,7 +15,7 @@ Accessor.prototype = {
    *   "Webdriver By" object.
    * @return WebElement
    */
-  waitForElement: function(locator) {
+  waitForElement(locator) {
     locator = typeof locator === 'string' ? By.css(locator) : locator;
 
     var element = this.driver.wait(until.elementLocated(locator));

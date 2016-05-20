@@ -8,27 +8,27 @@ function SignInView() {
 }
 
 SignInView.prototype = Object.assign({
-  successLogin: function(password) {
+  successLogin(password) {
     password = password !== undefined ? password : 12345678;
     return this._submitPassword(password)
     .then(() => this.instanciateNextView('signed_in'));
   },
 
-  failureLogin: function(password) {
+  failureLogin(password) {
     return this._submitPassword(password)
     .then(() => this.alertMessage());
   },
 
-  _submitPassword: function(password) {
+  _submitPassword(password) {
     return this.accessor.passwordField.sendKeys(password)
     .then(() => this.accessor.submitButton.click());
   },
 
-  alertMessage: function() {
+  alertMessage() {
     return this.driver.switchTo().alert().getText();
   },
 
-  dismissAlert: function() {
+  dismissAlert() {
     return this.driver.switchTo().alert().accept();
   },
 }, View.prototype);

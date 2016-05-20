@@ -15,7 +15,7 @@ function SetUpWebapp(url) {
 }
 
 SetUpWebapp.prototype = {
-    init: function() {
+    init() {
       return this.driver.get(this.url)
         .then(() => this.defaultView);
     },
@@ -36,18 +36,18 @@ SetUpWebapp.prototype = {
     },
 
     get defaultView() {
-      return this.getSetUpView();
+      return this.setUpView;
     },
 
-    getSignInPage : function() {
+    get signInPage() {
       return new SignInPageView(this.driver);
     },
 
-    getSetUpView : function() {
+    get setUpView() {
       return new SetUpView(this.driver);
     },
 
-    getAppMainView : function() {
+    get appMainView() {
       return new MainView(this.driver);
     }
 };

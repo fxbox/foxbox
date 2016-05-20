@@ -19,7 +19,7 @@ describe('sessions ui', function() {
 
       beforeEach(function() {
         return suiteBuilder.browserCleanUp().then(() => {
-          setUpView = setUpWebapp.getSetUpView();
+          setUpView = setUpWebapp.setUpView;
         });
       });
 
@@ -84,7 +84,7 @@ describe('sessions ui', function() {
 
       beforeEach(function() {
         return suiteBuilder.browserCleanUp()
-        .then(() => { signInView = setUpWebapp.getSignInPage(); });
+        .then(() => { signInView = setUpWebapp.signInPage; });
       });
 
       [{

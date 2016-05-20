@@ -9,7 +9,7 @@ function SignedOutPageView() {
 }
 
 SignedOutPageView.prototype = {
-    hasSignedOut: function() {
+    hasSignedOut() {
         return this.accessor.root;
     }
 };
