@@ -220,13 +220,6 @@ impl Handler for TaxonomyRouter {
         get_post_api!(get_services, ServiceSelector, ["services"]);
         get_post_api!(get_channels, ChannelSelector, ["channels"]);
 
-        // FIXME: Deprecate and remove
-        // FIXME: Need to tweak selector
-        get_post_api!(get_channels, ChannelSelector, ["channels", "getters"]);
-        // FIXME: Deprecate and remove
-        // FIXME: Need to tweak selector
-        get_post_api!(get_channels, ChannelSelector, ["channels", "setters"]);
-
         // Fetching and getting values.
         // We can't use a GET http method here because the Fetch() DOM api
         // doesn't allow bodies with GET and HEAD requests.
@@ -243,20 +236,6 @@ impl Handler for TaxonomyRouter {
                     tags => Vec<Id<TagId>>,
                     ["channels", "tags"], Method::Post);
 
-
-      // FIXME: Deprecate and remove
-      // FIXME: Need to tweak selector
-        payload_api2!(add_channel_tags,
-                      getters => Vec<ChannelSelector>,
-                      tags => Vec<Id<TagId>>,
-                      ["channels", "getters", "tags"], Method::Post);
-      // FIXME: Deprecate and remove
-      // FIXME: Need to tweak selector
-        payload_api2!(add_channel_tags,
-                      setters => Vec<ChannelSelector>,
-                      tags => Vec<Id<TagId>>,
-                      ["channels", "setters", "tags"], Method::Post);
-
         // Removing tags.
         payload_api2!(remove_service_tags,
                       services => Vec<ServiceSelector>,
@@ -266,20 +245,6 @@ impl Handler for TaxonomyRouter {
                        channels => Vec<ChannelSelector>,
                        tags => Vec<Id<TagId>>,
                        ["channels", "tags"], Method::Delete);
-
-          // FIXME: Deprecate and remove
-          // FIXME: Need to tweak selector
-        payload_api2!(remove_channel_tags,
-                      getters => Vec<ChannelSelector>,
-                      tags => Vec<Id<TagId>>,
-                      ["channels", "getters", "tags"], Method::Delete);
-
-          // FIXME: Deprecate and remove
-          // FIXME: Need to tweak selector
-        payload_api2!(remove_channel_tags,
-                      setters => Vec<ChannelSelector>,
-                      tags => Vec<Id<TagId>>,
-                      ["channels", "setters", "tags"], Method::Delete);
 
         // Fallthrough, returning a 404.
         Ok(Response::with((Status::NotFound,
@@ -297,12 +262,10 @@ pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
         vec![
             AuthEndpoint(vec![Method::Get, Method::Post], "services".to_owned()),
             AuthEndpoint(vec![Method::Post, Method::Delete], "services/tags".to_owned()),
-            AuthEndpoint(vec![Method::Get, Method::Post], "channels/getters".to_owned()),
-            AuthEndpoint(vec![Method::Get, Method::Post], "channels/setters".to_owned()),
+            AuthEndpoint(vec![Method::Get, Method::Post], "channels".to_owned()),
             AuthEndpoint(vec![Method::Get], "channels/get".to_owned()),
             AuthEndpoint(vec![Method::Put], "channels/set".to_owned()),
-            AuthEndpoint(vec![Method::Post, Method::Delete], "channels/getters/tags".to_owned()),
-            AuthEndpoint(vec![Method::Post, Method::Delete], "channels/setters/tags".to_owned())
+            AuthEndpoint(vec![Method::Post, Method::Delete], "channels/tags".to_owned())
         ]
     } else {
         vec![]
@@ -351,6 +314,17 @@ describe! taxonomy_router {
                                     &mount).unwrap();
         let body = response::extract_body_to_string(response);
         let s = r#"[{"adapter":"clock@link.mozilla.org","channels":{"getter:interval.clock@link.mozilla.org":{"adapter":"clock@link.mozilla.org","id":"getter:interval.clock@link.mozilla.org","kind":"CountEveryInterval","service":"service:clock@link.mozilla.org","supports_fetch":false,"supports_send":false,"tags":[]},"getter:timeofday.clock@link.mozilla.org":{"adapter":"clock@link.mozilla.org","id":"getter:timeofday.clock@link.mozilla.org","kind":"CurrentTimeOfDay","service":"service:clock@link.mozilla.org","supports_fetch":true,"supports_send":false,"tags":[]},"getter:timestamp.clock@link.mozilla.org":{"adapter":"clock@link.mozilla.org","id":"getter:timestamp.clock@link.mozilla.org","kind":"CurrentTime","service":"service:clock@link.mozilla.org","supports_fetch":true,"supports_send":false,"tags":[]}},"id":"service:clock@link.mozilla.org","properties":{"model":"Mozilla clock v1"},"tags":[]}]"#;
+
+        assert_eq!(body, s);
+    }
+
+    it "should return the list of channels from a POST request" {
+        let response = request::post("http://localhost:3000/api/v1/channels",
+                                     Headers::new(),
+                                     r#"[{"id":"getter:interval.clock@link.mozilla.org"}]"#,
+                                     &mount).unwrap();
+        let body = response::extract_body_to_string(response);
+        let s = r#"[{"adapter":"clock@link.mozilla.org","id":"getter:interval.clock@link.mozilla.org","kind":"CountEveryInterval","service":"service:clock@link.mozilla.org","supports_fetch":false,"supports_send":false,"tags":[]}]"#;
 
         assert_eq!(body, s);
     }
