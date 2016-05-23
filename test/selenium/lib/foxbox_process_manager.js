@@ -27,7 +27,9 @@ FoxboxManager.prototype = {
         '--disable-tls',
         '--port', FoxboxManager.PORT,
         '--profile', PROFILE_PATH,
-      ], { stdio: 'inherit' });
+      ], {
+        // stdio: 'inherit'
+      });
 
       setTimeout(resolve, WAIT_TIME_IN_MS.startUp);
     });
