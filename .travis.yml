@@ -25,7 +25,7 @@ matrix:
       env: BUILD_ENV=-cargo_update
 
 addons:
-  firefox: latest-beta
+  firefox: latest
   apt:
     packages:
       - libupnp-dev
