@@ -74,13 +74,6 @@ impl Adapter for Console {
             })
             .collect()
     }
-
-    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult
-    {
-        watch.drain(..).map(|(id, _, _)| {
-            (id.clone(), Err(Error::GetterDoesNotSupportWatching(id)))
-        }).collect()
-    }
 }
 
 

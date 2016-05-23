@@ -1,9 +1,11 @@
 //! An API for plugging in adapters.
 
-use adapter::{ Adapter, AdapterWatchGuard, ResultMap, WatchEvent as AdapterWatchEvent };
+use adapter::{ Adapter, AdapterWatchGuard, RawAdapter,  WatchEvent as AdapterWatchEvent };
+use adapter_utils::RawAdapterForAdapter;
 use transact::InsertInMap;
 
 use api::{ Error, InternalError, TargetMap, Targetted, WatchEvent };
+use io::*;
 use selector::*;
 use services::*;
 use tag_storage::TagStorage;
@@ -36,16 +38,16 @@ macro_rules! log_debug_assert {
 /// Whenever possible, the `AdapterManager` attempts to place calls to the Adapters
 /// after it has released its locks. An `AdapterRequest` represents stuff that has
 /// been extracted from the maps while they were locked for use after unlocking.
-pub type AdapterRequest<T> = HashMap<Id<AdapterId>, (Arc<Adapter>, T)>;
+pub type AdapterRequest<T> = HashMap<Id<AdapterId>, (Arc<RawAdapter>, T)>;
 
 /// A request to an adapter, for performing a `fetch` operation.
 pub type FetchRequest = AdapterRequest<HashMap<Id<Channel>, Type>>;
 
 /// A request to an adapter, for performing a `send` operation.
-pub type SendRequest = AdapterRequest<(HashMap<Id<Channel>, Value>, ResultMap<Id<Channel>, (), Error>)>;
+pub type SendRequest = AdapterRequest<HashMap<Id<Channel>, (Payload, Type)>>;
 
 /// A request to an adapter, for performing a `watch` operation.
-pub type WatchRequest = AdapterRequest<Vec<(Id<Channel>, Option<Value>, Weak<WatcherData>)>>;
+pub type WatchRequest = AdapterRequest<Vec<(Id<Channel>, Option<(Payload, Type)>, /*values*/Type, Weak<WatcherData>)>>;
 
 pub type WatchGuardCommit = Vec<(Weak<WatcherData>, Vec<(Id<Channel>, Box<AdapterWatchGuard>)>)>;
 
@@ -129,14 +131,14 @@ impl<'a> ServiceLike for ServiceView<'a> {
 /// Data and metadata on an adapter.
 struct AdapterData {
     /// The implementation of the adapter.
-    adapter: Arc<Adapter>,
+    adapter: Arc<RawAdapter>,
 
     /// The services for this adapter.
     services: HashMap<Id<ServiceId>, Arc<SubCell<ServiceData>>>,
 }
 
 impl AdapterData {
-    fn new(adapter: Arc<Adapter>) -> Self {
+    fn new(adapter: Arc<RawAdapter>) -> Self {
         AdapterData {
             adapter: adapter,
             services: HashMap::new(),
@@ -144,7 +146,7 @@ impl AdapterData {
     }
 }
 impl Deref for AdapterData {
-    type Target = Arc<Adapter>;
+    type Target = Arc<RawAdapter>;
     fn deref(&self) -> &Self::Target {
         &self.adapter
     }
@@ -180,9 +182,9 @@ impl Tagged for Channel {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct WatchKey(usize);
 
-/// Data and metadata on a getter.
+/// Data and metadata on a channel.
 struct ChannelData {
-    /// The getter itself.
+    /// The channel itself.
     channel: Channel,
 
     /// The tags of the service.
@@ -230,7 +232,7 @@ impl Tagged for ChannelData {
 /// yet. The `WatcherData` is materialized as a `WatchGuard` in userland.
 pub struct WatcherData {
     /// The criteria for watching.
-    watch: TargetMap<ChannelSelector, Exactly<Value>>,
+    watch: TargetMap<ChannelSelector, Exactly<(Payload, Type)>>,
 
     /// The listener for this watch.
     on_event: Mutex<Box<ExtSender<WatchEvent>>>,
@@ -261,7 +263,7 @@ impl PartialEq for WatcherData {
 }
 
 impl WatcherData {
-    fn new(liveness: &Arc<Liveness>, key: WatchKey, watch:TargetMap<ChannelSelector, Exactly<Value>>, on_event: Box<ExtSender<WatchEvent>>) -> Self {
+    fn new(liveness: &Arc<Liveness>, key: WatchKey, watch:TargetMap<ChannelSelector, Exactly<(Payload, Type)>>, on_event: Box<ExtSender<WatchEvent>>) -> Self {
         WatcherData {
             key: key,
             on_event: Mutex::new(on_event),
@@ -298,7 +300,7 @@ impl WatchMap {
             liveness: liveness.clone()
         }
     }
-    fn create(&mut self, watch:TargetMap<ChannelSelector, Exactly<Value>>, on_event: Box<ExtSender<WatchEvent>>) -> Arc<WatcherData> {
+    fn create(&mut self, watch:TargetMap<ChannelSelector, Exactly<(Payload, Type)>>, on_event: Box<ExtSender<WatchEvent>>) -> Arc<WatcherData> {
         let id = WatchKey(self.counter);
         self.counter += 1;
         let watcher = Arc::new(WatcherData::new(&self.liveness, id, watch, on_event));
@@ -558,6 +560,9 @@ impl State {
     ///
     /// Returns an error if an adapter with the same id is already present.
     pub fn add_adapter(&mut self, adapter: Arc<Adapter>) -> Result<(), Error> {
+        self.add_raw_adapter(Arc::new(RawAdapterForAdapter::new(adapter)))
+    }
+    pub fn add_raw_adapter(&mut self, adapter: Arc<RawAdapter>) -> Result<(), Error> {
         match self.adapter_by_id.entry(adapter.id()) {
             Entry::Occupied(_) => return Err(Error::InternalError(InternalError::DuplicateAdapter(adapter.id()))),
             Entry::Vacant(entry) => {
@@ -890,40 +895,21 @@ impl State {
 
 
     /// Send values to a set of channels
-    pub fn prepare_send_values(&self, mut keyvalues: TargetMap<ChannelSelector, Value>) -> SendRequest {
+    pub fn prepare_send_values(&self, mut keyvalues: TargetMap<ChannelSelector, Payload>) -> SendRequest {
         // First determine the channels and group them by adapter.
         let mut per_adapter = HashMap::new();
-        for Targetted {select: selectors, payload: value} in keyvalues.drain(..) {
+        for Targetted { select: selectors, payload } in keyvalues.drain(..) {
             Self::with_channels(selectors, &self.channel_by_id, |data| {
                 use std::collections::hash_map::Entry::*;
                 if !data.supports_send {
                     return;
                 }
                 let id = data.channel.id.clone();
-
-                // Check that the values we are about to send have the correct type. If they
-                // don't, no need to even send them to the Adapter.
-                let typ = data.channel.kind.get_type();
-                let checked = if value.get_type() == typ {
-                    Ok(value.clone())
-                } else {
-                    Err(Error::TypeError(TypeError {
-                        got: value.get_type(),
-                        expected: typ
-                    }))
-                };
+                let value = (payload.clone(), data.kind.get_type());
                 match per_adapter.entry(data.channel.adapter.clone()) {
                     Vacant(entry) => {
                         let mut request = HashMap::new();
-                        let mut failures = HashMap::new();
-                        match checked {
-                            Ok(value) => {
-                                request.insert(id, value);
-                            }
-                            Err(error) => {
-                                failures.insert(id, Err(error));
-                            }
-                        }
+                        request.insert(id, value.clone());
                         let adapter = match self.adapter_by_id.get(&data.channel.adapter) {
                             None => {
                                 log_debug_assert!(false, "Internal inconsistency: could not find adapter {}", data.channel.adapter);
@@ -931,18 +917,11 @@ impl State {
                             }
                             Some(adapter) => adapter
                         };
-                        entry.insert((adapter.adapter.clone(), (request, failures)));
+                        entry.insert((adapter.adapter.clone(), request));
                     }
                     Occupied(mut entry) => {
-                        let &mut(_, (ref mut request, ref mut failures)) = entry.get_mut();
-                        match checked {
-                            Ok(value) => {
-                                request.insert(id, value);
-                            }
-                            Err(error) => {
-                                failures.insert(id, Err(error));
-                            }
-                        }
+                        let &mut(_, ref mut request) = entry.get_mut();
+                        request.insert(id, value.clone());
                     }
                 }
             })
@@ -952,7 +931,7 @@ impl State {
 
     fn aux_start_channel_watch(watcher: &mut Arc<WatcherData>,
         getter_data: &mut ChannelData,
-        filter: &Exactly<Value>,
+        filter: &Exactly<(Payload, Type)>,
         adapter_by_id: &HashMap<Id<AdapterId>, AdapterData>,
         per_adapter: &mut WatchRequest)
     {
@@ -960,6 +939,8 @@ impl State {
 
         let id = getter_data.id.clone();
         let adapter = getter_data.adapter.clone();
+
+        let type_ = getter_data.kind.get_type();
 
         let insert_in_getter =
             match InsertInMap::start(&mut getter_data.watchers, vec![ ( watcher.key, Arc::downgrade(watcher) )] ) {
@@ -991,17 +972,17 @@ impl State {
                         adapter_data.adapter.clone()
                     }
                 };
-                entry.insert((adapter, (vec![(id, range, Arc::downgrade(watcher) )])));
+                entry.insert((adapter, (vec![(id, range, type_, Arc::downgrade(watcher) )])));
             },
             Occupied(mut entry) => {
-                (entry.get_mut().1).push((id, range, Arc::downgrade(watcher)));
+                (entry.get_mut().1).push((id, range, type_, Arc::downgrade(watcher)));
             }
         }
 
         insert_in_getter.commit();
     }
 
-    pub fn prepare_channel_watch(&mut self, mut watch: TargetMap<ChannelSelector, Exactly<Value>>,
+    pub fn prepare_channel_watch(&mut self, mut watch: TargetMap<ChannelSelector, Exactly<(Payload, Type)>>,
         on_event: Box<ExtSender<WatchEvent>>) -> (WatchRequest, WatchKey, Arc<AtomicBool>)
     {
         // Prepare the watcher and store it. Once we leave the lock, every time a channel is
@@ -1090,7 +1071,7 @@ impl State {
 
         let mut to_add = vec![];
         for (_, (adapter, mut adapter_request)) in per_adapter.drain() {
-            for (id, range, weak_watch_data) in adapter_request.drain(..) {
+            for (id, range, event_type, weak_watch_data) in adapter_request.drain(..) {
                 let watch_data = match weak_watch_data.upgrade() {
                     None => {
                         // The watch_data has already been dropped, nothing to do.
@@ -1116,26 +1097,33 @@ impl State {
                         return None;
                     }
                     Some(match event {
-                        AdapterWatchEvent::Enter { id, value } =>
+                        AdapterWatchEvent::Enter { id, value: (payload, type_) } =>
                             WatchEvent::EnterRange {
-                                from: id,
-                                value: value
+                                channel: id,
+                                value: payload,
+                                type_: type_
                             },
-                        AdapterWatchEvent::Exit { id, value } =>
+                        AdapterWatchEvent::Exit { id, value: (payload, type_) } =>
                             WatchEvent::ExitRange {
-                                from: id,
-                                value: value
+                                channel: id,
+                                value: payload,
+                                type_: type_
                             },
+                        AdapterWatchEvent::Error { id, error } =>
+                            WatchEvent::Error {
+                                channel: id,
+                                error: error
+                            }
                     })
                 });
 
                 let mut guards = vec![];
-                for (id, result) in adapter.register_watch(vec![(id, range, Box::new(on_ok))]) {
+                for (id, result) in adapter.register_watch(vec![(id, range, event_type, Box::new(on_ok))]) {
                     debug!(target: "Taxonomy-backend", "State::start_watch, registered watch for {} => {}.", id, result.is_ok());
 
                     match result {
                         Err(err) => {
-                            let event = WatchEvent::InitializationError {
+                            let event = WatchEvent::Error {
                                 channel: id.clone(),
                                 error: err
                             };
