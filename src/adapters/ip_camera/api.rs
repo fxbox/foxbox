@@ -6,7 +6,7 @@ extern crate hyper;
 extern crate time;
 extern crate url;
 
-use config_store::ConfigService;
+use foxbox_core::config_store::ConfigService;
 use foxbox_taxonomy::api::{ Error, InternalError };
 use foxbox_taxonomy::services::*;
 use rustc_serialize::base64::{ FromBase64, ToBase64, STANDARD };
@@ -315,7 +315,7 @@ pub fn remove_dir_all<P: AsRef<Path>>(dirname: P) -> io::Result<()> {
 describe! ip_camera {
 
     before_each {
-        use config_store::ConfigService;
+        use foxbox_core::config_store::ConfigService;
         use std::sync::Arc;
         use uuid::Uuid;
 
@@ -410,4 +410,3 @@ describe! ip_camera {
         camera.take_snapshot().unwrap();
     }
 }
-

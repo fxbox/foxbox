@@ -11,13 +11,13 @@ extern crate serde_json;
 mod api;
 mod upnp_listener;
 
-use config_store::ConfigService;
+use foxbox_core::config_store::ConfigService;
+use foxbox_core::traits::Controller;
 use foxbox_taxonomy::api::{Error, InternalError, User};
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Value, Json, Binary, Type, TypeError};
-use traits::Controller;
 use transformable_channels::mpsc::*;
 use self::api::*;
 use self::upnp_listener::IpCameraUpnpListener;

@@ -30,7 +30,7 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use traits::Controller;
+use foxbox_core::traits::Controller;
 use transformable_channels::mpsc::*;
 
 header! { (Encryption, "Encryption") => [String] }

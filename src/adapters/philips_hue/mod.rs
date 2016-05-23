@@ -17,6 +17,7 @@ pub mod hub_api;
 pub mod lights;
 pub mod structs;
 
+use foxbox_core::traits::Controller;
 use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
@@ -27,7 +28,6 @@ use std::sync::{ Arc, Mutex };
 use std::thread;
 use self::hub::Hub;
 use self::lights::Light;
-use traits::Controller;
 use transformable_channels::mpsc::*;
 
 static ADAPTER_NAME: &'static str = "Philips Hue adapter (built-in)";
