@@ -10,6 +10,10 @@ GECKO_DRIVER_VERSION='0.7.1'
 GECKO_DRIVER_FOLDER="$PROJECT_HOME/target"
 GECKO_DRIVER_BINARY="$GECKO_DRIVER_FOLDER/$GECKO_DRIVER_BINARY_NAME"
 
+# GeckoDriver must be in the path, so Selenium client can locate it
+export PATH="$PATH:$GECKO_DRIVER_FOLDER"
+
+
 _build_project() {
   pushd "${PROJECT_HOME}"
   cargo build
@@ -34,8 +38,6 @@ _install_firefox_driver() {
 
   gunzip "$GECKO_DRIVER_BINARY.gz"
   chmod +x "$GECKO_DRIVER_BINARY"
-
-  export PATH="$PATH:$GECKO_DRIVER_FOLDER" # Wires must be in the path, so Selenium client can locate it
 }
 
 _run_tests() {
