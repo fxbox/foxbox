@@ -1698,8 +1698,8 @@ impl Parser<Value> for Value {
             JSON::Object(ref obj) if obj.len() == 1 => {
                 let mut vec : Vec<_> = obj.iter().collect();
                 let (k, v) = vec.pop().unwrap(); // We checked the length just above.
-                match VALUE_PARSER.get(&k as &str) {
-                    None => Err(ParseError::type_error("Value", &path, &&*self::VALUE_KEYS)),
+                match VALUE_PARSER.get(k as &str) {
+                    None => Err(ParseError::type_error("Value", &path, &*self::VALUE_KEYS)),
                     Some(parser) => path.push(k, |path| parser(path, v))
                 }
             }

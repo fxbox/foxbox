@@ -7,8 +7,6 @@ use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::{ Value };
 
-use transformable_channels::mpsc::*;
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
