@@ -5,7 +5,8 @@
 //! living room (that's a selector), rather than needing to access every single heater one by one.
 
 pub use parse::*;
-use services::{ Service, ChannelKind, Channel };
+use channel::*;
+use services::Service;
 use util::*;
 use values::Duration;
 
@@ -24,6 +25,17 @@ pub trait SelectedBy<T> {
     fn matches(&self, &T) -> bool;
 }
 
+impl SelectedBy<Option<Signature>> for Exactly<bool> {
+    fn matches(&self, sig: &Option<Signature>) -> bool {
+        match (self, sig) {
+            (&Exactly::Always, _) |
+            (&Exactly::Exactly(true), &Some(_)) |
+            (&Exactly::Exactly(false), &None) => true,
+            _ => false
+        }
+    }
+}
+
 /// A trait used to let `ServiceSelector` work on complex data structures
 /// that are not necessarily exactly Selector.
 pub trait ServiceLike {
@@ -33,13 +45,13 @@ pub trait ServiceLike {
     #[deprecated]
     fn has_setters<F>(&self, f: F) -> bool where F: Fn(&Channel) -> bool {
         self.has_channels(|chan| {
-            chan.supports_send && f(chan)
+            chan.supports_send.is_some() && f(chan)
         })
     }
     #[deprecated]
     fn has_getters<F>(&self, f: F) -> bool where F: Fn(&Channel) -> bool {
         self.has_channels(|chan| {
-            chan.supports_fetch && f(chan)
+            chan.supports_fetch.is_some() && f(chan)
         })
     }
     fn has_channels<F>(&self, f: F) -> bool where F: Fn(&Channel) -> bool;
@@ -99,11 +111,8 @@ impl ServiceLike for Service {
 /// let json_selector = "{
 ///   \"id\": \"setter 1\",
 ///   \"tags\": [\"tag 1\", \"tag 2\"],
-///   \"getters\": [{
-///     \"kind\": \"Ready\"
-///   }],
-///   \"setters\": [{
-///     \"tags\": [\"tag 3\"]
+///   \"channels\": [{
+///     \"feature\": \"chronometer/is-ready\"
 ///   }]
 /// }";
 ///
@@ -193,9 +202,9 @@ impl ServiceSelector {
     }
 
     /// Selector for a service with a specific id.
-    pub fn with_id(self, id: Id<ServiceId>) -> Self {
+    pub fn with_id(self, id: &Id<ServiceId>) -> Self {
         ServiceSelector {
-            id: self.id.and(Exactly::Exactly(id)),
+            id: self.id.and(Exactly::Exactly(id.clone())),
             .. self
         }
     }
@@ -285,8 +294,8 @@ impl SelectedBy<ServiceSelector> for Service {
 /// use foxbox_taxonomy::services::*;
 ///
 /// let selector = ChannelSelector::new()
-///   .with_parent(Id::new("foxbox"))
-///   .with_kind(ChannelKind::CurrentTimeOfDay);
+///   .with_parent(&Id::new("foxbox"))
+///   .with_feature(&Id::new("light/is-on"));
 /// ```
 ///
 /// # JSON
@@ -338,9 +347,8 @@ pub struct ChannelSelector {
     ///  Restrict results to channels offered by a service that has all the tags in `tags`.
     pub service_tags: HashSet<Id<TagId>>,
 
-    /// If `Exactly(k)`, restrict results to channels that produce values
-    /// of kind `k`.
-    pub kind: Exactly<ChannelKind>,
+    /// If `Exactly(k)`, restrict results to channels that provide feature `k`
+    pub feature: Exactly<Id<FeatureId>>,
 
     pub supports_send: Exactly<bool>,
     pub supports_fetch: Exactly<bool>,
@@ -386,7 +394,7 @@ impl Parser<ChannelSelector> for ChannelSelector {
             }
             Some(Err(err)) => return Err(err),
         };
-        let kind = try!(match path.push("kind", |path| Exactly::take_opt(path, source, "kind")) {
+        let feature = try!(match path.push("feature", |path| Exactly::take_opt(path, source, "feature")) {
             None => Ok(Exactly::Always),
             Some(result) => {
                 is_empty = false;
@@ -413,7 +421,7 @@ impl Parser<ChannelSelector> for ChannelSelector {
                 parent: service_id,
                 tags: tags,
                 service_tags: service_tags,
-                kind: kind,
+                feature: feature,
                 supports_send: supports_send,
                 supports_fetch: supports_fetch,
                 supports_watch: supports_watch,
@@ -429,25 +437,25 @@ impl ChannelSelector {
     }
 
     /// Restrict to a channel with a specific id.
-    pub fn with_id(self, id: Id<Channel>) -> Self {
+    pub fn with_id(self, id: &Id<Channel>) -> Self {
         ChannelSelector {
-            id: self.id.and(Exactly::Exactly(id)),
+            id: self.id.and(Exactly::Exactly(id.clone())),
             .. self
         }
     }
 
     /// Restrict to a channel with a specific parent.
-    pub fn with_parent(self, id: Id<ServiceId>) -> Self {
+    pub fn with_parent(self, id: &Id<ServiceId>) -> Self {
         ChannelSelector {
-            parent: self.parent.and(Exactly::Exactly(id)),
+            parent: self.parent.and(Exactly::Exactly(id.clone())),
             .. self
         }
     }
 
     /// Restrict to a channel with a specific kind.
-    pub fn with_kind(self, kind: ChannelKind) -> Self {
+    pub fn with_feature(self, feature: &Id<FeatureId>) -> Self {
         ChannelSelector {
-            kind: self.kind.and(Exactly::Exactly(kind)),
+            feature: self.feature.and(Exactly::Exactly(feature.clone())),
             .. self
         }
     }
@@ -496,7 +504,7 @@ impl ChannelSelector {
             parent: self.parent.and(other.parent),
             tags: self.tags.union(&other.tags).cloned().collect(),
             service_tags: self.service_tags.union(&other.service_tags).cloned().collect(),
-            kind: self.kind.and(other.kind),
+            feature: self.feature.and(other.feature),
             supports_send: self.supports_send.and(other.supports_send),
             supports_fetch: self.supports_fetch.and(other.supports_fetch),
             supports_watch: self.supports_watch.and(other.supports_watch),
@@ -512,16 +520,16 @@ impl ChannelSelector {
         if !self.parent.matches(&channel.service) {
             return false;
         }
-        if !self.kind.matches(&channel.kind) {
+        if !self.feature.matches(&channel.feature) {
             return false;
         }
-        if !self.supports_send.matches(&channel.supports_send) {
+        if !(&self.supports_send as &SelectedBy<_>).matches(&channel.supports_send) {
             return false;
         }
-        if !self.supports_watch.matches(&channel.supports_watch) {
+        if !(&self.supports_watch as &SelectedBy<_>).matches(&channel.supports_watch) {
             return false;
         }
-        if !self.supports_fetch.matches(&channel.supports_fetch) {
+        if !(&self.supports_fetch as &SelectedBy<_>).matches(&channel.supports_fetch) {
             return false;
         }
         if !has_selected_tags(&self.tags, &channel.tags) {
