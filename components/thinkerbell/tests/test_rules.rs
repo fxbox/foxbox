@@ -32,6 +32,7 @@ enum Event {
 
 #[test]
 fn test_compile() {
+    println!("[test_compile] START");
     let (tx, rx) : (_, Receiver<Event>)= channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
@@ -47,26 +48,26 @@ fn test_compile() {
         }
     });
 
-    println!("* Attempting to parse an run an empty script will raise an error.");
+    println!("[test_compile] * Attempting to parse an run an empty script will raise an error.");
     let script = Script::from_str(r#"{"name": "foo", "rules": []}"#).unwrap();
     match exec.start(env, script, User::None, tx_run) {
         Err(Error::CompileError(CompileError::SourceError(SourceError::NoRule))) => {},
         other => panic!("Unexpected result {:?}", other)
     }
 
-    println!("//FIXME: Attempting to parse a script with an empty condition will raise an error.");
-    println!("//FIXME: Attempting to parse a script with an empty statement will raise an error.");
-    println!("//FIXME: Attempting to parse a script with an empty source will raise an error.");
-    println!("//FIXME: Attempting to parse a script with an empty destination will raise an error.");
-    println!("//FIXME: Attempting to parse a script with a type error in a match will raise an error.");
-    println!("//FIXME: Attempting to parse a script with a type error in a send will raise an error.");
+    println!("[test_compile] //FIXME: Attempting to parse a script with an empty condition will raise an error.");
+    println!("[test_compile] //FIXME: Attempting to parse a script with an empty statement will raise an error.");
+    println!("[test_compile] //FIXME: Attempting to parse a script with an empty source will raise an error.");
+    println!("[test_compile] //FIXME: Attempting to parse a script with an empty destination will raise an error.");
+    println!("[test_compile] //FIXME: Attempting to parse a script with a type error in a match will raise an error.");
+    println!("[test_compile] //FIXME: Attempting to parse a script with a type error in a send will raise an error.");
 
-    println!("");
+    println!("[test_compile] END");
 }
 
 #[test]
 fn test_run() {
-    println!("* Starting test_run.");
+    println!("[test_run] * START");
     let (tx, rx) : (_, Receiver<Event>) = channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
@@ -79,9 +80,11 @@ fn test_run() {
 
     let data_off = Payload::from_value(&Value::OnOff(OnOff::Off), &Type::OnOff).unwrap();
 
-    println!("* Spawning thread.");
+    println!("[test_run] * Spawning thread.");
     thread::spawn(move || {
+        println!("[test_run] In thread. rx = {:?}", rx);
         for msg in rx {
+            println!("[test_run] * In for loop. msg = {:?}", msg);
             if let Event::Env(FakeEnvEvent::Done) = msg {
                 tx_done.send(()).unwrap();
             } else if let Event::Env(FakeEnvEvent::Send { id, value }) = msg {
@@ -93,7 +96,7 @@ fn test_run() {
         }
     });
 
-    println!("* Preparing script.");
+    println!("[test_run] * Preparing script.");
     let script_1 = Script {
         name: "Test script".to_owned(),
         rules: vec![
@@ -133,10 +136,10 @@ fn test_run() {
     let setter_id_2 = Id::<Channel>::new("Setter 2");
     let setter_id_3 = Id::<Channel>::new("Setter 3");
 
-    println!("* We can start executing a trivial rule.");
+    println!("[test_run] * We can start executing a trivial rule.");
     exec.start(env.clone(), script_1, User::None, tx_run).unwrap();
 
-    println!("* Changing the structure of the network doesn't break the rule.");
+    println!("[test_run] * Changing the structure of the network doesn't break the rule.");
     env.execute(Instruction::AddAdapters(vec![adapter_id_1.to_string()]));
     rx_done.recv().unwrap();
 
@@ -164,17 +167,22 @@ fn test_run() {
     ]));
     rx_done.recv().unwrap();
 
-    println!("* Injecting the expected value triggers the send.");
+    println!("[test_run] * Injecting the expected value triggers the send.");
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
     ]));
 
+    println!("[test_run] after env.execute(...);");
     rx_done.recv().unwrap();
+    println!("[test_run] after rx_done.recv().unwrap();");
+    // IT HANGS JUST THE LINE BELOW //////////////////////////////////////
     let (id, value) = rx_send.recv().unwrap();
+    println!("[test_run] after rx_send.recv().unwrap();");
     assert_eq!(id, setter_id_1);
+    println!("[test_run] after assert_eq!(id, setter_id_1);");
     assert_eq!(value, Value::OnOff(OnOff::Off));
 
-    println!("* Injecting an out-of-range value does not trigger the send.");
+    println!("[test_run] * Injecting an out-of-range value does not trigger the send.");
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
     ]));
@@ -182,7 +190,7 @@ fn test_run() {
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Injecting an error does not trigger the send.");
+    println!("[test_run] * Injecting an error does not trigger the send.");
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_1.clone(), Err(APIError::TypeError(APITypeError {
             expected: Type::OnOff,
@@ -193,7 +201,7 @@ fn test_run() {
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Injecting the expected value again triggers the send again.");
+    println!("[test_run] * Injecting the expected value again triggers the send again.");
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
     ]));
@@ -203,7 +211,7 @@ fn test_run() {
     assert_eq!(id, setter_id_1);
     assert_eq!(value, Value::OnOff(OnOff::Off));
 
-    println!("* Adding a second getter doesn't break the world.");
+    println!("[test_run] * Adding a second getter doesn't break the world.");
     env.execute(Instruction::AddChannels(vec![
         Channel {
             kind: ChannelKind::LightOn,
@@ -215,7 +223,7 @@ fn test_run() {
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Changing the state of the second getter while the condition remains true with the second getter doesn't do anything.");
+    println!("[test_run] * Changing the state of the second getter while the condition remains true with the second getter doesn't do anything.");
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
     ]));
@@ -234,7 +242,7 @@ fn test_run() {
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Changing the state of the first getter while the condition remains true with the second getter doesn't do anything.");
+    println!("[test_run] * Changing the state of the first getter while the condition remains true with the second getter doesn't do anything.");
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
     ]));
@@ -253,7 +261,7 @@ fn test_run() {
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
-    println!("* If neither condition is met, the second getter can trigger the send.");
+    println!("[test_run] * If neither condition is met, the second getter can trigger the send.");
 
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
@@ -270,7 +278,7 @@ fn test_run() {
     assert_eq!(id, setter_id_1);
     assert_eq!(value, Value::OnOff(OnOff::Off));
 
-    println!("* If neither condition is met, the first getter can trigger the send.");
+    println!("[test_run] * If neither condition is met, the first getter can trigger the send.");
 
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
@@ -287,7 +295,7 @@ fn test_run() {
     assert_eq!(id, setter_id_1);
     assert_eq!(value, Value::OnOff(OnOff::Off));
 
-    println!("* If we add a second setter, it also receives these sends.");
+    println!("[test_run] * If we add a second setter, it also receives these sends.");
     env.execute(Instruction::AddChannels(vec![
         Channel {
             kind: ChannelKind::LightOn,
@@ -317,7 +325,7 @@ fn test_run() {
     assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
-    println!("* If we add a setter of a mismatched type, it does not receive these sends.");
+    println!("[test_run] * If we add a setter of a mismatched type, it does not receive these sends.");
     env.execute(Instruction::AddChannels(vec![
         Channel {
             kind: ChannelKind::Ready,
@@ -347,7 +355,7 @@ fn test_run() {
     assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
-    println!("* Removing a getter resets its condition_is_met to false.");
+    println!("[test_run] * Removing a getter resets its condition_is_met to false.");
     env.execute(Instruction::RemoveChannels(vec![
         getter_id_1.clone()
     ]));
@@ -373,7 +381,7 @@ fn test_run() {
     assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
-    println!("* Removing a setter does not prevent the other setter from receiving.");
+    println!("[test_run] * Removing a setter does not prevent the other setter from receiving.");
     env.execute(Instruction::RemoveChannels(vec![
         setter_id_1.clone()
     ]));
@@ -396,7 +404,7 @@ fn test_run() {
     assert_eq!(value, Value::OnOff(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
-    println!("* Even if a setter has errors, other setters will receive the send.");
+    println!("[test_run] * Even if a setter has errors, other setters will receive the send.");
     env.execute(Instruction::AddChannels(vec![
         Channel {
             kind: ChannelKind::LightOn,
@@ -432,7 +440,7 @@ fn test_run() {
     assert_eq!(value, Value::OnOff(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
-    println!("");
+    println!("[test_run] END");
 }
 
 
@@ -450,7 +458,9 @@ fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Channel>, Value)>, rx
 
 #[test]
 fn test_run_with_delay() {
-{    let (tx, rx) : (_, Receiver<Event>)= channel();
+{
+    println!("[test_run_with_delay] * START");
+    let (tx, rx) : (_, Receiver<Event>)= channel();
 
     let tx_env = Box::new(tx.map(|event| Event::Env(event)));
     let tx_run = tx.map(|event| Event::Run(event));
@@ -518,11 +528,11 @@ fn test_run_with_delay() {
     let setter_id_1 = Id::<Channel>::new("Setter 1");
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* We can start executing a trivial rule.");
+	println!("[test_run_with_delay] * We can start executing a trivial rule.");
     exec.start(env.clone(), script_1, User::None, tx_run).unwrap();
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* Changing the structure of the network doesn't break the rule.");
+	println!("[test_run_with_delay] * Changing the structure of the network doesn't break the rule.");
     env.execute(Instruction::AddAdapters(vec![adapter_id_1.to_string()]));
     rx_done.recv().unwrap();
 
@@ -551,7 +561,7 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* Injecting the expected value is not sufficient to trigger the send.");
+	println!("[test_run_with_delay] * Injecting the expected value is not sufficient to trigger the send.");
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
     ]));
@@ -560,7 +570,7 @@ fn test_run_with_delay() {
     rx_send.try_recv().unwrap_err();
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* Waiting until the chrono fires triggers the send.");
+	println!("[test_run_with_delay] * Waiting until the chrono fires triggers the send.");
     env.execute(Instruction::TriggerTimersUntil(TimeStamp::from(UTC::now() + ChronoDuration::seconds(15))));
     rx_done.recv().unwrap();
 
@@ -570,7 +580,7 @@ fn test_run_with_delay() {
 
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* Injecting an out-of-range value does not trigger the send, even if we wait.");
+	println!("[test_run_with_delay] * Injecting an out-of-range value does not trigger the send, even if we wait.");
     env.execute(Instruction::ResetTimers);
     rx_done.recv().unwrap();
 
@@ -586,7 +596,7 @@ fn test_run_with_delay() {
     rx_send.try_recv().unwrap_err();
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* We can cancel the send by sending an out-of-range value before the delay.");
+	println!("[test_run_with_delay] * We can cancel the send by sending an out-of-range value before the delay.");
     env.execute(Instruction::ResetTimers);
     rx_done.recv().unwrap();
 
@@ -615,7 +625,7 @@ fn test_run_with_delay() {
     rx_send.try_recv().unwrap_err();
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* A getter removal cancels the send.");
+	println!("[test_run_with_delay] * A getter removal cancels the send.");
     env.execute(Instruction::ResetTimers);
     rx_done.recv().unwrap();
 
@@ -652,7 +662,7 @@ fn test_run_with_delay() {
     rx_send.try_recv().unwrap_err();
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* With two devices, setting in-range value doesn't trigger the send immediately.");
+	println!("[test_run_with_delay] * With two devices, setting in-range value doesn't trigger the send immediately.");
     env.execute(Instruction::ResetTimers);
     rx_done.recv().unwrap();
 
@@ -684,7 +694,7 @@ fn test_run_with_delay() {
     rx_send.try_recv().unwrap_err();
 
     sleep(&rx_done, &rx_send, &rx_timer);
-	println!("* With two devices, cancelling for one device doesn't cancel for all.");
+	println!("[test_run_with_delay] * With two devices, cancelling for one device doesn't cancel for all.");
 
     env.execute(Instruction::InjectGetterValues(vec![
         (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On))),
@@ -706,13 +716,14 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Test complete, cleaning up.");
+    println!("[test_run_with_delay] * Test complete, cleaning up.");
 
     sleep(&rx_done, &rx_send, &rx_timer);
     rx_done.try_recv().unwrap_err();
     rx_send.try_recv().unwrap_err();
 
-    println!("* Cleanup complete.");}
+    println!("[test_run_with_delay] * Cleanup complete.");}
 
-    println!("* Drop complete.");
+    println!("[test_run_with_delay] * Drop complete.");
+    println!("[test_run_with_delay] END");
 }

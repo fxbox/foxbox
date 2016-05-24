@@ -11,6 +11,6 @@ CRATES="$PROJECT_PATH/components/thinkerbell"
 for crate in $CRATES; do
     cd $crate
     echo "Running tests for crate at $crate"
-    cargo test
+    cargo test -- --nocapture
     cd -
 done
