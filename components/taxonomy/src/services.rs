@@ -9,10 +9,6 @@
 use parse::*;
 use values::*;
 pub use util::{ Exactly, Id, AdapterId, ServiceId, KindId, TagId, VendorId };
-
-use serde::ser::Serializer;
-use serde::de::{ Deserializer, Error };
-
 use std::hash::{ Hash, Hasher };
 use std::collections::{ HashSet, HashMap };
 

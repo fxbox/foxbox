@@ -243,7 +243,7 @@ impl<K> Parser<Targetted<K, Exactly<(Payload, Type)>>> for Targetted<K, Exactly<
     fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
         let select = try!(path.push("select", |path| Vec::<K>::take(path, source, "select")));
         if let Some(&JSON::String(ref str)) = source.find("range") {
-            if &str as &str == "Never" {
+            if str == "Never" {
                 return Ok(Targetted {
                     select: select,
                     payload: Exactly::Never

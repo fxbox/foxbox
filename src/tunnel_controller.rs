@@ -5,7 +5,6 @@
 use foxbox_core::managed_process::ManagedProcess;
 
 // Assumes Unix
-use std::io::prelude::*;
 use std::process::{ Child, Command };
 use std::io::Result;
 use url::{ SchemeData, Url };
