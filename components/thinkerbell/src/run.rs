@@ -7,8 +7,8 @@ use compile;
 
 use foxbox_taxonomy::api;
 use foxbox_taxonomy::api::{ API, Error as APIError, Targetted, User, WatchEvent };
+use foxbox_taxonomy::channel::Channel;
 use foxbox_taxonomy::io::*;
-use foxbox_taxonomy::services::Channel;
 use foxbox_taxonomy::util::{ Exactly, Id };
 use foxbox_taxonomy::values::{ Duration, Type, Value };
 

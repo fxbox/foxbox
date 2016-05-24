@@ -10,6 +10,7 @@ use foxbox_thinkerbell::run::*;
 use foxbox_thinkerbell::ast::*;
 
 use foxbox_taxonomy::api::{ Error as APIError, User };
+use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::io::*;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
@@ -103,7 +104,7 @@ fn test_run() {
                         source: vec![
                             ChannelSelector::new()
                         ],
-                        kind: ChannelKind::LightOn,
+                        feature: Id::new("light/is-on"),
                         range: Range::Eq(Value::OnOff(OnOff::On)),
                         duration: None,
                         phantom: PhantomData
@@ -115,7 +116,7 @@ fn test_run() {
                             ChannelSelector::new()
                         ],
                         value: data_off,
-                        kind: ChannelKind::LightOn,
+                        feature: Id::new("light/is-on"),
                         phantom: PhantomData,
                     }
                 ],
@@ -147,19 +148,23 @@ fn test_run() {
 
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::LightOn,
-            supports_fetch: true,
-            supports_watch: true,
-            .. Channel::empty(&getter_id_1, &service_id_1, &adapter_id_1)
+            id: getter_id_1.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_send: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::LightOn,
-            supports_send: true,
-            .. Channel::empty(&setter_id_1, &service_id_1, &adapter_id_1)
+            id: setter_id_1.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_fetch: None,
+            supports_watch: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
@@ -206,10 +211,11 @@ fn test_run() {
     println!("* Adding a second getter doesn't break the world.");
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::LightOn,
-            supports_fetch: true,
-            supports_watch: true,
-            .. Channel::empty(&getter_id_2, &service_id_1, &adapter_id_1)
+            id: getter_id_2.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_send: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
@@ -290,9 +296,12 @@ fn test_run() {
     println!("* If we add a second setter, it also receives these sends.");
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::LightOn,
-            supports_send: true,
-            .. Channel::empty(&setter_id_2, &service_id_1, &adapter_id_1)
+            id: setter_id_2.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_fetch: None,
+            supports_watch: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
@@ -320,9 +329,12 @@ fn test_run() {
     println!("* If we add a setter of a mismatched type, it does not receive these sends.");
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::Ready,
-            supports_send: true,
-            .. Channel::empty(&setter_id_3, &service_id_1, &adapter_id_1)
+            id: setter_id_3.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_fetch: None,
+            supports_watch: None,
+            .. AVAILABLE.clone()
         }
     ]));
     rx_done.recv().unwrap();
@@ -399,9 +411,12 @@ fn test_run() {
     println!("* Even if a setter has errors, other setters will receive the send.");
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::LightOn,
-            supports_send: true,
-            .. Channel::empty(&setter_id_1, &service_id_1, &adapter_id_1)
+            id: setter_id_1.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_watch: None,
+            supports_fetch: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
@@ -489,7 +504,7 @@ fn test_run_with_delay() {
                         source: vec![
                             ChannelSelector::new()
                         ],
-                        kind: ChannelKind::LightOn,
+                        feature: Id::new("light/is-on"),
                         range: Range::Eq(Value::OnOff(OnOff::On)),
                         duration: Some(Duration::from(chrono::Duration::seconds(10))),
                         phantom: PhantomData
@@ -501,7 +516,7 @@ fn test_run_with_delay() {
                             ChannelSelector::new()
                         ],
                         value: data_off,
-                        kind: ChannelKind::LightOn,
+                        feature: Id::new("light/is-on"),
                         phantom: PhantomData,
                     }
                 ],
@@ -530,22 +545,25 @@ fn test_run_with_delay() {
         Service::empty(&service_id_1, &adapter_id_1)
     ]));
     rx_done.recv().unwrap();
-
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::LightOn,
-            supports_fetch: true,
-            supports_watch: true,
-            .. Channel::empty(&getter_id_1, &service_id_1, &adapter_id_1)
+            id: getter_id_1.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_send: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::LightOn,
-            supports_send: true,
-            .. Channel::empty(&setter_id_1, &service_id_1, &adapter_id_1)
+            id: setter_id_1.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_fetch: None,
+            supports_watch: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
@@ -658,10 +676,11 @@ fn test_run_with_delay() {
 
     env.execute(Instruction::AddChannels(vec![
         Channel {
-            kind: ChannelKind::LightOn,
-            supports_fetch: true,
-            supports_watch: true,
-            .. Channel::empty(&getter_id_1, &service_id_1, &adapter_id_1)
+            id: getter_id_1.clone(),
+            service: service_id_1.clone(),
+            adapter: adapter_id_1.clone(),
+            supports_send: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
