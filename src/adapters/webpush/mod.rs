@@ -44,8 +44,6 @@ header! { (Ttl, "TTL") => [u32] }
 static ADAPTER_NAME: &'static str = "WebPush adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
 static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
-// This user identifier will be used when authentication is disabled.
-static NO_AUTH_USER_ID: i32 = -1;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Subscription {
@@ -227,22 +225,14 @@ impl<C: Controller> Adapter for WebPush<C> {
 
     fn fetch_values(&self, mut set: Vec<Id<Channel>>, user: User) -> ResultMap<Id<Channel>, Option<Value>, Error> {
         set.drain(..).map(|id| {
-            let user_id = if cfg!(feature = "authentication") {
-                match user {
-                    User::None => {
-                        return (id,
-                                Err(Error::InternalError(InternalError::GenericError("Cannot fetch from this channel without a user.".to_owned()))));
-                    },
-                    User::Id(id) => id
-                }
-            } else {
-                NO_AUTH_USER_ID
-            };
-
+            if cfg!(feature = "authentication") && (user == User::None) {
+                return (id,
+                        Err(Error::InternalError(InternalError::GenericError("Cannot fetch from this channel without a user.".to_owned()))));
+            }
             macro_rules! getter_api {
                 ($getter:ident, $getter_id:ident, $getter_type:ident) => (
                     if id == self.$getter_id {
-                        match self.$getter(user_id) {
+                        match self.$getter(&user) {
                             Ok(data) => {
                                 let rsp = $getter_type::new(data);
                                 return (id, Ok(Some(Value::new(Json(serde_json::to_value(&rsp))))));
@@ -261,22 +251,15 @@ impl<C: Controller> Adapter for WebPush<C> {
 
     fn send_values(&self, mut values: HashMap<Id<Channel>, Value>, user: User) -> ResultMap<Id<Channel>, (), Error> {
         values.drain().map(|(id, value)| {
-            let user_id = if cfg!(feature = "authentication") {
-                match user {
-                    User::None => {
-                        return (id,
-                            Err(Error::InternalError(InternalError::GenericError("Cannot send to this channel without a user.".to_owned()))));
-                    },
-                    User::Id(id) => id
-                }
-            } else {
-                NO_AUTH_USER_ID
-            };
+            if cfg!(feature = "authentication") && (user == User::None) {
+                return (id,
+                        Err(Error::InternalError(InternalError::GenericError("Cannot send to this channel without a user.".to_owned()))));
+            }
 
             if id == self.channel_notify_id {
                 match value.cast::<WebPushNotify>() {
                     Ok(notification) => {
-                        match self.set_notify(user_id, notification) {
+                        match self.set_notify(&user, notification) {
                             Ok(_) => return (id, Ok(())),
                             Err(err) => return (id, Err(Error::InternalError(InternalError::GenericError(format!("Database error: {}", err)))))
                         }
@@ -297,7 +280,7 @@ impl<C: Controller> Adapter for WebPush<C> {
                         let data: Result<$setter_type, _> = serde_json::from_value(json_value.clone());
                         match data {
                             Ok(x) => {
-                                self.$setter(user_id, &x).unwrap();
+                                self.$setter(&user, &x).unwrap();
                                 return (id, Ok(()));
                             }
                             Err(err) => return (id, Err(Error::InternalError(InternalError::GenericError(format!("While handling {}, cannot serialize value: {}, {:?}", $setter_name, err, json_value)))))
@@ -382,40 +365,40 @@ impl<C: Controller> WebPush<C> {
         db::WebPushDb::new(&self.controller.get_profile().path_for("webpush.sqlite"))
     }
 
-    fn set_subscribe(&self, user_id: i32, setter: &SubscriptionGetter) -> rusqlite::Result<()> {
+    fn set_subscribe(&self, user: &User, setter: &SubscriptionGetter) -> rusqlite::Result<()> {
         let db = self.get_db();
         for sub in &setter.subscriptions {
-            try!(db.subscribe(user_id, sub));
+            try!(db.subscribe(&user, sub));
         }
         Ok(())
     }
 
-    fn set_unsubscribe(&self, user_id: i32, setter: &SubscriptionGetter) -> rusqlite::Result<()> {
+    fn set_unsubscribe(&self, user: &User, setter: &SubscriptionGetter) -> rusqlite::Result<()> {
         let db = self.get_db();
         for sub in &setter.subscriptions {
-            try!(db.unsubscribe(user_id, &sub.push_uri));
+            try!(db.unsubscribe(&user, &sub.push_uri));
         }
         Ok(())
     }
 
-    fn set_resources(&self, user_id: i32, setter: &ResourceGetter) -> rusqlite::Result<()> {
-        try!(self.get_db().set_resources(user_id, &setter.resources));
+    fn set_resources(&self, user: &User, setter: &ResourceGetter) -> rusqlite::Result<()> {
+        try!(self.get_db().set_resources(&user, &setter.resources));
         Ok(())
     }
 
-    fn get_resources(&self, user_id: i32) -> rusqlite::Result<Vec<String>> {
-        self.get_db().get_resources(user_id)
+    fn get_resources(&self, user: &User) -> rusqlite::Result<Vec<String>> {
+        self.get_db().get_resources(user)
     }
 
-    fn get_subscriptions(&self, user_id: i32) -> rusqlite::Result<Vec<Subscription>> {
-        self.get_db().get_subscriptions(user_id)
+    fn get_subscriptions(&self, user: &User) -> rusqlite::Result<Vec<Subscription>> {
+        self.get_db().get_subscriptions(user)
     }
 
     fn get_resource_subscriptions(&self, resource: &str) -> rusqlite::Result<Vec<Subscription>> {
         self.get_db().get_resource_subscriptions(resource)
     }
 
-    fn set_notify(&self, _: i32, setter: &WebPushNotify) -> rusqlite::Result<()> {
+    fn set_notify(&self, _: &User, setter: &WebPushNotify) -> rusqlite::Result<()> {
         info!("notify on resource {}: {}", setter.resource, setter.message);
 
         let subscriptions = try!(self.get_resource_subscriptions(&setter.resource));

@@ -351,7 +351,7 @@ describe! binary_getter {
         use foxbox_taxonomy::services::*;
         use foxbox_taxonomy::values::{ format, Value, Binary };
         use iron::Headers;
-        use iron::headers::{ Authorization, Bearer, ContentLength, ContentType };
+        use iron::headers::{ ContentLength, ContentType };
         use iron_test::{ request, response };
         use mount::Mount;
         use std::collections::HashMap;
@@ -387,7 +387,7 @@ describe! binary_getter {
 
             fn fetch_values(&self, mut set: Vec<Id<Channel>>, user: User)
                 -> ResultMap<Id<Channel>, Option<Value>, Error> {
-                assert_eq!(user, User::Id(2));
+                assert_eq!(user, User::None);
                 set.drain(..).map(|id| {
                     if id == Id::new("getter:binary@link.mozilla.org") {
                         let vec = vec![1, 2, 3, 10, 11, 12];
@@ -441,15 +441,8 @@ describe! binary_getter {
         let mut mount = Mount::new();
         mount.mount("/api/v1", create(ControllerStub::new(), &taxo_manager));
 
-        // Token payload is { "id": 2, "name": "admin" }
-        let token = "eyJ0eXAiOiJKV1QiLCJraWQiOm51bGwsImFsZyI6IkhTMjU2In0.eyJpZCI\
-                     6MiwibmFtZSI6ImFkbWluIn0.JNtvokupDl2hdqB+vER15y89qigPc4FviZfJOSR1Vso";
-
-        let mut headers = Headers::new();
-        headers.set(Authorization(Bearer { token: token.to_owned() }));
-
         let response = request::put("http://localhost:3000/api/v1/channels/get",
-                                    headers,
+                                    Headers::new(),
                                     r#"[{"id":"getter:binary@link.mozilla.org"}]"#,
                                     &mount).unwrap();
 
