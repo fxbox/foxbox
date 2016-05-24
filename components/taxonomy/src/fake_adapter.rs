@@ -3,7 +3,6 @@
 use adapter::*;
 
 use api::{ Error, User };
-use selector::*;
 use services::*;
 use values::*;
 

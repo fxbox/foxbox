@@ -31,7 +31,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use traits::Controller;
-use transformable_channels::mpsc::*;
 
 header! { (Encryption, "Encryption") => [String] }
 header! { (EncryptionKey, "Encryption-Key") => [String] }

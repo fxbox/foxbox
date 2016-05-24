@@ -170,7 +170,7 @@ impl Tagged for Channel {
     fn remove_tags(&mut self, tags: &[Id<TagId>]) -> bool {
         let mut has_changed = false;
         for tag in tags {
-            if self.tags.remove(&tag) {
+            if self.tags.remove(tag) {
                 has_changed = true;
             }
         }
@@ -341,7 +341,7 @@ impl State {
     /// Auxiliary function to remove a service, once the mutex has been acquired.
     /// Clients should rather use AdapterManager::remove_service.
     fn aux_remove_service(&mut self, id: &Id<ServiceId>) -> Result<Id<AdapterId>, Error> {
-        let (adapter, service) = match self.service_by_id.remove(&id) {
+        let (adapter, service) = match self.service_by_id.remove(id) {
             None => return Err(Error::InternalError(InternalError::NoSuchService(id.clone()))),
             Some(service) => {
                 let adapter = service.borrow().adapter.clone();
@@ -360,7 +360,7 @@ impl State {
         let mut store = match self.db_path {
             // Even if we have a path, TagStorage opens the underlying database lazily,
             // so this is cheap.
-            Some(ref path) => Some(TagStorage::new(&path)),
+            Some(ref path) => Some(TagStorage::new(path)),
             None => None
         };
 
@@ -627,7 +627,7 @@ impl State {
         {
             if let Some(ref path) = self.db_path {
                 // Update the service's tag set with the full set from the database.
-                let mut store = TagStorage::new(&path);
+                let mut store = TagStorage::new(path);
                 let tags = match store.get_tags_for(&id) {
                     Err(err) => return Err(Error::InternalError(InternalError::GenericError(format!("{}", err)))),
                     Ok(tags) => tags
@@ -698,7 +698,7 @@ impl State {
     pub fn add_channel(&mut self, mut setter: Channel) -> Result<WatchRequest, Error> {
         // Add the database tags to this setter.
         if let Some(ref path) = self.db_path {
-            let mut store = TagStorage::new(&path);
+            let mut store = TagStorage::new(path);
             // Add all the tags for this channel.
             if let Ok(all_tags) = store.get_tags_for(&setter.id) {
                 setter.insert_tags(&all_tags);
@@ -750,7 +750,7 @@ impl State {
         Self::aux_channel_may_need_unregistration(&mut *channel.borrow_mut(), true);
 
         let service_id = &channel.borrow().channel.service;
-        match self.service_by_id.get_mut(&service_id) {
+        match self.service_by_id.get_mut(service_id) {
             None => Err(Error::InternalError(InternalError::NoSuchService(service_id.clone()))),
             Some(service) => {
                 if service.borrow_mut().channels.remove(id).is_none() {
@@ -804,7 +804,7 @@ impl State {
             }
 
             for tag in &tags {
-                let _ = tag_set.remove(&tag);
+                let _ = tag_set.remove(tag);
             }
             result += 1;
         });
@@ -828,7 +828,7 @@ impl State {
                 // This channel has changed, we may need to update watches and the tags database.
                 if data.insert_tags(&tags) {
                     if let Some(ref path) = db_path {
-                        let mut store = TagStorage::new(&path);
+                        let mut store = TagStorage::new(path);
                         store.add_tags(&data.id, &tags)
                              .unwrap_or_else(|err| { error!("Storage add_tags error: {}", err); });
                     }
@@ -847,7 +847,7 @@ impl State {
         Self::with_channels_mut(selectors, &mut self.channel_by_id, |mut data| {
             if data.remove_tags(&tags) {
                 if let Some(ref path) = db_path {
-                    let mut store = TagStorage::new(&path);
+                    let mut store = TagStorage::new(path);
                     store.remove_tags(&data.id, &tags)
                          .unwrap_or_else(|err| { error!("Storage remove_tags error: {}", err); });
                 }
