@@ -1,6 +1,6 @@
 sudo: required
 
-os: osx
+os: linux
 
 language: rust
 rust:

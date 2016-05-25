@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -ev
 
 CURRENT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -23,18 +23,9 @@ set_up_tests() {
     echo "set_up_tests: no set up required. Skipping..."
 }
 
-_e2e_tests() {
-    git clone https://github.com/fxbox/app.git
-    cd app
-    npm install
-    npm install -g gulp
-    gulp test-e2e
-}
-
 run_tests() {
+    echo "run_tests: no selenium installed. Skipping..."
     echo "run_tests: no npm installed. Skipping integration tests..."
     echo "run_tests: kcov is not supported on Mac. Running only the tests..."
-
-    _e2e_tests
     "$CURRENT_PATH/execute-all-rust-tests.sh"
 }

@@ -31,9 +31,18 @@ _set_up_selenium_tests() {
     npm install
 }
 
+_e2e_tests() {
+    git clone https://github.com/fxbox/app.git
+    cd app
+    npm install
+    npm install -g gulp
+    gulp test-e2e
+}
+
 set_up_tests() {
     _set_up_unit_tests
     _set_up_selenium_tests
+    _e2e_tests
 }
 
 run_tests() {
