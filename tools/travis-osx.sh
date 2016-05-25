@@ -11,7 +11,6 @@ install_dependencies() {
     source "$CURRENT_PATH/mac-os-x-setup.source.sh"
 }
 
-
 build() {
     cargo build
 }
