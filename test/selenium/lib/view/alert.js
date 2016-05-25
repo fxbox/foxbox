@@ -1,3 +1,5 @@
+'use strict';
+
 const until = require('selenium-webdriver').until;
 
 
@@ -8,11 +10,11 @@ function AlertWrapper(driver) {
 AlertWrapper.prototype = {
 
   get message() {
-    return this._waitForAlert().then(alert => alert.getText())
+    return this._waitForAlert().then(alert => alert.getText());
   },
 
   accept() {
-    return this._waitForAlert().then(alert => alert.accept())
+    return this._waitForAlert().then(alert => alert.accept());
   },
 
   _waitForAlert() {

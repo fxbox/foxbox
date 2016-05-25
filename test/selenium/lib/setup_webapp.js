@@ -4,17 +4,15 @@ const webdriver = require('selenium-webdriver');
 const SetUpView = require('./view/set_up/view.js');
 const SignInPageView = require('./view/sign_in/view.js');
 const MainView = require('./view/app_main/view.js');
-const Capabilities = require('selenium-webdriver/lib/capabilities').Capabilities;
+var firefoxCapabilities = require('selenium-webdriver/lib/capabilities')
+  .Capabilities.firefox();
 
-var capabilities = Capabilities.firefox();
-capabilities.set('marionette', true);
-const driverBuilder = new webdriver.Builder().withCapabilities(capabilities);
-
-console.log(driverBuilder.getCapabilities());
+firefoxCapabilities.set('marionette', true);
+const driverBuilder = new webdriver.Builder()
+  .withCapabilities(firefoxCapabilities);
 
 
 function SetUpWebapp(url) {
-  console.log('started driver', url);
   this.url = url;
   this.driver = driverBuilder.build();
 }
