@@ -1,6 +1,7 @@
 sudo: required
 
 os:
+  - osx
   - linux
 
 dist: trusty
@@ -9,11 +10,19 @@ language: rust
 rust:
   # Make sure to also update the nightly version for the arm_cross_compile branch of the matrix.
   - nightly-2016-05-22
+  - nightly
 
 matrix:
   fast_finish: true
   allow_failures:
     - rust: nightly
+  include:
+    - os: linux
+      rust: nightly-2016-05-22
+      env: BUILD_ENV=-arm_cross_compile
+    - os: linux
+      rust: nightly
+      env: BUILD_ENV=-cargo_update
 
 addons:
   firefox: latest

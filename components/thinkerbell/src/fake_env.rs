@@ -120,56 +120,38 @@ impl TestSharedAdapterBackend {
 
     fn inject_getter_values(&mut self, mut values: Vec<(Id<Channel>, Result<Value, Error>)>)
     {
-        println!("inject_getter_values: START. values = {:?}", values);
         for (id, value) in values.drain(..) {
-            println!("inject_getter_values: in loop. id = {:?}, value = {:?}", id, value);
             let old = self.getter_values.insert(id.clone(), value.clone());
             match value {
-                Err(err) => {
-                    println!("inject_getter_values: Value has failed! err = {:?}", err);
-                    continue
-                },
+                Err(_) => continue,
                 Ok(value) => {
-                    println!("inject_getter_values: Value is okay! value = {:?}. {:?} watchers to update", value, self.watchers.len());
                     for watcher in self.watchers.values() {
-                        println!("inject_getter_values: in for loop. fetching watcher details ");
                         let (ref watched_id, ref range, ref cb) = *watcher;
-                        println!("inject_getter_values: after ref got. watcher_id = {:?}, id = {:?}", *watched_id, id);
                         if *watched_id != id {
-                            println!("inject_getter_values: watchers didn't match!");
                             continue;
                         }
                         if let Some(ref range) = *range {
-                            println!("inject_getter_values: range match");
                             let was_met = if let Some(Ok(ref value)) = old {
-                                println!("inject_getter_values: in range check. range = {:?}, value = {:?}", range, value);
                                 range.contains(value)
                             } else {
-                                println!("inject_getter_values: wasn't met");
                                 false
                             };
                             match (was_met, range.contains(&value)) {
                                 (false, true) => {
-                                    println!("inject_getter_values: false true");
                                     let _ = cb.send(WatchEvent::Enter {
                                         id: id.clone(),
                                         value: value.clone()
                                     });
                                 }
                                 (true, false) => {
-                                    println!("inject_getter_values: true false");
                                     let _ = cb.send(WatchEvent::Exit {
                                         id: id.clone(),
                                         value: value.clone()
                                     });
                                 }
-                                _ => {
-                                    println!("inject_getter_values: nothing matched, continuing");
-                                    continue
-                                }
+                                _ => continue
                             }
                         } else {
-                            println!("inject_getter_values: range didn't match");
                             let _ = cb.send(WatchEvent::Enter {
                                 id: id.clone(),
                                 value: value.clone()
@@ -211,11 +193,8 @@ impl TestSharedAdapterBackend {
                 let _ = self.remove_watch(key);
             }
             InjectGetterValues(values, tx) => {
-                println!("execute: InjectGetterValues. values = {:?}", values);
                 let _ = self.inject_getter_values(values);
-                println!("execute: InjectGetterValues. after inject_getter_values()");
                 let _ = tx.send(FakeEnvEvent::Done);
-                println!("execute: InjectGetterValues. after tx.send()");
             }
             InjectSetterErrors(errors, tx) => {
                 let _ = self.inject_setter_errors(errors);
@@ -344,7 +323,6 @@ impl Adapter for TestAdapter {
     fn register_watch(&self, source: Vec<(Id<Channel>, Option<Value>, Box<ExtSender<WatchEvent<Value>>>)>) ->
             Vec<(Id<Channel>, Result<Box<AdapterWatchGuard>, Error>)>
     {
-        println!("register_watch: START");
         let (tx, rx) = channel();
         self.back_end.lock().unwrap().send(AdapterOp::Watch {
             source: source,
@@ -577,3 +555,6 @@ enum AdapterOp {
     TriggerTimersUntil(TimeStamp, Box<ExtSender<FakeEnvEvent>>),
     ResetTimers(Box<ExtSender<FakeEnvEvent>>),
 }
+
+
+
