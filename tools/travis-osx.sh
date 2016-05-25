@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ev
+set -ex
 
 CURRENT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -26,8 +26,8 @@ set_up_tests() {
 _e2e_tests() {
     git clone https://github.com/fxbox/app.git
     cd app
-    npm install -g gulp
     npm install
+    npm install -g gulp
     gulp test-e2e
 }
 
