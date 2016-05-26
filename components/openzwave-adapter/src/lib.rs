@@ -172,7 +172,7 @@ fn set_ozw_vid_from_taxo_value(vid: &ValueID, value: Value) -> Result<(), TaxoEr
                 //Value::OnOff(onOff) => { vid.set_bool(onOff == OnOff::On) } // TODO support switches
                 Value::OpenClosed(open_closed) => { vid.set_bool(open_closed == OpenClosed::Open) }
                 Value::DoorLocked(locked_unlocked) => { vid.set_bool(locked_unlocked == DoorLocked::Locked) }
-                _ => { return Err(TaxoError::InvalidValue(value)) } // TODO InvalidType would be better but we'll need to fix specific types for specific TaxoIds
+                _ => { return Err(TaxoError::InvalidValue) } // TODO InvalidType would be better but we'll need to fix specific types for specific TaxoIds
             }
         }
         _ => { return Err(TaxoError::InternalError(InternalError::GenericError(format!("Unsupported OZW type: {:?}", vid.get_type())))) }
@@ -192,7 +192,7 @@ fn start_including(ozw: &ZWaveManager, home_id: u32, value: &Value) -> Result<()
             info!("[OpenZWaveAdapter] Controller on network {} is awaiting an include in {} mode, please do the appropriate steps to include a device.", home_id, is_secure);
             Ok(())
         }
-        _ => Err(TaxoError::TypeError(TypeError { expected: Type::IsSecure, got: value.get_type() }))
+        _ => Err(TaxoError::TypeError(TypeError { expected: Type::IsSecure.name(), got: value.get_type().name() }))
     }
 }
 
