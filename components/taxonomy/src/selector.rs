@@ -42,18 +42,6 @@ pub trait ServiceLike {
     fn id(&self) -> &Id<ServiceId>;
     fn adapter(&self) -> &Id<AdapterId>;
     fn with_tags<F>(&self, f: F) -> bool where F: Fn(&HashSet<Id<TagId>>) -> bool;
-    #[deprecated]
-    fn has_setters<F>(&self, f: F) -> bool where F: Fn(&Channel) -> bool {
-        self.has_channels(|chan| {
-            chan.supports_send.is_some() && f(chan)
-        })
-    }
-    #[deprecated]
-    fn has_getters<F>(&self, f: F) -> bool where F: Fn(&Channel) -> bool {
-        self.has_channels(|chan| {
-            chan.supports_fetch.is_some() && f(chan)
-        })
-    }
     fn has_channels<F>(&self, f: F) -> bool where F: Fn(&Channel) -> bool;
 }
 
@@ -88,7 +76,7 @@ impl ServiceLike for Service {
 ///
 /// let selector = ServiceSelector::new()
 ///   .with_tags(vec![Id::<TagId>::new("entrance")])
-///   .with_getters(vec![ChannelSelector::new() /* can be more restrictive */]);
+///   .with_channels(vec![ChannelSelector::new() /* can be more restrictive */]);
 /// ```
 ///
 /// # JSON
@@ -97,9 +85,7 @@ impl ServiceLike for Service {
 ///
 /// - (optional) string `id`: accept only a service with a given id;
 /// - (optional) array of string `tags`:  accept only services with all the tags in the array;
-/// - (optional) array of objects `getters` (see `ChannelSelector`): accept only services with
-///    channels matching all the selectors in this array;
-/// - (optional) array of objects `setters` (see `ChannelSelector`): accept only services with
+/// - (optional) array of objects `channels` (see `ChannelSelector`): accept only services with
 ///    channels matching all the selectors in this array;
 ///
 /// While each field is optional, at least one field must be provided.
@@ -133,11 +119,8 @@ pub struct ServiceSelector {
     ///  Restrict results to services that have all the tags in `tags`.
     pub tags: HashSet<Id<TagId>>,
 
-    /// Restrict results to services that have all the getters in `getters`.
-    pub getters: Vec<ChannelSelector>,
-
-    /// Restrict results to services that have all the setters in `setters`.
-    pub setters: Vec<ChannelSelector>,
+    /// Restrict results to services that have all the channels in `channels`.
+    pub channels: Vec<ChannelSelector>,
 
     /// Make sure that we can't instantiate from another crate.
     private: (),
@@ -164,15 +147,7 @@ impl Parser<ServiceSelector> for ServiceSelector {
             }
             Some(Err(err)) => return Err(err),
         };
-        let getters = match path.push("getters", |path| ChannelSelector::take_vec_opt(path, source, "getters")) {
-            None => vec![],
-            Some(Ok(vec)) => {
-                is_empty = false;
-                vec
-            }
-            Some(Err(err)) => return Err(err)
-        };
-        let setters = match path.push("setters", |path| ChannelSelector::take_vec_opt(path, source, "setters")) {
+        let channels = match path.push("channels", |path| ChannelSelector::take_vec_opt(path, source, "channels")) {
             None => vec![],
             Some(Ok(vec)) => {
                 is_empty = false;
@@ -187,8 +162,7 @@ impl Parser<ServiceSelector> for ServiceSelector {
             Ok(ServiceSelector {
                 id: id,
                 tags: tags,
-                getters: getters,
-                setters: setters,
+                channels: channels,
                 private: ()
             })
         }
@@ -217,18 +191,10 @@ impl ServiceSelector {
         }
     }
 
-    /// Restrict results to services that have all the getters in `getters`.
-    pub fn with_getters(mut self, mut getters: Vec<ChannelSelector>) -> Self {
+    /// Restrict results to services that have all the channels in `channels`.
+    pub fn with_channels(mut self, mut channels: Vec<ChannelSelector>) -> Self {
         ServiceSelector {
-            getters: {self.getters.append(&mut getters); self.getters},
-            .. self
-        }
-    }
-
-    /// Restrict results to services that have all the setters in `setters`.
-    pub fn with_setters(mut self, mut setters: Vec<ChannelSelector>) -> Self {
-        ServiceSelector {
-            setters: {self.setters.append(&mut setters); self.setters},
+            channels: {self.channels.append(&mut channels); self.channels},
             .. self
         }
     }
@@ -238,8 +204,7 @@ impl ServiceSelector {
         ServiceSelector {
             id: self.id.and(other.id),
             tags: self.tags.union(&other.tags).cloned().collect(),
-            getters: {self.getters.append(&mut other.getters); self.getters},
-            setters: {self.setters.append(&mut other.setters); self.setters},
+            channels: { self.channels.append(&mut other.channels); self.channels },
             private: (),
         }
     }
@@ -255,24 +220,15 @@ impl ServiceSelector {
         }
         // If any of the getter selectors doesn't find a getter,
         // we don't match.
-        let getters_fail = self.getters.iter().any(|selector| {
-            !service.has_getters(|channel| {
+        let channels_fail = self.channels.iter().any(|selector| {
+            !service.has_channels(|channel| {
                 selector.matches(&self.tags, channel)
             })
         });
-        if getters_fail {
+        if channels_fail {
             return false;
         }
-        // If any of the setter selectors doesn't find a setter,
-        // we don't match.
-        let setters_fail = self.setters.iter().any(|selector| {
-            !service.has_setters(|channel| {
-                selector.matches(&self.tags, channel)
-            })
-        });
-        if setters_fail {
-            return false;
-        }
+
         true
     }
 }
