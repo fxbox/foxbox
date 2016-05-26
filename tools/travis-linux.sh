@@ -14,8 +14,18 @@ lint() {
     echo 'nothing to do'
 }
 
+_set_up_selenium_tests() {
+    sh -e /etc/init.d/xvfb start
+    export DISPLAY=:99.0
+    wget http://selenium-release.storage.googleapis.com/2.53/selenium-server-standalone-2.53.0.jar
+    java -jar selenium-server-standalone-2.53.0.jar > /dev/null &
+    sleep 5
+    nvm install 4.2
+    nvm use 4.2
+}
+
 set_up_tests() {
-    echo 'nothing to do'
+    _set_up_selenium_tests
 }
 
 _e2e_tests() {
