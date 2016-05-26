@@ -17,10 +17,6 @@ use transformable_channels::mpsc::*;
 
 use chrono::{ DateTime, UTC };
 
-use serde::ser::{Serialize, Serializer};
-use serde::de::{Deserialize, Deserializer};
-
-
 
 static VERSION : [u32;4] = [0, 0, 0, 0];
 
@@ -511,18 +507,8 @@ impl FakeEnv {
         }
     }
 }
-impl Serialize for FakeEnv {
-    fn serialize<S>(&self, _: &mut S) -> Result<(), S::Error> where S: Serializer {
-        panic!("Why are we attempting to serialize the env?")
-    }
-}
-impl Deserialize for FakeEnv {
-    fn deserialize<D>(_: &mut D) -> Result<Self, D::Error> where D: Deserializer {
-         panic!("Why are we attempting to deserialize the env?")
-    }
-}
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug)]
 /// Instructions given to the simulator by the user.
 pub enum Instruction {
     AddAdapters(Vec<String>),
