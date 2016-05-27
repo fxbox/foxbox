@@ -31,7 +31,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use traits::Controller;
+use foxbox_core::traits::Controller;
 
 header! { (Encryption, "Encryption") => [String] }
 header! { (EncryptionKey, "Encryption-Key") => [String] }
