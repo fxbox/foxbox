@@ -357,7 +357,7 @@ impl OpenzwaveAdapter {
                             Some(kind) => kind.clone()
                         };
 
-                        let id = TaxoId::<Channel>::new(&value_id);
+                        let id = TaxoId::new(&value_id);
 
                         let mut chan = Channel {
                             id: id.clone(),
@@ -367,7 +367,7 @@ impl OpenzwaveAdapter {
                         };
 
                         if vid.is_write_only() {
-                            // For some reason, the device is configured as not being readable.
+                            // For some reason, the value is configured as not being readable.
                             // Make sure that the channel doesn't pretend the opposite.
                             chan.supports_fetch = None;
                             chan.supports_watch = None;
@@ -375,7 +375,7 @@ impl OpenzwaveAdapter {
                             getter_map.push(id.clone(), vid);
                         }
                         if vid.is_read_only() {
-                            // For some reason, the device is configured as not being writeable.
+                            // For some reason, the value is configured as not being writeable.
                             // Make sure that the channel doesn't pretend the opposite.
                             chan.supports_send = None;
                         } else {
