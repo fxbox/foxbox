@@ -22,7 +22,6 @@ hyper = "0.8.1"
 libc = "0.2.7"
 log = "0.3"
 serde_json = "0.7.0"
-serde_macros = "0.7.2"
 tls = { path = "../tls/" }
 ws = { git = "https://github.com/JohanLorenzo/ws-rs.git" , branch = "0.4.6" }
 xml-rs = "0.3.0"

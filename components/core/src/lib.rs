@@ -4,7 +4,6 @@
 
 #![feature(reflect_marker)]
 #![feature(plugin)]
-#![plugin(serde_macros)]
 
 #![plugin(clippy)]
 #![deny(clippy)]
@@ -21,8 +20,6 @@ extern crate libc;
 extern crate log;
 extern crate serde_json;
 
-#[allow(plugin_as_library)]
-extern crate serde_macros;
 extern crate tls;
 
 #[cfg(test)]
