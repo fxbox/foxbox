@@ -1,55 +1,58 @@
 'use strict';
 
-var webdriver = require('selenium-webdriver');
-var SetUpView = require('./view/sign_up/view.js');
-var SignInPageView = require('./view/sign_in/view.js');
-var MainView = require('./view/app_main/view.js');
+const webdriver = require('selenium-webdriver');
+const SetUpView = require('./view/set_up/view.js');
+const SignInPageView = require('./view/sign_in/view.js');
+const MainView = require('./view/app_main/view.js');
+var firefoxCapabilities = require('selenium-webdriver/lib/capabilities')
+  .Capabilities.firefox();
 
-const driverBuilder = new webdriver.Builder().forBrowser('firefox');
+firefoxCapabilities.set('marionette', true);
+const driverBuilder = new webdriver.Builder()
+  .withCapabilities(firefoxCapabilities);
 
 
 function SetUpWebapp(url) {
-  console.log('started driver', url);
   this.url = url;
-  this.driver = this.driver = driverBuilder.build();
+  this.driver = driverBuilder.build();
 }
 
 SetUpWebapp.prototype = {
-    init: function() {
-      return this.driver.get(this.url)
-        .then(() => this.defaultView);
-    },
+  init() {
+    return this.driver.get(this.url)
+      .then(() => this.defaultView);
+  },
 
-    clear() {
-      // Session data is not stored in cookies, but in local storage
-      return this._clearLocalStorage()
-        .then(() => this.init());
-    },
+  clear() {
+    // Session data is not stored in cookies, but in local storage
+    return this._clearLocalStorage()
+      .then(() => this.init());
+  },
 
-    _clearLocalStorage() {
-      return this.driver.executeScript('localStorage.clear();');
-    },
+  _clearLocalStorage() {
+    return this.driver.executeScript('localStorage.clear();');
+  },
 
-    stop() {
-      return this.driver.quit()
-        .then(() => { this.driver = null; });
-    },
+  stop() {
+    return this.driver.quit()
+      .then(() => { this.driver = null; });
+  },
 
-    get defaultView() {
-      return this.getSetUpView();
-    },
+  get defaultView() {
+    return this.setUpView;
+  },
 
-    getSignInPage : function() {
-      return new SignInPageView(this.driver);
-    },
+  get signInPage() {
+    return new SignInPageView(this.driver);
+  },
 
-    getSetUpView : function() {
-      return new SetUpView(this.driver);
-    },
+  get setUpView() {
+    return new SetUpView(this.driver);
+  },
 
-    getAppMainView : function() {
-      return new MainView(this.driver);
-    }
+  get appMainView() {
+    return new MainView(this.driver);
+  }
 };
 
 module.exports = SetUpWebapp;
