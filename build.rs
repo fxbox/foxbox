@@ -19,8 +19,8 @@ fn check_rustc_version() {
         return;
     }
 
-    println!("Found rustc ({} {})", hash, date);
-    panic!(r#"You need to install rustc nightly from {}, commit {}"#, RUSTC_DATE, RUSTC_HASH);
+    panic!(r#"Found rustc ({} {}), but you need to install rustc nightly from {}, commit {}"#,
+           hash, date, RUSTC_DATE, RUSTC_HASH);
 }
 
 fn update_local_git_hook() {
