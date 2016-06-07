@@ -202,12 +202,14 @@ fn main() {
                 log::LogLevel::Debug => "\x1b[1;34m",  // bold blue
                 log::LogLevel::Trace => "\x1b[1;35m"   // bold magenta
             };
-            format!("[\x1b[90m{}.{:03}\x1b[0m] {}{}{:5}\x1b[0m {}",
+            format!("[\x1b[90m{}.{:03}\x1b[0m] {}{}{:5} [{}@{}]\x1b[0m {}",
                 time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
                 t.tm_nsec / 1_000_000,
                 tid_str(),
                 level_color,
                 record.level(),
+                record.target(),
+                record.location().line(),
                 record.args()
             )
         };
@@ -216,11 +218,13 @@ fn main() {
         // Plain output formatter
         let format = |record: &LogRecord| {
             let t = time::now();
-            format!("{}.{:03} {}{:5} {}",
+            format!("{}.{:03} {}{:5} [{}@{}] {}",
                 time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
                 t.tm_nsec / 1_000_000,
                 tid_str(),
                 record.level(),
+                record.target(),
+                record.location().line(),
                 record.args()
             )
         };
