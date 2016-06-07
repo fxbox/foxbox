@@ -41,6 +41,8 @@ extern crate iron;
 extern crate iron_cors;
 #[cfg(test)]
 extern crate iron_test;
+#[macro_use]
+extern crate lazy_static;
 extern crate libc;
 #[macro_use]
 extern crate log;
