@@ -19,8 +19,9 @@ use foxbox_taxonomy::api::{ Error, InternalError, User };
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::io;
 use foxbox_taxonomy::manager::*;
+use foxbox_taxonomy::parse::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ TypeError, Value, Json, WebPushNotify };
+use foxbox_taxonomy::values::{ Data, Value, Json };
 use foxbox_taxonomy::values::format;
 
 use hyper::header::{ ContentEncoding, Encoding, Authorization };
@@ -80,6 +81,7 @@ impl ResourceGetter {
 }
 
 impl Subscription {
+    #[allow(useless_let_if_seq)] // Clippy's warning make no sense at all in this method.
     fn notify(&self, crypto: &CryptoContext, gcm_api_key: &str, message: &str) {
         // Make the record size at least the size of the encrypted message. We must
         // add 16 bytes for the encryption tag, 1 byte for padding and 1 byte to
@@ -243,7 +245,7 @@ impl<C: Controller> Adapter for WebPush<C> {
                         match self.$getter(user_id) {
                             Ok(data) => {
                                 let rsp = $getter_type::new(data);
-                                return (id, Ok(Some(Value::Json(Arc::new(Json(serde_json::to_value(&rsp)))))));
+                                return (id, Ok(Some(Value::new(Json(serde_json::to_value(&rsp))))));
                             },
                             Err(err) => return (id, Err(Error::InternalError(InternalError::GenericError(format!("Database error: {}", err)))))
                         };
@@ -272,20 +274,20 @@ impl<C: Controller> Adapter for WebPush<C> {
             };
 
             if id == self.channel_notify_id {
-                match value {
-                    Value::WebPushNotify(notification) => {
-                        match self.set_notify(user_id, &notification) {
+                match value.cast::<WebPushNotify>() {
+                    Ok(notification) => {
+                        match self.set_notify(user_id, notification) {
                             Ok(_) => return (id, Ok(())),
                             Err(err) => return (id, Err(Error::InternalError(InternalError::GenericError(format!("Database error: {}", err)))))
                         }
                     },
-                   _ => return (id, Err(Error::TypeError(TypeError::new(&WEBPUSH_NOTIFY, &value))))
+                   Err(err) => return (id, Err(err))
                 }
             }
 
-            let arc_json_value = match value {
-                Value::Json(v) => v,
-                _ => return (id, Err(Error::TypeError(TypeError::new(&format::JSON, &value))))
+            let arc_json_value = match value.cast::<Json>() {
+                Ok(v) => v,
+                Err(err) => return (id, Err(err))
             };
             let Json(ref json_value) = *arc_json_value;
 
@@ -331,9 +333,10 @@ impl<C: Controller> WebPush<C> {
             ..Channel::default()
         };
 
+        let notify_format = Arc::new(io::Format::new::<WebPushNotify>());
         try!(adapt.add_channel(Channel {
             feature: Id::new("webpush/notify-msg"),
-            supports_send: Some(Signature::accepts(Maybe::Required(WEBPUSH_NOTIFY.clone()))),
+            supports_send: Some(Signature::accepts(Maybe::Required(notify_format))),
             id: channel_notify_id,
             ..template.clone()
         }));
@@ -434,14 +437,27 @@ impl<C: Controller> WebPush<C> {
     }
 }
 
-/// Placeholder implementation.
-struct WebPushNotifyFormat;
-impl io::Format for WebPushNotifyFormat {
-    fn description(&self) -> String {
+#[derive(Debug, Clone, PartialEq)]
+pub struct WebPushNotify {
+    pub resource: String,
+    pub message: String,
+}
+
+impl Data for WebPushNotify {
+    fn description() -> String {
         "WebPushNotify".to_owned()
+    }
+    fn parse(path: Path, source: &JSON, binary: &io::BinarySource) -> Result<Self, Error> {
+        let resource = try!(path.push("resource", |path| String::parse_field(path, source, binary, "resource")));
+        let message = try!(path.push("message", |path| String::parse_field(path, source, binary, "message")));
+        Ok(WebPushNotify { resource: resource, message: message})
+    }
+    fn serialize(source: &Self, _binary: &io::BinaryTarget) -> Result<JSON, Error> {
+        let json = vec![
+            ("resource", &source.resource),
+            ("message", &source.message),
+        ].to_json();
+        Ok(json)
     }
 }
 
-lazy_static! {
-    static ref WEBPUSH_NOTIFY : Arc<io::Format> = Arc::new(WebPushNotifyFormat);
-}
