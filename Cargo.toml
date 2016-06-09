@@ -11,8 +11,9 @@ exclude = [ "**/*.conf", "**/*.json",
           ]
 
 [features]
-default = ["authentication"]
+default = ["authentication", "zwave"]
 authentication = []
+zwave = ["openzwave-adapter"]
 
 [replace]
 "iron:0.3.0" = { path = "iron-fork/" }
@@ -25,7 +26,7 @@ rustc_version = "0.1.7"
 foxbox_core = { path = "components/core/" }
 foxbox_thinkerbell = { path = "components/thinkerbell/" }
 foxbox_taxonomy = { path = "components/taxonomy/" }
-openzwave-adapter = { path = "components/openzwave-adapter/" }
+openzwave-adapter = { path = "components/openzwave-adapter/", optional = true }
 tls = { path = "components/tls/" }
 
 foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "d4e5277" }
