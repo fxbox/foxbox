@@ -148,7 +148,7 @@ fn ozw_vid_as_taxo_value(vid: &ValueID) -> Option<Value> {
                 if ref_eq(kind, &DOOR_IS_OPEN) {
                     Some(Value::new(if value {OpenClosed::Open} else {OpenClosed::Closed}))
                 } else if ref_eq(kind, &DOOR_IS_LOCKED) {
-                    Some(Value::new(if value {DoorLocked::Locked} else {DoorLocked::Unlocked}))
+                    Some(Value::new(if value {IsLocked::Locked} else {IsLocked::Unlocked}))
                 } else {
                     None
                 }
@@ -170,8 +170,8 @@ fn set_ozw_vid_from_taxo_value(vid: &ValueID, value: Value) -> Result<(), TaxoEr
         ValueType::ValueType_Bool => {
             if let Some(open_closed) = value.downcast::<OpenClosed>() {
                 vid.set_bool(*open_closed == OpenClosed::Open)
-            } else if let Some(locked_unlocked) = value.downcast::<DoorLocked>() {
-                vid.set_bool(*locked_unlocked == DoorLocked::Locked)
+            } else if let Some(locked_unlocked) = value.downcast::<IsLocked>() {
+                vid.set_bool(*locked_unlocked == IsLocked::Locked)
             } else {
                 return Err(TaxoError::InvalidValue) // TODO InvalidType would be better but we'll need to fix specific types for specific TaxoIds
             }

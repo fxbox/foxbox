@@ -419,7 +419,7 @@ impl Data for OpenClosed {
 ///
 /// Values of this type are represented by strings "Locked" | "Unlocked".
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum DoorLocked {
+pub enum IsLocked {
     /// # JSON
     ///
     /// Represented by "Locked".
@@ -428,10 +428,10 @@ pub enum DoorLocked {
     /// use foxbox_taxonomy::values::*;
     /// use foxbox_taxonomy::parse::*;
     ///
-    /// let parsed = DoorLocked::from_str("\"Locked\"").unwrap();
-    /// assert_eq!(parsed, DoorLocked::Locked);
+    /// let parsed = IsLocked::from_str("\"Locked\"").unwrap();
+    /// assert_eq!(parsed, IsLocked::Locked);
     ///
-    /// let serialized: JSON = DoorLocked::Locked.to_json();
+    /// let serialized: JSON = IsLocked::Locked.to_json();
     /// assert_eq!(serialized.as_string().unwrap(), "Locked");
     /// ```
     Locked,
@@ -444,61 +444,61 @@ pub enum DoorLocked {
     /// use foxbox_taxonomy::values::*;
     /// use foxbox_taxonomy::parse::*;
     ///
-    /// let parsed = DoorLocked::from_str("\"Unlocked\"").unwrap();
-    /// assert_eq!(parsed, DoorLocked::Unlocked);
+    /// let parsed = IsLocked::from_str("\"Unlocked\"").unwrap();
+    /// assert_eq!(parsed, IsLocked::Unlocked);
     ///
-    /// let serialized: JSON = DoorLocked::Unlocked.to_json();
+    /// let serialized: JSON = IsLocked::Unlocked.to_json();
     /// assert_eq!(serialized.as_string().unwrap(), "Unlocked");
     /// ```
     Unlocked,
 }
 
-impl DoorLocked {
+impl IsLocked {
     fn as_bool(&self) -> bool {
         match *self {
-            DoorLocked::Locked => true,
-            DoorLocked::Unlocked => false,
+            IsLocked::Locked => true,
+            IsLocked::Unlocked => false,
         }
     }
 }
 
-impl Data for DoorLocked {
+impl Data for IsLocked {
     fn description() -> String {
-        "DoorLocked".to_owned()
+        "IsLocked".to_owned()
     }
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<Self, Error> {
         match source.as_string() {
-            Some("Locked") => Ok(DoorLocked::Locked),
-            Some("Unlocked") => Ok(DoorLocked::Unlocked),
+            Some("Locked") => Ok(IsLocked::Locked),
+            Some("Unlocked") => Ok(IsLocked::Unlocked),
             Some(str) => Err(Error::ParseError(ParseError::unknown_constant(str, &path))),
-            None => Err(Error::ParseError(ParseError::type_error("DoorLocked", &path, "string")))
+            None => Err(Error::ParseError(ParseError::type_error("IsLocked", &path, "string")))
         }
     }
     fn serialize(source: &Self, _binary: &BinaryTarget) -> Result<JSON, Error> {
         let str = match *source {
-            DoorLocked::Locked => "Locked",
-            DoorLocked::Unlocked => "Unlocked"
+            IsLocked::Locked => "Locked",
+            IsLocked::Unlocked => "Unlocked"
         };
         Ok(JSON::String(str.to_owned()))
     }
 }
 
-impl ToJSON for DoorLocked {
+impl ToJSON for IsLocked {
     fn to_json(&self) -> JSON {
         match *self {
-            DoorLocked::Locked => JSON::String("Locked".to_owned()),
-            DoorLocked::Unlocked => JSON::String("Unlocked".to_owned())
+            IsLocked::Locked => JSON::String("Locked".to_owned()),
+            IsLocked::Unlocked => JSON::String("Unlocked".to_owned())
         }
     }
 }
 
-impl PartialOrd for DoorLocked {
+impl PartialOrd for IsLocked {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for DoorLocked {
+impl Ord for IsLocked {
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_bool().cmp(&other.as_bool())
     }
@@ -1189,6 +1189,7 @@ pub mod format {
         pub static ref ON_OFF : Arc<Format> = Arc::new(Format::new::<OnOff>());
         pub static ref OPEN_CLOSED : Arc<Format> = Arc::new(Format::new::<OpenClosed>());
         pub static ref IS_SECURE : Arc<Format> = Arc::new(Format::new::<IsSecure>());
+        pub static ref IS_LOCKED : Arc<Format> = Arc::new(Format::new::<IsLocked>());
         pub static ref COLOR : Arc<Format> = Arc::new(Format::new::<Color>());
         pub static ref JSON: Arc<Format> = Arc::new(Format::new::<Json>());
         pub static ref STRING : Arc<Format> = Arc::new(Format::new::<String>());

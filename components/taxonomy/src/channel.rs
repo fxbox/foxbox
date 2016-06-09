@@ -181,11 +181,11 @@ lazy_static! {
     /// - watch this channel to be informed when it is (un)locked.
     pub static ref DOOR_IS_LOCKED : Channel = Channel {
         feature: Id::new("door/is-locked"),
-        supports_send: Some(Signature::accepts(Maybe::Required(format::OPEN_CLOSED.clone()))),
-        supports_fetch: Some(Signature::returns(Maybe::Required(format::OPEN_CLOSED.clone()))),
+        supports_send: Some(Signature::accepts(Maybe::Required(format::IS_LOCKED.clone()))),
+        supports_fetch: Some(Signature::returns(Maybe::Required(format::IS_LOCKED.clone()))),
         supports_watch: Some(Signature {
-            accepts: Maybe::Optional(format::OPEN_CLOSED.clone()),
-            returns: Maybe::Required(format::OPEN_CLOSED.clone())
+            accepts: Maybe::Optional(format::IS_LOCKED.clone()),
+            returns: Maybe::Required(format::IS_LOCKED.clone())
         }),
         .. Channel::default()
     };
