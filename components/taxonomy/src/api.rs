@@ -224,13 +224,13 @@ pub enum WatchEvent {
 #[derive(Debug, Clone, PartialEq)]
 pub enum User {
     None,
-    Id(i32)
+    Id(String)
 }
 
 #[test]
 fn test_user_partialeq() {
     assert_eq!(User::None, User::None);
-    assert_eq!(User::Id(1), User::Id(1));
+    assert_eq!(User::Id(String::from("1")), User::Id(String::from("1")));
 }
 
 impl<K> Parser<Targetted<K, Payload>> for Targetted<K, Payload> where K: Parser<K> + Clone {
