@@ -76,4 +76,4 @@ iron-test = "0.3.0"
 regex = "0.1.55"
 rand = "0.3.14"
 tempdir = "0.3.4"
-uuid = "0.1.18"
+uuid = { version = "0.2.2", features = ["v4"] }
