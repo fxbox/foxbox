@@ -13,7 +13,7 @@
 
 #![deny(clippy)]
 // TODO: re-enable deny mode once the identity_op issue is fixed.
-#![warn(identity_op)]
+#![allow(identity_op)]
 // Clippy tries hard to be clever but sometimes fails.
 #![warn(useless_let_if_seq)]
 // Needed for many #[derive(...)] macros
