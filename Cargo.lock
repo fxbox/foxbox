@@ -10,7 +10,7 @@ dependencies = [
  "foxbox_core 0.1.0",
  "foxbox_taxonomy 0.2.0",
  "foxbox_thinkerbell 0.1.2",
- "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=ec53c3a)",
+ "foxbox_users 0.1.0 (git+https://github.com/ferjm/users.git?branch=user.activation)",
  "get_if_addrs 0.4.0 (git+https://github.com/dhylands/get_if_addrs?rev=23632fd3473d42d3dc5710fc7855c5979b10ce50)",
  "hyper 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -227,7 +227,7 @@ name = "foxbox_core"
 version = "0.1.0"
 dependencies = [
  "clippy 0.0.76 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=ec53c3a)",
+ "foxbox_users 0.1.0 (git+https://github.com/ferjm/users.git?branch=user.activation)",
  "hyper 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.12 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -275,8 +275,9 @@ dependencies = [
 [[package]]
 name = "foxbox_users"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/users.git?rev=ec53c3a#ec53c3ab994041742b799d9cb115444ffbf66928"
+source = "git+https://github.com/ferjm/users.git?branch=user.activation#2ec94978a16bf1b3846ea486ace10664f564c5f0"
 dependencies = [
+ "hyper 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=f397cd2)",
  "jwt 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",

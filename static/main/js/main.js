@@ -30,6 +30,7 @@
 
 var SIGN_IN         = 0;
 var SIGNED_IN       = 1;
+var SIGN_UP         = 2;
 
 var ELEMENTS = [{
   screen: SIGN_IN,
@@ -42,6 +43,20 @@ var ELEMENTS = [{
   selector: '#signin-button',
   event: 'click',
   listener: 'signin'
+}, {
+  screen: SIGN_UP,
+  selector: '#signup-name'
+}, {
+  screen: SIGN_UP,
+  selector: '#signup-pwd1'
+}, {
+  screen: SIGN_UP,
+  selector: '#signup-pwd2'
+}, {
+  screen: SIGN_UP,
+  selector: '#signup-button',
+  event: 'click',
+  listener: 'signup'
 }, {
   screen: SIGNED_IN,
   selector: '#signout-button',
@@ -61,22 +76,43 @@ var Main = {
     Main.elements = {};
     Main.screens = {
       signin: document.querySelector('#signin'),
-      signedin: document.querySelector('#signedin')
+      signedin: document.querySelector('#signedin'),
+      signup: document.querySelector('#signup')
     };
 
     if (Main.session === null) {
-      // We might end up in the login screen because the user directly
-      // browsed to FoxBox's URL or because the user was redirected from
-      // an external app that is requesting access to FoxBox APIs.
-      // In this case, we need to obtain the 'redirect_url' query parameter
+      // No session token. We need to either show the sign in or the sign up
+      // screen.
+
+      // We might end up in FoxBox's UI for three different reasons:
+      // 1. because the user directly browsed to FoxBox's URL
+      // 2. because the user was redirected from an external app that is
+      //    requesting access to FoxBox APIs.
+      // 3. because the user clicked on an activation URL that was received
+      //    via email
+      //
+      // In the case of 2., we need to obtain the 'redirect_url' query parameter
       // so we can redirect the user back to the external app once the
       // login process is completed.
+      //
+      // In case of 3., we need to obtain the 'activation_url' so we can
+      // complete the user sign up process.
+
       var searchParams =
         new URLSearchParams(window.location.search.substring(1));
 
+      if (searchParams.has('activation_url')) {
+        try {
+          Main.activationURL = new URL(searchParams.get('activation_url'));
+        } catch (e) {
+          console.error(e);
+        }
+        return Main.show(SIGN_UP);
+      }
+
       if (searchParams.has('redirect_url')) {
         try {
-          Main.redirect = new URL(searchParams.get('redirect_url'));
+          Main.redirectURL = new URL(searchParams.get('redirect_url'));
         } catch(e) {
           console.error(e);
         }
@@ -141,6 +177,7 @@ var Main = {
     this.currentScreen = screen;
     this.screens.signin.hidden = (screen != SIGN_IN);
     this.screens.signedin.hidden = (screen != SIGNED_IN);
+    this.screens.signup.hidden = (screen != SIGN_UP);
 
     if (screen == SIGNED_IN) {
       Console.setup();
@@ -169,10 +206,10 @@ var Main = {
       return;
     }
 
-    Session.start(email, pwd, Main.redirect === undefined).then(
+    Session.signin(email, pwd, Main.redirectURL === undefined).then(
       function(token) {
-      if (Main.redirect) {
-        var url = Main.redirect;
+      if (Main.redirectURL) {
+        var url = Main.redirectURL;
         url.search +=
          (url.search.split('?')[1] ? '&':'?') + 'session_token=' + token;
         url.hash = window.location.hash;
@@ -185,8 +222,35 @@ var Main = {
     });
   },
 
+  signup: function(evt) {
+    evt.preventDefault();
+
+    var name = Main.elements.signupName.value;
+    if (!name.length) {
+      window.alert('You need to specify a user name');
+      return;
+    }
+
+    var pwd = Main.elements.signupPwd1.value;
+    if (pwd != Main.elements.signupPwd2.value) {
+      window.alert('Passwords don\'t match! Please try again.');
+      return;
+    }
+
+    if (!pwd || pwd.length < 8) {
+      window.alert('Invalid password');
+      return;
+    }
+
+    Session.signup(name, pwd, Main.activationURL).then(function() {
+      Main.show(SIGNED_IN);
+    }).catch(function(error) {
+      window.alert('Signup error ' + error);
+    });
+  },
+
   signout: function() {
-    Session.clear();
+    Session.signout();
     Main.show(SIGN_IN);
   }
 };

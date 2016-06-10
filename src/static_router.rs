@@ -9,7 +9,7 @@ use iron::status;
 use router::Router;
 use staticfile::Static;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{ Arc, RwLock };
 
 fn handler(req: &mut Request, db: &UsersDb) -> IronResult<Response> {
     let handler = match db.read(ReadFilter::IsAdmin(true)) {
@@ -27,15 +27,15 @@ fn handler(req: &mut Request, db: &UsersDb) -> IronResult<Response> {
     Handler::handle(&handler, req)
 }
 
-pub fn create(manager: Arc<UsersManager>) -> Router {
+pub fn create(manager: Arc<RwLock<UsersManager>>) -> Router {
     let mut router = Router::new();
-    let usersmanager = manager.clone();
+    let cloned = manager.clone();
     router.any("", move |req: &mut Request| -> IronResult<Response> {
-        handler(req, &usersmanager.get_db())
+        handler(req, &cloned.read().unwrap().get_db())
     });
-    let usersmanager = manager.clone();
+    let manager = manager.clone();
     router.any("*", move |req: &mut Request| -> IronResult<Response> {
-        handler(req, &usersmanager.get_db())
+        handler(req, &manager.read().unwrap().get_db())
     });
     router
 }

@@ -10,7 +10,7 @@ use serde_json;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{ Arc, RwLock };
 use std::vec::IntoIter;
 use tls::{ CertificateRecord, CertificateManager };
 use upnp::UpnpManager;
@@ -34,6 +34,6 @@ pub trait Controller : Send + Sync + Clone + Reflect + 'static {
 
     fn get_config(&self) -> Arc<ConfigService>;
     fn get_upnp_manager(&self) -> Arc<UpnpManager>;
-    fn get_users_manager(&self) -> Arc<UsersManager>;
+    fn get_users_manager(&self) -> Arc<RwLock<UsersManager>>;
     fn get_profile(&self) -> &ProfileService;
 }

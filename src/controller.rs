@@ -18,7 +18,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::sync::{ Arc, Mutex };
+use std::sync::{ Arc, Mutex, RwLock };
 use std::sync::atomic::{ AtomicBool, Ordering };
 use std::vec::IntoIter;
 use tls::{ CertificateManager, CertificateRecord, SniSslContextProvider, TlsOption };
@@ -36,7 +36,7 @@ pub struct FoxBox {
     websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
     pub config: Arc<ConfigService>,
     upnp: Arc<UpnpManager>,
-    users_manager: Arc<UsersManager>,
+    users_manager: Arc<RwLock<UsersManager>>,
     profile_service: Arc<ProfileService>,
 }
 
@@ -64,7 +64,7 @@ impl FoxBox {
             ws_port: ws_port,
             config: config,
             upnp: Arc::new(UpnpManager::new()),
-            users_manager: Arc::new(UsersManager::new(&profile_service.path_for("users_db.sqlite"))),
+            users_manager: Arc::new(RwLock::new(UsersManager::new(&profile_service.path_for("users_db.sqlite")))),
             profile_service: Arc::new(profile_service)
         }
     }
@@ -150,7 +150,7 @@ impl Controller for FoxBox {
         self.upnp.clone()
     }
 
-    fn get_users_manager(&self) -> Arc<UsersManager> {
+    fn get_users_manager(&self) -> Arc<RwLock<UsersManager>> {
         self.users_manager.clone()
     }
 
