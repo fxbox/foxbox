@@ -175,7 +175,7 @@ describe! tests {
     it "should manage subscription correctly" {
         use super::super::Subscription;
 
-        let subs0 = db.get_subscriptions(&User::Id("1".to_owned())).unwrap();
+        let subs0 = db.get_subscriptions(&User::Id(String::from("1"))).unwrap();
         assert_eq!(subs0.len(), 0);
 
         let sub = Subscription {
