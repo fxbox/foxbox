@@ -68,6 +68,7 @@ extern crate ws;
 extern crate multicast_dns;
 
 // adapters
+#[cfg(feature = "zwave")]
 extern crate openzwave_adapter as openzwave;
 
 #[cfg(test)]
