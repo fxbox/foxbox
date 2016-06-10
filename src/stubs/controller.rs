@@ -15,7 +15,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{ Arc, RwLock };
 use std::sync::atomic::AtomicBool;
 use tls::{ CertificateManager, CertificateRecord, SniSslContextProvider };
 use ws;
@@ -67,8 +67,9 @@ impl Controller for ControllerStub {
     fn get_upnp_manager(&self) -> Arc<UpnpManager> {
         Arc::new(UpnpManager::new())
     }
-    fn get_users_manager(&self) -> Arc<UsersManager> {
-        Arc::new(UsersManager::new(&self.profile_service.path_for("unused")))
+    fn get_users_manager(&self) -> Arc<RwLock<UsersManager>> {
+        Arc::new(RwLock::new(
+            UsersManager::new(&self.profile_service.path_for("unused"))))
     }
     fn get_profile(&self) -> &ProfileService {
         &self.profile_service
