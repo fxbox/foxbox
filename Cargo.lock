@@ -4,7 +4,7 @@ version = "0.1.0"
 dependencies = [
  "chrono 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.76 (registry+https://github.com/rust-lang/crates.io-index)",
- "docopt 0.6.80 (registry+https://github.com/rust-lang/crates.io-index)",
+ "docopt 0.6.81 (registry+https://github.com/rust-lang/crates.io-index)",
  "docopt_macros 0.6.84 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "foxbox_core 0.1.0",
@@ -188,7 +188,7 @@ dependencies = [
 
 [[package]]
 name = "docopt"
-version = "0.6.80"
+version = "0.6.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "regex 0.1.71 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -201,7 +201,7 @@ name = "docopt_macros"
 version = "0.6.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "docopt 0.6.80 (registry+https://github.com/rust-lang/crates.io-index)",
+ "docopt 0.6.81 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -253,7 +253,7 @@ dependencies = [
  "serde 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_macros 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "string_cache 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "string_cache 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "sublock 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "transformable_channels 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -695,14 +695,14 @@ version = "0.1.0"
 dependencies = [
  "foxbox_taxonomy 0.2.0",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "openzwave-stateful 0.1.0 (git+https://github.com/fxbox/openzwave-stateful-rust)",
+ "openzwave-stateful 0.1.0 (git+https://github.com/fxbox/openzwave-stateful-rust?rev=481baff1d7671dd44df00a00b9c008550407aecb)",
  "transformable_channels 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "openzwave-stateful"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/openzwave-stateful-rust#481baff1d7671dd44df00a00b9c008550407aecb"
+source = "git+https://github.com/fxbox/openzwave-stateful-rust?rev=481baff1d7671dd44df00a00b9c008550407aecb#481baff1d7671dd44df00a00b9c008550407aecb"
 dependencies = [
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "openzwave 0.1.0 (git+https://github.com/fxbox/openzwave-rust)",
@@ -976,7 +976,7 @@ dependencies = [
 
 [[package]]
 name = "string_cache"
-version = "0.2.18"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "debug_unreachable 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
