@@ -126,7 +126,8 @@ Options:
         --dns-domain <domain>          Set the top level domain for public DNS [default: box.knilxof.org]
         --dns-api <url>                Set the DNS API endpoint [default: https://knilxof.org:5300]
     -c, --config <namespace;key;value>  Set configuration override
-    -h, --help               Print this help menu.
+    -e, --email-server <url>    User email server URL. [default: http://knilxof.org:4000]
+    -h, --help                  Print this help menu.
 ",
         flag_local_name: String,
         flag_port: u16,
@@ -139,7 +140,8 @@ Options:
         flag_disable_tls: bool,
         flag_dns_domain: String,
         flag_dns_api: String,
-        flag_config: Option<Vec<String>>);
+        flag_config: Option<Vec<String>>,
+        flag_email_server: String);
 
 /// Updates local host name with the provided host name string. If requested host name
 /// is not available (used by anyone else on the same network) then collision
@@ -292,17 +294,44 @@ fn main() {
 
     // Start the tunnel.
     let mut tunnel: Option<Tunnel> = None;
-    if let Some(tunnel_url) = args.flag_tunnel {
-        tunnel = Some(Tunnel::new(TunnelConfig::new(tunnel_url,
+    if let Some(ref tunnel_url) = args.flag_tunnel {
+        tunnel = Some(Tunnel::new(TunnelConfig::new(tunnel_url.to_owned(),
                                                     args.flag_tunnel_secret,
                                                     args.flag_port,
                                                     args.flag_wsport,
-                                                    registrar.get_remote_dns_name())));
+                                                    registrar.clone().get_remote_dns_name())));
         tunnel.as_mut().unwrap().start().unwrap();
     }
 
-    registrar.start(args.flag_iface, &tunnel,
-                    args.flag_port,  &controller);
+    registrar.clone().start(args.flag_iface, &tunnel,
+                            args.flag_port,  &controller);
+
+    let scheme = if controller.get_tls_enabled() {
+        String::from("https://")
+    } else {
+        String::from("http://")
+    };
+
+    // If remote access is enabled, we use the remote address.
+    // Otherwise, we have to fallback to the local address and hope that the
+    // user clicks on the invitation link while she is connected to the same
+    // network foxbox is connected to.
+    let dns_name = match args.flag_tunnel {
+        Some(_) => registrar.get_remote_dns_name(),
+        None => registrar.get_local_dns_name()
+    };
+
+    let invitation_prepath = format!("{}{}?activation_url={}{}/users",
+                                 scheme, dns_name, scheme, dns_name);
+
+    debug!("email_server {} invitation prepath {}",
+           args.flag_email_server, invitation_prepath);
+
+    let manager = controller.get_users_manager().clone();
+    manager.write().unwrap().setup_invitation_middleware(
+        &args.flag_email_server,
+        &invitation_prepath
+    );
 
     controller.run(&SHUTDOWN_FLAG);
 
@@ -329,6 +358,7 @@ describe! main {
             assert_eq!(args.flag_iface, None);
             assert_eq!(args.flag_tunnel, None);
             assert_eq!(args.flag_config, None);
+            assert_eq!(args.flag_email_server, "http://knilxof.org:4000");
             assert_eq!(args.flag_help, false);
         }
 

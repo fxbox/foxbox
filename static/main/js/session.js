@@ -109,12 +109,12 @@
      * 'store' flag is true, we save this session token in memory and
      * in localStorage.
      */
-    start: function(username, pwd, store) {
-      if (!username || !pwd) {
+    signin: function(email, pwd, store) {
+      if (!email || !pwd) {
         return Promise.reject();
       }
       return sessionRequest({
-        username: username,
+        username: email,
         password: pwd
       }).then(function(token) {
         if (store) {
@@ -124,7 +124,31 @@
       });
     },
 
-    clear: function() {
+    signup: function(name, pwd, url) {
+      var response;
+      return fetch(url, {
+        method: 'PUT',
+        mode: 'cors',
+        body: JSON.stringify({
+          name: name,
+          password: pwd
+        })
+      }).then(function(res) {
+        response = res;
+        return response.json();
+      }).then(function(json) {
+        if (response.status !== 201) {
+          throw json.message || 'Could not activate user';
+        }
+        var token = json.session_token;
+        if (!token) {
+          throw 'Could not activate user';
+        }
+        localStorage.setItem('session', token);
+      });
+    },
+
+    signout: function() {
       localStorage.clear('session');
     },
 

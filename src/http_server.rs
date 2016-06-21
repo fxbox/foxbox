@@ -69,11 +69,12 @@ impl<T: Controller> HttpServer<T> {
                                                       adapter_api);
 
         let users_manager = self.controller.get_users_manager();
+        let guard = users_manager.read().unwrap();
         let mut mount = Mount::new();
         mount.mount("/", static_router::create(users_manager.clone()))
              .mount("/ping", Ping)
              .mount("/api/v1", taxonomy_chain)
-             .mount("/users", users_manager.get_router_chain());
+             .mount("/users", guard.get_router_chain());
 
         let mut chain = Chain::new(mount);
         chain.link_after(Custom404);

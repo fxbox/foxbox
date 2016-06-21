@@ -7,11 +7,10 @@
 /// after trying more aggressively at first run.
 
 extern crate get_if_addrs;
-extern crate hyper;
 
-use self::hyper::Client;
-use self::hyper::header::Connection;
-use self::hyper::status::StatusCode;
+use hyper::Client;
+use hyper::header::Connection;
+use hyper::status::StatusCode;
 use self::get_if_addrs::{ IfAddr, Interface };
 use foxbox_core::traits::Controller;
 use serde_json;
@@ -23,6 +22,7 @@ use tunnel_controller:: { Tunnel };
 
 const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
 
+#[derive(Clone)]
 pub struct Registrar {
     certificate_manager: CertificateManager,
     top_level_domain: String,

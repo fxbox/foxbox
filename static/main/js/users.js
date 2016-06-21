@@ -51,6 +51,11 @@ var Users = {
    */
   getUsers: function() {
     // Set the current logged in user.
+    var user = Session.getUser();
+    if (!user || !user.email) {
+      console.warn('Invalid user');
+      return;
+    }
     Users.user.textContent = Session.getUser().email;
     // Obtain the list of registered users
     Session.request('GET', '/users/v1/users').then(function(response) {

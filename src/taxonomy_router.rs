@@ -281,7 +281,8 @@ pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
     };
 
     let mut chain = Chain::new(router);
-    chain.around(controller.get_users_manager().get_middleware(auth_endpoints));
+    let manager = controller.get_users_manager().clone();
+    chain.around(manager.read().unwrap().get_middleware(auth_endpoints));
 
     chain
 }

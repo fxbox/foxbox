@@ -66,7 +66,7 @@ var SetupUI = {
       return;
     }
 
-    if (pwd.length < 8) {
+    if (!pwd || pwd.length < 8) {
       window.alert('Please use a password of at least 8 characters.');
       return;
     }
