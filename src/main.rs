@@ -329,8 +329,8 @@ fn main() {
 
     let manager = controller.get_users_manager().clone();
     manager.write().unwrap().setup_invitation_middleware(
-        args.flag_email_server,
-        invitation_prepath
+        &args.flag_email_server,
+        &invitation_prepath
     );
 
     controller.run(&SHUTDOWN_FLAG);
