@@ -16,6 +16,7 @@ pub mod tts;
 mod ip_camera;
 
 /// An adapter dedicated to the Philips Hue
+#[cfg(feature = "philips_hue")]
 mod philips_hue;
 
 /// An adapter providing access to Thinkerbell.
@@ -69,17 +70,27 @@ impl<T: Controller> AdapterManager<T> {
         // nothing to see :)
     }
 
+    #[cfg(feature = "philips_hue")]
+    fn start_philips_hue(&self, manager: &Arc<TaxoManager>) {
+        philips_hue::PhilipsHueAdapter::init(manager, self.controller.clone()).unwrap();
+    }
+
+    #[cfg(not(feature = "philips_hue"))]
+    fn start_philips_hue(&self, _: &Arc<TaxoManager>) {
+        // nothing to see :)
+    }
+
     /// Start all the adapters.
     pub fn start(&mut self, manager: &Arc<TaxoManager>) {
         let c = self.controller.clone(); // extracted here to prevent double-borrow of 'self'
         console::Console::init(manager).unwrap(); // FIXME: We should have a way to report errors
-        philips_hue::PhilipsHueAdapter::init(manager, c.clone()).unwrap();
         clock::Clock::init(manager).unwrap(); // FIXME: We should have a way to report errors
         webpush::WebPush::init(c, manager).unwrap();
         ip_camera::IPCameraAdapter::init(manager, self.controller.clone()).unwrap();
         let scripts_path = &self.controller.get_profile().path_for("thinkerbell_scripts.sqlite");
         ThinkerbellAdapter::init(manager, scripts_path).unwrap(); // FIXME: no unwrap!
 
+        self.start_philips_hue(manager);
         self.start_zwave(manager);
         self.start_tts(manager);
     }
