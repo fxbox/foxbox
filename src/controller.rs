@@ -91,8 +91,6 @@ impl Controller for FoxBox {
         HttpServer::new(self.clone()).start(&taxo_manager);
         WsServer::start(self.clone());
 
-        self.upnp.search(None).unwrap();
-
         event_loop.run(&mut FoxBoxEventLoop {
             controller: self.clone(),
             shutdown_flag: shutdown_flag
