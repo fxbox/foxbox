@@ -14,9 +14,10 @@ exclude = [ "**/*.conf", "**/*.json",
 # We get the workspace's crates from the `path` definitions.
 
 [features]
-default = ["authentication", "zwave"]
+default = ["authentication", "zwave", "philips_hue"]
 authentication = []
 zwave = ["openzwave-adapter"]
+philips_hue = []
 
 [replace]
 "iron:0.3.0" = { path = "iron-fork/" }
