@@ -88,7 +88,7 @@ impl TaxonomyRouter {
             if let Ok(Some((ref payload, _))) = *map_value {
                 if let Ok(ref data) = payload.to_value(&format::BINARY) {
                     match data.downcast::<Binary>() {
-                        Some(ref data) => {
+                        Some(data) => {
                             return Some(Binary {
                                 mimetype: (*data).mimetype.clone(),
                                 data: (*data).data.clone()

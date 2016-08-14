@@ -185,7 +185,7 @@ impl ThinkerbellAdapter {
                     // If the rule already existed (i.e. we're overwriting the original source),
                     // we don't need to re-add a Service. This is safe, because a Service doesn't
                     // know or care about the contents of the rule, just the ID.
-                    for ref rule in &rules {
+                    for rule in &rules {
                         if rule.script_id == script_id {
                             info!("[thinkerbell@link.mozilla.org] No need to create a new service for this rule; ID '{}' already exists.", &script_id);
                             continue 'recv;
@@ -204,7 +204,7 @@ impl ThinkerbellAdapter {
                 // The script has already been removed from ScriptManager at this point;
                 // we're just updating the Service-level bookkeeping.
                 ThinkAction::RemoveRuleService(script_id) => {
-                    if let Some(position) = rules.iter().position(|ref r| r.script_id == script_id) {
+                    if let Some(position) = rules.iter().position(|r| r.script_id == script_id) {
                         let rule = rules.remove(position);
                         match self.remove_rule_service(&rule) {
                             Ok(_) => {},
@@ -216,7 +216,7 @@ impl ThinkerbellAdapter {
                 },
                 // Respond to a pending Getter request.
                 ThinkAction::RespondToGetter(tx, getter_id) => {
-                    for ref rule in &rules {
+                    for rule in &rules {
                         if getter_id == rule.channel_is_enabled_id {
                             let is_enabled = script_manager.is_enabled(&rule.script_id);
                             let _ = tx.send(Ok(Some(Value::new(if is_enabled { OnOff::On } else { OnOff::Off }))));
@@ -267,7 +267,7 @@ impl ThinkerbellAdapter {
                         // NOTE: This linear search is not ideal, but tracking getters/setters in maps
                         // would be far more complex until we have a simpler way to track state within
                         // getter/setter API requests. In any case, this loop should be plenty fast for now.
-                        for ref rule in &rules {
+                        for rule in &rules {
                             if setter_id == rule.channel_is_enabled_id {
                                 match value.cast::<OnOff>() {
                                     Ok(&OnOff::On) => {
