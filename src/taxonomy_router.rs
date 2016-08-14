@@ -398,14 +398,14 @@ describe! binary_getter {
                         return (id.clone(), Ok(Some(Value::new(binary))));
                     }
 
-                    (id.clone(), Err(Error::InternalError(InternalError::NoSuchChannel(id))))
+                    (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
                 }).collect()
             }
 
             fn send_values(&self, mut values: HashMap<Id<Channel>, Value>, _: User)
                 -> ResultMap<Id<Channel>, (), Error> {
                 values.drain().map(|(id, _)| {
-                    (id.clone(), Err(Error::InternalError(InternalError::NoSuchChannel(id))))
+                    (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
                 }).collect()
             }
 

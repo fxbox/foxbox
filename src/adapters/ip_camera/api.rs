@@ -109,7 +109,7 @@ impl IpCamera {
     fn get_bytes(&self, url: &str, username: &str, _password: &str) -> Result<Vec<u8>, Error> {
         // For testing assume that url is a filename.
         if username == "get_bytes:fail" {
-            Err(Error::InternalError(InternalError::GenericError("get_bytes".to_owned())))
+            Err(Error::Internal(InternalError::GenericError("get_bytes".to_owned())))
         } else {
             self.read_image(url)
         }
