@@ -761,7 +761,7 @@ pub enum Color {
     /// }";
     ///
     /// match Color::parse_str(source_2) {
-    ///   Err(Error::ParseError(ParseError::TypeError{..})) => {},
+    ///   Err(Error::Parsing(ParseError::TypeError{..})) => {},
     ///   other => panic!("Unexpected result {:?}", other)
     /// }
     ///
@@ -774,7 +774,7 @@ pub enum Color {
     /// }";
     ///
     /// match Color::parse_str(source_4) {
-    ///   Err(Error::ParseError(ParseError::MissingField{ref name, ..})) if &name as &str == "h" => {},
+    ///   Err(Error::Parsing(ParseError::MissingField{ref name, ..})) if &name as &str == "h" => {},
     ///   other => panic!("Unexpected result {:?}", other)
     /// }
     /// ```
