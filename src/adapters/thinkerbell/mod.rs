@@ -98,7 +98,7 @@ impl ExecutableDevEnv for ThinkerbellExecutionEnv {
 /// Convert a `ScriptManagerError` into an API Error.
 /// We can't implement From<T> because `ScriptManagerError` is in a different crate.
 fn sm_error(e: ScriptManagerError) -> Error {
-    Error::InternalError(InternalError::GenericError(format!("{:?}", e)))
+    Error::Internal(InternalError::GenericError(format!("{:?}", e)))
 }
 
 impl Adapter for ThinkerbellAdapter {
@@ -125,7 +125,7 @@ impl Adapter for ThinkerbellAdapter {
             match rx.recv() {
                 Ok(result) => (id.clone(), result),
                 // If an error occurs, the channel/thread died!
-                Err(recv_err) => (id.clone(), Err(Error::InternalError(
+                Err(recv_err) => (id.clone(), Err(Error::Internal(
                         InternalError::GenericError(format!("{:?}", recv_err))))),
             }
         }).collect()
@@ -139,7 +139,7 @@ impl Adapter for ThinkerbellAdapter {
                 match rx.recv() {
                     Ok(result) => (id.clone(), result),
                     // If an error occurs, the channel died!
-                    Err(recv_err) => (id.clone(), Err(Error::InternalError(
+                    Err(recv_err) => (id.clone(), Err(Error::Internal(
                             InternalError::GenericError(format!("{:?}", recv_err))))),
                 }
             })
@@ -230,7 +230,7 @@ impl ThinkerbellAdapter {
                                         }
                                         Err(err) => {
                                             warn!("[thinkerbell_adapter] The source for rule {} was stored in the db but cannot be parsed", rule.script_id);
-                                            let _ = tx.send(Err(Error::ParseError(ParseError::JSON(JSONError(err)))));
+                                            let _ = tx.send(Err(Error::Parsing(ParseError::JSON(JSONError(err)))));
                                         }
                                     }
                                 },
@@ -241,7 +241,7 @@ impl ThinkerbellAdapter {
                             continue 'recv;
                         }
                     }
-                    let _ = tx.send(Err(Error::InternalError(InternalError::NoSuchChannel(getter_id.clone()))));
+                    let _ = tx.send(Err(Error::Internal(InternalError::NoSuchChannel(getter_id.clone()))));
                 },
                 // Respond to a pending Setter request.
                 ThinkAction::RespondToSetter(tx, setter_id, value, user) => {
@@ -288,7 +288,7 @@ impl ThinkerbellAdapter {
                             }
                         }
                         // If we got here, no setters matched.
-                        let _ = tx.send(Err(Error::InternalError(InternalError::NoSuchChannel(setter_id.clone()))));
+                        let _ = tx.send(Err(Error::Internal(InternalError::NoSuchChannel(setter_id.clone()))));
                     }
                 }
             }
@@ -444,7 +444,7 @@ impl Data for RuleSource {
     }
     fn parse(path: Path, source: &JSON, _: &io::BinarySource) -> Result<Self, Error> {
         let script = try!(Script::<UncheckedCtx>::parse(path, source)
-            .map_err(Error::ParseError));
+            .map_err(Error::Parsing));
         match serde_json::to_string(source) {
             Ok(source) =>
                 Ok(RuleSource {
@@ -452,12 +452,12 @@ impl Data for RuleSource {
                     source: source
                 }),
             Err(err) =>
-                Err(Error::SerializeError(io::SerializeError::JSON(err.to_string())))
+                Err(Error::Serializing(io::SerializeError::JSON(err.to_string())))
         }
     }
     fn serialize(source: &Self, _binary: &io::BinaryTarget) -> Result<JSON, Error> {
         serde_json::from_str(&source.source)
-            .map_err(|err| Error::ParseError(ParseError::JSON(JSONError(err))))
+            .map_err(|err| Error::Parsing(ParseError::JSON(JSONError(err))))
     }
 }
 
