@@ -258,7 +258,7 @@ pub enum OnOff {
     /// assert_eq!(parsed, OnOff::On);
     ///
     /// let serialized: JSON = OnOff::serialize(&OnOff::On, &BinaryTarget).unwrap();
-    /// assert_eq!(serialized.as_string().unwrap(), "On");
+    /// assert_eq!(serialized.as_str().unwrap(), "On");
     /// ```
     On,
 
@@ -276,7 +276,7 @@ pub enum OnOff {
     /// assert_eq!(parsed, OnOff::Off);
     ///
     /// let serialized: JSON = OnOff::serialize(&OnOff::Off, &BinaryTarget).unwrap();
-    /// assert_eq!(serialized.as_string().unwrap(), "Off");
+    /// assert_eq!(serialized.as_str().unwrap(), "Off");
     /// ```
     Off,
 }
@@ -346,7 +346,7 @@ pub enum OpenClosed {
     /// assert_eq!(parsed, OpenClosed::Open);
     ///
     /// let serialized: JSON = OpenClosed::serialize(&OpenClosed::Open, &BinaryTarget).unwrap();
-    /// assert_eq!(serialized.as_string().unwrap(), "Open");
+    /// assert_eq!(serialized.as_str().unwrap(), "Open");
     /// ```
     Open,
 
@@ -364,7 +364,7 @@ pub enum OpenClosed {
     /// assert_eq!(parsed, OpenClosed::Closed);
     ///
     /// let serialized: JSON = OpenClosed::serialize(&OpenClosed::Closed, &BinaryTarget).unwrap();
-    /// assert_eq!(serialized.as_string().unwrap(), "Closed");
+    /// assert_eq!(serialized.as_str().unwrap(), "Closed");
     /// ```
     Closed,
 }
@@ -431,7 +431,7 @@ pub enum IsLocked {
     /// assert_eq!(parsed, IsLocked::Locked);
     ///
     /// let serialized: JSON = IsLocked::Locked.to_json();
-    /// assert_eq!(serialized.as_string().unwrap(), "Locked");
+    /// assert_eq!(serialized.as_str().unwrap(), "Locked");
     /// ```
     Locked,
 
@@ -447,7 +447,7 @@ pub enum IsLocked {
     /// assert_eq!(parsed, IsLocked::Unlocked);
     ///
     /// let serialized: JSON = IsLocked::Unlocked.to_json();
-    /// assert_eq!(serialized.as_string().unwrap(), "Unlocked");
+    /// assert_eq!(serialized.as_str().unwrap(), "Unlocked");
     /// ```
     Unlocked,
 }
@@ -525,7 +525,7 @@ pub enum IsSecure {
     /// assert_eq!(parsed, IsSecure::Insecure);
     ///
     /// let serialized: JSON = IsSecure::serialize(&IsSecure::Insecure, &BinaryTarget).unwrap();
-    /// assert_eq!(serialized.as_string().unwrap(), "Insecure");
+    /// assert_eq!(serialized.as_str().unwrap(), "Insecure");
     /// ```
     Insecure,
 
@@ -543,7 +543,7 @@ pub enum IsSecure {
     /// assert_eq!(parsed, IsSecure::Secure);
     ///
     /// let serialized: JSON = IsSecure::serialize(&IsSecure::Secure, &BinaryTarget).unwrap();
-    /// assert_eq!(serialized.as_string().unwrap(), "Secure");
+    /// assert_eq!(serialized.as_str().unwrap(), "Secure");
     /// ```
     Secure,
 }
@@ -906,7 +906,7 @@ impl ToJSON for Binary {
 ///
 ///
 /// let serialized: JSON = TimeStamp::serialize(&ts, &BinaryTarget).unwrap();
-/// assert!(serialized.as_string().unwrap().starts_with("2014-11-28"));
+/// assert!(serialized.as_str().unwrap().starts_with("2014-11-28"));
 ///
 /// # }
 /// ```
@@ -1002,8 +1002,8 @@ pub enum Range<T> where T: Data + PartialOrd + PartialEq {
     /// }
     ///
     /// let as_json = Range::<OnOff>::serialize(&parsed, &BinaryTarget).unwrap();
-    /// let as_string = serde_json::to_string(&as_json).unwrap();
-    /// assert_eq!(as_string, "{\"Leq\":\"On\"}");
+    /// let as_str = serde_json::to_string(&as_json).unwrap();
+    /// assert_eq!(as_str, "{\"Leq\":\"On\"}");
     ///
     /// # }
     /// ```
