@@ -211,7 +211,7 @@ impl Data for String {
         "String".to_owned()
     }
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<String, Error> {
-        match source.as_string() {
+        match source.as_str() {
             None => Err(Error::Parsing(ParseError::type_error("String", &path, "string"))),
             Some(s) => Ok(s.to_owned())
         }
@@ -307,7 +307,7 @@ impl Data for OnOff {
         "On/Off".to_owned()
     }
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<Self, Error> {
-        let result = match source.as_string() {
+        let result = match source.as_str() {
             Some("On") => OnOff::On,
             Some("Off") => OnOff::Off,
             Some(str) => return Err(Error::Parsing(ParseError::unknown_constant(str, &path))),
@@ -395,7 +395,7 @@ impl Data for OpenClosed {
         "Open/Closed".to_owned()
     }
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<Self, Error> {
-        let result = match source.as_string() {
+        let result = match source.as_str() {
             Some("Open") => OpenClosed::Open,
             Some("Closed") => OpenClosed::Closed,
             Some(str) => return Err(Error::Parsing(ParseError::unknown_constant(str, &path))),
@@ -466,7 +466,7 @@ impl Data for IsLocked {
         "IsLocked".to_owned()
     }
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<Self, Error> {
-        match source.as_string() {
+        match source.as_str() {
             Some("Locked") => Ok(IsLocked::Locked),
             Some("Unlocked") => Ok(IsLocked::Unlocked),
             Some(str) => Err(Error::Parsing(ParseError::unknown_constant(str, &path))),
@@ -553,7 +553,7 @@ impl Data for IsSecure {
         "Secure/Insecure".to_owned()
     }
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<Self, Error> {
-        let result = match source.as_string() {
+        let result = match source.as_str() {
             Some("Secure") => IsSecure::Secure,
             Some("Insecure") => IsSecure::Insecure,
             Some(str) => return Err(Error::Parsing(ParseError::unknown_constant(str, &path))),
