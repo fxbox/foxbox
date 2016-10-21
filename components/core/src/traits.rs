@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use config_store::ConfigService;
-use core::marker::Reflect;
 use foxbox_users::UsersManager;
 use profile_service::ProfileService;
 use serde_json;
@@ -16,7 +15,7 @@ use tls::{ CertificateRecord, CertificateManager };
 use upnp::UpnpManager;
 use ws;
 
-pub trait Controller : Send + Sync + Clone + Reflect + 'static {
+pub trait Controller : Send + Sync + Clone + 'static {
     fn run(&mut self, shutdown_flag: &AtomicBool);
     fn adapter_started(&self, adapter: String);
     fn adapter_notification(&self, notification: serde_json::value::Value);
