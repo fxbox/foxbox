@@ -5,7 +5,8 @@ os:
 #  - osx
   - linux
 
-dist: trusty
+# Use the latest LTS
+dist: xenial
 
 language: rust
 rust:

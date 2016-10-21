@@ -7,10 +7,10 @@ RUST_TARGET='armv7-unknown-linux-gnueabihf'
 
 _install_arm_packages() {
     sudo tee -a /etc/apt/sources.list <<EOF
-deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty main
-deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty-updates main
-deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty universe
-deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty-updates universe
+deb [arch=armhf,arm64] http://ports.ubuntu.com/ xenial main
+deb [arch=armhf,arm64] http://ports.ubuntu.com/ xenial-updates main
+deb [arch=armhf,arm64] http://ports.ubuntu.com/ xenial universe
+deb [arch=armhf,arm64] http://ports.ubuntu.com/ xenial-updates universe
 EOF
 
     sudo dpkg --add-architecture armhf
