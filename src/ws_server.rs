@@ -67,7 +67,7 @@ impl<T: Controller> Handler for WsHandler<T> {
             _ => return self.close_with_error("Missing authorization"),
         };
 
-        if let Err(_) = self.controller.get_users_manager().verify_token(&token) {
+        if self.controller.get_users_manager().verify_token(&token).is_err() {
             return self.close_with_error("Authorization failed");
         }
 

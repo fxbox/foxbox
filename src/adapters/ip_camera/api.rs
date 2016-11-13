@@ -178,7 +178,7 @@ impl IpCamera {
         options.read(true);
         if let Ok(mut image_file) = options.open(full_filename) {
             let mut image = Vec::new();
-            if let Ok(_) = image_file.read_to_end(&mut image) {
+            if image_file.read_to_end(&mut image).is_ok() {
                 return Ok(image);
             }
             warn!("Error reading {}", full_filename);
