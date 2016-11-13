@@ -126,7 +126,7 @@ impl Tunnel {
 
     /// Start the Tunnel process if it has not already been started
     pub fn start(&mut self) -> Result<()> {
-        if let Some(_) = self.tunnel_process {
+        if self.tunnel_process.is_some() {
             // Already started
             Ok(())
         } else {

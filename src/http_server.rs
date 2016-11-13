@@ -30,7 +30,7 @@ impl AfterMiddleware for Custom404 {
         use std::io::Error as StdError;
         use std::io::ErrorKind;
 
-        if let Some(_) = err.error.downcast::<NoRoute>() {
+        if err.error.downcast::<NoRoute>().is_some() {
             // Router error
             return Ok(Response::with((Status::NotFound,
                                       format!("Unknown resource: {}", err))));

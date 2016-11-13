@@ -102,7 +102,7 @@ impl Registrar {
         if let Ok(mut response) = res {
             if response.status == StatusCode::Ok {
                 let mut body = String::new();
-                if let Ok(_) = response.read_to_string(&mut body) {
+                if response.read_to_string(&mut body).is_ok() {
                     info!("registration server responded with: {}", body);
                 } else {
                     warn!("registration server: Unable to read answer from {}", self.registration_endpoint);
@@ -134,7 +134,7 @@ impl Registrar {
             &self.dns_api_endpoint.clone(),
         );
 
-        if let Err(_) = result {
+        if result.is_err() {
             warn!("DNS server: Could not create DNS entry for {}", local_name);
         }
 
@@ -151,7 +151,7 @@ impl Registrar {
                 &self.dns_api_endpoint.clone(),
             );
 
-            if let Err(_) = result {
+            if result.is_err() {
                 warn!("DNS server: Could not create DNS entry for {}", remote_name);
             }
         }
