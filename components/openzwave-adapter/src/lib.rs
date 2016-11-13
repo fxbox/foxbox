@@ -9,24 +9,24 @@ mod watchers;
 
 
 use taxonomy::channel::*;
-use taxonomy::util::{ Id as TaxoId, Maybe, ref_eq };
-use taxonomy::services::{ AdapterId, ServiceId, Service };
+use taxonomy::util::{Id as TaxoId, Maybe, ref_eq};
+use taxonomy::services::{AdapterId, ServiceId, Service};
 use taxonomy::values::*;
-use taxonomy::api::{ Operation, ResultMap, Error as TaxoError, InternalError, User };
-use taxonomy::adapter::{ AdapterManagerHandle, AdapterWatchGuard, WatchEvent };
+use taxonomy::api::{Operation, ResultMap, Error as TaxoError, InternalError, User};
+use taxonomy::adapter::{AdapterManagerHandle, AdapterWatchGuard, WatchEvent};
 use transformable_channels::mpsc::ExtSender;
 
-use openzwave::{ ConfigPath, InitOptions, ZWaveManager, ZWaveNotification };
-use openzwave::{ CommandClass, ValueGenre, ValueType, ValueID };
-use openzwave::{ Controller, Node };
+use openzwave::{ConfigPath, InitOptions, ZWaveManager, ZWaveNotification};
+use openzwave::{CommandClass, ValueGenre, ValueType, ValueID};
+use openzwave::{Controller, Node};
 
 use std::error;
 use std::fmt;
-use std::{ fs, io };
+use std::{fs, io};
 use std::path::Path;
 use std::thread;
 use std::sync::mpsc;
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 
 use id_map::IdMap;
@@ -39,7 +39,7 @@ pub enum Error {
     TaxonomyError(TaxoError),
     IOError(io::Error),
     OpenzwaveError(openzwave::Error),
-    UnknownError
+    UnknownError,
 }
 
 impl From<TaxoError> for Error {
@@ -69,8 +69,12 @@ impl From<io::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::TaxonomyError(ref err)  => write!(f, "{}: {}", error::Error::description(self), err),
-            Error::OpenzwaveError(ref err) => write!(f, "{}: {}", error::Error::description(self), err),
+            Error::TaxonomyError(ref err) => {
+                write!(f, "{}: {}", error::Error::description(self), err)
+            }
+            Error::OpenzwaveError(ref err) => {
+                write!(f, "{}: {}", error::Error::description(self), err)
+            }
             Error::IOError(ref err) => write!(f, "{}: {}", error::Error::description(self), err),
             Error::UnknownError => write!(f, "{}", error::Error::description(self)),
         }
@@ -111,7 +115,7 @@ impl RangeChecker for Option<Value> {
     fn should_send(&self, value: &Value, event_type: EventType) -> bool {
         match *self {
             None => event_type == EventType::Enter, // no range means we send only Enter events
-            Some(ref range) => range == value // FIXME: This won't scale up to interesting ranges.
+            Some(ref range) => range == value, // FIXME: This won't scale up to interesting ranges.
         }
     }
 }
@@ -124,11 +128,11 @@ impl RangeChecker for Value {
 
 fn taxo_kind_from_ozw_vid(vid: &ValueID) -> Option<&Channel> {
     match (vid.get_type(), vid.get_command_class(), vid.get_index()) {
-        (ValueType::ValueType_Bool, Some(CommandClass::DoorLock),     0) => Some(&DOOR_IS_LOCKED),
+        (ValueType::ValueType_Bool, Some(CommandClass::DoorLock), 0) => Some(&DOOR_IS_LOCKED),
         (ValueType::ValueType_Bool, Some(CommandClass::SensorBinary), _) => Some(&DOOR_IS_OPEN),
         // (ValueType::ValueType_Bool, Some(_)) => Some(ChannelKind::OnOff), TODO Find a proper type
         // Unrecognized command class or type - we don't know what to do with it.
-        _ => None
+        _ => None,
     }
 }
 
@@ -146,9 +150,17 @@ fn ozw_vid_as_taxo_value(vid: &ValueID) -> Option<Value> {
                     return None;
                 };
                 if ref_eq(kind, &DOOR_IS_OPEN) {
-                    Some(Value::new(if value {OpenClosed::Open} else {OpenClosed::Closed}))
+                    Some(Value::new(if value {
+                        OpenClosed::Open
+                    } else {
+                        OpenClosed::Closed
+                    }))
                 } else if ref_eq(kind, &DOOR_IS_LOCKED) {
-                    Some(Value::new(if value {IsLocked::Locked} else {IsLocked::Unlocked}))
+                    Some(Value::new(if value {
+                        IsLocked::Locked
+                    } else {
+                        IsLocked::Unlocked
+                    }))
                 } else {
                     None
                 }
@@ -156,7 +168,7 @@ fn ozw_vid_as_taxo_value(vid: &ValueID) -> Option<Value> {
             } else {
                 None
             }
-        },
+        }
         _ => None,   // TODO: Support more ValueType's
     }
 }
@@ -166,38 +178,54 @@ fn set_ozw_vid_from_taxo_value(vid: &ValueID, value: Value) -> Result<(), TaxoEr
         return Err(TaxoError::Internal(InternalError::GenericError(format!("Unknown command class: {}", vid.get_command_class_id()))));
     }
 
-    let result = match vid.get_type() {
-        ValueType::ValueType_Bool => {
-            if let Some(open_closed) = value.downcast::<OpenClosed>() {
-                vid.set_bool(*open_closed == OpenClosed::Open)
-            } else if let Some(locked_unlocked) = value.downcast::<IsLocked>() {
-                vid.set_bool(*locked_unlocked == IsLocked::Locked)
-            } else {
-                return Err(TaxoError::InvalidValue) // TODO InvalidType would be better but we'll need to fix specific types for specific TaxoIds
+    let result =
+        match vid.get_type() {
+            ValueType::ValueType_Bool => {
+                if let Some(open_closed) = value.downcast::<OpenClosed>() {
+                    vid.set_bool(*open_closed == OpenClosed::Open)
+                } else if let Some(locked_unlocked) = value.downcast::<IsLocked>() {
+                    vid.set_bool(*locked_unlocked == IsLocked::Locked)
+                } else {
+                    return Err(TaxoError::InvalidValue); // TODO InvalidType would be better but we'll need to fix specific types for specific TaxoIds
+                }
             }
-        }
-        _ => { return Err(TaxoError::Internal(InternalError::GenericError(format!("Unsupported OZW type: {:?}", vid.get_type())))) }
-    };
+            _ => { return Err(TaxoError::Internal(InternalError::GenericError(format!("Unsupported OZW type: {:?}", vid.get_type())))) }
+        };
 
-    result.map_err(|e| TaxoError::Internal(InternalError::GenericError(format!("Error while setting a value: {}", e))))
+    result.map_err(|e| {
+        TaxoError::Internal(InternalError::GenericError(format!("Error while setting a value: {}",
+                                                                e)))
+    })
 }
 
 fn start_including(ozw: &ZWaveManager, home_id: u32, value: &Value) -> Result<(), TaxoError> {
     let is_secure = try!(value.cast::<IsSecure>());
     let is_secure_bool = *is_secure == IsSecure::Secure;
-    try!(
-        ozw.add_node(home_id, is_secure_bool)
-            .map_err(|e| TaxoError::Internal(InternalError::GenericError(format!("Error while including node on network {}: {}", home_id, e))))
-    );
-    info!("[OpenZWaveAdapter] Controller on network {} is awaiting an include in {} mode, please do the appropriate steps to include a device.", home_id, is_secure);
+    try!(ozw.add_node(home_id, is_secure_bool)
+        .map_err(|e| {
+            TaxoError::Internal(InternalError::GenericError(format!("Error while including node \
+                                                                     on network {}: {}",
+                                                                    home_id,
+                                                                    e)))
+        }));
+    info!("[OpenZWaveAdapter] Controller on network {} is awaiting an include in {} mode, please \
+           do the appropriate steps to include a device.",
+          home_id,
+          is_secure);
     Ok(())
 }
 
 fn start_excluding(ozw: &ZWaveManager, home_id: u32) -> Result<(), TaxoError> {
-    try!(
-         ozw.remove_node(home_id)
-            .map_err(|e| TaxoError::Internal(InternalError::GenericError(format!("Error while excluding node on network {}: {}", home_id, e)))));
-    info!("[OpenZWaveAdapter] Controller on network {} is awaiting an exclude, please do the appropriate steps to exclude a device.", home_id);
+    try!(ozw.remove_node(home_id)
+        .map_err(|e| {
+            TaxoError::Internal(InternalError::GenericError(format!("Error while excluding node \
+                                                                     on network {}: {}",
+                                                                    home_id,
+                                                                    e)))
+        }));
+    info!("[OpenZWaveAdapter] Controller on network {} is awaiting an exclude, please do the \
+           appropriate steps to exclude a device.",
+          home_id);
     Ok(())
 }
 
@@ -222,9 +250,10 @@ pub struct OpenzwaveAdapter {
 fn ensure_directory<T: AsRef<Path> + ?Sized>(directory: &T) -> Result<(), Error> {
     let path = directory.as_ref();
     if path.exists() && !path.is_dir() {
-        return Err(
-            Error::IOError(io::Error::new(io::ErrorKind::AlreadyExists, format!("The file {} already exists and isn't a directory.", path.display())))
-        );
+        return Err(Error::IOError(io::Error::new(io::ErrorKind::AlreadyExists,
+                                                 format!("The file {} already exists and \
+                                                          isn't a directory.",
+                                                         path.display()))));
     }
 
     if !path.exists() {
@@ -235,15 +264,18 @@ fn ensure_directory<T: AsRef<Path> + ?Sized>(directory: &T) -> Result<(), Error>
 }
 
 impl OpenzwaveAdapter {
-    pub fn init<T: AdapterManagerHandle + Send + Sync + 'static>(box_manager: &Arc<T>, user_path: &str, devices: Option<String>) -> Result<(), Error> {
+    pub fn init<T: AdapterManagerHandle + Send + Sync + 'static>(box_manager: &Arc<T>,
+                                                                 user_path: &str,
+                                                                 devices: Option<String>)
+                                                                 -> Result<(), Error> {
 
         try!(ensure_directory(user_path));
 
         let options = InitOptions {
             // We treat devices as a comma (with optional whitespace) delimited list of device names.
             devices: devices.map(|s| s.split(',').map(|s| s.trim().to_owned()).collect()),
-            config_path: ConfigPath::Default, // This is where the default system configuraton is, usually contains the device information.
-            user_path: user_path, // This is where we can override the system configuration, and where the network layout and logs are stored.
+            config_path: ConfigPath::Default, /* This is where the default system configuraton is, usually contains the device information. */
+            user_path: user_path, /* This is where we can override the system configuration, and where the network layout and logs are stored. */
         };
 
         let (ozw, rx) = try!(match openzwave::init(&options) {
@@ -252,13 +284,15 @@ impl OpenzwaveAdapter {
                 // TODO manage errors at adapter start: https://github.com/fxbox/RFC/issues/14
                 info!("[OpenzwaveAdapter] No ZWave device has been found.");
                 return Ok(());
-            },
+            }
             Err(openzwave::Error::CannotReadDevice(device, cause)) => {
                 // early return for the same reason as above.
-                error!("[OpenzwaveAdapter] Could not read the device {}: {}.", device, cause);
+                error!("[OpenzwaveAdapter] Could not read the device {}: {}.",
+                       device,
+                       cause);
                 return Ok(());
             }
-            result => result
+            result => result,
         });
 
         let name = String::from("OpenZwave Adapter");
@@ -301,24 +335,29 @@ impl OpenzwaveAdapter {
 
         thread::spawn(move || {
             for notification in rx {
-                //debug!("Received notification {:?}", notification);
+                // debug!("Received notification {:?}", notification);
                 match notification {
                     ZWaveNotification::ControllerReady(controller) => {
                         let home_id = controller.get_home_id();
-                        info!("Opened ZWave Controller {} HomeId: {:08x}", controller.get_controller_path(), home_id);
+                        info!("Opened ZWave Controller {} HomeId: {:08x}",
+                              controller.get_controller_path(),
+                              home_id);
 
                         let service_name = format!("OpenZWave-controller-{:08x}", home_id);
                         let service_id = TaxoId::new(&service_name);
                         controller_map.push(service_id.clone(), controller);
 
                         let mut service = Service::empty(&service_id, &adapter_id);
-                        service.properties.insert(String::from("name"), format!("Service for controller {:08x}", home_id));
+                        service.properties.insert(String::from("name"),
+                                                  format!("Service for controller {:08x}",
+                                                          home_id));
 
                         box_manager.add_service(service).unwrap_or_else(|e| {
                             error!("Couldn't add the service {}: {}", service_name, e);
                         });
 
-                        let include_setter_name = format!("OpenZWave-controller-{:08x}-include", home_id);
+                        let include_setter_name = format!("OpenZWave-controller-{:08x}-include",
+                                                          home_id);
                         let include_setter_id = TaxoId::new(&include_setter_name);
                         include_map.push(include_setter_id.clone(), controller);
 
@@ -333,60 +372,68 @@ impl OpenzwaveAdapter {
                             error!("Couldn't add the setter {}: {}", include_setter_id, e);
                         });
 
-                        let exclude_setter_name = format!("OpenZWave-controller-{:08x}-exclude", home_id);
+                        let exclude_setter_name = format!("OpenZWave-controller-{:08x}-exclude",
+                                                          home_id);
                         let exclude_setter_id = TaxoId::new(&exclude_setter_name);
                         exclude_map.push(exclude_setter_id.clone(), controller);
 
                         box_manager.add_channel(Channel {
-                            feature: TaxoId::new("zwave/exclude"),
-                            supports_send: Some(Signature::nothing()),
-                            id: exclude_setter_id.clone(),
-                            service: service_id.clone(),
-                            adapter: adapter_id.clone(),
-                            .. Channel::default()
-                        }).unwrap_or_else(|e| {
-                            error!("Couldn't add the setter {}: {}", exclude_setter_id, e);
-                        });
+                                feature: TaxoId::new("zwave/exclude"),
+                                supports_send: Some(Signature::nothing()),
+                                id: exclude_setter_id.clone(),
+                                service: service_id.clone(),
+                                adapter: adapter_id.clone(),
+                                ..Channel::default()
+                            })
+                            .unwrap_or_else(|e| {
+                                error!("Couldn't add the setter {}: {}", exclude_setter_id, e);
+                            });
                     }
-                    ZWaveNotification::NodeNew(_node)               => {}
-                    ZWaveNotification::NodeAdded(node)              => {
-                        let service_name = format!("OpenZWave-{:08x}-{:02x}", node.get_home_id(), node.get_id());
+                    ZWaveNotification::NodeNew(_node) => {}
+                    ZWaveNotification::NodeAdded(node) => {
+                        let service_name =
+                            format!("OpenZWave-{:08x}-{:02x}", node.get_home_id(), node.get_id());
                         let service_id = TaxoId::new(&service_name);
                         node_map.push(service_id.clone(), node);
 
                         let mut service = Service::empty(&service_id, &adapter_id);
                         service.properties.insert(String::from("name"), node.get_name());
-                        service.properties.insert(String::from("product_name"), node.get_product_name());
-                        service.properties.insert(String::from("manufacturer_name"), node.get_manufacturer_name());
+                        service.properties
+                            .insert(String::from("product_name"), node.get_product_name());
+                        service.properties.insert(String::from("manufacturer_name"),
+                                                  node.get_manufacturer_name());
                         service.properties.insert(String::from("location"), node.get_location());
 
                         box_manager.add_service(service).unwrap_or_else(|e| {
                             error!("Couldn't add the service {}: {}", service_name, e);
                         });
                     }
-                    ZWaveNotification::NodeNaming(_node)             => {
+                    ZWaveNotification::NodeNaming(_node) => {
                         // unfortunately we can't change a service' properties :(
                         // https://github.com/fxbox/taxonomy/issues/97
                         // When it's done we can move the properties change from above to here.
                     }
-                    ZWaveNotification::NodeRemoved(node)           => {
+                    ZWaveNotification::NodeRemoved(node) => {
                         if let Some(service_id) = node_map.remove_by_ozw(&node) {
                             box_manager.remove_service(&service_id).unwrap_or_else(|e| {
                                 error!("Couldn't remove the service {}: {}", service_id, e);
                             });
                         }
                     }
-                    ZWaveNotification::ValueAdded(vid)              => {
-                        if vid.get_genre() != ValueGenre::ValueGenre_User { continue }
+                    ZWaveNotification::ValueAdded(vid) => {
+                        if vid.get_genre() != ValueGenre::ValueGenre_User {
+                            continue;
+                        }
 
-                        let value_id = format!("OpenZWave-{:08x}-{:016x}", vid.get_home_id(), vid.get_id());
+                        let value_id =
+                            format!("OpenZWave-{:08x}-{:016x}", vid.get_home_id(), vid.get_id());
 
                         let node_id = node_map.find_taxo_id_from_ozw(&vid.get_node()).unwrap();
 
                         let kind = taxo_kind_from_ozw_vid(&vid);
                         let chan = match kind {
                             None => continue,
-                            Some(kind) => kind.clone()
+                            Some(kind) => kind.clone(),
                         };
 
                         let id = TaxoId::new(&value_id);
@@ -420,27 +467,27 @@ impl OpenzwaveAdapter {
                                 error!("Couldn't add the getter {}: {}", value_id, e);
                             });
                     }
-                    ZWaveNotification::ValueChanged(vid)          => {
+                    ZWaveNotification::ValueChanged(vid) => {
                         match vid.get_type() {
-                            ValueType::ValueType_Bool => {},
-                            _ => continue // ignore non-bool vals for now
+                            ValueType::ValueType_Bool => {}
+                            _ => continue, // ignore non-bool vals for now
                         };
 
                         let taxo_id = match getter_map.find_taxo_id_from_ozw(&vid) {
                             Some(taxo_id) => taxo_id,
-                            _ => continue
+                            _ => continue,
                         };
 
                         let taxo_value = match ozw_vid_as_taxo_value(&vid) {
                             Some(value) => value,
-                            _ => continue
+                            _ => continue,
                         };
 
                         let watchers = watchers.lock().unwrap();
 
                         let watchers = match watchers.get_from_taxo_id(&taxo_id) {
                             Some(watchers) => watchers,
-                            _ => continue
+                            _ => continue,
                         };
 
                         let previous_value = {
@@ -451,39 +498,61 @@ impl OpenzwaveAdapter {
                         };
 
                         for &(ref when, ref sender) in &watchers {
-                            debug!("[OpenzwaveAdapter::ValueChanged] Iterating over watcher {:?} {:?}", taxo_id, when);
+                            debug!("[OpenzwaveAdapter::ValueChanged] Iterating over watcher {:?} \
+                                    {:?}",
+                                   taxo_id,
+                                   when);
 
                             let should_send_value = when.should_send(&taxo_value, EventType::Enter);
 
                             if let Some(ref previous_value) = previous_value {
-                                let should_send_previous = when.should_send(previous_value, EventType::Exit);
+                                let should_send_previous =
+                                    when.should_send(previous_value, EventType::Exit);
                                 // If the new and the old values are both in the same range, we
                                 // need to send nothing.
-                                if should_send_value && should_send_previous { continue }
+                                if should_send_value && should_send_previous {
+                                    continue;
+                                }
 
                                 if should_send_previous {
-                                    debug!("Openzwave::Adapter::ValueChanged Sending event Exit {:?} {:?}", taxo_id, taxo_value);
+                                    debug!("Openzwave::Adapter::ValueChanged Sending event Exit \
+                                            {:?} {:?}",
+                                           taxo_id,
+                                           taxo_value);
                                     let sender = sender.lock().unwrap();
-                                    sender.send(
-                                        WatchEvent::Exit { id: taxo_id.clone(), value: taxo_value.clone() }
-                                    ).unwrap_or_else(|_| {
-                                        error!("Couldn't send the exit event {{ id: {:?}, value: {:?} }}", taxo_id, taxo_value);
-                                    });
+                                    sender.send(WatchEvent::Exit {
+                                            id: taxo_id.clone(),
+                                            value: taxo_value.clone(),
+                                        })
+                                        .unwrap_or_else(|_| {
+                                            error!("Couldn't send the exit event {{ id: {:?}, \
+                                                    value: {:?} }}",
+                                                   taxo_id,
+                                                   taxo_value);
+                                        });
                                 }
                             }
 
                             if should_send_value {
-                                debug!("[OpenzwaveAdapter::ValueChanged] Sending event Enter {:?} {:?}", taxo_id, taxo_value);
+                                debug!("[OpenzwaveAdapter::ValueChanged] Sending event Enter \
+                                        {:?} {:?}",
+                                       taxo_id,
+                                       taxo_value);
                                 let sender = sender.lock().unwrap();
-                                sender.send(
-                                    WatchEvent::Enter { id: taxo_id.clone(), value: taxo_value.clone() }
-                                ).unwrap_or_else(|_| {
-                                    error!("Couldn't send the enter event {{ id: {:?}, value: {:?} }}", taxo_id, taxo_value);
-                                });
+                                sender.send(WatchEvent::Enter {
+                                        id: taxo_id.clone(),
+                                        value: taxo_value.clone(),
+                                    })
+                                    .unwrap_or_else(|_| {
+                                        error!("Couldn't send the enter event {{ id: {:?}, \
+                                                value: {:?} }}",
+                                               taxo_id,
+                                               taxo_value);
+                                    });
                             }
                         }
                     }
-                    ZWaveNotification::ValueRemoved(vid)            => {
+                    ZWaveNotification::ValueRemoved(vid) => {
                         if let Some(getter_id) = getter_map.remove_by_ozw(&vid) {
                             box_manager.remove_channel(&getter_id).unwrap_or_else(|e| {
                                 error!("Unable to remove getter_id {}: {}", getter_id, e);
@@ -495,11 +564,12 @@ impl OpenzwaveAdapter {
                             });
                         }
                     }
-                    ZWaveNotification::AwakeNodesQueried(ref controller) | ZWaveNotification::AllNodesQueried(ref controller) => {
+                    ZWaveNotification::AwakeNodesQueried(ref controller) |
+                    ZWaveNotification::AllNodesQueried(ref controller) => {
                         debug!("[OpenzwaveAdapter] Writing the network config.");
                         controller.write_config();
                     }
-                    ZWaveNotification::Generic(_string)             => {}
+                    ZWaveNotification::Generic(_string) => {}
                     _ => {}
                 }
             }
@@ -524,7 +594,10 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
         &self.version
     }
 
-    fn fetch_values(&self, mut set: Vec<TaxoId<Channel>>, _: User) -> ResultMap<TaxoId<Channel>, Option<Value>, TaxoError> {
+    fn fetch_values(&self,
+                    mut set: Vec<TaxoId<Channel>>,
+                    _: User)
+                    -> ResultMap<TaxoId<Channel>, Option<Value>, TaxoError> {
         set.drain(..).map(|id| {
             let ozw_vid = self.getter_map.find_ozw_from_taxo_id(&id);
 
@@ -538,21 +611,30 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<TaxoId<Channel>, Value>, _: User) -> ResultMap<TaxoId<Channel>, (), TaxoError> {
-        values.drain().map(|(id, value)| {
-            if let Some(ozw_vid) = self.setter_map.find_ozw_from_taxo_id(&id) {
-                (id, set_ozw_vid_from_taxo_value(&ozw_vid, value))
-            } else if let Some(ozw_controller) = self.include_map.find_ozw_from_taxo_id(&id) {
-                (id, start_including(&self.ozw, ozw_controller.get_home_id(), &value))
-            } else if let Some(ozw_controller) = self.exclude_map.find_ozw_from_taxo_id(&id) {
-                (id, start_excluding(&self.ozw, ozw_controller.get_home_id()))
-            } else {
-                (id.clone(), Err(TaxoError::Internal(InternalError::NoSuchChannel(id))))
-            }
-        }).collect()
+    fn send_values(&self,
+                   mut values: HashMap<TaxoId<Channel>, Value>,
+                   _: User)
+                   -> ResultMap<TaxoId<Channel>, (), TaxoError> {
+        values.drain()
+            .map(|(id, value)| {
+                if let Some(ozw_vid) = self.setter_map.find_ozw_from_taxo_id(&id) {
+                    (id, set_ozw_vid_from_taxo_value(&ozw_vid, value))
+                } else if let Some(ozw_controller) = self.include_map.find_ozw_from_taxo_id(&id) {
+                    (id, start_including(&self.ozw, ozw_controller.get_home_id(), &value))
+                } else if let Some(ozw_controller) = self.exclude_map.find_ozw_from_taxo_id(&id) {
+                    (id, start_excluding(&self.ozw, ozw_controller.get_home_id()))
+                } else {
+                    (id.clone(), Err(TaxoError::Internal(InternalError::NoSuchChannel(id))))
+                }
+            })
+            .collect()
     }
 
-    fn register_watch(&self, mut values: Vec<(TaxoId<Channel>, Option<Value>, Box<ExtSender<WatchEvent<Value>>>)>) -> Vec<(TaxoId<Channel>, Result<Box<AdapterWatchGuard>, TaxoError>)> {
+    fn register_watch(&self,
+                      mut values: Vec<(TaxoId<Channel>,
+                                       Option<Value>,
+                                       Box<ExtSender<WatchEvent<Value>>>)>)
+                      -> Vec<(TaxoId<Channel>, Result<Box<AdapterWatchGuard>, TaxoError>)> {
         debug!("[OpenzwaveAdapter::register_watch] Should register some watchers");
         values.drain(..).filter_map(|(id, range, sender)| {
             if self.getter_map.find_ozw_from_taxo_id(&id).is_none() {
@@ -591,7 +673,8 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
     }
 
     fn stop(&self) {
-        info!("[OpenzwaveAdapter::stop] Stopping the Openzwave adapter: writing the network config.");
+        info!("[OpenzwaveAdapter::stop] Stopping the Openzwave adapter: writing the network \
+               config.");
         self.ozw.write_configs();
     }
 }
@@ -599,7 +682,5 @@ impl taxonomy::adapter::Adapter for OpenzwaveAdapter {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn it_works() {
-    }
+    fn it_works() {}
 }
-

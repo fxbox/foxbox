@@ -1,7 +1,7 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-use openssl::ssl::{ Ssl, SslContext, SslMethod, SSL_VERIFY_NONE };
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+use openssl::ssl::{Ssl, SslContext, SslMethod, SSL_VERIFY_NONE};
 use openssl::ssl::error::SslError;
 use openssl::x509::X509FileType;
 use openssl_sys;
@@ -9,18 +9,18 @@ use openssl_sys;
 use std::collections::HashMap;
 use std::io::Error;
 use std::path::Path;
-use std::sync::{ Arc, RwLock };
+use std::sync::{Arc, RwLock};
 
 use certificate_record::CertificateRecord;
 
-pub trait SslContextProvider : Send + Sync {
+pub trait SslContextProvider: Send + Sync {
     fn context(&self) -> Result<SslContext, Error>;
     fn update(&self, HashMap<String, CertificateRecord>) -> ();
 }
 
 #[derive(Clone)]
 pub struct SniSslContextProvider {
-    main_context: Arc<RwLock<SslContext>>
+    main_context: Arc<RwLock<SslContext>>,
 }
 
 impl SslContextProvider for SniSslContextProvider {
@@ -35,8 +35,9 @@ impl SslContextProvider for SniSslContextProvider {
 
         for record in configured_hosts.values() {
             debug!("Creating SslContext for {}", record.hostname);
-            let ssl_context = create_ssl_context(
-                &record.cert_file, &record.private_key_file, &record.full_chain);
+            let ssl_context = create_ssl_context(&record.cert_file,
+                                                 &record.private_key_file,
+                                                 &record.full_chain);
 
             if ssl_context.is_ok() {
                 let ssl_context = ssl_context.unwrap();
@@ -48,23 +49,21 @@ impl SslContextProvider for SniSslContextProvider {
 
         debug!("Update certificates");
         checklock!(self.main_context.write())
-            .set_servername_callback_with_data(SniSslContextProvider::servername_callback, new_ssl_hosts);
+            .set_servername_callback_with_data(SniSslContextProvider::servername_callback,
+                                               new_ssl_hosts);
     }
 }
 
 impl SniSslContextProvider {
     pub fn new() -> Self {
         SniSslContextProvider {
-            main_context: Arc::new(
-                              RwLock::new(
-                                  SslContext::new(SslMethod::Sslv23).unwrap()
-                              )
-                          )
+            main_context: Arc::new(RwLock::new(SslContext::new(SslMethod::Sslv23).unwrap())),
         }
     }
 
     fn servername_callback_impl<T>(ssl: &mut SslForSni<T>,
-                                   configured_certs: &HashMap<String, T>) -> i32 {
+                                   configured_certs: &HashMap<String, T>)
+                                   -> i32 {
         debug!("servername_callback invoked");
         let requested_hostname = ssl.get_hostname();
 
@@ -79,18 +78,20 @@ impl SniSslContextProvider {
 
         let ssl_context_for_hostname = configured_certs.get(&requested_hostname);
 
-        if let Some(ctx)= ssl_context_for_hostname {
+        if let Some(ctx) = ssl_context_for_hostname {
             ssl.set_context(ctx);
         } else {
-            error!("No certificate available for requested hostname: {}", requested_hostname);
+            error!("No certificate available for requested hostname: {}",
+                   requested_hostname);
         }
 
         openssl_sys::SSL_TLSEXT_ERR_OK
     }
 
-    fn servername_callback(ssl: &mut Ssl, _: &mut i32,
+    fn servername_callback(ssl: &mut Ssl,
+                           _: &mut i32,
                            configured_certs: &HashMap<String, SslContext>)
-        -> i32 {
+                           -> i32 {
         Self::servername_callback_impl(ssl, configured_certs)
     }
 }
@@ -116,12 +117,14 @@ impl SslForSni<SslContext> for Ssl {
     }
 }
 
-pub fn create_ssl_context<C, K>(crt: &C, key: &K, chain: &Option<K>)
-        -> Result<SslContext, SslError>
-    where C: AsRef<Path>, K: AsRef<Path> {
+pub fn create_ssl_context<C, K>(crt: &C, key: &K, chain: &Option<K>) -> Result<SslContext, SslError>
+    where C: AsRef<Path>,
+          K: AsRef<Path>
+{
 
     debug!("Creating SSL Context with Cert: {:?}, Key: {:?}",
-            crt.as_ref().to_str(), key.as_ref().to_str());
+           crt.as_ref().to_str(),
+           key.as_ref().to_str());
 
     let mut ctx = try!(SslContext::new(SslMethod::Sslv23));
     try!(ctx.set_cipher_list("DEFAULT"));
@@ -141,13 +144,13 @@ pub fn create_ssl_context<C, K>(crt: &C, key: &K, chain: &Option<K>)
 mod sni_ssl_context_provider {
     use openssl_sys;
     use std::collections::HashMap;
-    use std::sync::mpsc::{ channel, Sender };
+    use std::sync::mpsc::{channel, Sender};
 
     use super::*;
 
     pub struct MockSsl {
         servername: Option<String>,
-        context_set: Option<Sender<String>>
+        context_set: Option<Sender<String>>,
     }
 
     impl SslForSni<String> for MockSsl {
@@ -170,7 +173,7 @@ mod sni_ssl_context_provider {
 
         let mut ssl = MockSsl {
             servername: Some("test.knilxof.org".to_owned()),
-            context_set: Some(tx_context_called)
+            context_set: Some(tx_context_called),
         };
 
         let mut contexts = HashMap::new();
@@ -179,14 +182,10 @@ mod sni_ssl_context_provider {
 
         let result = SniSslContextProvider::servername_callback_impl(&mut ssl, &contexts);
 
-        assert!(
-            result == openssl_sys::SSL_TLSEXT_ERR_OK,
-            "Servername callback did not return OK"
-        );
-        assert!(
-            rx_context_called.recv().unwrap() == "fake_context",
-            "Set context was not called with the expected value"
-        );
+        assert!(result == openssl_sys::SSL_TLSEXT_ERR_OK,
+                "Servername callback did not return OK");
+        assert!(rx_context_called.recv().unwrap() == "fake_context",
+                "Set context was not called with the expected value");
     }
 
     #[test]
@@ -199,9 +198,7 @@ mod sni_ssl_context_provider {
         let contexts = HashMap::new();
         let result = SniSslContextProvider::servername_callback_impl(&mut ssl, &contexts);
 
-        assert!(
-            result == openssl_sys::SSL_TLSEXT_ERR_NOACK,
-            "Expected ERR_NOACK result from servername callback"
-        );
+        assert!(result == openssl_sys::SSL_TLSEXT_ERR_NOACK,
+                "Expected ERR_NOACK result from servername callback");
     }
 }

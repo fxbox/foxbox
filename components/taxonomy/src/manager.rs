@@ -6,7 +6,7 @@
 
 pub use adapter::*;
 use api;
-use api::{ API, Error, TargetMap, User };
+use api::{API, Error, TargetMap, User};
 use backend::*;
 use channel::Channel;
 use io::*;
@@ -16,8 +16,8 @@ use util::is_sync;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{ Arc, Mutex, Weak };
-use std::sync::atomic::{ AtomicBool, Ordering };
+use std::sync::{Arc, Mutex, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use sublock::atomlock::*;
@@ -247,8 +247,10 @@ impl API for AdapterManager {
     }
 
     /// Read the latest value from a set of channels
-    fn fetch_values(&self, selectors: Vec<ChannelSelector>, user: User) -> OpResult<(Payload, Arc<Format>)>
-    {
+    fn fetch_values(&self,
+                    selectors: Vec<ChannelSelector>,
+                    user: User)
+                    -> OpResult<(Payload, Arc<Format>)> {
         // First, prepare the request.
         let mut request;
         {
@@ -267,9 +269,10 @@ impl API for AdapterManager {
     }
 
     /// Send a bunch of values to a set of channels
-    fn send_values(&self, keyvalues: TargetMap<ChannelSelector, Payload>, user: User) ->
-        ResultMap<Id<Channel>, (), Error>
-    {
+    fn send_values(&self,
+                   keyvalues: TargetMap<ChannelSelector, Payload>,
+                   user: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
         // First, prepare the request.
         let mut prepared;
         {
@@ -288,13 +291,14 @@ impl API for AdapterManager {
     }
 
     /// Watch for any change
-    fn watch_values(&self, watch: TargetMap<ChannelSelector, Exactly<Payload>>,
-        on_event: Box<ExtSender<api::WatchEvent>>) -> Self::WatchGuard
-    {
-        let (request, watch_key, is_dropped) =
-        {
+    fn watch_values(&self,
+                    watch: TargetMap<ChannelSelector, Exactly<Payload>>,
+                    on_event: Box<ExtSender<api::WatchEvent>>)
+                    -> Self::WatchGuard {
+        let (request, watch_key, is_dropped) = {
             // Acquire and release write lock.
-            self.back_end.write()
+            self.back_end
+                .write()
                 .unwrap()
                 .prepare_channel_watch(watch, on_event)
         };
@@ -303,7 +307,9 @@ impl API for AdapterManager {
             debug!(target: "Taxonomy-manager", "manager.watch_values => need to register watches");
         }
         self.register_watches(request);
-        WatchGuard::new(self.tx_watch.lock().unwrap().internal_clone(), watch_key, is_dropped)
+        WatchGuard::new(self.tx_watch.lock().unwrap().internal_clone(),
+                        watch_key,
+                        is_dropped)
     }
 
     /// A value that causes a disconnection once it is dropped.
@@ -320,7 +326,7 @@ enum WatchOp {
     Start(WatchRequest, RawSender<()>),
 
     /// Release a watch, after the corresponding WatchGuard has been dropped.
-    Release(WatchKey)
+    Release(WatchKey),
 }
 
 impl AdapterManager {
@@ -342,7 +348,7 @@ impl AdapterManager {
             for msg in rx {
                 match state.upgrade() {
                     None => return, // The manager has been dropped.
-                    Some(backend) =>
+                    Some(backend) => {
                         match msg {
                             WatchOp::Start(request, tx) => {
                                 let add = State::start_watch(request);
@@ -353,6 +359,7 @@ impl AdapterManager {
                                 backend.write().unwrap().stop_watch(request)
                             }
                         }
+                    }
                 }
             }
         });
@@ -374,12 +381,11 @@ pub struct WatchGuard {
     is_dropped: Arc<AtomicBool>,
 }
 impl WatchGuard {
-    fn new(tx_owner: Box<ExtSender<WatchOp>>, key: WatchKey, is_dropped: Arc<AtomicBool>) -> Self
-    {
+    fn new(tx_owner: Box<ExtSender<WatchOp>>, key: WatchKey, is_dropped: Arc<AtomicBool>) -> Self {
         WatchGuard {
             tx_owner: tx_owner,
             key: key,
-            is_dropped: is_dropped
+            is_dropped: is_dropped,
         }
     }
 }

@@ -1,11 +1,11 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 extern crate rand;
 
 use foxbox_core::config_store::ConfigService;
-use foxbox_core::profile_service::{ ProfilePath, ProfileService };
+use foxbox_core::profile_service::{ProfilePath, ProfileService};
 use foxbox_core::traits::Controller;
 use foxbox_core::upnp::UpnpManager;
 use foxbox_users::UsersManager;
@@ -17,13 +17,13 @@ use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use tls::{ CertificateManager, CertificateRecord, SniSslContextProvider };
+use tls::{CertificateManager, CertificateRecord, SniSslContextProvider};
 use ws;
 
 #[derive(Clone)]
 pub struct ControllerStub {
     pub config: Arc<ConfigService>,
-    profile_service: Arc<ProfileService>
+    profile_service: Arc<ProfileService>,
 }
 
 impl ControllerStub {
@@ -31,10 +31,8 @@ impl ControllerStub {
         let path = format!("/tmp/{}", rand::random::<i32>());
         let profile_service = ProfileService::new(ProfilePath::Custom(path));
         ControllerStub {
-            config: Arc::new(
-                ConfigService::new(&profile_service.path_for("foxbox.conf"))
-            ),
-            profile_service: Arc::new(profile_service)
+            config: Arc::new(ConfigService::new(&profile_service.path_for("foxbox.conf"))),
+            profile_service: Arc::new(profile_service),
         }
     }
 }
@@ -83,12 +81,13 @@ impl Controller for ControllerStub {
 
     fn get_box_certificate(&self) -> io::Result<CertificateRecord> {
         CertificateRecord::new_from_components("foxbox.local".to_owned(),
-                                        PathBuf::from("a/file.pem"),
-                                        PathBuf::from("b/file.pem"),
-                                        "abcdef".to_owned())
+                                               PathBuf::from("a/file.pem"),
+                                               PathBuf::from("b/file.pem"),
+                                               "abcdef".to_owned())
     }
 
     fn get_certificate_manager(&self) -> CertificateManager {
-       CertificateManager::new(PathBuf::from(current_dir!()), Box::new(SniSslContextProvider::new()))
+        CertificateManager::new(PathBuf::from(current_dir!()),
+                                Box::new(SniSslContextProvider::new()))
     }
 }

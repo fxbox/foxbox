@@ -14,7 +14,9 @@ use std::marker::PhantomData;
 
 /// A thinkerbell scrip"t.
 #[derive(Debug)]
-pub struct Script<Ctx> where Ctx: Context {
+pub struct Script<Ctx>
+    where Ctx: Context
+{
     pub name: String,
 
     /// A set of rules, stating what must be done in which circumstance.
@@ -28,12 +30,12 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
         "Script".to_owned()
     }
     fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
-        let name =  try!(path.push("name", |path| String::take(path, source, "name")));
+        let name = try!(path.push("name", |path| String::take(path, source, "name")));
         let rules = try!(path.push("rules", |path| Rule::take_vec(path, source, "rules")));
         Ok(Script {
             name: name,
             rules: rules,
-            phantom: PhantomData
+            phantom: PhantomData,
         })
     }
 }
@@ -76,7 +78,9 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Rule<Ctx> where Ctx: Context {
+pub struct Rule<Ctx>
+    where Ctx: Context
+{
     /// The condition in which to execute the trigger. The condition
     /// is matched once *all* the `Match` branches are true. Whenever
     /// `conditions` was false and becomes true, we execute `execute`.
@@ -94,11 +98,9 @@ impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
 
     fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
         let conditions = try!(path.push("conditions",
-            |path| Match::take_vec(path, source, "conditions"))
-        );
+                                        |path| Match::take_vec(path, source, "conditions")));
         let execute = try!(path.push("execute",
-            |path| Statement::take_vec(path, source, "execute"))
-        );
+                                     |path| Statement::take_vec(path, source, "execute")));
         Ok(Rule {
             conditions: conditions,
             execute: execute,
@@ -149,7 +151,9 @@ impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Match<Ctx> where Ctx: Context {
+pub struct Match<Ctx>
+    where Ctx: Context
+{
     /// The set of getters to watch. Note that the set of getters may
     /// change (e.g. when devices are added/removed) without rebooting
     /// the script.
@@ -181,21 +185,15 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
 
     fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
         let sources = try!(path.push("source",
-            |path| ChannelSelector::take_vec(path, source, "source"))
-        );
-        let feature = try!(path.push("feature",
-            |path| Id::take(path, source, "feature"))
-        );
-        let when = try!(path.push("when",
-            |path| Payload::take(path, source, "when"))
-        );
-        let duration = match path.push("duration",
-            |path| Duration::take(path, source, "duration"))
-        {
-            Err(ParseError::MissingField {..}) => None,
-            Err(err) => return Err(err),
-            Ok(ok) => Some(ok)
-        };
+                                     |path| ChannelSelector::take_vec(path, source, "source")));
+        let feature = try!(path.push("feature", |path| Id::take(path, source, "feature")));
+        let when = try!(path.push("when", |path| Payload::take(path, source, "when")));
+        let duration =
+            match path.push("duration", |path| Duration::take(path, source, "duration")) {
+                Err(ParseError::MissingField { .. }) => None,
+                Err(err) => return Err(err),
+                Ok(ok) => Some(ok),
+            };
         Ok(Match {
             source: sources,
             feature: feature,
@@ -238,7 +236,9 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Statement<Ctx> where Ctx: Context {
+pub struct Statement<Ctx>
+    where Ctx: Context
+{
     /// The set of setters to which to send a command. Note that the
     /// set of setters may change (e.g. when devices are
     /// added/removed) without rebooting the script.
@@ -263,15 +263,11 @@ impl Parser<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
     }
 
     fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
-        let destination = try!(path.push("destination",
-            |path| ChannelSelector::take_vec(path, source, "destination"))
-        );
-        let feature = try!(path.push("feature",
-            |path| Id::take(path, source, "feature"))
-        );
-        let value = try!(path.push("value",
-            |path| Payload::take(path, source, "value"))
-        );
+        let destination = try!(path.push("destination", |path| {
+            ChannelSelector::take_vec(path, source, "destination")
+        }));
+        let feature = try!(path.push("feature", |path| Id::take(path, source, "feature")));
+        let value = try!(path.push("value", |path| Payload::take(path, source, "value")));
         Ok(Statement {
             destination: destination,
             value: value,
@@ -290,13 +286,10 @@ impl Parser<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
 /// been compiled/checked yet and must not be executed;
 /// - `compile::CompiledCtx`, designed to mark the fact that a script
 /// has been compiled and can be executed.
-pub trait Context {
-}
+pub trait Context {}
 
 /// A Context used to represent a script that hasn't been compiled
 /// yet.
 #[derive(Debug)]
 pub struct UncheckedCtx;
-impl Context for UncheckedCtx {
-}
-
+impl Context for UncheckedCtx {}

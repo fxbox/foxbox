@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! Stores subscription information for `WebPush`.
 //!
@@ -21,7 +21,7 @@
 use foxbox_taxonomy::api::User;
 use super::Subscription;
 use libc::c_int;
-use rusqlite::{ self, Connection };
+use rusqlite::{self, Connection};
 
 fn escape(string: &str) -> String {
     // http://www.sqlite.org/faq.html#q14
@@ -37,8 +37,8 @@ fn escape_option(opt: &Option<String>) -> Option<String> {
 
 fn user_to_str(user: &User) -> String {
     match *user {
-        User::Id(ref user)  => user.clone(),
-        User::None          => String::from("")
+        User::Id(ref user) => user.clone(),
+        User::None => String::from(""),
     }
 }
 
@@ -51,34 +51,41 @@ impl WebPushDb {
     pub fn new(path: &str) -> Self {
         let db = Connection::open(path).unwrap();
         db.execute("CREATE TABLE IF NOT EXISTS subscriptions (
-                    user_id     TEXT,
+                    user_id     \
+                      TEXT,
                     push_uri    TEXT NOT NULL UNIQUE,
-                    public_key  TEXT NOT NULL,
+                    \
+                      public_key  TEXT NOT NULL,
                     auth        TEXT
-            )", &[]).unwrap();
+            \
+                      )",
+                     &[])
+            .unwrap();
 
         db.execute("CREATE TABLE IF NOT EXISTS resources (
-                    user_id     TEXT,
+                    user_id     \
+                      TEXT,
                     resource    TEXT NOT NULL
-            )", &[]).unwrap();
+            )",
+                     &[])
+            .unwrap();
 
-        WebPushDb {
-            db: db
-        }
+        WebPushDb { db: db }
     }
 
     /// Adds a new push subscription `sub` bound to the user `user_id`.
     pub fn subscribe(&self, user_id: &User, sub: &Subscription) -> rusqlite::Result<c_int> {
         self.db.execute("INSERT INTO subscriptions VALUES ($1, $2, $3, $4)",
-                        &[&escape(&user_to_str(user_id)), &escape(&sub.push_uri), &escape(&sub.public_key), &escape_option(&sub.auth)]
-        )
+                        &[&escape(&user_to_str(user_id)),
+                          &escape(&sub.push_uri),
+                          &escape(&sub.public_key),
+                          &escape_option(&sub.auth)])
     }
 
     /// Removes an existing push subscription identified by `push_uri`.
     pub fn unsubscribe(&self, _: &User, push_uri: &str) -> rusqlite::Result<c_int> {
         self.db.execute("DELETE FROM subscriptions WHERE push_uri=$1",
-                        &[&escape(push_uri)]
-        )
+                        &[&escape(push_uri)])
     }
 
     /// Sets the resources to subscribe to notifications for the user `user_id`.
@@ -119,14 +126,16 @@ impl WebPushDb {
             subs.push(Subscription {
                 push_uri: row.get(0),
                 public_key: row.get(1),
-                auth: row.get(2)
+                auth: row.get(2),
             });
         }
         Ok(subs)
     }
 
     /// Gets the push subscriptions for users who are subscribed to `resource` notifications.
-    pub fn get_resource_subscriptions(&self, resource: &str) -> rusqlite::Result<Vec<Subscription>> {
+    pub fn get_resource_subscriptions(&self,
+                                      resource: &str)
+                                      -> rusqlite::Result<Vec<Subscription>> {
         let mut subs = Vec::new();
         let mut stmt = try!(self.db.prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE
                                              user_id IN (SELECT user_id FROM resources WHERE resource=$1)"));
@@ -138,7 +147,7 @@ impl WebPushDb {
             subs.push(Subscription {
                 push_uri: row.get(0),
                 public_key: row.get(1),
-                auth: row.get(2)
+                auth: row.get(2),
             });
         }
         Ok(subs)
@@ -161,7 +170,7 @@ pub fn remove_test_db() {
     let dbfile = get_db_environment();
     match fs::remove_file(Path::new(&dbfile)) {
         Err(e) => panic!("Error {} cleaning up {}", e, dbfile),
-        _ => assert!(true)
+        _ => assert!(true),
     }
 }
 

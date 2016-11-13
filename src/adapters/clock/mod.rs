@@ -1,24 +1,24 @@
 //! An adapter providing time-related services, such as the current
 //! timestamp or the current time of day.
 
-use foxbox_taxonomy::api::{ Error, InternalError, Operation, User };
+use foxbox_taxonomy::api::{Error, InternalError, Operation, User};
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ format, Duration as ValDuration, Range, TimeStamp, Value };
+use foxbox_taxonomy::values::{format, Duration as ValDuration, Range, TimeStamp, Value};
 
 use transformable_channels::mpsc::*;
 
 use std::collections::HashMap;
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 
 use chrono;
-use chrono::{ DateTime, Duration, Local, NaiveTime, Timelike };
+use chrono::{DateTime, Duration, Local, NaiveTime, Timelike};
 use timer;
 
 static ADAPTER_NAME: &'static str = "Clock adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
-static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
+static ADAPTER_VERSION: [u32; 4] = [0, 0, 0, 0];
 
 #[derive(Clone)]
 enum Op {
@@ -26,7 +26,10 @@ enum Op {
     Exit(Id<Channel>, Value),
 }
 
-enum Movement { Enter, Exit }
+enum Movement {
+    Enter,
+    Exit,
+}
 
 pub struct Clock {
     /// Timer used to dispatch `register_watch` requests.
@@ -39,8 +42,7 @@ pub struct Clock {
 
 /// A guard used to cancel watching for values.
 struct Guard(Vec<timer::Guard>);
-impl AdapterWatchGuard for Guard {
-}
+impl AdapterWatchGuard for Guard {}
 
 impl Clock {
     pub fn id() -> Id<AdapterId> {
@@ -72,108 +74,126 @@ impl Adapter for Clock {
         ADAPTER_VENDOR
     }
 
-    fn version(&self) -> &[u32;4] {
+    fn version(&self) -> &[u32; 4] {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, mut set: Vec<Id<Channel>>, _: User) -> ResultMap<Id<Channel>, Option<Value>, Error> {
-        set.drain(..).map(|id| {
-            if id == self.getter_timestamp_id {
-                let date = TimeStamp::from_datetime(chrono::UTC::now());
-                (id, Ok(Some(Value::new(date))))
-            } else if id == self.getter_time_of_day_id {
-                use chrono::Timelike;
-                let date = chrono::Local::now();
-                let duration = chrono::Duration::seconds(date.num_seconds_from_midnight() as i64);
-                (id, Ok(Some(Value::new(ValDuration::from(duration)))))
-            } else {
-                (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
-            }
-        }).collect()
-    }
-
-    fn send_values(&self, mut values: HashMap<Id<Channel>, Value>, _: User) -> ResultMap<Id<Channel>, (), Error> {
-        values.drain()
-            .map(|(id, _)| {
-                (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
+    fn fetch_values(&self,
+                    mut set: Vec<Id<Channel>>,
+                    _: User)
+                    -> ResultMap<Id<Channel>, Option<Value>, Error> {
+        set.drain(..)
+            .map(|id| {
+                if id == self.getter_timestamp_id {
+                    let date = TimeStamp::from_datetime(chrono::UTC::now());
+                    (id, Ok(Some(Value::new(date))))
+                } else if id == self.getter_time_of_day_id {
+                    use chrono::Timelike;
+                    let date = chrono::Local::now();
+                    let duration =
+                        chrono::Duration::seconds(date.num_seconds_from_midnight() as i64);
+                    (id, Ok(Some(Value::new(ValDuration::from(duration)))))
+                } else {
+                    (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
+                }
             })
             .collect()
     }
 
-    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult
-    {
-        watch.drain(..).map(|(id, filter, tx)| {
-            let tx = tx.map(|msg| {
-                match msg {
-                    Op::Enter(id, value) => {
-                        WatchEvent::Enter {
-                            id: id,
-                            value: value
+    fn send_values(&self,
+                   mut values: HashMap<Id<Channel>, Value>,
+                   _: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
+        values.drain()
+            .map(|(id, _)| (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id)))))
+            .collect()
+    }
+
+    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult {
+        watch.drain(..)
+            .map(|(id, filter, tx)| {
+                let tx = tx.map(|msg| {
+                    match msg {
+                        Op::Enter(id, value) => {
+                            WatchEvent::Enter {
+                                id: id,
+                                value: value,
+                            }
                         }
-                    },
-                    Op::Exit(id, value) => {
-                        WatchEvent::Exit {
-                            id: id,
-                            value: value
+                        Op::Exit(id, value) => {
+                            WatchEvent::Exit {
+                                id: id,
+                                value: value,
+                            }
                         }
-                    },
-                }
-            });
-            (id.clone(), match filter {
-                Some(range) => self.aux_register_watch(&id, &range, Box::new(tx.clone())),
-                _ => Err(Error::GetterRequiresThresholdForWatching(id)),
+                    }
+                });
+                (id.clone(),
+                 match filter {
+                    Some(range) => self.aux_register_watch(&id, &range, Box::new(tx.clone())),
+                    _ => Err(Error::GetterRequiresThresholdForWatching(id)),
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl Clock {
-    fn aux_register_watch(&self, id: &Id<Channel>, range: &Value, tx: Box<ExtSender<Op>>)
-        -> Result<Box<AdapterWatchGuard>, Error>
-    {
+    fn aux_register_watch(&self,
+                          id: &Id<Channel>,
+                          range: &Value,
+                          tx: Box<ExtSender<Op>>)
+                          -> Result<Box<AdapterWatchGuard>, Error> {
         match () {
-            _ if *id == self.getter_time_of_day_id => self.aux_register_watch_timeofday(id, range, tx),
-            _ if *id == self.getter_timestamp_id => self.aux_register_watch_timestamp(id, range, tx),
+            _ if *id == self.getter_time_of_day_id => {
+                self.aux_register_watch_timeofday(id, range, tx)
+            }
+            _ if *id == self.getter_timestamp_id => {
+                self.aux_register_watch_timestamp(id, range, tx)
+            }
             _ if *id == self.getter_interval_id => self.aux_register_watch_interval(id, range, tx),
-            _ => Err(Error::OperationNotSupported(Operation::Watch, id.clone()))
+            _ => Err(Error::OperationNotSupported(Operation::Watch, id.clone())),
         }
     }
 
-    fn aux_register_watch_interval(&self, id: &Id<Channel>, value: &Value, tx: Box<ExtSender<Op>>)
-        -> Result<Box<AdapterWatchGuard>, Error>
-    {
+    fn aux_register_watch_interval(&self,
+                                   id: &Id<Channel>,
+                                   value: &Value,
+                                   tx: Box<ExtSender<Op>>)
+                                   -> Result<Box<AdapterWatchGuard>, Error> {
         // Determine when to call the trigger.
         let duration = try!(value.cast::<ValDuration>()).clone();
 
         debug!(target: "clock@link.mozilla.org", "[clock@link.mozilla.org] Scheduling a repeating watch with a duration of {:?}", duration);
 
         let id = id.clone();
-        let guard = self.timer.lock().unwrap().schedule_repeating(duration.clone().into(), move || {
-            // Send Enter followed immediately by Exit, to make sure that Thinkerbell
-            // rules reset themselves.
-            let _ = tx.send(Op::Enter(id.clone(),
-                Value::new(duration.clone())));
-            let _ = tx.send(Op::Exit(id.clone(),
-                Value::new(duration.clone())));
-        });
+        let guard =
+            self.timer.lock().unwrap().schedule_repeating(duration.clone().into(), move || {
+                // Send Enter followed immediately by Exit, to make sure that Thinkerbell
+                // rules reset themselves.
+                let _ = tx.send(Op::Enter(id.clone(), Value::new(duration.clone())));
+                let _ = tx.send(Op::Exit(id.clone(), Value::new(duration.clone())));
+            });
         Ok(Box::new(Guard(vec![guard])))
     }
 
-    fn aux_register_watch_timeofday(&self, id: &Id<Channel>, value: &Value, tx: Box<ExtSender<Op>>)
-        -> Result<Box<AdapterWatchGuard>, Error>
-    {
+    fn aux_register_watch_timeofday(&self,
+                                    id: &Id<Channel>,
+                                    value: &Value,
+                                    tx: Box<ExtSender<Op>>)
+                                    -> Result<Box<AdapterWatchGuard>, Error> {
         use foxbox_taxonomy::values::Range::*;
 
         let range = try!(value.cast::<Range<ValDuration>>());
 
         // Determine when to call the trigger. Repeat duration is always one day.
         let mut thresholds = match *range {
-            Leq (ref val) => {
+            Leq(ref val) => {
                 // Equivalent to BetweenEq { min: 0am, max: val }
-                let ts : chrono::Duration = val.clone().into();
+                let ts: chrono::Duration = val.clone().into();
                 vec![(Movement::Enter, chrono::Duration::seconds(0)), (Movement::Exit, ts)]
             }
-            Geq (ref val) => {
+            Geq(ref val) => {
                 // Equivalent to BetweenEq { min: val, max: 0am }
                 let ts = val.clone().into();
                 vec![(Movement::Enter, ts), (Movement::Exit, Duration::days(1))]
@@ -189,72 +209,79 @@ impl Clock {
                 let ts_max = max.clone().into();
                 vec![(Movement::Exit, ts_min), (Movement::Enter, ts_max)]
             }
-            Eq (ref val) => {
-                let ts : chrono::Duration = val.clone().into();
+            Eq(ref val) => {
+                let ts: chrono::Duration = val.clone().into();
                 vec![(Movement::Enter, ts.clone()), (Movement::Exit, ts)]
             }
         };
 
         // Determine when the next timers needs to launch.
         let now = chrono::Local::now();
-        let guards : Vec<timer::Guard> = thresholds.drain(..).filter_map(|(movement, threshold)| {
-            let date = match Self::get_next_date(&now, threshold) {
-                Err(_) => return None,
-                Ok(date) => date,
-            };
-            let id = id.clone();
-            let tx = tx.clone();
-            let guard = self.timer.lock().unwrap().schedule(date, Some(Duration::days(1)), move || {
-                let naive_time = chrono::Local::now().time();
-                let duration = Duration::hours(naive_time.hour() as i64)
-                    + Duration::minutes(naive_time.minute() as i64)
-                    + Duration::seconds(naive_time.second() as i64);
-
-                let event = match movement {
-                    Movement::Enter => Op::Enter(id.clone(),
-                        Value::new(ValDuration::from(duration))),
-                    Movement::Exit => Op::Exit(id.clone(),
-                        Value::new(ValDuration::from(duration))),
+        let guards: Vec<timer::Guard> = thresholds.drain(..)
+            .filter_map(|(movement, threshold)| {
+                let date = match Self::get_next_date(&now, threshold) {
+                    Err(_) => return None,
+                    Ok(date) => date,
                 };
-                let _ = tx.send(event);
-            });
-            Some(guard)
-        }).collect();
+                let id = id.clone();
+                let tx = tx.clone();
+                let guard =
+                    self.timer.lock().unwrap().schedule(date, Some(Duration::days(1)), move || {
+                        let naive_time = chrono::Local::now().time();
+                        let duration = Duration::hours(naive_time.hour() as i64) +
+                                       Duration::minutes(naive_time.minute() as i64) +
+                                       Duration::seconds(naive_time.second() as i64);
+
+                        let event = match movement {
+                            Movement::Enter => {
+                                Op::Enter(id.clone(), Value::new(ValDuration::from(duration)))
+                            }
+                            Movement::Exit => {
+                                Op::Exit(id.clone(), Value::new(ValDuration::from(duration)))
+                            }
+                        };
+                        let _ = tx.send(event);
+                    });
+                Some(guard)
+            })
+            .collect();
         Ok(Box::new(Guard(guards)))
     }
 
-    fn get_next_date(now: &DateTime<Local>, time_of_day: Duration)
-        -> Result<DateTime<Local>, Error>
-    {
+    fn get_next_date(now: &DateTime<Local>,
+                     time_of_day: Duration)
+                     -> Result<DateTime<Local>, Error> {
         match chrono::Local::today().and_time(NaiveTime::from_hms(0, 0, 0) + time_of_day) {
             None => Err(Error::InvalidValue),
             Some(date) => {
-                if date >= *now  {
+                if date >= *now {
                     Ok(date)
                 } else {
                     // Otherwise, shift to tomorrow.
                     match date.checked_add(Duration::days(1)) {
                         None => Err(Error::InvalidValue),
-                        Some(date) => Ok(date)
+                        Some(date) => Ok(date),
                     }
                 }
             }
         }
     }
 
-    fn aux_register_watch_timestamp(&self, id: &Id<Channel>, value: &Value, tx: Box<ExtSender<Op>>)
-        -> Result<Box<AdapterWatchGuard>, Error>
-    {
+    fn aux_register_watch_timestamp(&self,
+                                    id: &Id<Channel>,
+                                    value: &Value,
+                                    tx: Box<ExtSender<Op>>)
+                                    -> Result<Box<AdapterWatchGuard>, Error> {
         use foxbox_taxonomy::values::Range::*;
         let range = try!(value.cast::<Range<TimeStamp>>());
 
         // Now determine when/if to call the trigger.
         let mut thresholds = match *range {
-            Leq (_) => {
+            Leq(_) => {
                 // This variant doesn't make sense.
-                return Ok(Box::new(Guard(vec![])))
+                return Ok(Box::new(Guard(vec![])));
             }
-            Geq (ref val) | Eq (ref val) => {
+            Geq(ref val) | Eq(ref val) => {
                 let ts = *val.as_datetime();
                 vec![(Movement::Enter, ts)]
             }
@@ -272,28 +299,32 @@ impl Clock {
 
         // Determine when/if the next timers needs to launch.
         let now = chrono::UTC::now();
-        let guards : Vec<timer::Guard> = thresholds.drain(..).filter_map(|(movement, date)| {
-            if date < now {
-                return None
-            }
-            let id = id.clone();
-            let tx = tx.clone();
-            let guard = self.timer.lock().unwrap().schedule_with_date(date, move || {
-                let naive_time = chrono::Local::now().time();
-                let duration = Duration::hours(naive_time.hour() as i64)
-                    + Duration::minutes(naive_time.minute() as i64)
-                    + Duration::seconds(naive_time.second() as i64);
+        let guards: Vec<timer::Guard> = thresholds.drain(..)
+            .filter_map(|(movement, date)| {
+                if date < now {
+                    return None;
+                }
+                let id = id.clone();
+                let tx = tx.clone();
+                let guard = self.timer.lock().unwrap().schedule_with_date(date, move || {
+                    let naive_time = chrono::Local::now().time();
+                    let duration = Duration::hours(naive_time.hour() as i64) +
+                                   Duration::minutes(naive_time.minute() as i64) +
+                                   Duration::seconds(naive_time.second() as i64);
 
-                let event = match movement {
-                    Movement::Enter => Op::Enter(id.clone(),
-                        Value::new(ValDuration::from(duration))),
-                    Movement::Exit => Op::Exit(id.clone(),
-                        Value::new(ValDuration::from(duration))),
-                };
-                let _ = tx.send(event);
-            });
-            Some(guard)
-        }).collect();
+                    let event = match movement {
+                        Movement::Enter => {
+                            Op::Enter(id.clone(), Value::new(ValDuration::from(duration)))
+                        }
+                        Movement::Exit => {
+                            Op::Exit(id.clone(), Value::new(ValDuration::from(duration)))
+                        }
+                    };
+                    let _ = tx.send(event);
+                });
+                Some(guard)
+            })
+            .collect();
         Ok(Box::new(Guard(guards)))
     }
 }

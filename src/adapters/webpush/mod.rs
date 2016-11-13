@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! Adapter for `WebPush`.
 //!
@@ -15,19 +15,19 @@
 mod crypto;
 mod db;
 
-use foxbox_taxonomy::api::{ Error, InternalError, User };
+use foxbox_taxonomy::api::{Error, InternalError, User};
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::io;
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::parse::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ Data, Value, Json };
+use foxbox_taxonomy::values::{Data, Value, Json};
 use foxbox_taxonomy::values::format;
 
-use hyper::header::{ ContentEncoding, Encoding, Authorization };
+use hyper::header::{ContentEncoding, Encoding, Authorization};
 use hyper::Client;
 use hyper::client::Body;
-use rusqlite::{ self };
+use rusqlite;
 use self::crypto::CryptoContext;
 use serde_json;
 use std::cmp::max;
@@ -43,7 +43,7 @@ header! { (Ttl, "TTL") => [u32] }
 
 static ADAPTER_NAME: &'static str = "WebPush adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
-static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
+static ADAPTER_VERSION: [u32; 4] = [0, 0, 0, 0];
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Subscription {
@@ -54,27 +54,23 @@ pub struct Subscription {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct SubscriptionGetter {
-    subscriptions: Vec<Subscription>
+    subscriptions: Vec<Subscription>,
 }
 
 impl SubscriptionGetter {
     fn new(subs: Vec<Subscription>) -> Self {
-        SubscriptionGetter {
-            subscriptions: subs
-        }
+        SubscriptionGetter { subscriptions: subs }
     }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ResourceGetter {
-    resources: Vec<String>
+    resources: Vec<String>,
 }
 
 impl ResourceGetter {
     fn new(res: Vec<String>) -> Self {
-        ResourceGetter {
-            resources: res
-        }
+        ResourceGetter { resources: res }
     }
 }
 
@@ -99,10 +95,15 @@ impl Subscription {
         // parameter can be omitted for messages that fit within this limit."
         //
         let record_size = max(4096, message.len() + 18);
-        let enc = match crypto.encrypt(&self.public_key, message.to_owned(), &self.auth, record_size) {
+        let enc = match crypto.encrypt(&self.public_key,
+                                       message.to_owned(),
+                                       &self.auth,
+                                       record_size) {
             Some(x) => x,
             None => {
-                warn!("notity subscription {} failed for {}", self.push_uri, message);
+                warn!("notity subscription {} failed for {}",
+                      self.push_uri,
+                      message);
                 return;
             }
         };
@@ -129,7 +130,8 @@ impl Subscription {
         // https://github.com/GoogleChrome/web-push-encryption/blob/dd8c58c62b1846c481ceb066c52da0d695c8415b/src/push.js#L84
         if push_uri != self.push_uri {
             if gcm_api_key.is_empty() {
-                warn!("cannot notify subscription {}, GCM API key missing from foxbox.conf", push_uri);
+                warn!("cannot notify subscription {}, GCM API key missing from foxbox.conf",
+                      push_uri);
                 return;
             }
             req = req.header(Authorization(format!("key={}", gcm_api_key)));
@@ -164,10 +166,15 @@ impl Subscription {
         // TODO: Add a retry mechanism if 429 Too Many Requests returned by push service
         let rsp = match req.send() {
             Ok(x) => x,
-            Err(e) => { warn!("notify subscription {} failed: {:?}", push_uri, e); return; }
+            Err(e) => {
+                warn!("notify subscription {} failed: {:?}", push_uri, e);
+                return;
+            }
         };
 
-        info!("notified subscription {} (status {:?})", push_uri, rsp.status);
+        info!("notified subscription {} (status {:?})",
+              push_uri,
+              rsp.status);
     }
 }
 
@@ -219,11 +226,14 @@ impl<C: Controller> Adapter for WebPush<C> {
         ADAPTER_VENDOR
     }
 
-    fn version(&self) -> &[u32;4] {
+    fn version(&self) -> &[u32; 4] {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, mut set: Vec<Id<Channel>>, user: User) -> ResultMap<Id<Channel>, Option<Value>, Error> {
+    fn fetch_values(&self,
+                    mut set: Vec<Id<Channel>>,
+                    user: User)
+                    -> ResultMap<Id<Channel>, Option<Value>, Error> {
         set.drain(..).map(|id| {
             if cfg!(feature = "authentication") && (user == User::None) {
                 return (id,
@@ -249,7 +259,10 @@ impl<C: Controller> Adapter for WebPush<C> {
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Channel>, Value>, user: User) -> ResultMap<Id<Channel>, (), Error> {
+    fn send_values(&self,
+                   mut values: HashMap<Id<Channel>, Value>,
+                   user: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
         values.drain().map(|(id, value)| {
             if cfg!(feature = "authentication") && (user == User::None) {
                 return (id,
@@ -349,8 +362,7 @@ impl<C: Controller> WebPush<C> {
         Ok(())
     }
 
-    fn new(controller: C) -> Self
-    {
+    fn new(controller: C) -> Self {
         WebPush {
             controller: controller,
             crypto: CryptoContext::new().unwrap(),
@@ -407,8 +419,8 @@ impl<C: Controller> WebPush<C> {
         } else {
             let json = json!({resource: setter.resource, message: setter.message});
             let crypto = self.crypto.clone();
-            let gcm_api_key = self.controller.get_config().get_or_set_default(
-                "webpush", "gcm_api_key", "");
+            let gcm_api_key =
+                self.controller.get_config().get_or_set_default("webpush", "gcm_api_key", "");
 
             thread::spawn(move || {
                 for sub in subscriptions {
@@ -432,15 +444,19 @@ impl Data for WebPushNotify {
     }
     fn parse(path: Path, source: &JSON, binary: &io::BinarySource) -> Result<Self, Error> {
         let resource = try!(path.push("resource", |path| String::parse_field(path, source, binary, "resource")));
-        let message = try!(path.push("message", |path| String::parse_field(path, source, binary, "message")));
-        Ok(WebPushNotify { resource: resource, message: message})
+        let message =
+            try!(path.push("message", |path| String::parse_field(path, source, binary, "message")));
+        Ok(WebPushNotify {
+            resource: resource,
+            message: message,
+        })
     }
     fn serialize(source: &Self, _binary: &io::BinaryTarget) -> Result<JSON, Error> {
         let json = vec![
             ("resource", &source.resource),
             ("message", &source.message),
-        ].to_json();
+        ]
+            .to_json();
         Ok(json)
     }
 }
-

@@ -1,16 +1,16 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 // Assumes Unix
-use libc::{self,  c_int};
+use libc::{self, c_int};
 
 use std::thread;
 use std::thread::JoinHandle;
-use std::sync::{ Arc, Mutex, RwLock };
+use std::sync::{Arc, Mutex, RwLock};
 use std::process::Child;
-use std::io::{ Error, ErrorKind, Result };
-use std::time::{ Duration, Instant };
+use std::io::{Error, ErrorKind, Result};
+use std::time::{Duration, Instant};
 
 /// Unix exit statuses
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -20,9 +20,9 @@ const RESTART_TIME_THRESHOLD: u64 = 5; // seconds
 
 pub struct ManagedProcess {
     kill_signal: Arc<Mutex<u32>>,
-    pid:         Arc<Mutex<Option<u32>>>,
-    thread:      JoinHandle<()>,
-    backoff:     Arc<RwLock<Backoff>>,
+    pid: Arc<Mutex<Option<u32>>>,
+    thread: JoinHandle<()>,
+    backoff: Arc<RwLock<Backoff>>,
 }
 
 struct Backoff {
@@ -33,7 +33,6 @@ struct Backoff {
 }
 
 impl Backoff {
-
     fn new(restart_threshold: Duration) -> Self {
         Backoff {
             restart_count: 0,
@@ -50,20 +49,19 @@ impl Backoff {
     fn next_backoff(&mut self) -> Duration {
         let end_time = Instant::now();
 
-        let duration_to_backoff =
-            if let Some(start_time) = self.start_time {
-                if (end_time - start_time) < self.restart_threshold {
-                    self.backoff += 1;
+        let duration_to_backoff = if let Some(start_time) = self.start_time {
+            if (end_time - start_time) < self.restart_threshold {
+                self.backoff += 1;
 
-                    // non-linear back off
-                    Duration::from_secs((self.backoff * self.backoff) >> 1)
-                } else {
-                    self.backoff = 1;
-                    Duration::from_secs(0)
-                }
+                // non-linear back off
+                Duration::from_secs((self.backoff * self.backoff) >> 1)
             } else {
+                self.backoff = 1;
                 Duration::from_secs(0)
-            };
+            }
+        } else {
+            Duration::from_secs(0)
+        };
 
         self.restart_count += 1;
         self.start_time = Some(Instant::now());
@@ -77,7 +75,6 @@ impl Backoff {
 }
 
 impl ManagedProcess {
-
     /// Create a new ManagedProcess and start it.
     ///
     /// # Examples
@@ -93,7 +90,8 @@ impl ManagedProcess {
     /// });
     ///
     pub fn start<F: 'static>(spawn: F) -> Result<ManagedProcess>
-        where F: Fn() -> Result<Child> + Send {
+        where F: Fn() -> Result<Child> + Send
+    {
 
         let pid = Arc::new(Mutex::new(None));
 
@@ -101,7 +99,7 @@ impl ManagedProcess {
         // In this case we want a bool like thing _and_ a lock.
         let kill_signal = Arc::new(Mutex::new(0));
 
-        let shared_kill_signal  = kill_signal.clone();
+        let shared_kill_signal = kill_signal.clone();
         let backoff = Arc::new(RwLock::new(Backoff::from_secs(RESTART_TIME_THRESHOLD)));
         let shared_pid = pid.clone();
         let shared_backoff = backoff.clone();
@@ -122,7 +120,8 @@ impl ManagedProcess {
                         break;
                     }
 
-                    info!("Starting process. Restarted {} times", checklock!(backoff.read()).get_restart_count());
+                    info!("Starting process. Restarted {} times",
+                          checklock!(backoff.read()).get_restart_count());
                     child_process = spawn().unwrap();
                     *pid = Some(child_process.id());
                 }
@@ -137,8 +136,8 @@ impl ManagedProcess {
         Ok(ManagedProcess {
             backoff: backoff,
             kill_signal: kill_signal,
-            pid:  pid,
-            thread: thread
+            pid: pid,
+            thread: thread,
         })
     }
 
@@ -193,17 +192,17 @@ impl ManagedProcess {
             Ok(Some(_)) => {
                 // Process is already exited
                 false
-            },
+            }
             Ok(None) => {
                 // Process is still alive
                 true
-            },
+            }
             Err(e) => {
                 // Something went wrong probably at the OS level, warn and don't
                 // try and kill the process.
                 warn!("{}", e);
                 false
-            },
+            }
         };
 
         if needs_kill {
@@ -227,13 +226,11 @@ impl ManagedProcess {
 fn try_wait(id: i32) -> Result<Option<ExitStatus>> {
     let mut status = 0 as c_int;
 
-    match c_rv_retry(|| unsafe {
-        libc::waitpid(id, &mut status, libc::WNOHANG)
-    }) {
-        Ok(0)  => Ok(None),
+    match c_rv_retry(|| unsafe { libc::waitpid(id, &mut status, libc::WNOHANG) }) {
+        Ok(0) => Ok(None),
         Ok(n) if n == id => Ok(Some(ExitStatus(status))),
-        Ok(n)  => Err(Error::new(ErrorKind::NotFound, format!("Unknown pid: {}", n))),
-        Err(e) => Err(Error::new(ErrorKind::Other, format!("Unknown waitpid error: {}", e)))
+        Ok(n) => Err(Error::new(ErrorKind::NotFound, format!("Unknown pid: {}", n))),
+        Err(e) => Err(Error::new(ErrorKind::Other, format!("Unknown waitpid error: {}", e))),
     }
 }
 
@@ -311,10 +308,11 @@ fn test_managed_process_restart() {
     use std::process::Command;
 
     let process = ManagedProcess::start(|| {
-        Command::new("sleep")
+            Command::new("sleep")
                 .arg("0")
                 .spawn()
-    }).unwrap();
+        })
+        .unwrap();
 
     // Maybe spin with try_recv and check a duration
     // to assert liveness?
@@ -337,10 +335,11 @@ fn test_managed_process_shutdown() {
     // Ideally need a timeout. The test should be, if shutdown doesn't happen immediately,
     // something's broken.
     let process = ManagedProcess::start(|| {
-        Command::new("sleep")
+            Command::new("sleep")
                 .arg("1000")
                 .spawn()
-    }).unwrap();
+        })
+        .unwrap();
 
     process.shutdown().unwrap();
 }

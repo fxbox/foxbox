@@ -1,14 +1,14 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-///! This is the database that holds tags associated to various objects.
-///! It provides an api to manage Id <-> tags relationships.
-///! All users share the same tags for objects.
+/// ! This is the database that holds tags associated to various objects.
+/// ! It provides an api to manage Id <-> tags relationships.
+/// ! All users share the same tags for objects.
 
-use rusqlite::{ Connection, Result };
+use rusqlite::{Connection, Result};
 use std::path::PathBuf;
-use util::{ Id, TagId };
+use util::{Id, TagId};
 
 fn escape<T>(string: &Id<T>) -> String {
     // http://www.sqlite.org/faq.html#q14
@@ -18,7 +18,7 @@ fn escape<T>(string: &Id<T>) -> String {
 /// Creates a unique key for a (id, tag) tuple.
 /// `SQlite` integers are i64 so we turn the hashed u64 into a String...
 fn create_key<T>(id: &Id<T>, tag: &Id<TagId>) -> String {
-    use std::hash::{ Hash, Hasher };
+    use std::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
 
     let mut hasher = DefaultHasher::new();
@@ -38,7 +38,7 @@ impl TagStorage {
     pub fn new(path: &PathBuf) -> Self {
         TagStorage {
             db: None,
-            path: path.clone()
+            path: path.clone(),
         }
     }
 
@@ -55,10 +55,14 @@ impl TagStorage {
         });
 
         db.execute("CREATE TABLE IF NOT EXISTS tags (
-                    key    TEXT NOT NULL PRIMARY KEY,
+                    key    TEXT NOT NULL \
+                      PRIMARY KEY,
                     id     TEXT NOT NULL,
-                    tag    TEXT NOT NULL
-            )", &[]).unwrap_or_else(|err| {
+                    \
+                      tag    TEXT NOT NULL
+            )",
+                     &[])
+            .unwrap_or_else(|err| {
                 panic!("Unable to create taxonomy tags database: {}", err);
             });
 
@@ -91,7 +95,7 @@ impl TagStorage {
         for tag in tags {
             try!(self.add_tag(id, tag));
         }
-        //self.dump("add_tags");
+        // self.dump("add_tags");
         Ok(())
     }
 
@@ -146,7 +150,7 @@ pub fn remove_test_db() {
     let dbfile = get_db_environment();
     match fs::remove_file(dbfile.clone()) {
         Err(e) => panic!("Error {} cleaning up {}", e, dbfile.display()),
-        _ => assert!(true)
+        _ => assert!(true),
     }
 }
 
@@ -174,7 +178,7 @@ fn storage_test() {
             remove_test_db();
         }
     }
-    let auto_db = AutoDeleteDb { };
+    let auto_db = AutoDeleteDb {};
 
     let mut store = TagStorage::new(&get_db_environment());
 

@@ -12,7 +12,9 @@ use util::*;
 use std::hash::Hash;
 use std::collections::HashSet;
 
-fn merge<T>(mut a: HashSet<T>, b: Vec<T>) -> HashSet<T> where T: Hash + Eq {
+fn merge<T>(mut a: HashSet<T>, b: Vec<T>) -> HashSet<T>
+    where T: Hash + Eq
+{
     for x in b {
         a.insert(x);
     }
@@ -29,7 +31,7 @@ impl SelectedBy<Option<Signature>> for Exactly<bool> {
             (&Exactly::Always, _) |
             (&Exactly::Exactly(true), &Some(_)) |
             (&Exactly::Exactly(false), &None) => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -50,10 +52,14 @@ impl ServiceLike for Service {
     fn adapter(&self) -> &Id<AdapterId> {
         &self.adapter
     }
-    fn with_tags<F>(&self, f: F) -> bool where F: Fn(&HashSet<Id<TagId>>) -> bool {
+    fn with_tags<F>(&self, f: F) -> bool
+        where F: Fn(&HashSet<Id<TagId>>) -> bool
+    {
         f(&self.tags)
     }
-    fn has_channels<F>(&self, f: F) -> bool where F: Fn(&Channel) -> bool {
+    fn has_channels<F>(&self, f: F) -> bool
+        where F: Fn(&Channel) -> bool
+    {
         for chan in self.channels.values() {
             if f(chan) {
                 return true;
@@ -137,21 +143,24 @@ impl Parser<ServiceSelector> for ServiceSelector {
                 result
             }
         });
-        let tags : HashSet<_> = match path.push("tags", |path| Id::take_vec_opt(path, source, "tags")) {
-            None => HashSet::new(),
-            Some(Ok(mut vec)) => {
-                is_empty = false;
-                vec.drain(..).collect()
-            }
-            Some(Err(err)) => return Err(err),
-        };
-        let channels = match path.push("channels", |path| ChannelSelector::take_vec_opt(path, source, "channels")) {
+        let tags: HashSet<_> =
+            match path.push("tags", |path| Id::take_vec_opt(path, source, "tags")) {
+                None => HashSet::new(),
+                Some(Ok(mut vec)) => {
+                    is_empty = false;
+                    vec.drain(..).collect()
+                }
+                Some(Err(err)) => return Err(err),
+            };
+        let channels = match path.push("channels", |path| {
+            ChannelSelector::take_vec_opt(path, source, "channels")
+        }) {
             None => vec![],
             Some(Ok(vec)) => {
                 is_empty = false;
                 vec
             }
-            Some(Err(err)) => return Err(err)
+            Some(Err(err)) => return Err(err),
         };
 
         if is_empty {
@@ -161,7 +170,7 @@ impl Parser<ServiceSelector> for ServiceSelector {
                 id: id,
                 tags: tags,
                 channels: channels,
-                private: ()
+                private: (),
             })
         }
     }
@@ -175,25 +184,22 @@ impl ServiceSelector {
 
     /// Selector for a service with a specific id.
     pub fn with_id(self, id: &Id<ServiceId>) -> Self {
-        ServiceSelector {
-            id: self.id.and(Exactly::Exactly(id.clone())),
-            .. self
-        }
+        ServiceSelector { id: self.id.and(Exactly::Exactly(id.clone())), ..self }
     }
 
     ///  Restrict results to services that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<Id<TagId>>) -> Self {
-        ServiceSelector {
-            tags: merge(self.tags, tags),
-            .. self
-        }
+        ServiceSelector { tags: merge(self.tags, tags), ..self }
     }
 
     /// Restrict results to services that have all the channels in `channels`.
     pub fn with_channels(mut self, mut channels: Vec<ChannelSelector>) -> Self {
         ServiceSelector {
-            channels: {self.channels.append(&mut channels); self.channels},
-            .. self
+            channels: {
+                self.channels.append(&mut channels);
+                self.channels
+            },
+            ..self
         }
     }
 
@@ -202,7 +208,10 @@ impl ServiceSelector {
         ServiceSelector {
             id: self.id.and(other.id),
             tags: self.tags.union(&other.tags).cloned().collect(),
-            channels: { self.channels.append(&mut other.channels); self.channels },
+            channels: {
+                self.channels.append(&mut other.channels);
+                self.channels
+            },
             private: (),
         }
     }
@@ -218,11 +227,9 @@ impl ServiceSelector {
         }
         // If any of the getter selectors doesn't find a getter,
         // we don't match.
-        let channels_fail = self.channels.iter().any(|selector| {
-            !service.has_channels(|channel| {
-                selector.matches(&self.tags, channel)
-            })
-        });
+        let channels_fail = self.channels
+            .iter()
+            .any(|selector| !service.has_channels(|channel| selector.matches(&self.tags, channel)));
         if channels_fail {
             return false;
         }
@@ -325,14 +332,26 @@ impl Parser<ChannelSelector> for ChannelSelector {
                 result
             }
         });
-        let service_id = try!(match path.push("service", |path| Exactly::take_opt(path, source, "service")) {
+        let service_id =
+            try!(match path.push("service", |path| Exactly::take_opt(path, source, "service")) {
             None => Ok(Exactly::Always),
             Some(result) => {
                 is_empty = false;
                 result
             }
         });
-        let tags : HashSet<_> = match path.push("tags", |path| Id::take_vec_opt(path, source, "tags")) {
+        let tags: HashSet<_> =
+            match path.push("tags", |path| Id::take_vec_opt(path, source, "tags")) {
+                None => HashSet::new(),
+                Some(Ok(mut vec)) => {
+                    is_empty = false;
+                    vec.drain(..).collect()
+                }
+                Some(Err(err)) => return Err(err),
+            };
+        let service_tags: HashSet<_> = match path.push("service_tags", |path| {
+            Id::take_vec_opt(path, source, "service_tags")
+        }) {
             None => HashSet::new(),
             Some(Ok(mut vec)) => {
                 is_empty = false;
@@ -340,15 +359,8 @@ impl Parser<ChannelSelector> for ChannelSelector {
             }
             Some(Err(err)) => return Err(err),
         };
-        let service_tags : HashSet<_> = match path.push("service_tags", |path| Id::take_vec_opt(path, source, "service_tags")) {
-            None => HashSet::new(),
-            Some(Ok(mut vec)) => {
-                is_empty = false;
-                vec.drain(..).collect()
-            }
-            Some(Err(err)) => return Err(err),
-        };
-        let feature = try!(match path.push("feature", |path| Exactly::take_opt(path, source, "feature")) {
+        let feature =
+            try!(match path.push("feature", |path| Exactly::take_opt(path, source, "feature")) {
             None => Ok(Exactly::Always),
             Some(result) => {
                 is_empty = false;
@@ -379,7 +391,7 @@ impl Parser<ChannelSelector> for ChannelSelector {
                 supports_send: supports_send,
                 supports_fetch: supports_fetch,
                 supports_watch: supports_watch,
-                private: ()
+                private: (),
             })
         }
     }
@@ -393,63 +405,39 @@ impl ChannelSelector {
 
     /// Restrict to a channel with a specific id.
     pub fn with_id(self, id: &Id<Channel>) -> Self {
-        ChannelSelector {
-            id: self.id.and(Exactly::Exactly(id.clone())),
-            .. self
-        }
+        ChannelSelector { id: self.id.and(Exactly::Exactly(id.clone())), ..self }
     }
 
     /// Restrict to a channel with a specific parent.
     pub fn with_parent(self, id: &Id<ServiceId>) -> Self {
-        ChannelSelector {
-            parent: self.parent.and(Exactly::Exactly(id.clone())),
-            .. self
-        }
+        ChannelSelector { parent: self.parent.and(Exactly::Exactly(id.clone())), ..self }
     }
 
     /// Restrict to a channel with a specific kind.
     pub fn with_feature(self, feature: &Id<FeatureId>) -> Self {
-        ChannelSelector {
-            feature: self.feature.and(Exactly::Exactly(feature.clone())),
-            .. self
-        }
+        ChannelSelector { feature: self.feature.and(Exactly::Exactly(feature.clone())), ..self }
     }
 
     ///  Restrict to channels that have all the tags in `tags`.
     pub fn with_tags(self, tags: Vec<Id<TagId>>) -> Self {
-        ChannelSelector {
-            tags: merge(self.tags, tags),
-            .. self
-        }
+        ChannelSelector { tags: merge(self.tags, tags), ..self }
     }
 
     pub fn with_supports_watch(self, value: Exactly<bool>) -> Self {
-        ChannelSelector {
-            supports_watch: self.supports_watch.and(value),
-            .. self
-        }
+        ChannelSelector { supports_watch: self.supports_watch.and(value), ..self }
     }
 
     pub fn with_supports_fetch(self, value: Exactly<bool>) -> Self {
-        ChannelSelector {
-            supports_fetch: self.supports_fetch.and(value),
-            .. self
-        }
+        ChannelSelector { supports_fetch: self.supports_fetch.and(value), ..self }
     }
 
     pub fn with_supports_send(self, value: Exactly<bool>) -> Self {
-        ChannelSelector {
-            supports_send: self.supports_send.and(value),
-            .. self
-        }
+        ChannelSelector { supports_send: self.supports_send.and(value), ..self }
     }
 
     ///  Restrict to channels offered by a service that has all the tags in `tags`.
     pub fn with_service_tags(self, tags: Vec<Id<TagId>>) -> Self {
-        ChannelSelector {
-            service_tags: merge(self.service_tags, tags),
-            .. self
-        }
+        ChannelSelector { service_tags: merge(self.service_tags, tags), ..self }
     }
 
     /// Restrict to channels that are accepted by two selector.

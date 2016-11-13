@@ -1,47 +1,48 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 extern crate url;
 
 use self::url::Url;
 use foxbox_core::traits::Controller;
 use std::thread;
 use ws;
-use ws::{ Handler, Sender, Result, Message, Handshake, CloseCode, Error };
+use ws::{Handler, Sender, Result, Message, Handshake, CloseCode, Error};
 use ws::listen;
 
 pub struct WsServer;
 
 pub struct WsHandler<T> {
     pub out: Sender,
-    pub controller: T
+    pub controller: T,
 }
 
 impl WsServer {
-
     pub fn start<T: Controller>(controller: T) {
         let addrs: Vec<_> = controller.ws_as_addrs().unwrap().collect();
-        thread::Builder::new().name("WsServer".to_owned()).spawn(move || {
+        thread::Builder::new()
+            .name("WsServer".to_owned())
+            .spawn(move || {
 
-            listen(addrs[0], |out| {
-                WsHandler {
-                    out: out,
-                    controller: controller.clone(),
-                }
-            }).unwrap();
-        }).unwrap();
+                listen(addrs[0], |out| {
+                        WsHandler {
+                            out: out,
+                            controller: controller.clone(),
+                        }
+                    })
+                    .unwrap();
+            })
+            .unwrap();
     }
 }
 
 impl<T: Controller> WsHandler<T> {
-
     fn close_with_error(&mut self, reason: &'static str) -> Result<()> {
         self.out.close_with_reason(ws::CloseCode::Error, reason)
     }
 }
 
 impl<T: Controller> Handler for WsHandler<T> {
-
     fn on_open(&mut self, handshake: Handshake) -> Result<()> {
         info!("Hello new ws connection");
 
@@ -58,7 +59,7 @@ impl<T: Controller> Handler for WsHandler<T> {
                 pairs.iter()
                     .find(|set| set.0.to_lowercase() == "auth")
                     .map(|set| set.1.clone())
-            },
+            }
             _ => return self.close_with_error("Missing authorization"),
         };
 

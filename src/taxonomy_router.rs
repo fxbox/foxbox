@@ -1,50 +1,48 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 extern crate serde_json;
 
 use foxbox_core::traits::Controller;
 use foxbox_taxonomy::manager::*;
-use foxbox_taxonomy::api::{ API, Error, TargetMap, User };
+use foxbox_taxonomy::api::{API, Error, TargetMap, User};
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::io::*;
-use foxbox_taxonomy::values::{ format, Binary };
+use foxbox_taxonomy::values::{format, Binary};
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 
 use foxbox_users::AuthEndpoint;
 use foxbox_users::SessionToken;
 
-use iron::{ Handler, headers, IronResult, Request, Response };
+use iron::{Handler, headers, IronResult, Request, Response};
 use iron::headers::ContentType;
 use iron::method::Method;
 use iron::prelude::Chain;
 use iron::request::Body;
 use iron::status::Status;
 
-use std::io::{ Error as IOError, Read };
+use std::io::{Error as IOError, Read};
 use std::sync::Arc;
 
 /// This is a specialized Router for the taxonomy API.
 /// It handles all the calls under the api/v1/ url space.
 pub struct TaxonomyRouter {
-    api: Arc<AdapterManager>
+    api: Arc<AdapterManager>,
 }
 
 type GetterResultMap = ResultMap<Id<Channel>, Option<(Payload, Arc<Format>)>, Error>;
 
 impl TaxonomyRouter {
     pub fn new(adapter_api: &Arc<AdapterManager>) -> Self {
-        TaxonomyRouter {
-            api: adapter_api.clone()
-        }
+        TaxonomyRouter { api: adapter_api.clone() }
     }
 
     fn build_binary_response(&self, payload: &Binary) -> IronResult<Response> {
         use hyper::mime::Mime;
 
-        let mime : Mime = format!("{}", payload.mimetype).parse().unwrap();
+        let mime: Mime = format!("{}", payload.mimetype).parse().unwrap();
         // TODO: stop copying the array here.
         let data = payload.data.clone();
 
@@ -70,7 +68,7 @@ impl TaxonomyRouter {
         Ok(response)
     }
 
-    fn read_body_to_string<'a, 'b : 'a>(body: &mut Body<'a, 'b>) -> Result<String, IOError> {
+    fn read_body_to_string<'a, 'b: 'a>(body: &mut Body<'a, 'b>) -> Result<String, IOError> {
         let mut s = String::new();
         try!(body.read_to_string(&mut s));
         Ok(s)
@@ -91,9 +89,9 @@ impl TaxonomyRouter {
                         Some(data) => {
                             return Some(Binary {
                                 mimetype: (*data).mimetype.clone(),
-                                data: (*data).data.clone()
+                                data: (*data).data.clone(),
                             });
-                        },
+                        }
                         None => {
                             warn!("get_binary could not convert data labelled as format::BINARY to Binary {}", data.description());
                         }
@@ -108,19 +106,18 @@ impl TaxonomyRouter {
 }
 
 impl Handler for TaxonomyRouter {
-
     #[allow(cyclomatic_complexity)]
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        let user: User = match req.headers.clone().get::
-            <headers::Authorization<headers::Bearer>>() {
-            Some(&headers::Authorization(headers::Bearer { ref token })) => {
-                match SessionToken::from_string(token) {
-                    Ok(token) => User::Id(token.claims.id),
-                    Err(_) => return Ok(Response::with(Status::Unauthorized))
+        let user: User =
+            match req.headers.clone().get::<headers::Authorization<headers::Bearer>>() {
+                Some(&headers::Authorization(headers::Bearer { ref token })) => {
+                    match SessionToken::from_string(token) {
+                        Ok(token) => User::Id(token.claims.id),
+                        Err(_) => return Ok(Response::with(Status::Unauthorized)),
+                    }
                 }
-            },
-            _ => User::None
-        };
+                _ => User::None,
+            };
 
         // We are handling urls relative to the mounter set up in http_server.rs
         // That means that for a full url like http://localhost/api/v1/services
@@ -256,13 +253,13 @@ impl Handler for TaxonomyRouter {
                        ["channels", "tags"], Method::Delete);
 
         // Fallthrough, returning a 404.
-        Ok(Response::with((Status::NotFound,
-                           format!("Unknown url: {}", req.url))))
+        Ok(Response::with((Status::NotFound, format!("Unknown url: {}", req.url))))
     }
 }
 
 pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
-    where T: Controller {
+    where T: Controller
+{
     let router = TaxonomyRouter::new(adapter_api);
 
     let auth_endpoints = if cfg!(feature = "authentication") && !cfg!(test) {
@@ -360,7 +357,7 @@ describe! binary_getter {
 
         let taxo_manager = Arc::new(AdapterManager::new(None));
 
-        // Create a basic adpater and service with a getter returning binary data.
+// Create a basic adpater and service with a getter returning binary data.
 
         static ADAPTER_NAME: &'static str = "Test adapter";
         static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";

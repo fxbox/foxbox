@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 // Needed to derive `Serialize` on ServiceProperties
 #![feature(custom_derive, plugin, proc_macro)]
@@ -97,15 +97,15 @@ mod stubs {
 
 use controller::FoxBox;
 use env_logger::LogBuilder;
-use tunnel_controller:: { TunnelConfig, Tunnel };
-use libc::{ sighandler_t, SIGINT };
-use log::{ LogRecord, LogLevelFilter };
+use tunnel_controller::{TunnelConfig, Tunnel};
+use libc::{sighandler_t, SIGINT};
+use log::{LogRecord, LogLevelFilter};
 
 use multicast_dns::errors::Error as HostManagerError;
 use multicast_dns::host::HostManager;
 use foxbox_core::profile_service::ProfilePath;
 use std::env;
-use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
+use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 use tls::TlsOption;
 use foxbox_core::traits::Controller;
 use foxbox_core::utils;
@@ -172,7 +172,7 @@ fn update_hostname(hostname: &str) -> Result<String, HostManagerError> {
 // Signal handlers must not do anything substantial. To trigger shutdown, we atomically
 // flip this flag; the event loop checks the flag and exits accordingly.
 static SHUTDOWN_FLAG: AtomicBool = ATOMIC_BOOL_INIT;
-unsafe fn handle_sigint(_:i32) {
+unsafe fn handle_sigint(_: i32) {
     SHUTDOWN_FLAG.store(true, Ordering::Release);
 }
 
@@ -202,21 +202,20 @@ fn main() {
             let t = time::now();
             let level_color = match record.level() {
                 log::LogLevel::Error => "\x1b[1;31m",  // bold red
-                log::LogLevel::Warn  => "\x1b[1;33m",  // bold yellow
-                log::LogLevel::Info  => "\x1b[1;32m",  // bold green
+                log::LogLevel::Warn => "\x1b[1;33m",  // bold yellow
+                log::LogLevel::Info => "\x1b[1;32m",  // bold green
                 log::LogLevel::Debug => "\x1b[1;34m",  // bold blue
-                log::LogLevel::Trace => "\x1b[1;35m"   // bold magenta
+                log::LogLevel::Trace => "\x1b[1;35m",   // bold magenta
             };
             format!("[\x1b[90m{}.{:03}\x1b[0m] {}{}{:5} [{}@{}]\x1b[0m {}",
-                time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
-                t.tm_nsec / 1_000_000,
-                tid_str(),
-                level_color,
-                record.level(),
-                record.target(),
-                record.location().line(),
-                record.args()
-            )
+                    time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
+                    t.tm_nsec / 1_000_000,
+                    tid_str(),
+                    level_color,
+                    record.level(),
+                    record.target(),
+                    record.location().line(),
+                    record.args())
         };
         builder.format(format).filter(None, LogLevelFilter::Info);
     } else {
@@ -224,20 +223,19 @@ fn main() {
         let format = |record: &LogRecord| {
             let t = time::now();
             format!("{}.{:03} {}{:5} [{}@{}] {}",
-                time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
-                t.tm_nsec / 1_000_000,
-                tid_str(),
-                record.level(),
-                record.target(),
-                record.location().line(),
-                record.args()
-            )
+                    time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
+                    t.tm_nsec / 1_000_000,
+                    tid_str(),
+                    record.level(),
+                    record.target(),
+                    record.location().line(),
+                    record.args())
         };
         builder.format(format).filter(None, LogLevelFilter::Info);
     }
 
     if env::var("RUST_LOG").is_ok() {
-       builder.parse(&env::var("RUST_LOG").unwrap());
+        builder.parse(&env::var("RUST_LOG").unwrap());
     }
     builder.init().unwrap();
 
@@ -252,14 +250,19 @@ fn main() {
         .and_then(|name| Ok(format!("{}.local", name)))
         .unwrap();
 
-    let mut controller = FoxBox::new(
-        args.flag_verbose, local_name.clone(), args.flag_port,
-        args.flag_wsport,
-        if args.flag_disable_tls { TlsOption::Disabled } else { TlsOption::Enabled },
-        match args.flag_profile {
-            Some(p) => ProfilePath::Custom(p),
-            None => ProfilePath::Default
-        });
+    let mut controller = FoxBox::new(args.flag_verbose,
+                                     local_name.clone(),
+                                     args.flag_port,
+                                     args.flag_wsport,
+                                     if args.flag_disable_tls {
+                                         TlsOption::Disabled
+                                     } else {
+                                         TlsOption::Enabled
+                                     },
+                                     match args.flag_profile {
+                                         Some(p) => ProfilePath::Custom(p),
+                                         None => ProfilePath::Default,
+                                     });
 
     // Override config values
     {
@@ -311,8 +314,7 @@ fn main() {
         tunnel.as_mut().unwrap().start().unwrap();
     }
 
-    registrar.start(args.flag_iface, &tunnel,
-                    args.flag_port,  &controller);
+    registrar.start(args.flag_iface, &tunnel, args.flag_port, &controller);
 
     controller.run(&SHUTDOWN_FLAG);
 

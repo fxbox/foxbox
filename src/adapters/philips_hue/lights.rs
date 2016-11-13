@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! Module that implements lights for `PhilipsHueAdapter`
 //!
@@ -14,7 +14,7 @@ use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::services::*;
 use super::*;
 use super::hub_api::HubApi;
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 
 const CUSTOM_PROPERTY_MANUFACTURER: &'static str = "manufacturer";
 const CUSTOM_PROPERTY_MODEL: &'static str = "model";
@@ -33,9 +33,7 @@ pub struct Light {
 }
 
 impl Light {
-    pub fn new(api: Arc<Mutex<HubApi>>, hub_id: &str, light_id: &str)
-        -> Self
-    {
+    pub fn new(api: Arc<Mutex<HubApi>>, hub_id: &str, light_id: &str) -> Self {
         Light {
             api: api,
             hub_id: hub_id.to_owned(),
@@ -52,9 +50,10 @@ impl Light {
     pub fn stop(&self) {
         // Nothing to do, yet
     }
-    pub fn init_service(&mut self, manager: Arc<AdapterManager>,
-        services: LightServiceMap) -> Result<(), Error>
-    {
+    pub fn init_service(&mut self,
+                        manager: Arc<AdapterManager>,
+                        services: LightServiceMap)
+                        -> Result<(), Error> {
         let adapter_id = create_adapter_id();
         let status = self.api.lock().unwrap().get_light_status(&self.light_id);
 
@@ -65,13 +64,11 @@ impl Light {
 
             let mut service = Service::empty(&self.service_id, &adapter_id);
             service.properties.insert(CUSTOM_PROPERTY_MANUFACTURER.to_owned(),
-                status.manufacturername.to_owned());
-            service.properties.insert(CUSTOM_PROPERTY_MODEL.to_owned(),
-                status.modelid.to_owned());
-            service.properties.insert(CUSTOM_PROPERTY_NAME.to_owned(),
-                status.name.to_owned());
+                                      status.manufacturername.to_owned());
+            service.properties.insert(CUSTOM_PROPERTY_MODEL.to_owned(), status.modelid.to_owned());
+            service.properties.insert(CUSTOM_PROPERTY_NAME.to_owned(), status.name.to_owned());
             service.properties.insert(CUSTOM_PROPERTY_TYPE.to_owned(),
-                "Light/ColorLight".to_owned());
+                                      "Light/ColorLight".to_owned());
             service.tags.insert(tag_id!("type:Light/ColorLight"));
 
             try!(manager.add_service(service));
@@ -115,13 +112,11 @@ impl Light {
                 self.light_id, self.hub_id);
             let mut service = Service::empty(&self.service_id, &adapter_id);
             service.properties.insert(CUSTOM_PROPERTY_MANUFACTURER.to_owned(),
-                status.manufacturername.to_owned());
-            service.properties.insert(CUSTOM_PROPERTY_MODEL.to_owned(),
-                status.modelid.to_owned());
-            service.properties.insert(CUSTOM_PROPERTY_NAME.to_owned(),
-                status.name.to_owned());
+                                      status.manufacturername.to_owned());
+            service.properties.insert(CUSTOM_PROPERTY_MODEL.to_owned(), status.modelid.to_owned());
+            service.properties.insert(CUSTOM_PROPERTY_NAME.to_owned(), status.name.to_owned());
             service.properties.insert(CUSTOM_PROPERTY_TYPE.to_owned(),
-                "Light/DimmerLight".to_owned());
+                                      "Light/DimmerLight".to_owned());
             service.tags.insert(tag_id!("type:Light/DimmerLight"));
 
             try!(manager.add_service(service));

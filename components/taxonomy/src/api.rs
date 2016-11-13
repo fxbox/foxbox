@@ -1,4 +1,3 @@
-//!
 //! The API for communicating with devices.
 //!
 //! This API is provided as Traits to be implemented:
@@ -17,12 +16,12 @@ use channel::Channel;
 use io::*;
 use services::*;
 use selector::*;
-pub use util::{ ResultMap, TargetMap, Targetted };
+pub use util::{ResultMap, TargetMap, Targetted};
 use values::TypeError;
 
 use transformable_channels::mpsc::*;
 
-use std::{ error, fmt };
+use std::{error, fmt};
 use std::error::Error as std_error;
 use std::sync::Arc;
 
@@ -32,7 +31,7 @@ use serde_json;
 pub enum Operation {
     Fetch,
     Send,
-    Watch
+    Watch,
 }
 impl fmt::Display for Operation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -48,10 +47,11 @@ impl ToJSON for Operation {
     fn to_json(&self) -> JSON {
         use self::Operation::*;
         match *self {
-            Fetch => "Fetch",
-            Send => "Send",
-            Watch => "Watch",
-        }.to_json()
+                Fetch => "Fetch",
+                Send => "Send",
+                Watch => "Watch",
+            }
+            .to_json()
     }
 }
 
@@ -90,22 +90,18 @@ impl ToJSON for Error {
         use self::Error::*;
         match *self {
             OperationNotSupported(ref op, ref id) => {
-                vec![("OperationNotSupported", vec![("operation", op.to_json()), ("channel", id.to_json())])].to_json()
-            },
+                vec![("OperationNotSupported",
+                      vec![("operation", op.to_json()), ("channel", id.to_json())])]
+                    .to_json()
+            }
             GetterRequiresThresholdForWatching(ref id) => {
                 vec![("GetterRequiresThresholdForWatching", id.to_json())].to_json()
-            },
+            }
             InvalidValue => "InvalidValue".to_json(),
             Internal(_) => "Internal Error".to_json(), // FIXME: Implement ToJSON for InternalError as well
-            Parsing(ref err) => {
-                vec![("ParseError", serde_json::to_value(err))].to_json()
-            },
-            Serializing(ref err) => {
-                vec![("SerializeError", serde_json::to_value(err))].to_json()
-            },
-            WrongType(ref err) => {
-                vec![("TypeError", serde_json::to_value(err))].to_json()
-            }
+            Parsing(ref err) => vec![("ParseError", serde_json::to_value(err))].to_json(),
+            Serializing(ref err) => vec![("SerializeError", serde_json::to_value(err))].to_json(),
+            WrongType(ref err) => vec![("TypeError", serde_json::to_value(err))].to_json(),
         }
     }
 }
@@ -113,10 +109,14 @@ impl ToJSON for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::OperationNotSupported(ref operation, ref channel) => write!(f, "{}: {} {}", self.description(), operation, channel),
-            Error::GetterRequiresThresholdForWatching(ref getter) => write!(f, "{}: {}", self.description(), getter),
+            Error::OperationNotSupported(ref operation, ref channel) => {
+                write!(f, "{}: {} {}", self.description(), operation, channel)
+            }
+            Error::GetterRequiresThresholdForWatching(ref getter) => {
+                write!(f, "{}: {}", self.description(), getter)
+            }
             Error::WrongType(ref err) => write!(f, "{}: {}", self.description(), err),
-            Error::InvalidValue => write!(f, "{}",self.description()),
+            Error::InvalidValue => write!(f, "{}", self.description()),
             Error::Internal(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for InternalError as well
             Error::Parsing(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for ParseError as well
             Error::Serializing(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for ParseError as well
@@ -127,20 +127,24 @@ impl fmt::Display for Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::OperationNotSupported(_, _) => "Attempting to perform a call to a Channel that does not support such calls",
-            Error::GetterRequiresThresholdForWatching(_) => "Attempting to watch all value from a Channel that requires a filter",
+            Error::OperationNotSupported(_, _) => {
+                "Attempting to perform a call to a Channel that does not support such calls"
+            }
+            Error::GetterRequiresThresholdForWatching(_) => {
+                "Attempting to watch all value from a Channel that requires a filter"
+            }
             Error::WrongType(_) => "Attempting to send a value with a wrong type",
             Error::InvalidValue => "Attempting to send an invalid value",
             Error::Internal(_) => "Internal Error", // TODO implement Error for InternalError as well
             Error::Parsing(ref err) => err.description(),
-            Error::Serializing(ref err) => err.description()
+            Error::Serializing(ref err) => err.description(),
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
             Error::WrongType(ref err) => Some(err),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -188,7 +192,7 @@ pub enum WatchEvent {
         /// The actual value.
         value: Payload,
 
-        format: Arc<Format>
+        format: Arc<Format>,
     },
 
     /// If a range was specified when we registered for watching, `ExitRange` is fired whenever
@@ -213,10 +217,7 @@ pub enum WatchEvent {
     /// added. Payload is the id of the device that was added.
     ChannelAdded(Id<Channel>),
 
-    Error {
-        channel: Id<Channel>,
-        error: Error
-    },
+    Error { channel: Id<Channel>, error: Error },
 }
 
 /// User identifier that will be passed from the REST API handlers to the
@@ -224,7 +225,7 @@ pub enum WatchEvent {
 #[derive(Debug, Clone, PartialEq)]
 pub enum User {
     None,
-    Id(String)
+    Id(String),
 }
 
 #[test]
@@ -233,7 +234,10 @@ fn test_user_partialeq() {
     assert_eq!(User::Id(String::from("1")), User::Id(String::from("1")));
 }
 
-impl<P, T> Parser<Targetted<T, Payload>> for Targetted<P, Payload> where P: Parser<T>, T: Clone {
+impl<P, T> Parser<Targetted<T, Payload>> for Targetted<P, Payload>
+    where P: Parser<T>,
+          T: Clone
+{
     fn description() -> String {
         format!("Targetted<{}, Value>", P::description())
     }
@@ -244,26 +248,33 @@ impl<P, T> Parser<Targetted<T, Payload>> for Targetted<P, Payload> where P: Pars
             let payload = try!(path.push("value", |path| Payload::take(path, source, "value")));
             Ok(Targetted {
                 select: select,
-                payload: payload
+                payload: payload,
             })
         } else if let JSON::Array(ref array) = *source {
             // Fallback format: an array of two values.
             if array.len() != 2 {
-                return Err(ParseError::type_error(&Self::description() as &str, &path, "an array of length 2"))
+                return Err(ParseError::type_error(&Self::description() as &str,
+                                                  &path,
+                                                  "an array of length 2"));
             }
             let select = try!(path.push_index(0, |path| Vec::<P>::parse(path, &array[0])));
             let payload = try!(path.push_index(1, |path| Payload::parse(path, &array[1])));
             Ok(Targetted {
                 select: select,
-                payload: payload
+                payload: payload,
             })
         } else {
-            Err(ParseError::type_error(&Self::description() as &str, &path, "an object {select, value}"))
+            Err(ParseError::type_error(&Self::description() as &str,
+                                       &path,
+                                       "an object {select, value}"))
         }
     }
 }
 
-impl<P, T> Parser<Targetted<T, Exactly<Payload>>> for Targetted<P, Exactly<Payload>> where P: Parser<T>, T: Clone {
+impl<P, T> Parser<Targetted<T, Exactly<Payload>>> for Targetted<P, Exactly<Payload>>
+    where P: Parser<T>,
+          T: Clone
+{
     fn description() -> String {
         format!("Targetted<{}, range>", P::description())
     }
@@ -273,19 +284,21 @@ impl<P, T> Parser<Targetted<T, Exactly<Payload>>> for Targetted<P, Exactly<Paylo
             if str == "Never" {
                 return Ok(Targetted {
                     select: select,
-                    payload: Exactly::Never
-                })
+                    payload: Exactly::Never,
+                });
             }
         }
-        let result = match path.push("range", |path| Exactly::<Payload>::take_opt(path, source, "range")) {
+        let result = match path.push("range",
+                                     |path| Exactly::<Payload>::take_opt(path, source, "range")) {
             Some(Ok(Exactly::Exactly(payload))) => Exactly::Exactly(payload),
-            Some(Ok(Exactly::Always)) | None => Exactly::Always,
+            Some(Ok(Exactly::Always)) |
+            None => Exactly::Always,
             Some(Ok(Exactly::Never)) => Exactly::Never,
             Some(Err(err)) => return Err(err),
         };
         Ok(Targetted {
             select: select,
-            payload: result
+            payload: result,
         })
     }
 }
@@ -298,7 +311,7 @@ pub trait API: Send {
     /// the metadata on all services matching _either_ `req1` or `req2`
     /// or ...
     ///
-    fn get_services(& self, Vec<ServiceSelector>) -> Vec<Service>;
+    fn get_services(&self, Vec<ServiceSelector>) -> Vec<Service>;
 
     /// Label a set of services with a set of tags.
     ///
@@ -313,7 +326,7 @@ pub trait API: Send {
     ///
     /// Note that this call is _not live_. In other words, if services
     /// are added after the call, they will not be affected.
-    fn add_service_tags(& self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn add_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Remove a set of tags from a set of services.
     ///
@@ -328,11 +341,11 @@ pub trait API: Send {
     ///
     /// Note that this call is _not live_. In other words, if services
     /// are added after the call, they will not be affected.
-    fn remove_service_tags(& self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn remove_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
 
 
     /// Get a list of channels matching some conditions
-    fn get_channels(& self, selectors: Vec<ChannelSelector>) -> Vec<Channel>;
+    fn get_channels(&self, selectors: Vec<ChannelSelector>) -> Vec<Channel>;
 
     /// Label a set of channels with a set of tags.
     ///
@@ -347,7 +360,7 @@ pub trait API: Send {
     ///
     /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
-    fn add_channel_tags(& self, selectors: Vec<ChannelSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn add_channel_tags(&self, selectors: Vec<ChannelSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Remove a set of tags from a set of channels.
     ///
@@ -362,7 +375,7 @@ pub trait API: Send {
     ///
     /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
-    fn remove_channel_tags(& self, selectors: Vec<ChannelSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn remove_channel_tags(&self, selectors: Vec<ChannelSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Read the latest value from a set of channels
     fn fetch_values(&self, Vec<ChannelSelector>, user: User) -> OpResult<(Payload, Arc<Format>)>;
@@ -371,7 +384,10 @@ pub trait API: Send {
     ///
     /// Sending values to several setters of the same service in a single call will generally
     /// be much faster than calling this method several times.
-    fn send_values(&self, TargetMap<ChannelSelector, Payload>, user: User) -> ResultMap<Id<Channel>, (), Error>;
+    fn send_values(&self,
+                   TargetMap<ChannelSelector, Payload>,
+                   user: User)
+                   -> ResultMap<Id<Channel>, (), Error>;
 
     /// Watch for changes from channels.
     ///
@@ -393,8 +409,10 @@ pub trait API: Send {
     /// Many devices may reject such requests.
     ///
     /// The watcher is disconnected once the `WatchGuard` returned by this method is dropped.
-    fn watch_values(& self, watch: TargetMap<ChannelSelector, Exactly<Payload>>,
-            on_event: Box<ExtSender<WatchEvent>>) -> Self::WatchGuard;
+    fn watch_values(&self,
+                    watch: TargetMap<ChannelSelector, Exactly<Payload>>,
+                    on_event: Box<ExtSender<WatchEvent>>)
+                    -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;

@@ -2,16 +2,16 @@ use parse::*;
 
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::hash::{ Hash, Hasher };
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::fmt;
 
-pub use odds::{ ptr_eq, ref_eq };
+pub use odds::{ptr_eq, ref_eq};
 
 use string_cache::Atom;
 
-use serde::ser::{ Serialize, Serializer };
-use serde::de::{ Deserialize, Deserializer, Error, Type };
+use serde::ser::{Serialize, Serializer};
+use serde::de::{Deserialize, Deserializer, Error, Type};
 
 /// A marker for a request that a expects a specific value.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -27,7 +27,9 @@ pub enum Exactly<T> {
     Never,
 }
 
-impl<T> Parser<Exactly<T>> for Exactly<T> where T: Parser<T> {
+impl<T> Parser<Exactly<T>> for Exactly<T>
+    where T: Parser<T>
+{
     fn description() -> String {
         T::description()
     }
@@ -41,19 +43,16 @@ impl<T> Parser<Exactly<T>> for Exactly<T> where T: Parser<T> {
     }
 }
 
-impl<T> Exactly<T> where T: PartialEq {
+impl<T> Exactly<T>
+    where T: PartialEq
+{
     /// Combine two constraints.
     pub fn and(self, other: Self) -> Self {
         use self::Exactly::*;
         match (self, other) {
             (Never, _) | (_, Never) => Never,
             (Always, x) | (x, Always) => x,
-            (Exactly(x), Exactly(y)) =>
-                if x == y {
-                    Exactly(y)
-                } else {
-                    Never
-                }
+            (Exactly(x), Exactly(y)) => if x == y { Exactly(y) } else { Never },
         }
     }
 
@@ -68,7 +67,7 @@ impl<T> Exactly<T> where T: PartialEq {
         match *self {
             Exactly::Always => true,
             Exactly::Exactly(ref id) => id == value,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -83,14 +82,14 @@ impl<T> Default for Exactly<T> {
 pub enum Maybe<T> {
     Required(T),
     Optional(T),
-    Nothing
+    Nothing,
 }
 
 
 /// A variant of `PhantomData` that supports [De]serialization
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub struct Phantom<T> {
-    phantom: PhantomData<T>
+    phantom: PhantomData<T>,
 }
 
 impl<T> Default for Phantom<T> {
@@ -101,24 +100,22 @@ impl<T> Default for Phantom<T> {
 
 impl<T> Phantom<T> {
     pub fn new() -> Self {
-        Phantom {
-            phantom: PhantomData
-        }
+        Phantom { phantom: PhantomData }
     }
 }
 impl<T> Serialize for Phantom<T> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
-        where S: Serializer {
-            ().serialize(serializer)
+        where S: Serializer
+    {
+        ().serialize(serializer)
     }
 }
 impl<T> Deserialize for Phantom<T> {
     fn deserialize<D>(_: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer {
+        where D: Deserializer
+    {
         // Nothing to consume
-        Ok(Phantom {
-            phantom: PhantomData
-        })
+        Ok(Phantom { phantom: PhantomData })
     }
 }
 
@@ -132,33 +129,38 @@ pub type TargetMap<K, T> = Vec<Targetted<K, T>>;
 
 pub struct Targetted<K, T> {
     pub select: Vec<K>,
-    pub payload: T
+    pub payload: T,
 }
-impl<K, T> Default for Targetted<K, T> where T: Default {
+impl<K, T> Default for Targetted<K, T>
+    where T: Default
+{
     fn default() -> Self {
         Targetted {
             select: vec![],
-            payload: T::default()
+            payload: T::default(),
         }
     }
 }
-impl<K, T> Targetted<K, T>  {
+impl<K, T> Targetted<K, T> {
     pub fn new(select: Vec<K>, payload: T) -> Self {
         Targetted {
             select: select,
-            payload: payload
+            payload: payload,
         }
     }
 }
-impl<K, T> Clone for Targetted<K, T> where K: Clone, T: Clone {
+impl<K, T> Clone for Targetted<K, T>
+    where K: Clone,
+          T: Clone
+{
     fn clone(&self) -> Self {
         Targetted {
             select: self.select.clone(),
-            payload: self.payload.clone()
+            payload: self.payload.clone(),
         }
     }
 }
- 
+
 /// A unique id for values of a given kind.
 ///
 /// # Performance
@@ -232,18 +234,20 @@ impl<T> PartialEq for Id<T> {
     }
 }
 
-impl<T> Eq for Id<T> {
-}
+impl<T> Eq for Id<T> {}
 
 impl<T> Hash for Id<T> {
-    fn hash<H>(&self, state: &mut H) where H: Hasher {
+    fn hash<H>(&self, state: &mut H)
+        where H: Hasher
+    {
         self.id.hash(state)
     }
 }
 
 impl<T> Serialize for Id<T> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
-        where S: Serializer {
+        where S: Serializer
+    {
         self.id.as_ref().serialize(serializer)
     }
 }
@@ -270,7 +274,8 @@ impl<T> ToJSON for Id<T> {
 
 impl<T> Deserialize for Id<T> {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer {
+        where D: Deserializer
+    {
         let deserialized_string = try!(String::deserialize(deserializer));
 
         Ok(Id {
@@ -288,12 +293,14 @@ impl<T> Default for Id<T> {
     fn default() -> Self {
         Id {
             id: ATOM_DEFAULT_ID.clone(),
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
 
-impl<T, U> ToJSON for HashMap<Id<U>, T> where T: ToJSON {
+impl<T, U> ToJSON for HashMap<Id<U>, T>
+    where T: ToJSON
+{
     fn to_json(&self) -> JSON {
         JSON::Object(self.iter().map(|(k, v)| (k.to_string(), T::to_json(v))).collect())
     }
@@ -334,17 +341,20 @@ impl<T, U> ToJSON for HashMap<Id<U>, T> where T: ToJSON {
 ///
 /// # fn main() {}
 /// ```
-pub struct TrivialEnumVisitor<T> where T: Deserialize {
-    parser: Box<Fn(&str) -> Result<T, ()>>
+pub struct TrivialEnumVisitor<T>
+    where T: Deserialize
+{
+    parser: Box<Fn(&str) -> Result<T, ()>>,
 }
 
-impl<T> TrivialEnumVisitor<T> where T: Deserialize {
+impl<T> TrivialEnumVisitor<T>
+    where T: Deserialize
+{
     pub fn new<F>(parser: F) -> Self
-        where F: Fn(&str) -> Result<T, ()> + 'static {
-            TrivialEnumVisitor {
-                parser: Box::new(parser)
-            }
-        }
+        where F: Fn(&str) -> Result<T, ()> + 'static
+    {
+        TrivialEnumVisitor { parser: Box::new(parser) }
+    }
     fn parse<E>(&self, source: &str) -> Result<T, E>
         where E: Error
     {
@@ -354,22 +364,24 @@ impl<T> TrivialEnumVisitor<T> where T: Deserialize {
 }
 
 use serde::de::Visitor;
-impl<T> Visitor for TrivialEnumVisitor<T> where T: Deserialize {
+impl<T> Visitor for TrivialEnumVisitor<T>
+    where T: Deserialize
+{
     type Value = T;
     fn visit_str<E>(&mut self, v: &str) -> Result<T, E>
-        where E: Error,
+        where E: Error
     {
         self.parse(v)
     }
 
     fn visit_string<E>(&mut self, v: String) -> Result<T, E>
-        where E: Error,
+        where E: Error
     {
         self.parse(&v)
     }
 
     fn visit_bytes<E>(&mut self, v: &[u8]) -> Result<T, E>
-        where E: Error,
+        where E: Error
     {
         use std::str;
         match str::from_utf8(v) {
@@ -379,7 +391,7 @@ impl<T> Visitor for TrivialEnumVisitor<T> where T: Deserialize {
     }
 
     fn visit_byte_buf<E>(&mut self, v: Vec<u8>) -> Result<T, E>
-        where E: Error,
+        where E: Error
     {
         match String::from_utf8(v) {
             Ok(s) => self.parse(&s),
@@ -415,4 +427,3 @@ pub struct MimeTypeId;
 
 /// Helper function, to check that a type implements Sync.
 pub fn is_sync<T: Sync>() {}
-

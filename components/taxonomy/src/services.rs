@@ -8,9 +8,9 @@
 
 use channel::*;
 use parse::*;
-pub use util::{ Exactly, Maybe, Id, AdapterId, ServiceId, KindId, TagId, VendorId };
+pub use util::{Exactly, Maybe, Id, AdapterId, ServiceId, KindId, TagId, VendorId};
 
-use std::collections::{ HashSet, HashMap };
+use std::collections::{HashSet, HashMap};
 
 // A helper macro to create a Id<ServiceId> without boilerplate.
 #[macro_export]
@@ -96,6 +96,7 @@ impl ToJSON for Service {
             ("tags", self.tags.to_json()),
             ("properties", self.properties.to_json()),
             ("channels", self.channels.to_json()),
-        ].to_json()
+        ]
+            .to_json()
     }
 }

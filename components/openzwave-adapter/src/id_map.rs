@@ -1,17 +1,18 @@
 use taxonomy::util::Id as TaxoId;
 
-use std::sync::{ Arc, RwLock };
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct IdMap<Kind, Type> {
-    map: Arc<RwLock<Vec<(TaxoId<Kind>, Type)>>>
+    map: Arc<RwLock<Vec<(TaxoId<Kind>, Type)>>>,
 }
 
-impl<Kind, Type> IdMap<Kind, Type> where Type: Eq + Clone, Kind: Clone {
+impl<Kind, Type> IdMap<Kind, Type>
+    where Type: Eq + Clone,
+          Kind: Clone
+{
     pub fn new() -> Self {
-        IdMap {
-            map: Arc::new(RwLock::new(Vec::new()))
-        }
+        IdMap { map: Arc::new(RwLock::new(Vec::new())) }
     }
 
     pub fn push(&mut self, id: TaxoId<Kind>, ozw_object: Type) {

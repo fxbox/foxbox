@@ -1,19 +1,19 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 extern crate hyper;
 extern crate time;
 extern crate url;
 
 use foxbox_core::config_store::ConfigService;
-use foxbox_taxonomy::api::{ Error, InternalError };
+use foxbox_taxonomy::api::{Error, InternalError};
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::services::*;
-use rustc_serialize::base64::{ FromBase64, ToBase64, STANDARD };
+use rustc_serialize::base64::{FromBase64, ToBase64, STANDARD};
 use std::fs;
 use std::os::unix::fs::MetadataExt;
-use std::io::{ BufWriter, ErrorKind };
+use std::io::{BufWriter, ErrorKind};
 use std::io::prelude::*;
 use std::path::Path;
 use std::sync::Arc;
@@ -22,8 +22,7 @@ pub fn create_service_id(service_id: &str) -> Id<ServiceId> {
     Id::new(&format!("service:{}@link.mozilla.org", service_id))
 }
 
-pub fn create_channel_id(operation: &str, service_id: &str) -> Id<Channel>
-{
+pub fn create_channel_id(operation: &str, service_id: &str) -> Id<Channel> {
     Id::new(&format!("channel:{}.{}@link.mozilla.org", operation, service_id))
 }
 
@@ -44,7 +43,12 @@ pub struct IpCamera {
 }
 
 impl IpCamera {
-    pub fn new(udn: &str, url: &str, upnp_name: &str, root_snapshot_dir: &str, config: &Arc<ConfigService>) -> Result<Self, Error> {
+    pub fn new(udn: &str,
+               url: &str,
+               upnp_name: &str,
+               root_snapshot_dir: &str,
+               config: &Arc<ConfigService>)
+               -> Result<Self, Error> {
         let camera = IpCamera {
             udn: udn.to_owned(),
             url: url.to_owned(),
@@ -60,7 +64,9 @@ impl IpCamera {
         // Create a directory to store snapshots for this camera.
         if let Err(err) = fs::create_dir_all(&camera.snapshot_dir) {
             if err.kind() != ErrorKind::AlreadyExists {
-                error!("Unable to create directory {}: {}", camera.snapshot_dir, err);
+                error!("Unable to create directory {}: {}",
+                       camera.snapshot_dir,
+                       err);
                 return Err(Error::Internal(InternalError::GenericError(format!("cannot create {}", camera.snapshot_dir))));
             }
         }
@@ -69,19 +75,15 @@ impl IpCamera {
 
     #[cfg(not(test))]
     fn get_bytes(&self, url: &str, username: &str, password: &str) -> Result<Vec<u8>, Error> {
-        use self::hyper::header::{ Authorization, Basic, Connection };
+        use self::hyper::header::{Authorization, Basic, Connection};
         let client = hyper::Client::new();
         let get_result = client.get(url)
-                               .header(
-                                   Authorization(
-                                       Basic {
-                                           username: username.to_owned(),
-                                           password: Some(password.to_owned())
-                                       }
-                                   )
-                               )
-                               .header(Connection::close())
-                               .send();
+            .header(Authorization(Basic {
+                username: username.to_owned(),
+                password: Some(password.to_owned()),
+            }))
+            .header(Connection::close())
+            .send();
         let mut res = match get_result {
             Ok(res) => res,
             Err(err) => {
@@ -158,7 +160,7 @@ impl IpCamera {
     }
 
     pub fn get_image_list(&self) -> Vec<String> {
-        let mut array: Vec<String> = vec!();
+        let mut array: Vec<String> = vec![];
         if let Ok(iter) = fs::read_dir(Path::new(&self.snapshot_dir)) {
             for entry in iter {
                 if let Ok(entry) = entry {
@@ -204,7 +206,8 @@ impl IpCamera {
                             let time = metadata.ctime();
                             if newest_image_time <= time {
                                 newest_image_time = time;
-                                newest_image = Some(String::from(entry.file_name().to_str().unwrap()));
+                                newest_image =
+                                    Some(String::from(entry.file_name().to_str().unwrap()));
                             }
                         }
                     }
@@ -225,7 +228,9 @@ impl IpCamera {
         let image = match self.get_bytes(&url, &self.get_username(), &self.get_password()) {
             Ok(image) => image,
             Err(err) => {
-                warn!("Error '{:?}' retrieving image from camera {}", err, self.url);
+                warn!("Error '{:?}' retrieving image from camera {}",
+                      err,
+                      self.url);
                 return Err(Error::Internal(InternalError::InvalidInitialService));
             }
         };
@@ -268,7 +273,9 @@ impl IpCamera {
         match writer.write_all(&image) {
             Ok(_) => {}
             Err(err) => {
-                warn!("Error '{:?}' writing snapshot.jpg for camera {}", err, self.udn);
+                warn!("Error '{:?}' writing snapshot.jpg for camera {}",
+                      err,
+                      self.udn);
                 return Err(Error::Internal(InternalError::InvalidInitialService));
             }
         }
@@ -346,7 +353,7 @@ describe! ip_camera {
         }
 
         failing "non-existant latest image" {
-            // Make sure that get_newest_image returns an empty list
+// Make sure that get_newest_image returns an empty list
             remove_dir_all(&snapshot_dir).unwrap();
             camera.get_newest_image().unwrap();
         }
@@ -366,7 +373,7 @@ describe! ip_camera {
         }
 
         failing "bad snapshot name" {
-            // Removing the snapshot dir will cause get_image to fail.
+// Removing the snapshot dir will cause get_image to fail.
             remove_dir_all(&snapshot_dir).unwrap();
             camera.get_image("xxx").unwrap();
         }
@@ -375,7 +382,7 @@ describe! ip_camera {
             camera.set_username("get_bytes:fail");
             let result = camera.take_snapshot();
 
-            // Do cleanup now since we're going to panic
+// Do cleanup now since we're going to panic
             remove_file(&config_filename).unwrap();
             remove_dir_all(&snapshot_dir).unwrap();
 
@@ -389,7 +396,7 @@ describe! ip_camera {
     }
 
     failing "bad snapshot dir" {
-        // Pick a root directory that we can't create
+// Pick a root directory that we can't create
         IpCamera::new("udn", "test/ip-camera", "upnp_name", "/unwritable", &Arc::new(config)).unwrap();
     }
 

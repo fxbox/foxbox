@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 /// An adapter providing time services.
 pub mod clock;
@@ -47,9 +47,7 @@ pub struct AdapterManager<T> {
 impl<T: Controller> AdapterManager<T> {
     pub fn new(controller: T) -> Self {
         debug!("Creating Adapter Manager");
-        AdapterManager {
-            controller: controller,
-        }
+        AdapterManager { controller: controller }
     }
 
     #[cfg(target_os = "linux")]
@@ -130,6 +128,5 @@ impl<T: Controller> AdapterManager<T> {
     }
 
     /// Stop all the adapters.
-    pub fn stop(&self) {
-    }
+    pub fn stop(&self) {}
 }

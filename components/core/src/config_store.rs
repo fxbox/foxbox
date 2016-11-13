@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use serde_json;
 use std::collections::BTreeMap;
@@ -8,7 +8,7 @@ use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use std::sync::{ Mutex, RwLock };
+use std::sync::{Mutex, RwLock};
 
 type ConfigNameSpace = BTreeMap<String, String>;
 
@@ -19,7 +19,7 @@ pub struct ConfigStore {
     file_name: String,
     save_lock: Mutex<()>,
     config: ConfigTree,
-    overrides: ConfigTree
+    overrides: ConfigTree,
 }
 
 impl ConfigStore {
@@ -28,12 +28,15 @@ impl ConfigStore {
             file_name: file_name.to_owned(),
             save_lock: Mutex::new(()),
             config: ConfigStore::load(file_name),
-            overrides: ConfigTree::new()
+            overrides: ConfigTree::new(),
         }
     }
 
     pub fn set(&mut self, namespace: &str, property: &str, value: &str) {
-        debug!("Setting config for {}::{} to {}", namespace, property, value);
+        debug!("Setting config for {}::{} to {}",
+               namespace,
+               property,
+               value);
         if !self.config.contains_key(namespace) {
             self.config.insert(namespace.to_owned(), ConfigNameSpace::new());
         }
@@ -45,7 +48,7 @@ impl ConfigStore {
     pub fn get(&self, namespace: &str, property: &str) -> Option<&String> {
         match self.get_override(namespace, property) {
             Some(value) => Some(value),
-            None => self.get_no_override(namespace, property)
+            None => self.get_no_override(namespace, property),
         }
     }
 
@@ -61,7 +64,10 @@ impl ConfigStore {
     }
 
     pub fn set_override(&mut self, namespace: &str, property: &str, value: &str) {
-        debug!("Setting config override for {}::{} to {}", namespace, property, value);
+        debug!("Setting config override for {}::{} to {}",
+               namespace,
+               property,
+               value);
         if !self.overrides.contains_key(namespace) {
             self.overrides.insert(namespace.to_owned(), ConfigNameSpace::new());
         }
@@ -71,7 +77,10 @@ impl ConfigStore {
     fn get_override(&self, namespace: &str, property: &str) -> Option<&String> {
         if self.overrides.contains_key(namespace) {
             let res = self.overrides.get(namespace).unwrap().get(property);
-            debug!("Config override for {}::{} is {:?}", namespace, property, res);
+            debug!("Config override for {}::{} is {:?}",
+                   namespace,
+                   property,
+                   res);
             res
         } else {
             None
@@ -81,12 +90,11 @@ impl ConfigStore {
     fn load(file_name: &str) -> ConfigTree {
         let empty_config = BTreeMap::new();
         let file = match File::open(&Path::new(file_name)) {
-            Ok(file) => {
-                file
-            },
+            Ok(file) => file,
             Err(error) => {
                 debug!("Unable to open configuration file {}: {}",
-                    file_name, error.to_string());
+                       file_name,
+                       error.to_string());
                 return empty_config;
             }
         };
@@ -94,8 +102,9 @@ impl ConfigStore {
             Ok(value) => value,
             Err(error) => {
                 error!("Unable to generate JSON from config file {}: {}",
-                    file_name, error.to_string());
-                    empty_config
+                       file_name,
+                       error.to_string());
+                empty_config
             }
         };
 
@@ -114,29 +123,33 @@ impl ConfigStore {
         let _ = self.save_lock.lock().unwrap();
         match File::create(update_path)
             .map(|mut file| file.write_all(conf_as_json.as_bytes()))
-            .and_then(|_| { fs::copy(&update_path, &file_path) })
-            .and_then(|_| { fs::remove_file(&update_path) }) {
-                Ok(_) => debug!("Wrote configuration file {}", self.file_name),
-                Err(error) => error!("While writing configuration file{}: {}",
-                    self.file_name, error.to_string())
-            };
+            .and_then(|_| fs::copy(&update_path, &file_path))
+            .and_then(|_| fs::remove_file(&update_path)) {
+            Ok(_) => debug!("Wrote configuration file {}", self.file_name),
+            Err(error) => {
+                error!("While writing configuration file{}: {}",
+                       self.file_name,
+                       error.to_string())
+            }
+        };
     }
 }
 
 pub struct ConfigService {
-    store: RwLock<ConfigStore>
+    store: RwLock<ConfigStore>,
 }
 
 impl ConfigService {
     pub fn new(file_name: &str) -> Self {
-        ConfigService {
-            store: RwLock::new(ConfigStore::new(file_name))
-        }
+        ConfigService { store: RwLock::new(ConfigStore::new(file_name)) }
     }
 
     pub fn get(&self, namespace: &str, property: &str) -> Option<String> {
-        self.store.read().unwrap().get(namespace, property)
-            .map(|value| { value.to_owned() })
+        self.store
+            .read()
+            .unwrap()
+            .get(namespace, property)
+            .map(|value| value.to_owned())
     }
 
     pub fn get_or_set_default(&self, namespace: &str, property: &str, default: &str) -> String {

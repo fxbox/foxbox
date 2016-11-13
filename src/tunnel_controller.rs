@@ -1,19 +1,19 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use foxbox_core::managed_process::ManagedProcess;
 
 // Assumes Unix
-use std::process::{ Child, Command };
+use std::process::{Child, Command};
 use std::io::Result;
-use url::{ SchemeData, Url };
+use url::{SchemeData, Url};
 
 pub type TunnelProcess = ManagedProcess;
 
 pub struct Tunnel {
     config: TunnelConfig,
-    pub tunnel_process: Option<TunnelProcess>
+    pub tunnel_process: Option<TunnelProcess>,
 }
 
 #[derive(Clone, Debug)]
@@ -23,7 +23,7 @@ pub struct TunnelConfig {
     tunnel_secret: String,
     local_http_port: u16,
     local_ws_port: u16,
-    remote_name: String
+    remote_name: String,
 }
 
 impl TunnelConfig {
@@ -31,14 +31,13 @@ impl TunnelConfig {
                tunnel_secret: String,
                local_http_port: u16,
                local_ws_port: u16,
-               remote_name: String) -> Self {
+               remote_name: String)
+               -> Self {
 
         let tunnel_url = match Url::parse(&tunnel_url) {
             Ok(url) => {
                 match url.scheme_data {
-                    SchemeData::Relative(..) => {
-                        url
-                    },
+                    SchemeData::Relative(..) => url,
                     SchemeData::NonRelative(..) => {
                         // We don't care about the scheme, we just want domain
                         // and port, but Url does not parse them properly without
@@ -51,9 +50,9 @@ impl TunnelConfig {
                                 panic!(err)
                             }
                         }
-                    },
+                    }
                 }
-            },
+            }
             Err(err) => {
                 error!("Could not parse tunnel url.
                         Try something like knilxof.org:443");
@@ -66,7 +65,7 @@ impl TunnelConfig {
             tunnel_secret: tunnel_secret,
             local_http_port: local_http_port,
             local_ws_port: local_ws_port,
-            remote_name: remote_name
+            remote_name: remote_name,
         }
     }
 
@@ -120,7 +119,7 @@ impl Tunnel {
     pub fn new(config: TunnelConfig) -> Tunnel {
         Tunnel {
             config: config,
-            tunnel_process: None
+            tunnel_process: None,
         }
     }
 
@@ -132,9 +131,8 @@ impl Tunnel {
         } else {
             let tunnel_config = self.config.clone();
 
-            self.tunnel_process = Some(ManagedProcess::start(move || {
-                tunnel_config.spawn()
-            }).unwrap());
+            self.tunnel_process = Some(ManagedProcess::start(move || tunnel_config.spawn())
+                .unwrap());
 
             Ok(())
         }
@@ -144,14 +142,14 @@ impl Tunnel {
     pub fn stop(&mut self) -> Result<()> {
         match self.tunnel_process.take() {
             None => Ok(()),
-            Some(process) => process.shutdown()
+            Some(process) => process.shutdown(),
         }
     }
 
     pub fn get_frontend_name(&self) -> Option<String> {
         match self.config.tunnel_url.host() {
             Some(host) => Some(host.to_string()),
-            None => None
+            None => None,
         }
     }
 }
