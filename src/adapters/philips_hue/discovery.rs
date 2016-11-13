@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! Discovery for Philips Hue
 //!
@@ -14,11 +14,11 @@
 pub extern crate url;
 
 use foxbox_core::traits::Controller;
-use foxbox_core::upnp::{ UpnpListener, UpnpManager, UpnpService };
+use foxbox_core::upnp::{UpnpListener, UpnpManager, UpnpService};
 use serde_json;
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 use std::thread;
-use super::{ HueAction, http, PhilipsHueAdapter };
+use super::{HueAction, http, PhilipsHueAdapter};
 use transformable_channels::mpsc::*;
 
 static UPNP_MODEL_PATH: &'static str = "/root/device/modelName";
@@ -30,8 +30,7 @@ pub struct Discovery<C> {
 }
 
 impl<C: Controller> Discovery<C> {
-    pub fn new(adapter: PhilipsHueAdapter<C>) -> Self
-    {
+    pub fn new(adapter: PhilipsHueAdapter<C>) -> Self {
         let upnp = adapter.controller.get_upnp_manager();
         let listener = PhilipsHueUpnpListener::new(adapter.clone());
         upnp.add_listener("PhilipsHueTaxonomy".to_owned(), listener);
@@ -50,15 +49,18 @@ impl<C: Controller> Discovery<C> {
         let controller = self.adapter.controller.clone();
         let tx = self.adapter.tx.clone();
         thread::spawn(move || {
-            let nupnp_enabled = controller.get_config().get_or_set_default(
-                "philips_hue", "nupnp_enabled", "true");
+            let nupnp_enabled = controller.get_config()
+                .get_or_set_default("philips_hue", "nupnp_enabled", "true");
             if nupnp_enabled == "true" {
-                let nupnp_url = controller.get_config().get_or_set_default(
-                    "philips_hue", "nupnp_url", "https://www.meethue.com/api/nupnp");
+                let nupnp_url = controller.get_config().get_or_set_default("philips_hue",
+                                                                           "nupnp_url",
+                                                                           "https://www.meethue.\
+                                                                            com/api/nupnp");
                 let nupnp_hubs = nupnp_query(&nupnp_url);
                 for nupnp in nupnp_hubs {
                     let _ = tx.lock().unwrap().send(HueAction::AddHub(nupnp.id.to_owned(),
-                                nupnp.internalipaddress.to_owned()));
+                                                                      nupnp.internalipaddress
+                                                                          .to_owned()));
                 }
             }
         });
@@ -79,14 +81,12 @@ impl<C: Controller> Discovery<C> {
 }
 
 pub struct PhilipsHueUpnpListener<C> {
-    adapter: PhilipsHueAdapter<C>
+    adapter: PhilipsHueAdapter<C>,
 }
 
 impl<C: Controller> PhilipsHueUpnpListener<C> {
     pub fn new(adapter: PhilipsHueAdapter<C>) -> Box<Self> {
-        Box::new(PhilipsHueUpnpListener {
-            adapter: adapter
-        })
+        Box::new(PhilipsHueUpnpListener { adapter: adapter })
     }
 }
 
@@ -152,7 +152,7 @@ impl<C: Controller> UpnpListener for PhilipsHueUpnpListener<C> {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NupnpEntry {
     id: String,
-    internalipaddress: String
+    internalipaddress: String,
 }
 
 pub fn nupnp_query(server_url: &str) -> Vec<NupnpEntry> {

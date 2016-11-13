@@ -1,13 +1,13 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 extern crate serde_json;
 extern crate mio;
 
 use adapters::AdapterManager;
 use foxbox_core::config_store::ConfigService;
-use foxbox_core::profile_service::{ ProfilePath, ProfileService };
+use foxbox_core::profile_service::{ProfilePath, ProfileService};
 use foxbox_core::traits::Controller;
 use foxbox_core::upnp::UpnpManager;
 use foxbox_taxonomy::manager::AdapterManager as TaxoManager;
@@ -18,10 +18,10 @@ use std::io;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::sync::{ Arc, Mutex };
-use std::sync::atomic::{ AtomicBool, Ordering };
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::vec::IntoIter;
-use tls::{ CertificateManager, CertificateRecord, SniSslContextProvider, TlsOption };
+use tls::{CertificateManager, CertificateRecord, SniSslContextProvider, TlsOption};
 use ws_server::WsServer;
 use ws;
 
@@ -46,16 +46,19 @@ impl FoxBox {
                http_port: u16,
                ws_port: u16,
                tls_option: TlsOption,
-               profile_path: ProfilePath) -> Self {
+               profile_path: ProfilePath)
+               -> Self {
 
         let profile_service = ProfileService::new(profile_path);
         let config = Arc::new(ConfigService::new(&profile_service.path_for("foxbox.conf")));
 
-        let certificate_directory = PathBuf::from(
-            config.get_or_set_default("foxbox", "certificate_directory", &profile_service.path_for("certs/")));
+        let certificate_directory = PathBuf::from(config.get_or_set_default("foxbox",
+                                "certificate_directory",
+                                &profile_service.path_for("certs/")));
 
         FoxBox {
-            certificate_manager: CertificateManager::new(certificate_directory, Box::new(SniSslContextProvider::new())),
+            certificate_manager: CertificateManager::new(certificate_directory,
+                                                         Box::new(SniSslContextProvider::new())),
             tls_option: tls_option,
             websockets: Arc::new(Mutex::new(HashMap::new())),
             verbose: verbose,
@@ -64,14 +67,14 @@ impl FoxBox {
             ws_port: ws_port,
             config: config,
             upnp: Arc::new(UpnpManager::new()),
-            users_manager: Arc::new(UsersManager::new(&profile_service.path_for("users_db.sqlite"))),
-            profile_service: Arc::new(profile_service)
+            users_manager:
+                Arc::new(UsersManager::new(&profile_service.path_for("users_db.sqlite"))),
+            profile_service: Arc::new(profile_service),
         }
     }
 }
 
 impl Controller for FoxBox {
-
     fn run(&mut self, shutdown_flag: &AtomicBool) {
 
         debug!("Starting controller");
@@ -92,9 +95,10 @@ impl Controller for FoxBox {
         WsServer::start(self.clone());
 
         event_loop.run(&mut FoxBoxEventLoop {
-            controller: self.clone(),
-            shutdown_flag: shutdown_flag
-        }).unwrap();
+                controller: self.clone(),
+                shutdown_flag: shutdown_flag,
+            })
+            .unwrap();
 
         debug!("Stopping controller");
         adapter_manager.stop();
@@ -131,7 +135,7 @@ impl Controller for FoxBox {
         for socket in self.websockets.lock().unwrap().values() {
             match socket.send(serialized.clone()) {
                 Ok(_) => (),
-                Err(err) => error!("Error sending to socket: {}", err)
+                Err(err) => error!("Error sending to socket: {}", err),
             }
         }
     }
@@ -169,7 +173,7 @@ impl Controller for FoxBox {
         self.tls_option == TlsOption::Enabled
     }
 
-    fn get_hostname(&self) -> String  {
+    fn get_hostname(&self) -> String {
         self.hostname.clone()
     }
 }
@@ -177,7 +181,7 @@ impl Controller for FoxBox {
 #[allow(dead_code)]
 struct FoxBoxEventLoop<'a> {
     controller: FoxBox,
-    shutdown_flag: &'a AtomicBool
+    shutdown_flag: &'a AtomicBool,
 }
 
 impl<'a> mio::Handler for FoxBoxEventLoop<'a> {

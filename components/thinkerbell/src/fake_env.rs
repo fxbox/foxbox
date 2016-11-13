@@ -1,25 +1,25 @@
 use compile::ExecutableDevEnv;
 
-use foxbox_taxonomy::api::{ API, Error, User };
+use foxbox_taxonomy::api::{API, Error, User};
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::parse::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
 
-use std::cmp::{ Ord, PartialOrd, Ordering as OrdOrdering };
+use std::cmp::{Ord, PartialOrd, Ordering as OrdOrdering};
 use std::fmt;
-use std::collections::{ BinaryHeap, HashMap };
-use std::sync::{ Arc, Mutex };
-use std::sync::atomic::{ AtomicBool, Ordering as AtomicOrdering };
+use std::collections::{BinaryHeap, HashMap};
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::thread;
 
 use transformable_channels::mpsc::*;
 
-use chrono::{ DateTime, UTC };
+use chrono::{DateTime, UTC};
 
 
-static VERSION : [u32;4] = [0, 0, 0, 0];
+static VERSION: [u32; 4] = [0, 0, 0, 0];
 
 /// A back-end holding values and watchers, shared by all the virtual adapters of this simulator.
 struct TestSharedAdapterBackend {
@@ -52,44 +52,56 @@ impl TestSharedAdapterBackend {
         }
     }
 
-    fn fetch_values(&self, mut getters: Vec<Id<Channel>>, _: User) -> ResultMap<Id<Channel>, Option<Value>, Error> {
-        getters.drain(..).map(|id| {
-            let got = self.getter_values.get(&id).cloned();
-            match got {
-                None => (id, Ok(None)),
-                Some(Ok(value)) => (id, Ok(Some(value))),
-                Some(Err(err)) => (id, Err(err)),
-            }
-        }).collect()
+    fn fetch_values(&self,
+                    mut getters: Vec<Id<Channel>>,
+                    _: User)
+                    -> ResultMap<Id<Channel>, Option<Value>, Error> {
+        getters.drain(..)
+            .map(|id| {
+                let got = self.getter_values.get(&id).cloned();
+                match got {
+                    None => (id, Ok(None)),
+                    Some(Ok(value)) => (id, Ok(Some(value))),
+                    Some(Err(err)) => (id, Err(err)),
+                }
+            })
+            .collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Channel>, Value>, _: User) -> ResultMap<Id<Channel>, (), Error> {
-        values.drain().map(|(id, value)| {
-            match self.setter_errors.get(&id) {
-                None => {
-                    let event = FakeEnvEvent::Send {
-                        id: id.clone(),
-                        value: value
-                    };
-                    let _ = self.on_event.send(event);
-                    (id, Ok(()))
+    fn send_values(&self,
+                   mut values: HashMap<Id<Channel>, Value>,
+                   _: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
+        values.drain()
+            .map(|(id, value)| {
+                match self.setter_errors.get(&id) {
+                    None => {
+                        let event = FakeEnvEvent::Send {
+                            id: id.clone(),
+                            value: value,
+                        };
+                        let _ = self.on_event.send(event);
+                        (id, Ok(()))
+                    }
+                    Some(error) => (id, Err(error.clone())),
                 }
-                Some(error) => {
-                    (id, Err(error.clone()))
-                }
-            }
-        }).collect()
+            })
+            .collect()
     }
 
-    fn register_watch(&mut self, mut source: Vec<(Id<Channel>, Option<Value>, Box<ExtSender<WatchEvent<Value>>>)>) ->
-            Vec<(Id<Channel>, Result<usize, Error>)>
-    {
-        let results = source.drain(..).filter_map(|(id, range, tx)| {
-            let result = (id.clone(), Ok(self.counter));
-            self.watchers.insert(self.counter, (id, range, tx));
-            self.counter += 1;
-            Some(result)
-        }).collect();
+    fn register_watch(&mut self,
+                      mut source: Vec<(Id<Channel>,
+                                       Option<Value>,
+                                       Box<ExtSender<WatchEvent<Value>>>)>)
+                      -> Vec<(Id<Channel>, Result<usize, Error>)> {
+        let results = source.drain(..)
+            .filter_map(|(id, range, tx)| {
+                let result = (id.clone(), Ok(self.counter));
+                self.watchers.insert(self.counter, (id, range, tx));
+                self.counter += 1;
+                Some(result)
+            })
+            .collect();
         results
     }
 
@@ -97,13 +109,12 @@ impl TestSharedAdapterBackend {
         let _ = self.watchers.remove(&key);
     }
 
-    fn inject_setter_errors(&mut self, mut errors: Vec<(Id<Channel>, Option<Error>)>)
-    {
+    fn inject_setter_errors(&mut self, mut errors: Vec<(Id<Channel>, Option<Error>)>) {
         for (id, error) in errors.drain(..) {
             match error {
                 None => {
                     self.setter_errors.remove(&id);
-                },
+                }
                 Some(error) => {
                     self.setter_errors.insert(id, error);
                 }
@@ -111,14 +122,11 @@ impl TestSharedAdapterBackend {
         }
     }
 
-    fn inject_getter_values(&mut self, mut values: Vec<(Id<Channel>, Result<Value, Error>)>)
-    {
+    fn inject_getter_values(&mut self, mut values: Vec<(Id<Channel>, Result<Value, Error>)>) {
         for (id, value) in values.drain(..) {
             let old = self.getter_values.insert(id.clone(), value.clone());
             match value {
-                Err(_) => {
-                    continue
-                },
+                Err(_) => continue,
                 Ok(value) => {
                     for watcher in self.watchers.values() {
                         let (ref watched_id, ref condition, ref cb) = *watcher;
@@ -135,21 +143,21 @@ impl TestSharedAdapterBackend {
                                 (false, true) => {
                                     let _ = cb.send(WatchEvent::Enter {
                                         id: id.clone(),
-                                        value: value.clone()
+                                        value: value.clone(),
                                     });
                                 }
                                 (true, false) => {
                                     let _ = cb.send(WatchEvent::Exit {
                                         id: id.clone(),
-                                        value: value.clone()
+                                        value: value.clone(),
                                     });
                                 }
-                                _ => continue
+                                _ => continue,
                             }
                         } else {
                             let _ = cb.send(WatchEvent::Enter {
                                 id: id.clone(),
-                                value: value.clone()
+                                value: value.clone(),
                             });
                         }
                     }
@@ -195,7 +203,7 @@ impl TestSharedAdapterBackend {
                 let _ = self.inject_setter_errors(errors);
                 let _ = tx.send(FakeEnvEvent::Done);
             }
-            TriggerTimersUntil(date ,tx) => {
+            TriggerTimersUntil(date, tx) => {
                 let _ = self.trigger_timers_until(date.into());
                 let _ = tx.send(FakeEnvEvent::Done);
             }
@@ -212,9 +220,7 @@ impl TestSharedAdapterBackend {
                     Some(ref date) if *date < timer.date => {
                         self.timers.push(timer);
                     }
-                    Some(_) => {
-                        timer.trigger()
-                    }
+                    Some(_) => timer.trigger(),
                 }
             }
         }
@@ -225,10 +231,7 @@ impl TestSharedAdapterBackend {
 #[derive(Debug)]
 pub enum FakeEnvEvent {
     /// Some value was sent to a setter channel.
-    Send {
-        id: Id<Channel>,
-        value: Value
-    },
+    Send { id: Id<Channel>, value: Value },
 
     /// Some error took place.
     Error(Error),
@@ -267,7 +270,7 @@ impl Adapter for TestAdapter {
     fn vendor(&self) -> &str {
         "test@foxlink"
     }
-    fn version(&self) -> &[u32;4] {
+    fn version(&self) -> &[u32; 4] {
         &VERSION
     }
     // ... more metadata
@@ -278,12 +281,19 @@ impl Adapter for TestAdapter {
     /// expects the adapter to attempt to minimize the connections with the actual devices.
     ///
     /// The AdapterManager is in charge of keeping track of the age of values.
-    fn fetch_values(&self, getters: Vec<Id<Channel>>, _: User) -> ResultMap<Id<Channel>, Option<Value>, Error> {
+    fn fetch_values(&self,
+                    getters: Vec<Id<Channel>>,
+                    _: User)
+                    -> ResultMap<Id<Channel>, Option<Value>, Error> {
         let (tx, rx) = channel();
-        self.back_end.lock().unwrap().send(AdapterOp::FetchValues {
-            getters: getters,
-            tx: Box::new(tx),
-        }).unwrap();
+        self.back_end
+            .lock()
+            .unwrap()
+            .send(AdapterOp::FetchValues {
+                getters: getters,
+                tx: Box::new(tx),
+            })
+            .unwrap();
         rx.recv().unwrap()
     }
 
@@ -291,12 +301,19 @@ impl Adapter for TestAdapter {
     ///
     /// The AdapterManager always attempts to group calls to `send_values` by `Adapter`, and then
     /// expects the adapter to attempt to minimize the connections with the actual devices.
-    fn send_values(&self, values: HashMap<Id<Channel>, Value>, _: User) -> ResultMap<Id<Channel>, (), Error> {
+    fn send_values(&self,
+                   values: HashMap<Id<Channel>, Value>,
+                   _: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
         let (tx, rx) = channel();
-        self.back_end.lock().unwrap().send(AdapterOp::SendValues {
-            values: values,
-            tx: Box::new(tx),
-        }).unwrap();
+        self.back_end
+            .lock()
+            .unwrap()
+            .send(AdapterOp::SendValues {
+                values: values,
+                tx: Box::new(tx),
+            })
+            .unwrap();
         rx.recv().unwrap()
     }
 
@@ -315,29 +332,38 @@ impl Adapter for TestAdapter {
     /// If no `Range` option is set, the watcher expects to receive `EnterRange` events whenever
     /// a new value is available on the device. The adapter may decide to reject the request if
     /// this is clearly not the expected usage for a device, or to throttle it.
-    fn register_watch(&self, source: Vec<(Id<Channel>, Option<Value>, Box<ExtSender<WatchEvent<Value>>>)>) ->
-            Vec<(Id<Channel>, Result<Box<AdapterWatchGuard>, Error>)>
-    {
+    fn register_watch(&self,
+                      source: Vec<(Id<Channel>,
+                                   Option<Value>,
+                                   Box<ExtSender<WatchEvent<Value>>>)>)
+                      -> Vec<(Id<Channel>, Result<Box<AdapterWatchGuard>, Error>)> {
         let (tx, rx) = channel();
-        self.back_end.lock().unwrap().send(AdapterOp::Watch {
-            source: source,
-            tx: Box::new(tx),
-        }).unwrap();
+        self.back_end
+            .lock()
+            .unwrap()
+            .send(AdapterOp::Watch {
+                source: source,
+                tx: Box::new(tx),
+            })
+            .unwrap();
         let received = rx.recv().unwrap();
         let tx_unregister = self.back_end.lock().unwrap().clone();
-        received.iter().map(|&(ref id, ref result)| {
-            let tx_unregister = tx_unregister.clone();
-            (id.clone(), match *result {
-                Err(ref err) => Err(err.clone()),
-                Ok(ref key) => {
-                    let guard = TestAdapterWatchGuard {
-                        tx: Arc::new(Mutex::new(Box::new(tx_unregister))),
-                        key: key.clone()
-                    };
-                    Ok(Box::new(guard) as Box<AdapterWatchGuard>)
-                }
+        received.iter()
+            .map(|&(ref id, ref result)| {
+                let tx_unregister = tx_unregister.clone();
+                (id.clone(),
+                 match *result {
+                    Err(ref err) => Err(err.clone()),
+                    Ok(ref key) => {
+                        let guard = TestAdapterWatchGuard {
+                            tx: Arc::new(Mutex::new(Box::new(tx_unregister))),
+                            key: key.clone(),
+                        };
+                        Ok(Box::new(guard) as Box<AdapterWatchGuard>)
+                    }
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -422,7 +448,7 @@ impl ExecutableDevEnv for FakeEnv {
         let trigger = Timer {
             date: UTC::now() + duration.into(),
             on_triggered: timer,
-            is_dropped: is_dropped.clone()
+            is_dropped: is_dropped.clone(),
         };
         let _ = self.back_end.send(AdapterOp::AddTimer(trigger));
         TimerGuard(is_dropped)
@@ -448,7 +474,7 @@ impl FakeEnv {
 
     fn report_error<T>(&self, result: Result<T, Error>) {
         match result {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(err) => {
                 let _ = self.on_event.send(FakeEnvEvent::Error(err));
             }
@@ -467,41 +493,47 @@ impl FakeEnv {
                     self.report_error(result);
                 }
                 let _ = self.on_event.send(FakeEnvEvent::Done);
-            },
+            }
             AddServices(vec) => {
                 for service in vec {
                     let result = self.manager.add_service(service);
                     self.report_error(result);
                 }
                 let _ = self.on_event.send(FakeEnvEvent::Done);
-            },
+            }
             AddChannels(vec) => {
                 for channel in vec {
                     let result = self.manager.add_channel(channel);
                     self.report_error(result);
                 }
                 let _ = self.on_event.send(FakeEnvEvent::Done);
-            },
+            }
             RemoveChannels(vec) => {
                 for channel in vec {
                     let result = self.manager.remove_channel(&channel);
                     self.report_error(result);
                 }
                 let _ = self.on_event.send(FakeEnvEvent::Done);
-            },
+            }
             InjectGetterValues(vec) => {
-                self.back_end.send(AdapterOp::InjectGetterValues(vec, self.on_event.clone())).unwrap();
-            },
+                self.back_end
+                    .send(AdapterOp::InjectGetterValues(vec, self.on_event.clone()))
+                    .unwrap();
+            }
             InjectSetterErrors(vec) => {
-                self.back_end.send(AdapterOp::InjectSetterErrors(vec, self.on_event.clone())).unwrap();
+                self.back_end
+                    .send(AdapterOp::InjectSetterErrors(vec, self.on_event.clone()))
+                    .unwrap();
             }
             TriggerTimersUntil(date) => {
-                self.back_end.send(AdapterOp::TriggerTimersUntil(date, self.on_event.clone())).unwrap();
+                self.back_end
+                    .send(AdapterOp::TriggerTimersUntil(date, self.on_event.clone()))
+                    .unwrap();
             }
             ResetTimers => {
                 self.back_end.send(AdapterOp::ResetTimers(self.on_event.clone())).unwrap();
             }
-//            _ => unimplemented!()
+            //            _ => unimplemented!()
         }
     }
 }
@@ -523,15 +555,15 @@ pub enum Instruction {
 enum AdapterOp {
     FetchValues {
         getters: Vec<Id<Channel>>,
-        tx: Box<ExtSender<ResultMap<Id<Channel>, Option<Value>, Error>>>
+        tx: Box<ExtSender<ResultMap<Id<Channel>, Option<Value>, Error>>>,
     },
     SendValues {
         values: HashMap<Id<Channel>, Value>,
-        tx: Box<ExtSender<ResultMap<Id<Channel>, (), Error>>>
+        tx: Box<ExtSender<ResultMap<Id<Channel>, (), Error>>>,
     },
     Watch {
         source: Vec<(Id<Channel>, Option<Value>, Box<ExtSender<WatchEvent<Value>>>)>,
-        tx: Box<ExtSender<Vec<(Id<Channel>, Result<usize, Error>)>>>
+        tx: Box<ExtSender<Vec<(Id<Channel>, Result<usize, Error>)>>>,
     },
     AddTimer(Timer),
     Unwatch(usize),
@@ -595,19 +627,33 @@ impl Parser<Instruction> for Instruction {
             } else {
                 Err(ParseError::unknown_fields(vec![s.clone()], &path))
             }
-        } else if let Some(result) = path.push_str("TriggerTimersUntil", |path| TimeStamp::take_opt(path, source, "TriggerTimersUntil")) {
+        } else if let Some(result) = path.push_str("TriggerTimersUntil", |path| {
+            TimeStamp::take_opt(path, source, "TriggerTimersUntil")
+        }) {
             Ok(Instruction::TriggerTimersUntil(try!(result)))
-        } else if let Some(result) = path.push_str("InjectSetterErrors", |path| SetterErrorParser::take_vec_opt(path, source, "InjectSetterErrors")) {
+        } else if let Some(result) = path.push_str("InjectSetterErrors", |path| {
+            SetterErrorParser::take_vec_opt(path, source, "InjectSetterErrors")
+        }) {
             Ok(Instruction::InjectSetterErrors(try!(result)))
-        } else if let Some(result) = path.push_str("InjectGetterValues", |path| GetterValueParser::take_vec_opt(path, source, "InjectGetterValues")) {
+        } else if let Some(result) = path.push_str("InjectGetterValues", |path| {
+            GetterValueParser::take_vec_opt(path, source, "InjectGetterValues")
+        }) {
             Ok(Instruction::InjectGetterValues(try!(result)))
-        } else if let Some(result) = path.push_str("RemoveChannels", |path| Vec::<Id<_>>::take_opt(path, source, "RemoveChannels")) {
+        } else if let Some(result) = path.push_str("RemoveChannels", |path| {
+            Vec::<Id<_>>::take_opt(path, source, "RemoveChannels")
+        }) {
             Ok(Instruction::RemoveChannels(try!(result)))
-        } else if let Some(result) = path.push_str("AddChannels", |path| AddChannelsParser::take_opt(path, source, "AddChannels")) {
+        } else if let Some(result) = path.push_str("AddChannels", |path| {
+            AddChannelsParser::take_opt(path, source, "AddChannels")
+        }) {
             result
-        } else if let Some(result) = path.push_str("AddServices", |path| AddServicesParser::take_opt(path, source, "AddServices")) {
+        } else if let Some(result) = path.push_str("AddServices", |path| {
+            AddServicesParser::take_opt(path, source, "AddServices")
+        }) {
             result
-        } else if let Some(result) = path.push_str("AddAdapters", |path| Vec::<String>::take_opt(path, source, "AddAdapters")) {
+        } else if let Some(result) = path.push_str("AddAdapters", |path| {
+            Vec::<String>::take_opt(path, source, "AddAdapters")
+        }) {
             Ok(Instruction::AddAdapters(try!(result)))
         } else {
             unimplemented!()

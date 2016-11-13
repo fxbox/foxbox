@@ -1,10 +1,10 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::HashMap;
 use std::io::Read;
-use xml::reader::{ EventReader, XmlEvent };
+use xml::reader::{EventReader, XmlEvent};
 
 // Macros to help with json serializing of undeclared structs.
 // json_value!({ }) returns a serde_json::value::Value from an anonymous struct.
@@ -168,17 +168,24 @@ pub fn parse_simple_xml<R: Read>(data: R) -> Result<HashMap<String, String>, Str
             Ok(XmlEvent::EndElement { name, .. }) => {
                 // Should ensure truncated name and given name match?
                 match key.rfind('/') {
-                    Some(x) => { key.truncate(x); }
-                    _ => { return Err(format!("broken key {} at ending element {}", key, name)); }
+                    Some(x) => {
+                        key.truncate(x);
+                    }
+                    _ => {
+                        return Err(format!("broken key {} at ending element {}", key, name));
+                    }
                 }
             }
-            Ok(XmlEvent::Characters(x)) | Ok(XmlEvent::CData(x)) => {
+            Ok(XmlEvent::Characters(x)) |
+            Ok(XmlEvent::CData(x)) => {
                 if !ignore.contains_key(&key) {
-                    values.entry(key.clone()).or_insert_with(|| { String::new() }).push_str(x.as_str());
+                    values.entry(key.clone()).or_insert_with(String::new).push_str(x.as_str());
                 }
             }
-            Err(e) => { return Err(format!("parse error {}", e)); }
-            _ => { }
+            Err(e) => {
+                return Err(format!("parse error {}", e));
+            }
+            _ => {}
         }
     }
     Ok(values)

@@ -2,7 +2,7 @@
 //! Used for testing.
 use adapter::*;
 
-use api::{ Error, User };
+use api::{Error, User};
 use channel::Channel;
 use services::*;
 use values::*;
@@ -10,10 +10,10 @@ use values::*;
 use transformable_channels::mpsc::*;
 
 use std::cell::RefCell;
-use std::collections::HashMap ;
+use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
-use std::sync::{ Arc, Mutex };
-use std::sync::atomic::{ AtomicBool, Ordering} ;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 /// A tweak sent to the virtual device, to set a value, inject an error, ...
@@ -24,16 +24,18 @@ pub enum Tweak {
 
     /// Inject an error in a virtual setter. All operations on this setter will
     /// raise the error until `None` is injected instead.
-    InjectSetterError(Id<Channel>, Option<Error>)
+    InjectSetterError(Id<Channel>, Option<Error>),
 }
 
 /// Something that happened to the virtual device, e.g. a value was sent.
 #[derive(Debug)]
 pub enum Effect {
-    ValueSent(Id<Channel>, Value)
+    ValueSent(Id<Channel>, Value),
 }
 
-fn dup<T>(t: T) -> (T, T) where T: Clone {
+fn dup<T>(t: T) -> (T, T)
+    where T: Clone
+{
     (t.clone(), t)
 }
 
@@ -50,8 +52,8 @@ type SyncMap<K, V> = Arc<Mutex<HashMap<K, V>>>;
 struct WatcherState {
     filter: Option<Value>,
     on_event: Box<ExtSender<WatchEvent<Value>>>,
-    is_met: RefCell<bool>, /* is_met*/
-    is_dropped: Arc<AtomicBool>, /* is_dropped */
+    is_met: RefCell<bool>, // is_met
+    is_dropped: Arc<AtomicBool>, // is_dropped
 }
 pub struct FakeAdapter {
     id: Id<AdapterId>,
@@ -61,12 +63,12 @@ pub struct FakeAdapter {
     rx_effect: Mutex<Option<Receiver<Effect>>>,
     values: SyncMap<Id<Channel>, Result<Value, Error>>,
     senders: SyncMap<Id<Channel>, Error>,
-    watchers: SyncMap<Id<Channel>, Vec<WatcherState>>
+    watchers: SyncMap<Id<Channel>, Vec<WatcherState>>,
 }
 
 impl FakeAdapter {
     pub fn new(id: &Id<AdapterId>) -> Self {
-        let (tx, rx) : (RawSender<(Tweak, RawSender<()>)>, _) = channel();
+        let (tx, rx): (RawSender<(Tweak, RawSender<()>)>, _) = channel();
         let (tx_effect, rx_effect) = channel();
 
         let (values_main, values_thread) = dup(Arc::new(Mutex::new(HashMap::new())));
@@ -103,10 +105,12 @@ impl FakeAdapter {
                                 }
                                 match watcher.filter {
                                     None => {
-                                        watcher.on_event.send(WatchEvent::Enter {
-                                            id: id.clone(),
-                                            value: value.clone()
-                                        }).unwrap();
+                                        watcher.on_event
+                                            .send(WatchEvent::Enter {
+                                                id: id.clone(),
+                                                value: value.clone(),
+                                            })
+                                            .unwrap();
                                     }
                                     Some(ref target) => {
                                         let mut is_met = watcher.is_met.borrow_mut();
@@ -115,34 +119,38 @@ impl FakeAdapter {
                                                 continue;
                                             }
                                             *is_met = true;
-                                            watcher.on_event.send(WatchEvent::Enter {
-                                                id: id.clone(),
-                                                value: value.clone()
-                                            }).unwrap();
+                                            watcher.on_event
+                                                .send(WatchEvent::Enter {
+                                                    id: id.clone(),
+                                                    value: value.clone(),
+                                                })
+                                                .unwrap();
                                         } else {
                                             if !*is_met {
                                                 continue;
                                             }
                                             *is_met = false;
-                                            watcher.on_event.send(WatchEvent::Exit {
-                                                id: id.clone(),
-                                                value: value.clone()
-                                            }).unwrap();
+                                            watcher.on_event
+                                                .send(WatchEvent::Exit {
+                                                    id: id.clone(),
+                                                    value: value.clone(),
+                                                })
+                                                .unwrap();
                                         }
                                     }
                                 }
                             }
                         }
-                    },
+                    }
                     InjectGetterValue(id, Err(error)) => {
                         values_thread.lock().unwrap().insert(id, Err(error));
-                    },
+                    }
                     InjectGetterValue(id, Ok(None)) => {
                         values_thread.lock().unwrap().remove(&id);
-                    },
+                    }
                     InjectSetterError(id, None) => {
                         senders_thread.lock().unwrap().remove(&id);
-                    },
+                    }
                     InjectSetterError(id, Some(err)) => {
                         senders_thread.lock().unwrap().insert(id, err);
                     }
@@ -162,7 +170,7 @@ impl FakeAdapter {
     }
 }
 
-static VERSION : [u32;4] = [0, 0, 0, 0];
+static VERSION: [u32; 4] = [0, 0, 0, 0];
 
 impl Adapter for FakeAdapter {
     /// An id unique to this adapter. This id must persist between
@@ -180,59 +188,73 @@ impl Adapter for FakeAdapter {
         "test@foxbox_adapters"
     }
 
-    fn version(&self) -> &[u32;4] {
+    fn version(&self) -> &[u32; 4] {
         &VERSION
     }
 
     /// Request a value from a channel. The `FoxBox` (not the adapter)
     /// is in charge of keeping track of the age of values.
-    fn fetch_values(&self, mut channels: Vec<Id<Channel>>, _: User) -> ResultMap<Id<Channel>, Option<Value>, Error> {
+    fn fetch_values(&self,
+                    mut channels: Vec<Id<Channel>>,
+                    _: User)
+                    -> ResultMap<Id<Channel>, Option<Value>, Error> {
         let map = self.values.lock().unwrap();
-        channels.drain(..).map(|id| {
-            let result = match map.get(&id) {
-                None => Ok(None),
-                Some(&Ok(ref value)) => Ok(Some(value.clone())),
-                Some(&Err(ref error)) => Err(error.clone())
-            };
-            (id, result)
-        }).collect()
+        channels.drain(..)
+            .map(|id| {
+                let result = match map.get(&id) {
+                    None => Ok(None),
+                    Some(&Ok(ref value)) => Ok(Some(value.clone())),
+                    Some(&Err(ref error)) => Err(error.clone()),
+                };
+                (id, result)
+            })
+            .collect()
     }
 
     /// Request that a value be sent to a channel.
-    fn send_values(&self, mut values: HashMap<Id<Channel>, Value>, _: User) -> ResultMap<Id<Channel>, (), Error> {
+    fn send_values(&self,
+                   mut values: HashMap<Id<Channel>, Value>,
+                   _: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
         let map = self.senders.lock().unwrap();
-        values.drain().map(|(id, value)| {
-            let result = match map.get(&id) {
-                None => {
-                    self.tx_effect.lock().unwrap().send(Effect::ValueSent(id.clone(), value)).unwrap();
-                    Ok(())
-                }
-                Some(error) => Err(error.clone())
-            };
-            (id, result)
-        }).collect()
+        values.drain()
+            .map(|(id, value)| {
+                let result = match map.get(&id) {
+                    None => {
+                        self.tx_effect
+                            .lock()
+                            .unwrap()
+                            .send(Effect::ValueSent(id.clone(), value))
+                            .unwrap();
+                        Ok(())
+                    }
+                    Some(error) => Err(error.clone()),
+                };
+                (id, result)
+            })
+            .collect()
     }
 
     fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult {
         let mut watchers = self.watchers.lock().unwrap();
-        watch.drain(..).filter_map(|(id, filter, on_event)| {
-            let is_dropped = Arc::new(AtomicBool::new(false));
-            let watcher = WatcherState {
-                filter: filter,
-                on_event: on_event,
-                is_met: RefCell::new(false),
-                is_dropped: is_dropped.clone()
-            };
-            match watchers.entry(id.clone()) {
-                Occupied(mut entry) => {
-                    entry.get_mut().push(watcher)
+        watch.drain(..)
+            .filter_map(|(id, filter, on_event)| {
+                let is_dropped = Arc::new(AtomicBool::new(false));
+                let watcher = WatcherState {
+                    filter: filter,
+                    on_event: on_event,
+                    is_met: RefCell::new(false),
+                    is_dropped: is_dropped.clone(),
+                };
+                match watchers.entry(id.clone()) {
+                    Occupied(mut entry) => entry.get_mut().push(watcher),
+                    Vacant(entry) => {
+                        entry.insert(vec![watcher]);
+                    }
                 }
-                Vacant(entry) => {
-                    entry.insert(vec![watcher]);
-                }
-            }
-            let guard = Box::new(TestWatchGuard(is_dropped.clone())) as Box<AdapterWatchGuard>;
-            Some((id, Ok(guard)))
-        }).collect()
+                let guard = Box::new(TestWatchGuard(is_dropped.clone())) as Box<AdapterWatchGuard>;
+                Some((id, Ok(guard)))
+            })
+            .collect()
     }
 }

@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! API structures used by the Philips Hue API
 //!
@@ -104,11 +104,13 @@ impl SettingsLightEntry {
     }
 }
 
-pub fn parse_json<T: Deserialize + Debug> (json: &str) -> Option<T> {
+pub fn parse_json<T: Deserialize + Debug>(json: &str) -> Option<T> {
     let parsed: Option<T> = match serde_json::from_str(&json) {
         Ok(value) => Some(value),
         Err(error) => {
-            error!("Unable to parse JSON {}. Error: {}", json, error.to_string());
+            error!("Unable to parse JSON {}. Error: {}",
+                   json,
+                   error.to_string());
             None
         }
     };

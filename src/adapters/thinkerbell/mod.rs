@@ -1,17 +1,17 @@
 //! An adapter providing access to the Thinkerbell rules engine.
 
-use foxbox_taxonomy::api::{ Error, InternalError, User };
+use foxbox_taxonomy::api::{Error, InternalError, User};
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::io;
 use foxbox_taxonomy::manager::*;
 use foxbox_taxonomy::parse::*;
-use foxbox_taxonomy::services::{ AdapterId, ServiceId, Service };
-use foxbox_taxonomy::util::{ Id, Maybe };
-use foxbox_taxonomy::values::{ format, Data, Duration, Json, Value, OnOff };
+use foxbox_taxonomy::services::{AdapterId, ServiceId, Service};
+use foxbox_taxonomy::util::{Id, Maybe};
+use foxbox_taxonomy::values::{format, Data, Duration, Json, Value, OnOff};
 
 use foxbox_thinkerbell::ast::*;
 use foxbox_thinkerbell::compile::ExecutableDevEnv;
-use foxbox_thinkerbell::manager::{ ScriptManager, ScriptId, Error as ScriptManagerError };
+use foxbox_thinkerbell::manager::{ScriptManager, ScriptId, Error as ScriptManagerError};
 use foxbox_thinkerbell::run::ExecutionEvent;
 
 use timer;
@@ -20,14 +20,14 @@ use transformable_channels::mpsc::*;
 use std::collections::HashMap;
 use std::fmt;
 use std::path;
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use serde_json;
 
 static ADAPTER_NAME: &'static str = "Thinkerbell adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
-static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
+static ADAPTER_VERSION: [u32; 4] = [0, 0, 0, 0];
 
 /// `ThinkerbellAdapter` hooks up the rules engine (if this, then that) as an adapter.
 ///
@@ -42,7 +42,6 @@ static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
 /// This adapter performs most actions by delegating channel messages to its main thread.
 #[derive(Clone)]
 pub struct ThinkerbellAdapter {
-
     /// The sending end of the channel for sending messages to `ThinkerbellAdapter`'s main loop.
     tx: Arc<Mutex<RawSender<ThinkAction>>>,
 
@@ -68,7 +67,7 @@ struct ThinkerbellExecutionEnv {
     adapter_manager: Arc<AdapterManager>,
 
     // FIXME: Timer's not clonable, so we should only use one, right? Does this have to be mutexed?
-    timer: Arc<Mutex<timer::Timer>>
+    timer: Arc<Mutex<timer::Timer>>,
 }
 impl fmt::Debug for ThinkerbellExecutionEnv {
     fn fmt(&self, _: &mut fmt::Formatter) -> Result<(), fmt::Error> {
@@ -114,28 +113,39 @@ impl Adapter for ThinkerbellAdapter {
         ADAPTER_VENDOR
     }
 
-    fn version(&self) -> &[u32;4] {
+    fn version(&self) -> &[u32; 4] {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, set: Vec<Id<Channel>>, _: User) -> ResultMap<Id<Channel>, Option<Value>, Error> {
-        set.iter().map(|id| {
-            let (tx, rx) = channel();
-            let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToGetter(tx, id.clone()));
-            match rx.recv() {
-                Ok(result) => (id.clone(), result),
-                // If an error occurs, the channel/thread died!
-                Err(recv_err) => (id.clone(), Err(Error::Internal(
+    fn fetch_values(&self,
+                    set: Vec<Id<Channel>>,
+                    _: User)
+                    -> ResultMap<Id<Channel>, Option<Value>, Error> {
+        set.iter()
+            .map(|id| {
+                let (tx, rx) = channel();
+                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToGetter(tx, id.clone()));
+                match rx.recv() {
+                    Ok(result) => (id.clone(), result),
+                    // If an error occurs, the channel/thread died!
+                    Err(recv_err) => (id.clone(), Err(Error::Internal(
                         InternalError::GenericError(format!("{:?}", recv_err))))),
-            }
-        }).collect()
+                }
+            })
+            .collect()
     }
 
-    fn send_values(&self, values: HashMap<Id<Channel>, Value>, user: User) -> ResultMap<Id<Channel>, (), Error> {
+    fn send_values(&self,
+                   values: HashMap<Id<Channel>, Value>,
+                   user: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
         values.iter()
             .map(|(id, value)| {
                 let (tx, rx) = channel();
-                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx, id.clone(), value.clone(), user.clone()));
+                let _ = self.tx.lock().unwrap().send(ThinkAction::RespondToSetter(tx,
+                                                                                  id.clone(),
+                                                                                  value.clone(),
+                                                                                  user.clone()));
                 match rx.recv() {
                     Ok(result) => (id.clone(), result),
                     // If an error occurs, the channel died!
@@ -165,13 +175,11 @@ struct ThinkerbellRule {
 }
 
 impl ThinkerbellAdapter {
-
     #[allow(cyclomatic_complexity)]
-    fn main(
-        &self,
-        rx: Receiver<ThinkAction>,
-        mut script_manager: ScriptManager<ThinkerbellExecutionEnv, RawSender<(Id<ScriptId>, ExecutionEvent)>>
-    ) {
+    fn main(&self,
+            rx: Receiver<ThinkAction>,
+            mut script_manager: ScriptManager<ThinkerbellExecutionEnv,
+                                              RawSender<(Id<ScriptId>, ExecutionEvent)>>) {
         // Store an in-memory list of all of the rules (their getters, setters, etc.).
         // We need to track these to respond to getter/setter requests.
         let mut rules: Vec<ThinkerbellRule> = Vec::new();
@@ -194,12 +202,12 @@ impl ThinkerbellAdapter {
                     match self.add_rule_service(script_id) {
                         Ok(rule) => {
                             rules.push(rule);
-                        },
+                        }
                         Err(e) => {
                             error!("[thinkerbell@link.mozilla.org] Unable to add Thinkerbell Rule Service: {:?}", e);
                         }
                     };
-                },
+                }
                 // After a script has been stopped, remove the Service for that script.
                 // The script has already been removed from ScriptManager at this point;
                 // we're just updating the Service-level bookkeeping.
@@ -207,19 +215,23 @@ impl ThinkerbellAdapter {
                     if let Some(position) = rules.iter().position(|r| r.script_id == script_id) {
                         let rule = rules.remove(position);
                         match self.remove_rule_service(&rule) {
-                            Ok(_) => {},
+                            Ok(_) => {}
                             Err(e) => {
                                 error!("[thinkerbell@link.mozilla.org] Unable to remove Thinkerbell Rule Service: {:?}", e)
                             }
                         }
                     }
-                },
+                }
                 // Respond to a pending Getter request.
                 ThinkAction::RespondToGetter(tx, getter_id) => {
                     for rule in &rules {
                         if getter_id == rule.channel_is_enabled_id {
                             let is_enabled = script_manager.is_enabled(&rule.script_id);
-                            let _ = tx.send(Ok(Some(Value::new(if is_enabled { OnOff::On } else { OnOff::Off }))));
+                            let _ = tx.send(Ok(Some(Value::new(if is_enabled {
+                                OnOff::On
+                            } else {
+                                OnOff::Off
+                            }))));
                             continue 'recv;
                         } else if getter_id == rule.getter_source_id {
                             match script_manager.get_source_and_owner(&rule.script_id) {
@@ -233,7 +245,7 @@ impl ThinkerbellAdapter {
                                             let _ = tx.send(Err(Error::Parsing(ParseError::JSON(JSONError(err)))));
                                         }
                                     }
-                                },
+                                }
                                 Err(e) => {
                                     let _ = tx.send(Err(sm_error(e)));
                                 }
@@ -242,7 +254,7 @@ impl ThinkerbellAdapter {
                         }
                     }
                     let _ = tx.send(Err(Error::Internal(InternalError::NoSuchChannel(getter_id.clone()))));
-                },
+                }
                 // Respond to a pending Setter request.
                 ThinkAction::RespondToSetter(tx, setter_id, value, user) => {
                     // Add a new rule (with the given JSON source).
@@ -251,13 +263,18 @@ impl ThinkerbellAdapter {
                             Ok(rule_source) => {
                                 let script_id = Id::new(&rule_source.script.name);
                                 match script_manager.put(&script_id, &rule_source.source, &user) {
-                                    Err(err) => {let _ = tx.send(Err(sm_error(err))) ;}
+                                    Err(err) => {
+                                        let _ = tx.send(Err(sm_error(err)));
+                                    }
                                     Ok(ok) => {
                                         let _ = tx.send(Ok(ok));
-                                        let _ = self.tx.lock().unwrap().send(ThinkAction::AddRuleService(script_id.clone()));
+                                        let _ = self.tx
+                                            .lock()
+                                            .unwrap()
+                                            .send(ThinkAction::AddRuleService(script_id.clone()));
                                     }
                                 }
-                            },
+                            }
                             Err(err) => {
                                 let _ = tx.send(Err(err));
                             }
@@ -272,18 +289,22 @@ impl ThinkerbellAdapter {
                                 match value.cast::<OnOff>() {
                                     Ok(&OnOff::On) => {
                                         let _ = tx.send(script_manager.set_enabled(&rule.script_id, true).map_err(sm_error));
-                                    },
+                                    }
                                     Ok(&OnOff::Off) => {
                                         let _ = tx.send(script_manager.set_enabled(&rule.script_id, false).map_err(sm_error));
-                                    },
+                                    }
                                     Err(err) => {
                                         let _ = tx.send(Err(err));
-                                    },
+                                    }
                                 }
                                 continue 'recv;
                             } else if setter_id == rule.setter_remove_id {
-                                let _ = tx.send(script_manager.remove(&rule.script_id).map_err(sm_error));
-                                let _ = self.tx.lock().unwrap().send(ThinkAction::RemoveRuleService(rule.script_id.clone()));
+                                let _ = tx.send(script_manager.remove(&rule.script_id)
+                                    .map_err(sm_error));
+                                let _ = self.tx
+                                    .lock()
+                                    .unwrap()
+                                    .send(ThinkAction::RemoveRuleService(rule.script_id.clone()));
                                 continue 'recv;
                             }
                         }
@@ -365,7 +386,7 @@ impl ThinkerbellAdapter {
         let (tx_env, rx_env) = channel();
         let env = ThinkerbellExecutionEnv {
             adapter_manager: manager.clone(),
-            timer: Arc::new(Mutex::new(timer::Timer::new()))
+            timer: Arc::new(Mutex::new(timer::Timer::new())),
         };
 
         let mut script_manager = try!(
@@ -429,7 +450,7 @@ struct RuleSource {
     script: Script<UncheckedCtx>,
 
     /// The actual source code.
-    source: String
+    source: String,
 }
 
 impl PartialEq for RuleSource {
@@ -446,13 +467,13 @@ impl Data for RuleSource {
         let script = try!(Script::<UncheckedCtx>::parse(path, source)
             .map_err(Error::Parsing));
         match serde_json::to_string(source) {
-            Ok(source) =>
+            Ok(source) => {
                 Ok(RuleSource {
                     script: script,
-                    source: source
-                }),
-            Err(err) =>
-                Err(Error::Serializing(io::SerializeError::JSON(err.to_string())))
+                    source: source,
+                })
+            }
+            Err(err) => Err(Error::Serializing(io::SerializeError::JSON(err.to_string()))),
         }
     }
     fn serialize(source: &Self, _binary: &io::BinaryTarget) -> Result<JSON, Error> {
@@ -460,5 +481,3 @@ impl Data for RuleSource {
             .map_err(|err| Error::Parsing(ParseError::JSON(JSONError(err))))
     }
 }
-
-

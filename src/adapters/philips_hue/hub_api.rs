@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! Implementation of the Philips Hue API
 //!
@@ -77,12 +77,8 @@ impl HubApi {
         let url = format!("http://{}/", self.ip);
         let content = http::get(&url);
         match content {
-            Ok(value) => {
-                value.contains("hue personal wireless lighting")
-            },
-            Err(_) => {
-                false
-            }
+            Ok(value) => value.contains("hue personal wireless lighting"),
+            Err(_) => false,
         }
     }
 
@@ -100,32 +96,32 @@ impl HubApi {
         #[derive(Deserialize, Debug)]
         struct PairingResponse {
             success: Option<SuccessResponse>,
-            error: Option<ErrorResponse>
+            error: Option<ErrorResponse>,
         }
         #[derive(Deserialize, Debug)]
         struct SuccessResponse {
-            username: String
+            username: String,
         }
         #[derive(Deserialize, Debug)]
         struct ErrorResponse {
             #[serde(rename="type")]
             error_type: u32,
             address: String,
-            description: String
+            description: String,
         }
         let url = "api";
         let req = json!({ devicetype: "foxbox_hub"});
         let response = self.post_unauth(&url, &req).unwrap_or("[]".to_owned());
-        let mut response: Vec<PairingResponse> =
-            structs::parse_json(&response).unwrap_or(Vec::new());
+        let mut response: Vec<PairingResponse> = structs::parse_json(&response)
+            .unwrap_or(Vec::new());
         if response.len() != 1 {
             error!("Pairing request to Philips Hue bridge {} yielded unexpected response",
                 self.id);
-            return Err(())
+            return Err(());
         }
         let response = match response.pop() {
-            Some(response) => { response },
-            None => { return Err(()) }
+            Some(response) => response,
+            None => return Err(()),
         };
         if let Some(success) = response.success {
             Ok(Some(success.username))
@@ -152,8 +148,8 @@ impl HubApi {
         let mut lights: Vec<String> = Vec::new();
         let url = "lights";
         let res = self.get(url).unwrap(); // TODO: remove unwrap
-        let json: BTreeMap<String, structs::SettingsLightEntry> =
-            structs::parse_json(&res).unwrap(); // TODO: no unwrap
+        let json: BTreeMap<String, structs::SettingsLightEntry> = structs::parse_json(&res)
+            .unwrap(); // TODO: no unwrap
 
         for key in json.keys() {
             lights.push(key.to_owned());

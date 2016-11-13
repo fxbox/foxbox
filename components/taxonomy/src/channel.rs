@@ -4,21 +4,21 @@ use util::*;
 use values::*;
 
 use std::collections::HashSet;
-use std::hash::{ Hash, Hasher };
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 
 #[derive(Debug, Clone)]
 pub struct Signature {
     pub accepts: Maybe<Arc<Format>>,
-    pub returns: Maybe<Arc<Format>>
+    pub returns: Maybe<Arc<Format>>,
 }
 impl Signature {
     /// Shortcut for building a signature that accepts some arg, returns nothing.
     pub fn accepts(spec: Maybe<Arc<Format>>) -> Self {
         Signature {
             accepts: spec,
-            returns: Maybe::Nothing
+            returns: Maybe::Nothing,
         }
     }
 
@@ -26,14 +26,14 @@ impl Signature {
     pub fn returns(spec: Maybe<Arc<Format>>) -> Self {
         Signature {
             returns: spec,
-            accepts: Maybe::Nothing
+            accepts: Maybe::Nothing,
         }
     }
 
     pub fn nothing() -> Self {
         Signature {
             returns: Maybe::Nothing,
-            accepts: Maybe::Nothing
+            accepts: Maybe::Nothing,
         }
     }
 }
@@ -45,12 +45,8 @@ impl ToJSON for Signature {
             let spec;
             match *value {
                 Maybe::Nothing => continue,
-                Maybe::Required(ref format) => {
-                    spec = vec![("requires", format.description())]
-                },
-                Maybe::Optional(ref format) => {
-                    spec = vec![("optional", format.description())]
-                }
+                Maybe::Required(ref format) => spec = vec![("requires", format.description())],
+                Maybe::Optional(ref format) => spec = vec![("optional", format.description())],
             }
             vec.push((key, spec.to_json()))
         }
@@ -131,7 +127,6 @@ pub struct Channel {
     /// the channel.
     pub supports_fetch: Option<Signature>,
 
-
     /// The format used by operation `Watch`.
     ///
     /// If `None`, this channel does not support operation `Watch`.
@@ -152,21 +147,23 @@ impl ToJSON for Channel {
             ("feature", self.feature.to_json()),
             ("supports_send", self.supports_send.to_json()),
             ("supports_fetch", self.supports_fetch.to_json()),
-        ].to_json()
+        ]
+            .to_json()
     }
 }
 
-impl Eq for Channel {
-}
+impl Eq for Channel {}
 
 impl PartialEq for Channel {
-     fn eq(&self, other: &Self) -> bool {
-         self.id.eq(&other.id)
-     }
+    fn eq(&self, other: &Self) -> bool {
+        self.id.eq(&other.id)
+    }
 }
 
 impl Hash for Channel {
-    fn hash<H>(&self, state: &mut H) where H: Hasher {
+    fn hash<H>(&self, state: &mut H)
+        where H: Hasher
+    {
         self.id.hash(state)
     }
 }
@@ -266,4 +263,3 @@ lazy_static! {
         .. Channel::default()
     };
 }
-

@@ -1,4 +1,3 @@
-//!
 //! Values manipulated by services
 //!
 
@@ -6,16 +5,16 @@
 
 use api::Error;
 use io;
-use io::{ BinaryTarget, BinarySource };
+use io::{BinaryTarget, BinarySource};
 use parse::*;
 use util::*;
 
-use std::cmp::{ PartialOrd, Ordering };
+use std::cmp::{PartialOrd, Ordering};
 use std::fmt::Debug;
 use std::sync::Arc;
-use std::{ error, fmt };
+use std::{error, fmt};
 
-use chrono::{ Duration as ChronoDuration, DateTime, Local, TimeZone, UTC };
+use chrono::{Duration as ChronoDuration, DateTime, Local, TimeZone, UTC};
 use mopa;
 use serde_json;
 
@@ -33,7 +32,7 @@ impl TypeError {
     pub fn new(expected: &Arc<io::Format>, got: &Value) -> Self {
         TypeError {
             expected: expected.description(),
-            got: got.description()
+            got: got.description(),
         }
     }
 }
@@ -78,13 +77,15 @@ struct ValueImpl {
     eq: Box<Fn(&Data, &Data) -> bool + Send + Sync>,
 }
 impl ValueImpl {
-    fn new<T>(data: T) -> Self where T: Data + Debug + PartialEq + Sized {
+    fn new<T>(data: T) -> Self
+        where T: Data + Debug + PartialEq + Sized
+    {
         let describe = || T::description();
         let eq = |me: &Data, other: &Data| {
             let me = me.downcast_ref::<T>().unwrap(); // By definition, `me` has type `T`.
             match other.downcast_ref::<T>() {
                 None => false,
-                Some(other) => me.eq(other)
+                Some(other) => me.eq(other),
             }
         };
         ValueImpl {
@@ -103,23 +104,29 @@ impl fmt::Debug for ValueImpl {
 
 
 impl Value {
-    pub fn new<T>(data: T) -> Self where T: Data + Debug + PartialEq + Sized {
-        Value {
-            content: Arc::new(ValueImpl::new(data)),
-        }
+    pub fn new<T>(data: T) -> Self
+        where T: Data + Debug + PartialEq + Sized
+    {
+        Value { content: Arc::new(ValueImpl::new(data)) }
     }
 
-    pub fn cast<T>(&self) -> Result<&T, Error> where T: Data + Sized {
+    pub fn cast<T>(&self) -> Result<&T, Error>
+        where T: Data + Sized
+    {
         match self.content.data.downcast_ref::<T>() {
-            None => Err(Error::WrongType(TypeError {
-                expected: T::description(),
-                got: self.description()
-            })),
-            Some(r) => Ok(r)
+            None => {
+                Err(Error::WrongType(TypeError {
+                    expected: T::description(),
+                    got: self.description(),
+                }))
+            }
+            Some(r) => Ok(r),
         }
     }
 
-    pub fn downcast<T>(&self) -> Option<&T> where T: Data {
+    pub fn downcast<T>(&self) -> Option<&T>
+        where T: Data
+    {
         self.content.data.downcast_ref::<T>()
     }
 
@@ -141,7 +148,8 @@ pub trait Data: Debug + Send + Sync + mopa::Any {
     fn description() -> String where Self: Sized;
 
     /// Attempt to build a `Value` from a json `source` and `binary` components.
-    fn parse(path: Path, source: &JSON, binary: &BinarySource) -> Result<Self, Error> where Self: Sized;
+    fn parse(path: Path, source: &JSON, binary: &BinarySource) -> Result<Self, Error>
+        where Self: Sized;
 
     /// Serialize a `Value` into a `JSON`, storing binary data in `binary`.
     fn serialize(source: &Self, binary: &BinaryTarget) -> Result<JSON, Error> where Self: Sized;
@@ -149,18 +157,24 @@ pub trait Data: Debug + Send + Sync + mopa::Any {
     /// Shorthand for parsing from a string.
     ///
     /// Used mainly for testing purposes.
-    fn parse_str(source: &str) -> Result<Self, Error> where Self: Sized {
+    fn parse_str(source: &str) -> Result<Self, Error>
+        where Self: Sized
+    {
         serde_json::from_str(source)
             .map_err(|err| Error::Parsing(ParseError::JSON(JSONError(err))))
             .and_then(|json| Self::parse(Path::new(), &json, &BinarySource))
     }
 
-    fn parse_vec(path: Path, source: &JSON, binary: &BinarySource) -> Result<Vec<Self>, Error> where Self: Sized {
+    fn parse_vec(path: Path, source: &JSON, binary: &BinarySource) -> Result<Vec<Self>, Error>
+        where Self: Sized
+    {
         match source.as_array() {
-            None => Err(Error::WrongType(TypeError {
-                expected: "array".to_owned(),
-                got: "something else".to_owned()
-            })),
+            None => {
+                Err(Error::WrongType(TypeError {
+                    expected: "array".to_owned(),
+                    got: "something else".to_owned(),
+                }))
+            }
             Some(array) => {
                 let mut result = Vec::with_capacity(array.len());
                 for (item, i) in array.iter().zip(0..) {
@@ -172,14 +186,26 @@ pub trait Data: Debug + Send + Sync + mopa::Any {
         }
     }
 
-    fn parse_field(path: Path, source: &JSON, binary: &BinarySource, field_name: &str) -> Result<Self, Error> where Self: Sized {
+    fn parse_field(path: Path,
+                   source: &JSON,
+                   binary: &BinarySource,
+                   field_name: &str)
+                   -> Result<Self, Error>
+        where Self: Sized
+    {
         match Self::parse_opt_field(path.clone(), source, binary, field_name) { // FIXME: Get rid of this `path.clone()`
             Some(result) => result,
-            None => Err(Error::Parsing(ParseError::missing_field(field_name, &path)))
+            None => Err(Error::Parsing(ParseError::missing_field(field_name, &path))),
         }
     }
 
-    fn parse_opt_field(path: Path, source: &JSON, binary: &BinarySource, field_name: &str) -> Option<Result<Self, Error>> where Self: Sized {
+    fn parse_opt_field(path: Path,
+                       source: &JSON,
+                       binary: &BinarySource,
+                       field_name: &str)
+                       -> Option<Result<Self, Error>>
+        where Self: Sized
+    {
         if let JSON::Object(ref obj) = *source {
             if let Some(v) = obj.get(field_name) {
                 Some(Self::parse(path, v, binary))
@@ -193,7 +219,9 @@ pub trait Data: Debug + Send + Sync + mopa::Any {
 }
 mopafy!(Data);
 
-impl<T> Parser<T> for T where T: Data {
+impl<T> Parser<T> for T
+    where T: Data
+{
     fn description() -> String {
         T::description()
     }
@@ -201,7 +229,7 @@ impl<T> Parser<T> for T where T: Data {
         match T::parse(path, source, &BinarySource) {
             Ok(ok) => Ok(ok),
             Err(Error::Parsing(err)) => Err(err),
-            Err(err) => Err(ParseError::InternalError(format!("{}", err)))
+            Err(err) => Err(ParseError::InternalError(format!("{}", err))),
         }
     }
 }
@@ -213,7 +241,7 @@ impl Data for String {
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<String, Error> {
         match source.as_str() {
             None => Err(Error::Parsing(ParseError::type_error("String", &path, "string"))),
-            Some(s) => Ok(s.to_owned())
+            Some(s) => Ok(s.to_owned()),
         }
     }
 
@@ -311,7 +339,7 @@ impl Data for OnOff {
             Some("On") => OnOff::On,
             Some("Off") => OnOff::Off,
             Some(str) => return Err(Error::Parsing(ParseError::unknown_constant(str, &path))),
-            None => return Err(Error::Parsing(ParseError::type_error("OnOff", &path, "string")))
+            None => return Err(Error::Parsing(ParseError::type_error("OnOff", &path, "string"))),
         };
         Ok(result)
     }
@@ -399,7 +427,9 @@ impl Data for OpenClosed {
             Some("Open") => OpenClosed::Open,
             Some("Closed") => OpenClosed::Closed,
             Some(str) => return Err(Error::Parsing(ParseError::unknown_constant(str, &path))),
-            None => return Err(Error::Parsing(ParseError::type_error("OpenClosed", &path, "string")))
+            None => {
+                return Err(Error::Parsing(ParseError::type_error("OpenClosed", &path, "string")))
+            }
         };
         Ok(result)
     }
@@ -470,13 +500,13 @@ impl Data for IsLocked {
             Some("Locked") => Ok(IsLocked::Locked),
             Some("Unlocked") => Ok(IsLocked::Unlocked),
             Some(str) => Err(Error::Parsing(ParseError::unknown_constant(str, &path))),
-            None => Err(Error::Parsing(ParseError::type_error("IsLocked", &path, "string")))
+            None => Err(Error::Parsing(ParseError::type_error("IsLocked", &path, "string"))),
         }
     }
     fn serialize(source: &Self, _binary: &BinaryTarget) -> Result<JSON, Error> {
         let str = match *source {
             IsLocked::Locked => "Locked",
-            IsLocked::Unlocked => "Unlocked"
+            IsLocked::Unlocked => "Unlocked",
         };
         Ok(JSON::String(str.to_owned()))
     }
@@ -486,7 +516,7 @@ impl ToJSON for IsLocked {
     fn to_json(&self) -> JSON {
         match *self {
             IsLocked::Locked => JSON::String("Locked".to_owned()),
-            IsLocked::Unlocked => JSON::String("Unlocked".to_owned())
+            IsLocked::Unlocked => JSON::String("Unlocked".to_owned()),
         }
     }
 }
@@ -557,7 +587,7 @@ impl Data for IsSecure {
             Some("Secure") => IsSecure::Secure,
             Some("Insecure") => IsSecure::Insecure,
             Some(str) => return Err(Error::Parsing(ParseError::unknown_constant(str, &path))),
-            None => return Err(Error::Parsing(ParseError::type_error("IsSecure", &path, "string")))
+            None => return Err(Error::Parsing(ParseError::type_error("IsSecure", &path, "string"))),
         };
         Ok(result)
     }
@@ -584,7 +614,7 @@ impl ToJSON for IsSecure {
     fn to_json(&self) -> JSON {
         match *self {
             IsSecure::Insecure => JSON::String("Insecure".to_owned()),
-            IsSecure::Secure => JSON::String("Secure".to_owned())
+            IsSecure::Secure => JSON::String("Secure".to_owned()),
         }
     }
 }
@@ -603,7 +633,12 @@ impl Ord for IsSecure {
 
 impl fmt::Display for IsSecure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", match *self { IsSecure::Insecure => "insecure", IsSecure::Secure => "secure" })
+        write!(f,
+               "{}",
+               match *self {
+                   IsSecure::Insecure => "insecure",
+                   IsSecure::Secure => "secure",
+               })
     }
 }
 
@@ -778,7 +813,7 @@ pub enum Color {
     ///   other => panic!("Unexpected result {:?}", other)
     /// }
     /// ```
-    HSV(f64, f64, f64)
+    HSV(f64, f64, f64),
 }
 impl Data for Color {
     fn description() -> String {
@@ -791,7 +826,9 @@ impl Data for Color {
         // h can be any hue angle, will be interpreted (mod 360) in [0, 360).
         for &(val, name) in &vec![(&s, "s"), (&v, "v")] {
             if *val < 0. || *val > 1. {
-                return Err(Error::Parsing(ParseError::type_error(name, &path, "a number in [0, 1]")));
+                return Err(Error::Parsing(ParseError::type_error(name,
+                                                                 &path,
+                                                                 "a number in [0, 1]")));
             }
         }
         Ok(Color::HSV(h, s, v))
@@ -842,10 +879,10 @@ impl PartialOrd for Json {
 #[derive(Debug, PartialEq)]
 pub struct Binary {
     /// The binary data.
-   pub data: Vec<u8>,
+    pub data: Vec<u8>,
 
-   /// The mime type.
-   pub mimetype: Id<MimeTypeId>,
+    /// The mime type.
+    pub mimetype: Id<MimeTypeId>,
 }
 
 impl Data for Binary {
@@ -853,11 +890,15 @@ impl Data for Binary {
         "Binary".to_owned()
     }
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<Self, Error> {
-        let data = try!(path.push("data", |path| Vec::<u8>::take(path, source, "data").map_err(Error::Parsing)));
-        let mimetype = try!(path.push("mimetype", |path| Id::take(path, source, "mimetype").map_err(Error::Parsing)));
+        let data = try!(path.push("data", |path| {
+            Vec::<u8>::take(path, source, "data").map_err(Error::Parsing)
+        }));
+        let mimetype = try!(path.push("mimetype", |path| {
+            Id::take(path, source, "mimetype").map_err(Error::Parsing)
+        }));
         Ok(Binary {
             data: data,
-            mimetype: mimetype
+            mimetype: mimetype,
         })
     }
     fn serialize(source: &Self, _binary: &BinaryTarget) -> Result<JSON, Error> {
@@ -867,10 +908,9 @@ impl Data for Binary {
 
 impl ToJSON for Binary {
     fn to_json(&self) -> JSON {
-        let mut source = vec![
-            ("data", JSON::Array(self.data.iter().map(|x| JSON::U64(*x as u64)).collect())),
-            ("mimetype", JSON::String(self.mimetype.to_string()))
-        ];
+        let mut source =
+            vec![("data", JSON::Array(self.data.iter().map(|x| JSON::U64(*x as u64)).collect())),
+                 ("mimetype", JSON::String(self.mimetype.to_string()))];
         let map = source.drain(..)
             .map(|(key, value)| (key.to_owned(), value))
             .collect();
@@ -932,7 +972,7 @@ impl Data for TimeStamp {
         "TimeStamp (RFC 3339)".to_owned()
     }
     fn parse(path: Path, source: &JSON, _binary: &BinarySource) -> Result<Self, Error> {
-        use chrono::{ DateTime, UTC };
+        use chrono::{DateTime, UTC};
         use std::str::FromStr;
         if let JSON::String(ref str) = *source {
             if let Ok(dt) = DateTime::<UTC>::from_str(str) {
@@ -942,7 +982,7 @@ impl Data for TimeStamp {
         Err(Error::Parsing(ParseError::type_error("TimeStamp", &path, "date string (RFC 3339)")))
     }
     fn serialize(source: &Self, _binary: &BinaryTarget) -> Result<JSON, Error> {
-         Ok(JSON::String(source.0.to_rfc3339()))
+        Ok(JSON::String(source.0.to_rfc3339()))
     }
 }
 
@@ -951,17 +991,19 @@ impl ToJSON for TimeStamp {
         JSON::String(self.0.to_rfc3339())
     }
 }
-impl Into<DateTime<UTC>> for TimeStamp  {
+impl Into<DateTime<UTC>> for TimeStamp {
     fn into(self) -> DateTime<UTC> {
         self.0
     }
 }
-impl Into<DateTime<Local>> for TimeStamp  {
+impl Into<DateTime<Local>> for TimeStamp {
     fn into(self) -> DateTime<Local> {
         self.0.with_timezone(&Local)
     }
 }
-impl<T> From<DateTime<T>> for TimeStamp where T: TimeZone {
+impl<T> From<DateTime<T>> for TimeStamp
+    where T: TimeZone
+{
     fn from(date: DateTime<T>) -> Self {
         TimeStamp(date.with_timezone(&UTC))
     }
@@ -975,7 +1017,9 @@ impl<T> From<DateTime<T>> for TimeStamp where T: TimeZone {
 /// A range is an object with one field `{key: value}`.
 ///
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
-pub enum Range<T> where T: Data + PartialOrd + PartialEq {
+pub enum Range<T>
+    where T: Data + PartialOrd + PartialEq
+{
     /// Leq(x) accepts any value v such that v <= x.
     ///
     /// # JSON
@@ -1014,18 +1058,20 @@ pub enum Range<T> where T: Data + PartialOrd + PartialEq {
 
     /// BetweenEq {min, max} accepts any value v such that `min <= v`
     /// and `v <= max`. If `max < min`, it never accepts anything.
-    BetweenEq { min:T, max:T },
+    BetweenEq { min: T, max: T },
 
     /// OutOfStrict {min, max} accepts any value v such that `v < min`
     /// or `max < v`
-    OutOfStrict { min:T, max:T },
+    OutOfStrict { min: T, max: T },
 
     /// Eq(x) accespts any value v such that v == x
     Eq(T),
 }
 
 
-impl<T> Range<T> where T: Data + PartialOrd + PartialEq {
+impl<T> Range<T>
+    where T: Data + PartialOrd + PartialEq
+{
     /// Determine if a value is accepted by this range.
     pub fn contains(&self, value: &Value) -> bool {
         use self::Range::*;
@@ -1044,7 +1090,9 @@ impl<T> Range<T> where T: Data + PartialOrd + PartialEq {
     }
 }
 
-impl<T> Data for Range<T> where T: Data + PartialOrd + PartialEq {
+impl<T> Data for Range<T>
+    where T: Data + PartialOrd + PartialEq
+{
     fn description() -> String {
         format!("Range of {}", T::description())
     }
@@ -1059,35 +1107,44 @@ impl<T> Data for Range<T> where T: Data + PartialOrd + PartialEq {
                 } else if let Some(v) = obj.get("Eq") {
                     Eq(try!(path.push("eq", |path| T::parse(path, v, binary))))
                 } else if let Some(v) = obj.get("BetweenEq") {
-                    let mut bounds = try!(path.push("BetweenEq", |path| T::parse_vec(path, v, binary)));
+                    let mut bounds =
+                        try!(path.push("BetweenEq", |path| T::parse_vec(path, v, binary)));
                     if bounds.len() == 2 {
                         let max = bounds.pop().unwrap();
                         let min = bounds.pop().unwrap();
                         BetweenEq {
                             min: min,
-                            max: max
+                            max: max,
                         }
                     } else {
-                        return Err(Error::Parsing(ParseError::type_error("BetweenEq", &path, "an array of two values")))
+                        return Err(Error::Parsing(ParseError::type_error("BetweenEq",
+                                                                         &path,
+                                                                         "an array of two values")));
                     }
                 } else if let Some(v) = obj.get("OutOfStrict") {
-                    let mut bounds = try!(path.push("OutOfStrict", |path| T::parse_vec(path, v, binary)));
+                    let mut bounds =
+                        try!(path.push("OutOfStrict", |path| T::parse_vec(path, v, binary)));
                     if bounds.len() == 2 {
                         let max = bounds.pop().unwrap();
                         let min = bounds.pop().unwrap();
                         OutOfStrict {
                             min: min,
-                            max: max
+                            max: max,
                         }
                     } else {
-                        return Err(Error::Parsing(ParseError::type_error("OutOfStrict", &path, "an array of two values")))
+                        return Err(Error::Parsing(ParseError::type_error("OutOfStrict",
+                                                                         &path,
+                                                                         "an array of two values")));
                     }
                 } else {
-                    return Err(Error::Parsing(ParseError::type_error("Range", &path, "a field Eq, Leq, Geq, BetweenEq or OutOfStrict")))
+                    return Err(Error::Parsing(ParseError::type_error("Range",
+                                                                     &path,
+                                                                     "a field Eq, Leq, Geq, \
+                                                                      BetweenEq or OutOfStrict")));
                 };
                 Ok(result)
             }
-            _ => Err(Error::Parsing(ParseError::type_error("Range", &path, "object")))
+            _ => Err(Error::Parsing(ParseError::type_error("Range", &path, "object"))),
         }
     }
 
@@ -1096,14 +1153,16 @@ impl<T> Data for Range<T> where T: Data + PartialOrd + PartialEq {
             Range::Eq(ref val) => ("Eq", try!(T::serialize(val, binary))),
             Range::Geq(ref val) => ("Geq", try!(T::serialize(val, binary))),
             Range::Leq(ref val) => ("Leq", try!(T::serialize(val, binary))),
-            Range::BetweenEq { ref min, ref max } => ("BetweenEq", JSON::Array(vec![
-                try!(T::serialize(min, binary)),
-                try!(T::serialize(max, binary))
-            ])),
-            Range::OutOfStrict { ref min, ref max } => ("OutOfStrict", JSON::Array(vec![
-                try!(T::serialize(min, binary)),
-                try!(T::serialize(max, binary))
-            ])),
+            Range::BetweenEq { ref min, ref max } => {
+                ("BetweenEq",
+                 JSON::Array(vec![try!(T::serialize(min, binary)),
+                                  try!(T::serialize(max, binary))]))
+            }
+            Range::OutOfStrict { ref min, ref max } => {
+                ("OutOfStrict",
+                 JSON::Array(vec![try!(T::serialize(min, binary)),
+                                  try!(T::serialize(max, binary))]))
+            }
         };
         Ok(vec![(key, value)].to_json())
     }

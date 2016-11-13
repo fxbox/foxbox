@@ -1,15 +1,14 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use foxbox_core::traits::Controller;
 use foxbox_taxonomy::manager::*;
-use hyper::net::{ NetworkListener };
-use iron::{ AfterMiddleware, Chain, Handler,
-            HttpServerFactory, Iron, IronResult, Request,
-            Response, ServerFactory };
+use hyper::net::NetworkListener;
+use iron::{AfterMiddleware, Chain, Handler, HttpServerFactory, Iron, IronResult, Request,
+           Response, ServerFactory};
 use iron_cors::CORS;
-use iron::error::{ IronError };
+use iron::error::IronError;
 use iron::method::Method;
 use iron::status::Status;
 use mount::Mount;
@@ -32,13 +31,11 @@ impl AfterMiddleware for Custom404 {
 
         if err.error.downcast::<NoRoute>().is_some() {
             // Router error
-            return Ok(Response::with((Status::NotFound,
-                                      format!("Unknown resource: {}", err))));
+            return Ok(Response::with((Status::NotFound, format!("Unknown resource: {}", err))));
         } else if let Some(err) = err.error.downcast::<StdError>() {
             // StaticFile error
             if err.kind() == ErrorKind::NotFound {
-                return Ok(Response::with((Status::NotFound,
-                                          format!("Unknown resource: {}", err))));
+                return Ok(Response::with((Status::NotFound, format!("Unknown resource: {}", err))));
             }
         }
 
@@ -50,13 +47,13 @@ impl AfterMiddleware for Custom404 {
 struct Ping;
 
 impl Handler for Ping {
-    fn handle (&self, _: &mut Request) -> IronResult<Response> {
+    fn handle(&self, _: &mut Request) -> IronResult<Response> {
         Ok(Response::with(Status::NoContent))
     }
 }
 
 pub struct HttpServer<T: Controller> {
-    controller: T
+    controller: T,
 }
 
 impl<T: Controller> HttpServer<T> {
@@ -65,15 +62,14 @@ impl<T: Controller> HttpServer<T> {
     }
 
     pub fn start(&mut self, adapter_api: &Arc<AdapterManager>) {
-        let taxonomy_chain = taxonomy_router::create(self.controller.clone(),
-                                                      adapter_api);
+        let taxonomy_chain = taxonomy_router::create(self.controller.clone(), adapter_api);
 
         let users_manager = self.controller.get_users_manager();
         let mut mount = Mount::new();
         mount.mount("/", static_router::create(users_manager.clone()))
-             .mount("/ping", Ping)
-             .mount("/api/v1", taxonomy_chain)
-             .mount("/users", users_manager.get_router_chain());
+            .mount("/ping", Ping)
+            .mount("/api/v1", taxonomy_chain)
+            .mount("/users", users_manager.get_router_chain());
 
         let mut chain = Chain::new(mount);
         chain.link_after(Custom404);
@@ -105,14 +101,17 @@ impl<T: Controller> HttpServer<T> {
 
 fn start_server<TListener, T>(addrs: Vec<SocketAddr>, chain: Chain, factory: T)
     where TListener: NetworkListener + Send + 'static,
-          T: ServerFactory<TListener> + Send + 'static {
+          T: ServerFactory<TListener> + Send + 'static
+{
 
-    thread::Builder::new().name("HttpServer".to_owned())
-                          .spawn(move || {
-        Iron::new(chain)
-             .listen_with(addrs[0], THREAD_COUNT, &factory, None)
-             .unwrap();
-    }).unwrap();
+    thread::Builder::new()
+        .name("HttpServer".to_owned())
+        .spawn(move || {
+            Iron::new(chain)
+                .listen_with(addrs[0], THREAD_COUNT, &factory, None)
+                .unwrap();
+        })
+        .unwrap();
 }
 
 #[cfg(test)]

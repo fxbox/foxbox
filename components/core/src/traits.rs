@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use config_store::ConfigService;
 use foxbox_users::UsersManager;
@@ -11,11 +11,11 @@ use std::net::SocketAddr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::vec::IntoIter;
-use tls::{ CertificateRecord, CertificateManager };
+use tls::{CertificateRecord, CertificateManager};
 use upnp::UpnpManager;
 use ws;
 
-pub trait Controller : Send + Sync + Clone + 'static {
+pub trait Controller: Send + Sync + Clone + 'static {
     fn run(&mut self, shutdown_flag: &AtomicBool);
     fn adapter_started(&self, adapter: String);
     fn adapter_notification(&self, notification: serde_json::value::Value);

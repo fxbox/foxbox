@@ -19,7 +19,7 @@ pub struct BinaryTarget;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub enum SerializeError {
-    JSON(String)
+    JSON(String),
 }
 impl fmt::Display for SerializeError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
@@ -40,14 +40,12 @@ impl From<SerializeError> for Error {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Payload {
-    json: JSON
+    json: JSON,
 }
 
 impl Payload {
     fn new(json: JSON) -> Self {
-        Payload {
-            json: json
-        }
+        Payload { json: json }
     }
     pub fn empty() -> Self {
         Self::new(JSON::Null)
@@ -58,7 +56,9 @@ impl Payload {
         format.serialize(value, &BinaryTarget)
             .map(Self::new)
     }
-    pub fn from_data<T>(data: T, format: &Arc<Format>) -> Result<Payload, Error> where T: Data + PartialEq {
+    pub fn from_data<T>(data: T, format: &Arc<Format>) -> Result<Payload, Error>
+        where T: Data + PartialEq
+    {
         Self::from_value(&Value::new(data), format)
     }
     pub fn to_value(&self, format: &Arc<Format>) -> Result<Value, Error> {
@@ -83,30 +83,27 @@ impl Parser<Payload> for Payload {
         "JSON".to_owned()
     }
     fn parse(_: Path, source: &JSON) -> Result<Self, ParseError> {
-        Ok(Payload {
-            json: source.clone()
-        })
+        Ok(Payload { json: source.clone() })
     }
 }
 
 pub struct Format {
     description: Box<Fn() -> String + Send + Sync>,
-    #[allow(type_complexity)] // This type is used exactly once in the code.
+    #[allow(type_complexity)]
     parse: Box<Fn(Path, &JSON, &BinarySource) -> Result<Value, Error> + Send + Sync>,
-    serialize: Box<Fn(&Value, &BinaryTarget) -> Result<JSON, Error> + Send + Sync>
+    serialize: Box<Fn(&Value, &BinaryTarget) -> Result<JSON, Error> + Send + Sync>,
 }
 impl Format {
     #[allow(new_without_default)] // Clippy's warning doesn't make sense.
-    pub fn new<T>() -> Self where T: Data + PartialEq {
+    pub fn new<T>() -> Self
+        where T: Data + PartialEq
+    {
         let description = || T::description();
         Format {
             description: Box::new(description),
-            parse: Box::new(|path, source, binary| {
-                T::parse(path, source, binary)
-                    .map(Value::new)
-            }),
+            parse: Box::new(|path, source, binary| T::parse(path, source, binary).map(Value::new)),
             serialize: Box::new(|value, target| {
-                let value : &Value = value;
+                let value: &Value = value;
                 let data = try!(value.cast::<T>());
                 T::serialize(data, target)
             }),

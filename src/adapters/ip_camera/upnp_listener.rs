@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! `UPnP` listener for IP camera.
 //!
@@ -24,7 +24,10 @@ pub struct IpCameraUpnpListener {
 }
 
 impl IpCameraUpnpListener {
-    pub fn new(manager: &Arc<AdapterManager>, services: IpCameraServiceMap, config: &Arc<ConfigService>) -> Box<Self> {
+    pub fn new(manager: &Arc<AdapterManager>,
+               services: IpCameraServiceMap,
+               config: &Arc<ConfigService>)
+               -> Box<Self> {
         Box::new(IpCameraUpnpListener {
             manager: manager.clone(),
             services: services,
@@ -76,8 +79,8 @@ impl UpnpListener for IpCameraUpnpListener {
             model_name: model_name.to_owned(),
             name: name,
         };
-        IPCameraAdapter::init_service(&self.manager, self.services.clone(), &self.config,
-                                      camera).unwrap();
+        IPCameraAdapter::init_service(&self.manager, self.services.clone(), &self.config, camera)
+            .unwrap();
         true
     }
 }

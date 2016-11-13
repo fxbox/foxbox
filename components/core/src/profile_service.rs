@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 /// Simple service that helps with managing files in a configurable
 /// directory.
@@ -11,18 +11,18 @@ use std::io::ErrorKind;
 
 pub enum ProfilePath {
     Default,
-    Custom(String)
+    Custom(String),
 }
 
 pub struct ProfileService {
-    profile_path: String
+    profile_path: String,
 }
 
 fn get_env_var(name: &str) -> Option<String> {
     if let Some(value) = env::var_os(name) {
         return match value.into_string() {
             Ok(s) => Some(s),
-            Err(_) => None
+            Err(_) => None,
         };
     }
     None
@@ -39,7 +39,7 @@ impl ProfileService {
                 if let Some(xdg) = get_env_var("XDG_DATA_HOME") {
                     format!("{}/foxbox", xdg)
                 } else if let Some(home) = get_env_var("HOME") {
-                        format!("{}/.local/share/foxbox", home)
+                    format!("{}/.local/share/foxbox", home)
                 } else {
                     panic!("Unable to get $HOME value");
                 }
@@ -54,7 +54,7 @@ impl ProfileService {
                     panic!("The path {} is a file, and can't be used as a profile.",
                            dir);
                 }
-            },
+            }
             Err(_) => {
                 fs::create_dir_all(dir.clone()).unwrap_or_else(|err| {
                     if err.kind() != ErrorKind::AlreadyExists {
@@ -64,9 +64,7 @@ impl ProfileService {
             }
         }
 
-        ProfileService {
-            profile_path: dir
-        }
+        ProfileService { profile_path: dir }
     }
 
     // Returns an absolute path for a file.
@@ -79,8 +77,7 @@ impl ProfileService {
 #[test]
 #[should_panic]
 fn test_bogus_path() {
-    let _ = ProfileService::new(
-      ProfilePath::Custom("/cant_create/that/path".to_owned()));
+    let _ = ProfileService::new(ProfilePath::Custom("/cant_create/that/path".to_owned()));
 }
 
 #[test]
@@ -106,10 +103,10 @@ fn test_custom_profile() {
 
     let profile_dir = TempDir::new_in("/tmp", "foxbox").unwrap();
     let profile_path = String::from(profile_dir.into_path()
-                                    .to_str().unwrap());
+        .to_str()
+        .unwrap());
 
-    let profile = ProfileService::new(ProfilePath::Custom(profile_path
-                                                          .clone()));
+    let profile = ProfileService::new(ProfilePath::Custom(profile_path.clone()));
 
     let path = profile.path_for("test.conf");
     assert_eq!(path, format!("{}/test.conf", profile_path));
