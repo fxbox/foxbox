@@ -96,8 +96,7 @@ impl TunnelConfig {
 
         let res = Command::new("pagekite")
                 .arg(format!("--frontend={}", format!("{}:{}", domain, port)))
-                // XXX remove http service once we support https
-                .arg(format!("--service_on=http,https:{}:localhost:{}:{}",
+                .arg(format!("--service_on=https:{}:localhost:{}:{}",
                              self.remote_name,
                              self.local_http_port,
                              self.tunnel_secret))
@@ -107,7 +106,7 @@ impl TunnelConfig {
                              self.tunnel_secret))
                 .spawn();
         if res.is_err() {
-            error!("Failed to launch pagekite.py, check that it's installed and in your $PATH.");
+            error!("Failed to launch pagekite, check that it's installed and in your $PATH.");
         }
         res
     }
