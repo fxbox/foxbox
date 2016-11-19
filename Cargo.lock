@@ -228,6 +228,7 @@ dependencies = [
  "openssl 0.7.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "openssl-sys 0.7.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "openzwave-adapter 0.1.0",
+ "pagekite 0.1.0 (git+https://github.com/fabricedesre/pagekite-rs.git)",
  "pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.80 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -806,6 +807,14 @@ source = "git+https://github.com/fxbox/openzwave-rust#2c2910a5fa6d6bc948e9463f13
 dependencies = [
  "gcc 0.3.38 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "pagekite"
+version = "0.1.0"
+source = "git+https://github.com/fabricedesre/pagekite-rs.git#eaa2842813bdd466c532c9d7999fc0a0503e16ec"
+dependencies = [
+ "pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1442,6 +1451,7 @@ dependencies = [
 "checksum openzwave 0.1.1 (git+https://github.com/fxbox/openzwave-rust)" = "<none>"
 "checksum openzwave-stateful 0.1.0 (git+https://github.com/fxbox/openzwave-stateful-rust)" = "<none>"
 "checksum openzwave-sys 0.1.1 (git+https://github.com/fxbox/openzwave-rust)" = "<none>"
+"checksum pagekite 0.1.0 (git+https://github.com/fabricedesre/pagekite-rs.git)" = "<none>"
 "checksum persistent 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b5830c40f2c2d6b4f14ed2221d16b72aa3224869e11e5f3434602fc2caeea876"
 "checksum phf_generator 0.7.19 (registry+https://github.com/rust-lang/crates.io-index)" = "d5e1d4b224dfc609b025ea389e6eb9b850ae5814272880d7d75d71acc3d57c88"
 "checksum phf_shared 0.7.19 (registry+https://github.com/rust-lang/crates.io-index)" = "9f3d84458c4040eb4b9e626cb551a2dc46d92ea96b1c30331aa9fce9abd2c438"

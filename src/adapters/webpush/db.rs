@@ -94,8 +94,7 @@ impl WebPushDb {
                              &[&user_to_str(user_id)]));
         for resource in resources.iter() {
             try!(self.db.execute("INSERT INTO resources VALUES ($1, $2)",
-                                 &[&escape(&user_to_str(user_id)), &escape(resource)]
-            ));
+                                 &[&escape(&user_to_str(user_id)), &escape(resource)]));
         }
         Ok(())
     }
@@ -117,7 +116,8 @@ impl WebPushDb {
     /// Gets the push subscriptions for the user `user_id`.
     pub fn get_subscriptions(&self, user_id: &User) -> rusqlite::Result<Vec<Subscription>> {
         let mut subs = Vec::new();
-        let mut stmt = try!(self.db.prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE user_id=$1"));
+        let mut stmt = try!(self.db
+            .prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE user_id=$1"));
         let rows = try!(stmt.query(&[&user_to_str(user_id)]));
         let (count, _) = rows.size_hint();
         subs.reserve_exact(count);
@@ -137,8 +137,10 @@ impl WebPushDb {
                                       resource: &str)
                                       -> rusqlite::Result<Vec<Subscription>> {
         let mut subs = Vec::new();
-        let mut stmt = try!(self.db.prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE
-                                             user_id IN (SELECT user_id FROM resources WHERE resource=$1)"));
+        let mut stmt = try!(self.db
+            .prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE
+                                             \
+                      user_id IN (SELECT user_id FROM resources WHERE resource=$1)"));
         let rows = try!(stmt.query(&[&escape(resource)]));
         let (count, _) = rows.size_hint();
         subs.reserve_exact(count);
@@ -159,7 +161,9 @@ pub fn get_db_environment() -> String {
     use libc::getpid;
     use std::thread;
     let tid = format!("{:?}", thread::current());
-    format!("./webpush_db_test-{}-{}.sqlite", unsafe { getpid() }, tid.replace("/", "42"))
+    format!("./webpush_db_test-{}-{}.sqlite",
+            unsafe { getpid() },
+            tid.replace("/", "42"))
 }
 
 #[cfg(test)]
