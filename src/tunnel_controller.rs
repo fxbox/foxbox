@@ -82,13 +82,14 @@ impl Tunnel {
             Ok(())
         } else {
             self.pagekite = PageKite::init(Some("foxbox"),
-                                           2,
-                                           1,
-                                           10,
-                                           None,
+                                           2, // max kites
+                                           1, // max frontends
+                                           10, // max connections.
+                                           None, // dyndns url
                                            &[InitFlags::WithDefaults],
                                            &LOG_ALL);
             if let Some(ref pagekite) = self.pagekite {
+                pagekite.set_openssl_ciphers("ALL");
                 /// Describes how to configure pagekite.
                 /// pagekite requires a user (remote_name) and a shared secret to be able
                 /// to connect us with the bridge. For the first prototype we will have a
@@ -123,19 +124,21 @@ impl Tunnel {
                         panic!("No tunnel port found. Cannot start tunneling");
                     }
                 };
+                info!("Setting up tunnel for remote nanamed {}",
+                      self.config.remote_name);
                 pagekite.lookup_and_add_frontend(domain, port as i32, true);
-                // pagekite.add_kite("https",
-                //                   domain,
-                //                   port as i32,
-                //                   &self.config.tunnel_secret,
-                //                   &self.config.remote_name,
-                //                   self.config.local_http_port as i32);
-                // pagekite.add_kite("websocket",
-                //                   domain,
-                //                   port as i32,
-                //                   &self.config.tunnel_secret,
-                //                   &self.config.remote_name,
-                //                   self.config.local_ws_port as i32);
+                pagekite.add_kite("https",
+                                  domain,
+                                  port as i32,
+                                  &self.config.tunnel_secret,
+                                  &self.config.remote_name,
+                                  self.config.local_http_port as i32);
+                pagekite.add_kite("websocket",
+                                  domain,
+                                  port as i32,
+                                  &self.config.tunnel_secret,
+                                  &self.config.remote_name,
+                                  self.config.local_ws_port as i32);
                 pagekite.thread_start();
                 Ok(())
             } else {
