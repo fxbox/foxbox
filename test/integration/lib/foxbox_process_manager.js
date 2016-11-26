@@ -29,8 +29,9 @@ var foxbox_process_manager = (function() {
   }
 
   function fullOptionStart() {
-    foxboxInstance = spawn('./target/debug/foxbox',
-      ['-c',  config.get('nupnp_server.param')+';'+
+    foxboxInstance = spawn('cargo',
+      ['run', '--debug',
+      '-c',  config.get('nupnp_server.param')+';'+
       config.get('nupnp_server.url')+':'+
       config.get('nupnp_server.port')+'/',
       '--disable-tls'], {stdio: 'inherit'} ); // TODO TLS not yet supported
