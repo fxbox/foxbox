@@ -24,7 +24,7 @@ FoxboxManager.prototype = {
   start() {
     return new Promise(resolve => {
       this._foxboxInstance = spawn('cargo', [
-        'build', '--debug',
+        'run', '--debug',
         '--disable-tls',
         '--port', FoxboxManager.PORT,
         '--profile', PROFILE_PATH,
