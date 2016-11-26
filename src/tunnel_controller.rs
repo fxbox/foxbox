@@ -4,7 +4,7 @@
 
 use url::{SchemeData, Url};
 
-use pagekite::{PageKite, InitFlags, LOG_ALL};
+use pagekite::{PageKite, InitFlags, LOG_NORMAL};
 
 pub struct Tunnel {
     config: TunnelConfig,
@@ -97,18 +97,8 @@ impl Tunnel {
                                            10, // max connections.
                                            None, // dyndns url
                                            &[InitFlags::WithIpv4, InitFlags::WithIpv6],
-                                           &LOG_ALL);
+                                           &LOG_NORMAL);
             if let Some(ref pagekite) = self.pagekite {
-                // let res = Command::new("pagekite")
-                //     .arg(format!("--frontend={}", format!("{}:{}", domain, port)))
-                //     .arg(format!("--service_on=https:{}:localhost:{}:{}",
-                //                 self.remote_name,
-                //                 self.local_http_port,
-                //                 self.tunnel_secret))
-                //     .arg(format!("--service_on=websocket:{}:localhost:{}:{}",
-                //                 self.remote_name,
-                //                 self.local_ws_port,
-                //                 self.tunnel_secret));
                 let tunnel_domain = match self.config.tunnel_url.domain() {
                     Some(domain) => domain,
                     None => {
@@ -129,18 +119,18 @@ impl Tunnel {
                       self.config.local_http_port);
                 pagekite.add_kite("https",
                                   &self.config.remote_name,
-                                  0, // tunnel_port as i32,
+                                  tunnel_port as i32,
                                   &self.config.tunnel_secret,
                                   "localhost",
                                   self.config.local_http_port as i32);
-                // info!("Adding kite for websocket on port {}",
-                //       self.config.local_ws_port);
-                // pagekite.add_kite("websocket",
-                //                   &self.config.remote_name,
-                //                   tunnel_port as i32,
-                //                   &self.config.tunnel_secret,
-                //                   &self.config.remote_name,
-                //                   self.config.local_ws_port as i32);
+                info!("Adding kite for websocket on port {}",
+                      self.config.local_ws_port);
+                pagekite.add_kite("websocket",
+                                  &self.config.remote_name,
+                                  tunnel_port as i32,
+                                  &self.config.tunnel_secret,
+                                  "localhost",
+                                  self.config.local_ws_port as i32);
                 pagekite.thread_start();
                 Ok(())
             } else {
