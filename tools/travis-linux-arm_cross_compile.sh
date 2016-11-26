@@ -25,7 +25,8 @@ EOF
 
     sudo apt-get install -y --no-install-recommends libasound2:armhf \
         libssl-dev:armhf libespeak-dev:armhf libupnp6-dev:armhf \
-        libudev-dev:armhf libavahi-client-dev:armhf libsqlite3-dev:armhf
+        libudev-dev:armhf libavahi-client-dev:armhf libsqlite3-dev:armhf \
+        libev-dev:armhf
 }
 
 _set_up_cargo_config() {

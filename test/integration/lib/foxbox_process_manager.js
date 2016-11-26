@@ -30,7 +30,7 @@ var foxbox_process_manager = (function() {
 
   function fullOptionStart() {
     foxboxInstance = spawn('cargo',
-      ['run', '--bin', 'foxbox',
+      ['run', '--bin', 'foxbox', '--',
       '-c',  config.get('nupnp_server.param')+';'+
       config.get('nupnp_server.url')+':'+
       config.get('nupnp_server.port')+'/',
