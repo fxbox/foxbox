@@ -81,26 +81,24 @@ impl Tunnel {
             // Already started
             Ok(())
         } else {
+            // Describes how to configure pagekite.
+            // pagekite requires a user (remote_name) and a shared secret to be able
+            // to connect us with the bridge. For the first prototype we will have a
+            // secret common to all boxes, but in the end we will need a secret per
+            // box. Unfortunately pagekite does not provide a way to add a new
+            // domain/secret pair while the bridge is running, but it provides the
+            // possibility to delegate the authentication to a dynamic DNS server.
+            // XXX We will move to DNS authentication after the first prototype if
+            // we keep using pagekite.
+            // https://github.com/fxbox/foxbox/issues/177#issuecomment-194778308
             self.pagekite = PageKite::init(Some("foxbox"),
-                                           2, // max kites
+                                           2, // max kites: one for https and one for websocket.
                                            1, // max frontends
                                            10, // max connections.
                                            None, // dyndns url
-                                           &[InitFlags::WithDefaults],
+                                           &[InitFlags::WithIpv4, InitFlags::WithIpv6],
                                            &LOG_ALL);
             if let Some(ref pagekite) = self.pagekite {
-                pagekite.set_openssl_ciphers("ALL");
-                /// Describes how to configure pagekite.
-                /// pagekite requires a user (remote_name) and a shared secret to be able
-                /// to connect us with the bridge. For the first prototype we will have a
-                /// secret common to all boxes, but in the end we will need a secret per
-                /// box. Unfortunately pagekite does not provide a way to add a new
-                /// domain/secret pair while the bridge is running, but it provides the
-                /// possibility to delegate the authentication to a dynamic DNS server.
-                /// XXX We will move to DNS authentication after the first prototype if
-                /// we keep using pagekite.
-                /// https://github.com/fxbox/foxbox/issues/177#issuecomment-194778308
-
                 // let res = Command::new("pagekite")
                 //     .arg(format!("--frontend={}", format!("{}:{}", domain, port)))
                 //     .arg(format!("--service_on=https:{}:localhost:{}:{}",
@@ -111,14 +109,14 @@ impl Tunnel {
                 //                 self.remote_name,
                 //                 self.local_ws_port,
                 //                 self.tunnel_secret));
-                let domain = match self.config.tunnel_url.domain() {
+                let tunnel_domain = match self.config.tunnel_url.domain() {
                     Some(domain) => domain,
                     None => {
                         panic!("No tunnel domain found. Cannot start tunneling");
                     }
                 };
 
-                let port = match self.config.tunnel_url.port() {
+                let tunnel_port = match self.config.tunnel_url.port() {
                     Some(port) => port,
                     None => {
                         panic!("No tunnel port found. Cannot start tunneling");
@@ -126,19 +124,23 @@ impl Tunnel {
                 };
                 info!("Setting up tunnel for remote nanamed {}",
                       self.config.remote_name);
-                pagekite.lookup_and_add_frontend(domain, port as i32, true);
+                pagekite.lookup_and_add_frontend(tunnel_domain, tunnel_port as i32, true);
+                info!("Adding kite for https on port {}",
+                      self.config.local_http_port);
                 pagekite.add_kite("https",
-                                  domain,
-                                  port as i32,
-                                  &self.config.tunnel_secret,
                                   &self.config.remote_name,
+                                  0, // tunnel_port as i32,
+                                  &self.config.tunnel_secret,
+                                  "localhost",
                                   self.config.local_http_port as i32);
-                pagekite.add_kite("websocket",
-                                  domain,
-                                  port as i32,
-                                  &self.config.tunnel_secret,
-                                  &self.config.remote_name,
-                                  self.config.local_ws_port as i32);
+                // info!("Adding kite for websocket on port {}",
+                //       self.config.local_ws_port);
+                // pagekite.add_kite("websocket",
+                //                   &self.config.remote_name,
+                //                   tunnel_port as i32,
+                //                   &self.config.tunnel_secret,
+                //                   &self.config.remote_name,
+                //                   self.config.local_ws_port as i32);
                 pagekite.thread_start();
                 Ok(())
             } else {

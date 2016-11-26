@@ -812,7 +812,7 @@ dependencies = [
 [[package]]
 name = "pagekite"
 version = "0.1.0"
-source = "git+https://github.com/fabricedesre/pagekite-rs.git#2f03b86784ec2b5646def3e69c8ed6758758fb6c"
+source = "git+https://github.com/fabricedesre/pagekite-rs.git#6c3f5ed0761abd4d1fd36ed61d5994c01782ac94"
 dependencies = [
  "pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
