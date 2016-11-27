@@ -50,7 +50,7 @@ compile_foxbox_with_dead_code() {
 
 run_tests_and_coverage() {
   PROJECT_UNIT_TEST_BINARY=$(find "$PROJECT_BINARY_LOCATION" -maxdepth 1 -executable -name "$PROJECT_NAME"-\*)
-  PAGEKITE_LIB=$(find "$PROJECT_BINARY_LOCATION/build/pagekite*" -type d -name lib)
+  PAGEKITE_LIB=$(dirname $(find "$PROJECT_BINARY_LOCATION" -name libpagekite.so))
   # TODO: Add components and figure out why its not counted as part of the report
   LD_LIBRARY_PATH="$PAGEKITE_LIB" RUST_BACKTRACE=1 "$KCOV_BINARY" \
     --include-path="$PROJECT_HOME/src" \
