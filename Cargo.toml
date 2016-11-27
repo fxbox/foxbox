@@ -55,6 +55,7 @@ mount = "0.1.0"
 nix = "0.6.0"
 openssl = "0.7.6"
 openssl-sys = "0.7.6"
+pagekite = { git = "https://github.com/fabricedesre/pagekite-rs.git" }
 rand = "0.3"
 router = "0.1.0"
 rust-crypto = "0.2.34"

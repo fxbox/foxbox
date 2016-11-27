@@ -49,6 +49,7 @@ extern crate mount;
 extern crate nix;
 extern crate openssl;
 extern crate openssl_sys;
+extern crate pagekite;
 extern crate rand;
 extern crate router;
 extern crate rustc_serialize;

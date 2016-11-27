@@ -23,7 +23,8 @@ FoxboxManager.HOST_URL = format('http://localhost:%d/', FoxboxManager.PORT);
 FoxboxManager.prototype = {
   start() {
     return new Promise(resolve => {
-      this._foxboxInstance = spawn('./target/debug/foxbox', [
+      this._foxboxInstance = spawn('cargo', [
+        'run', '--bin', 'foxbox', '--',
         '--disable-tls',
         '--port', FoxboxManager.PORT,
         '--profile', PROFILE_PATH,

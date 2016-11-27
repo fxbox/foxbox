@@ -32,6 +32,8 @@ addons:
       - libupnp-dev
       - libespeak-dev
       - libudev-dev
+      # pagekite
+      - libev-dev
       # kcov
       - libcurl4-openssl-dev
       - libelf-dev

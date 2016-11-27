@@ -2,18 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use foxbox_core::managed_process::ManagedProcess;
-
-// Assumes Unix
-use std::process::{Child, Command};
-use std::io::Result;
 use url::{SchemeData, Url};
 
-pub type TunnelProcess = ManagedProcess;
+use pagekite::{PageKite, InitFlags, LOG_NORMAL};
 
 pub struct Tunnel {
     config: TunnelConfig,
-    pub tunnel_process: Option<TunnelProcess>,
+    pub pagekite: Option<PageKite>,
 }
 
 #[derive(Clone, Debug)]
@@ -68,48 +63,6 @@ impl TunnelConfig {
             remote_name: remote_name,
         }
     }
-
-    /// Describes how to spawn the pagekite process.
-    /// pagekite requires a user (remote_name) and a shared secret to be able
-    /// to connect us with the bridge. For the first prototype we will have a
-    /// secret common to all boxes, but in the end we will need a secret per
-    /// box. Unfortunately pagekite does not provide a way to add a new
-    /// domain/secret pair while the bridge is running, but it provides the
-    /// possibility to delegate the authentication to a dynamic DNS server.
-    /// XXX We will move to DNS authentication after the first prototype if
-    /// we keep using pagekite.
-    /// https://github.com/fxbox/foxbox/issues/177#issuecomment-194778308
-    pub fn spawn(&self) -> Result<Child> {
-        let domain = match self.tunnel_url.domain() {
-            Some(domain) => domain,
-            None => {
-                panic!("No tunnel domain found. Cannot start tunneling");
-            }
-        };
-
-        let port = match self.tunnel_url.port() {
-            Some(port) => port,
-            None => {
-                panic!("No tunnel port found. Cannot start tunneling");
-            }
-        };
-
-        let res = Command::new("pagekite")
-                .arg(format!("--frontend={}", format!("{}:{}", domain, port)))
-                .arg(format!("--service_on=https:{}:localhost:{}:{}",
-                             self.remote_name,
-                             self.local_http_port,
-                             self.tunnel_secret))
-                .arg(format!("--service_on=websocket:{}:localhost:{}:{}",
-                             self.remote_name,
-                             self.local_ws_port,
-                             self.tunnel_secret))
-                .spawn();
-        if res.is_err() {
-            error!("Failed to launch pagekite, check that it's installed and in your $PATH.");
-        }
-        res
-    }
 }
 
 impl Tunnel {
@@ -118,31 +71,81 @@ impl Tunnel {
     pub fn new(config: TunnelConfig) -> Tunnel {
         Tunnel {
             config: config,
-            tunnel_process: None,
+            pagekite: None,
         }
     }
 
     /// Start the Tunnel process if it has not already been started
-    pub fn start(&mut self) -> Result<()> {
-        if self.tunnel_process.is_some() {
+    pub fn start(&mut self) -> Result<(), ()> {
+        if self.pagekite.is_some() {
             // Already started
             Ok(())
         } else {
-            let tunnel_config = self.config.clone();
+            // Describes how to configure pagekite.
+            // pagekite requires a user (remote_name) and a shared secret to be able
+            // to connect us with the bridge. For the first prototype we will have a
+            // secret common to all boxes, but in the end we will need a secret per
+            // box. Unfortunately pagekite does not provide a way to add a new
+            // domain/secret pair while the bridge is running, but it provides the
+            // possibility to delegate the authentication to a dynamic DNS server.
+            // XXX We will move to DNS authentication after the first prototype if
+            // we keep using pagekite.
+            // https://github.com/fxbox/foxbox/issues/177#issuecomment-194778308
+            self.pagekite = PageKite::init(Some("foxbox"),
+                                           2, // max kites: one for https and one for websocket.
+                                           1, // max frontends
+                                           10, // max connections.
+                                           None, // dyndns url
+                                           &[InitFlags::WithIpv4, InitFlags::WithIpv6],
+                                           &LOG_NORMAL);
+            if let Some(ref pagekite) = self.pagekite {
+                let tunnel_domain = match self.config.tunnel_url.domain() {
+                    Some(domain) => domain,
+                    None => {
+                        panic!("No tunnel domain found. Cannot start tunneling");
+                    }
+                };
 
-            self.tunnel_process = Some(ManagedProcess::start(move || tunnel_config.spawn())
-                .unwrap());
-
-            Ok(())
+                let tunnel_port = match self.config.tunnel_url.port() {
+                    Some(port) => port,
+                    None => {
+                        panic!("No tunnel port found. Cannot start tunneling");
+                    }
+                };
+                info!("Setting up tunnel for remote nanamed {}",
+                      self.config.remote_name);
+                pagekite.lookup_and_add_frontend(tunnel_domain, tunnel_port as i32, true);
+                info!("Adding kite for https on port {}",
+                      self.config.local_http_port);
+                pagekite.add_kite("https",
+                                  &self.config.remote_name,
+                                  tunnel_port as i32,
+                                  &self.config.tunnel_secret,
+                                  "localhost",
+                                  self.config.local_http_port as i32);
+                info!("Adding kite for websocket on port {}",
+                      self.config.local_ws_port);
+                pagekite.add_kite("websocket",
+                                  &self.config.remote_name,
+                                  tunnel_port as i32,
+                                  &self.config.tunnel_secret,
+                                  "localhost",
+                                  self.config.local_ws_port as i32);
+                pagekite.thread_start();
+                Ok(())
+            } else {
+                Err(())
+            }
         }
     }
 
     /// Stop the tunnel process if it is runnnig
-    pub fn stop(&mut self) -> Result<()> {
-        match self.tunnel_process.take() {
-            None => Ok(()),
-            Some(process) => process.shutdown(),
+    pub fn stop(&mut self) -> Result<(), ()> {
+        if let Some(ref pagekite) = self.pagekite {
+            pagekite.thread_stop();
         }
+        self.pagekite = None;
+        Ok(())
     }
 
     pub fn get_frontend_name(&self) -> Option<String> {
