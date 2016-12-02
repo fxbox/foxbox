@@ -19,11 +19,13 @@ rust:
   - nightly-YYYY-MM-DD
 ```
 
-It's recommended that you use [`multirust`](https://github.com/brson/multirust) to install and switch between versions of Rust. You should then be able to then use:
+It's recommended that you use `rustup` to install and switch between versions
+of Rust and available toolchains. You should then be able to then use:
 ```
 cd /your/path/to/foxbox     # Required, otherwise you might replace rustc for another project
-multirust override nightly-YYYY-MM-DD   # Replace with the correct date you found
+rustup override nightly-YYYY-MM-DD   # Replace with the correct date you found
 ```
+
 After that, you should be all set in regard to compiling the project.
 
 #### :warning: Warning
@@ -40,6 +42,7 @@ rustc 1.9.0-nightly (241a9d0dd 2016-04-05)
 | ------------ | --------------------- | --------------- | ------------------ | --------------- |
 | `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `extra/libupnp`    | `libupnp`       |
 | `libssl`     | `libssl-dev`          | `openssl-devel` | via `base-devel`   | `openssl`       |
+| `libev`      | `libev-dev`           | `libev-devel`   | `?`                | `libev`         |
 | `libavahi`   | `libavahi-client-dev` | `avahi-devel`   | `extra/avahi`      | `n.a.`          |
 | `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`  | `core/sqlite`      | `sqlite`        |
 | `libespeak`  | `libespeak-dev`       | `espeak-devel`  | `community/espeak` | `espeak`        |
@@ -85,11 +88,13 @@ $ cd foxbox
 
 ### Extra steps for Mac OS X
 
-Foxbox requires some up-to-date libraries (like OpenSSL). In order to make sure you have the correct packages and bindings, we recommend you to install brew and to run:
+Foxbox requires some up-to-date libraries (like OpenSSL). In order to make sure
+you have the correct packages and bindings, we recommend you install `brew` and
+run:
 
 ``` bash
-brew install openssl libupnp sqlite
-source tools/mac-os-x-setup.source.sh
+brew install openssl libupnp sqlite libev
+export LIBRARY_PATH=/usr/local/lib
 ```
 
 ## Build time options
@@ -112,8 +117,6 @@ directory.
 | -------------- | ---------------------------------------------- |-------------------------------------------------------------------------------------------------------------- |
 | `dnschallenge` | No (required for LetsEncrypt DNS-01 challenge) | Built as a binary with `cargo build` in the same target directory as foxbox, see `target/<profile>` directory |
 | `bash`         | No (required for LetsEncrypt client)           | System package manager                                                                                        |
-| `python`       | Yes (required to run `pagekite.py`)            | System package manager                                                                                        |
-| `pagekite.py`  | Yes (required to enable tunneling)             | https://pagekite.net/wiki/OpenSource/                                                                         |
 
 ## Running the daemon
 
