@@ -54,7 +54,7 @@ impl ConfigStore {
 
     fn get_no_override(&self, namespace: &str, property: &str) -> Option<&String> {
         if self.config.contains_key(namespace) {
-            let res = self.config.get(namespace).unwrap().get(property);
+            let res = self.config[namespace].get(property);
             debug!("Config result for {}::{} is {:?}", namespace, property, res);
             res
         } else {
@@ -76,7 +76,7 @@ impl ConfigStore {
 
     fn get_override(&self, namespace: &str, property: &str) -> Option<&String> {
         if self.overrides.contains_key(namespace) {
-            let res = self.overrides.get(namespace).unwrap().get(property);
+            let res = self.overrides[namespace].get(property);
             debug!("Config override for {}::{} is {:?}",
                    namespace,
                    property,
