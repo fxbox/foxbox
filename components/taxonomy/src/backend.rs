@@ -103,9 +103,7 @@ impl ServiceData {
     }
 }
 
-struct ServiceView<'a>
-    where 'a
-{
+struct ServiceView<'a> {
     data: &'a ServiceData,
 }
 impl<'a> ServiceView<'a> {
