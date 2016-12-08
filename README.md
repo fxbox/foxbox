@@ -23,7 +23,7 @@ It's recommended that you use `rustup` to install and switch between versions
 of Rust and available toolchains. You should then be able to then use:
 ```
 cd /your/path/to/foxbox     # Required, otherwise you might replace rustc for another project
-rustup override nightly-YYYY-MM-DD   # Replace with the correct date you found
+rustup override set nightly-YYYY-MM-DD   # Replace with the correct date you found
 ```
 
 After that, you should be all set in regard to compiling the project.
