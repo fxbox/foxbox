@@ -26,6 +26,7 @@ pub trait Controller: Send + Sync + Clone + 'static {
     fn get_certificate_manager(&self) -> CertificateManager;
     fn get_box_certificate(&self) -> io::Result<CertificateRecord>;
     fn get_hostname(&self) -> String;
+    fn get_domain(&self) -> String;
 
     fn add_websocket(&mut self, socket: ws::Sender);
     fn remove_websocket(&mut self, socket: ws::Sender);

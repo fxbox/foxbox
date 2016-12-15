@@ -10,7 +10,7 @@ serde_json = "0.8"
 serde_derive = "0.8"
 chrono = "0.2.19"
 foxbox_taxonomy = { path = "../taxonomy/" }
-rusqlite = "0.6.0"
+rusqlite = "0.7"
 transformable_channels = "*"
 
 [dev-dependencies]

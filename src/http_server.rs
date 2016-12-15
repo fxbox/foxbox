@@ -4,9 +4,7 @@
 
 use foxbox_core::traits::Controller;
 use foxbox_taxonomy::manager::*;
-use hyper::net::NetworkListener;
-use iron::{AfterMiddleware, Chain, Handler, HttpServerFactory, Iron, IronResult, Request,
-           Response, ServerFactory};
+use iron::{AfterMiddleware, Chain, Handler, Iron, IronResult, Request, Response, Protocol};
 use iron_cors::CORS;
 use iron::error::IronError;
 use iron::method::Method;
@@ -18,7 +16,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::thread;
 use taxonomy_router;
-use tls::SniServerFactory;
 
 const THREAD_COUNT: usize = 8;
 
@@ -74,41 +71,50 @@ impl<T: Controller> HttpServer<T> {
         let mut chain = Chain::new(mount);
         chain.link_after(Custom404);
 
-        let cors = CORS::new(vec![
-            (vec![Method::Get], "ping".to_owned()),
+        let cors = CORS::new(vec![(vec![Method::Get], "ping".to_owned()),
 
-            // Taxonomy router paths. Keep in sync with taxonomy_router.rs
-            (vec![Method::Get, Method::Post], "api/v1/services".to_owned()),
-            (vec![Method::Post, Method::Delete], "api/v1/services/tags".to_owned()),
-            (vec![Method::Get, Method::Post], "api/v1/channels".to_owned()),
-            (vec![Method::Put], "api/v1/channels/get".to_owned()),
-            (vec![Method::Put], "api/v1/channels/set".to_owned()),
-            (vec![Method::Post, Method::Delete], "api/v1/channels/tags".to_owned())
-        ]);
+                                  // Taxonomy router paths. Keep in sync with taxonomy_router.rs
+                                  (vec![Method::Get, Method::Post], "api/v1/services".to_owned()),
+                                  (vec![Method::Post, Method::Delete],
+                                   "api/v1/services/tags".to_owned()),
+                                  (vec![Method::Get, Method::Post], "api/v1/channels".to_owned()),
+                                  (vec![Method::Put], "api/v1/channels/get".to_owned()),
+                                  (vec![Method::Put], "api/v1/channels/set".to_owned()),
+                                  (vec![Method::Post, Method::Delete],
+                                   "api/v1/channels/tags".to_owned())]);
         chain.link_after(cors);
 
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
 
         if self.controller.get_tls_enabled() {
-            let mut certificate_manager = self.controller.get_certificate_manager();
-            let server_factory = SniServerFactory::new(&mut certificate_manager);
-            start_server(addrs, chain, server_factory);
+            let certificate_manager = self.controller.get_certificate_manager();
+            let fingerprint = certificate_manager.get_box_certificate()
+                .unwrap()
+                .get_certificate_fingerprint();
+            // Get the certificate record for the hostname, and use its certificate and
+            // private key files.
+            let host_name = format!("remote.{}.{}", fingerprint, self.controller.get_domain());
+            let record = certificate_manager.get_certificate(&host_name)
+                .expect("Unable to start https server without remote certificate");
+            start_server(addrs,
+                         chain,
+                         Protocol::Https {
+                             certificate: record.cert_file,
+                             key: record.private_key_file,
+                         });
         } else {
-            start_server(addrs, chain, HttpServerFactory {});
+            start_server(addrs, chain, Protocol::Http);
         }
     }
 }
 
-fn start_server<TListener, T>(addrs: Vec<SocketAddr>, chain: Chain, factory: T)
-    where TListener: NetworkListener + Send + 'static,
-          T: ServerFactory<TListener> + Send + 'static
-{
+fn start_server(addrs: Vec<SocketAddr>, chain: Chain, protocol: Protocol) {
 
     thread::Builder::new()
         .name("HttpServer".to_owned())
         .spawn(move || {
             Iron::new(chain)
-                .listen_with(addrs[0], THREAD_COUNT, &factory, None)
+                .listen_with(addrs[0], THREAD_COUNT, protocol, None)
                 .unwrap();
         })
         .unwrap();

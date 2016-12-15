@@ -253,6 +253,7 @@ fn main() {
 
     let mut controller = FoxBox::new(args.flag_verbose,
                                      local_name.clone(),
+                                     args.flag_dns_domain.clone(),
                                      args.flag_port,
                                      args.flag_wsport,
                                      if args.flag_disable_tls {

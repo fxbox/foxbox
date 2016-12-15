@@ -7,18 +7,15 @@ authors = ["The Project Link Developers"]
 name = "foxbox_core"
 path = "src/lib.rs"
 
-[replace]
-"iron:0.3.1" = { path = "../../iron-fork/" }
-
 [dependencies.iron]
-version = "0.3.0"
+version = "0.4"
 default-features = true
 features = ["ssl"]
 
 [dependencies]
 clippy = "0.0"
-foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "ec53c3a" }
-hyper = "0.8.1"
+foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "edcd432" }
+hyper = "0.9"
 libc = "0.2.7"
 log = "0.3"
 serde_json = "0.8"

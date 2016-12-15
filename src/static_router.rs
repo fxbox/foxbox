@@ -30,12 +30,16 @@ fn handler(req: &mut Request, db: &UsersDb) -> IronResult<Response> {
 pub fn create(manager: Arc<UsersManager>) -> Router {
     let mut router = Router::new();
     let usersmanager = manager.clone();
-    router.any("", move |req: &mut Request| -> IronResult<Response> {
-        handler(req, &usersmanager.get_db())
-    });
+    router.any("",
+               move |req: &mut Request| -> IronResult<Response> {
+                   handler(req, &usersmanager.get_db())
+               },
+               "_empty_");
     let usersmanager = manager.clone();
-    router.any("*", move |req: &mut Request| -> IronResult<Response> {
-        handler(req, &usersmanager.get_db())
-    });
+    router.any("*",
+               move |req: &mut Request| -> IronResult<Response> {
+                   handler(req, &usersmanager.get_db())
+               },
+               "_any_");
     router
 }

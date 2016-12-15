@@ -31,6 +31,7 @@ pub struct FoxBox {
     tls_option: TlsOption,
     certificate_manager: CertificateManager,
     hostname: String,
+    domain: String,
     http_port: u16,
     ws_port: u16,
     websockets: Arc<Mutex<HashMap<ws::util::Token, ws::Sender>>>,
@@ -43,6 +44,7 @@ pub struct FoxBox {
 impl FoxBox {
     pub fn new(verbose: bool,
                hostname: String,
+               domain: String,
                http_port: u16,
                ws_port: u16,
                tls_option: TlsOption,
@@ -63,6 +65,7 @@ impl FoxBox {
             websockets: Arc::new(Mutex::new(HashMap::new())),
             verbose: verbose,
             hostname: hostname,
+            domain: domain,
             http_port: http_port,
             ws_port: ws_port,
             config: config,
@@ -175,6 +178,10 @@ impl Controller for FoxBox {
 
     fn get_hostname(&self) -> String {
         self.hostname.clone()
+    }
+
+    fn get_domain(&self) -> String {
+        self.domain.clone()
     }
 }
 

@@ -93,7 +93,9 @@ impl TaxonomyRouter {
                             });
                         }
                         None => {
-                            warn!("get_binary could not convert data labelled as format::BINARY to Binary {}", data.description());
+                            warn!("get_binary could not convert data labelled as format::BINARY \
+                                   to Binary {}",
+                                  data.description());
                         }
                     }
                 }
@@ -122,7 +124,7 @@ impl Handler for TaxonomyRouter {
         // We are handling urls relative to the mounter set up in http_server.rs
         // That means that for a full url like http://localhost/api/v1/services
         // the req.url.path will only contain ["services"]
-        let path = req.url.path.clone();
+        let path = req.url.path();
 
         /// Generates the code for a generic HTTP call, where we use an empty
         /// taxonomy selector for GET requests, and a decoded json body for POST ones.
