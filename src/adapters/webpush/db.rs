@@ -103,10 +103,8 @@ impl WebPushDb {
     pub fn get_resources(&self, user_id: &User) -> rusqlite::Result<Vec<String>> {
         let mut subs = Vec::new();
         let mut stmt = try!(self.db.prepare("SELECT resource FROM resources WHERE user_id=$1"));
-        let rows = try!(stmt.query(&[&user_to_str(user_id)]));
-        let (count, _) = rows.size_hint();
-        subs.reserve_exact(count);
-        for result_row in rows {
+        let mut rows = try!(stmt.query(&[&user_to_str(user_id)]));
+        while let Some(result_row) = rows.next() {
             let row = try!(result_row);
             subs.push(row.get(0));
         }
@@ -118,10 +116,8 @@ impl WebPushDb {
         let mut subs = Vec::new();
         let mut stmt = try!(self.db
             .prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE user_id=$1"));
-        let rows = try!(stmt.query(&[&user_to_str(user_id)]));
-        let (count, _) = rows.size_hint();
-        subs.reserve_exact(count);
-        for result_row in rows {
+        let mut rows = try!(stmt.query(&[&user_to_str(user_id)]));
+        while let Some(result_row) = rows.next() {
             let row = try!(result_row);
             subs.push(Subscription {
                 push_uri: row.get(0),
@@ -141,10 +137,8 @@ impl WebPushDb {
             .prepare("SELECT push_uri, public_key, auth FROM subscriptions WHERE
                                              \
                       user_id IN (SELECT user_id FROM resources WHERE resource=$1)"));
-        let rows = try!(stmt.query(&[&escape(resource)]));
-        let (count, _) = rows.size_hint();
-        subs.reserve_exact(count);
-        for result_row in rows {
+        let mut rows = try!(stmt.query(&[&escape(resource)]));
+        while let Some(result_row) = rows.next() {
             let row = try!(result_row);
             subs.push(Subscription {
                 push_uri: row.get(0),

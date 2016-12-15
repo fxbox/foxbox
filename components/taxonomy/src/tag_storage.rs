@@ -73,13 +73,16 @@ impl TagStorage {
     #[allow(dead_code)]
     fn dump(&mut self, msg: &str) {
         let mut stmt = self.db.as_ref().unwrap().prepare("SELECT * FROM tags").unwrap();
-        let rows = stmt.query(&[]).unwrap();
+        let mut rows = stmt.query(&[]).unwrap();
         println!("+-----------------------------------------------------------------------------");
         println!("| {}", msg);
         println!("+-----------------------------------------------------------------------------");
-        for result_row in rows {
+        while let Some(result_row) = rows.next() {
             let row = result_row.unwrap();
-            println!("| {} {} {}", row.get::<String>(0), row.get::<String>(1), row.get::<String>(2));
+            println!("| {} {} {}",
+                     row.get::<i32, String>(0),
+                     row.get::<i32, String>(1),
+                     row.get::<i32, String>(2));
         }
         println!("+-----------------------------------------------------------------------------");
     }
@@ -87,7 +90,9 @@ impl TagStorage {
     pub fn add_tag<T>(&mut self, id: &Id<T>, tag: &Id<TagId>) -> Result<()> {
         self.ensure_db();
         try!(self.db.as_ref().unwrap().execute("INSERT OR IGNORE INTO tags VALUES ($1, $2, $3)",
-                        &[&create_key(id, tag), &escape(&id), &escape(&tag)]));
+                                               &[&create_key(id, tag),
+                                                 &escape(&id),
+                                                 &escape(&tag)]));
         Ok(())
     }
 
@@ -101,7 +106,10 @@ impl TagStorage {
 
     pub fn remove_tag<T>(&mut self, id: &Id<T>, tag: &Id<TagId>) -> Result<()> {
         self.ensure_db();
-        try!(self.db.as_ref().unwrap().execute("DELETE FROM tags WHERE key=$1", &[&create_key(id, tag)]));
+        try!(self.db
+            .as_ref()
+            .unwrap()
+            .execute("DELETE FROM tags WHERE key=$1", &[&create_key(id, tag)]));
         Ok(())
     }
 
@@ -122,10 +130,9 @@ impl TagStorage {
         self.ensure_db();
         let mut subs = Vec::new();
         let mut stmt = try!(self.db.as_ref().unwrap().prepare("SELECT tag FROM tags WHERE id=$1"));
-        let rows = try!(stmt.query(&[&escape(&id)]));
-        let (count, _) = rows.size_hint();
-        subs.reserve_exact(count);
-        for result_row in rows {
+        let mut rows = try!(stmt.query(&[&escape(&id)]));
+
+        while let Some(result_row) = rows.next() {
             let row = try!(result_row);
             let s: String = row.get(0);
             subs.push(Id::<TagId>::new(&s));
@@ -139,7 +146,9 @@ pub fn get_db_environment() -> PathBuf {
     use libc::getpid;
     use std::thread;
     let tid = format!("{:?}", thread::current()).replace("(", "+").replace(")", "+");
-    let s = format!("./tagstore_db_test-{}-{}.sqlite", unsafe { getpid() }, tid.replace("/", "42"));
+    let s = format!("./tagstore_db_test-{}-{}.sqlite",
+                    unsafe { getpid() },
+                    tid.replace("/", "42"));
     PathBuf::from(s)
 }
 

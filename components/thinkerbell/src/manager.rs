@@ -94,9 +94,9 @@ impl<Env, T> ScriptManager<Env, T>
         let connection = try!(rusqlite::Connection::open(&self.path));
         let mut result_map = HashMap::new();
         let mut stmt = try!(connection.prepare("SELECT id, source, is_enabled, owner FROM scripts"));
-        let rows = try!(stmt.query(&[]));
+        let mut rows = try!(stmt.query(&[]));
 
-        for result_row in rows {
+        while let Some(result_row) = rows.next() {
             let row = try!(result_row);
             let id_string: String = try!(row.get_checked(0));
             let id: Id<ScriptId> = Id::new(&id_string);
@@ -216,7 +216,7 @@ impl<Env, T> ScriptManager<Env, T>
         let connection = try!(rusqlite::Connection::open(&self.path));
         let mut stmt = try!(connection.prepare("SELECT source, owner FROM scripts WHERE id = $1"));
         let mut rows = try!(stmt.query(&[&id.to_string()]));
-        let first_row = try!(try!(rows.nth(0).ok_or(Error::NoSuchScriptError)));
+        let first_row = try!(try!(rows.next().ok_or(Error::NoSuchScriptError)));
         let source = try!(first_row.get_checked(0));
         let owner_value: String = try!(first_row.get_checked(1));
         let owner = if owner_value.is_empty() {
