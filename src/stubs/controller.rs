@@ -79,6 +79,10 @@ impl Controller for ControllerStub {
         String::from("localhost")
     }
 
+    fn get_domain(&self) -> String {
+        String::from("knilox.org")
+    }
+
     fn get_box_certificate(&self) -> io::Result<CertificateRecord> {
         CertificateRecord::new_from_components("foxbox.local".to_owned(),
                                                PathBuf::from("a/file.pem"),
