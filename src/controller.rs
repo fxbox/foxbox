@@ -13,6 +13,7 @@ use foxbox_core::upnp::UpnpManager;
 use foxbox_taxonomy::manager::AdapterManager as TaxoManager;
 use foxbox_users::UsersManager;
 use http_server::HttpServer;
+use mio::{Events, Poll};
 use std::collections::hash_map::HashMap;
 use std::io;
 use std::net::SocketAddr;
@@ -81,7 +82,6 @@ impl Controller for FoxBox {
     fn run(&mut self, shutdown_flag: &AtomicBool) {
 
         debug!("Starting controller");
-        let mut event_loop = mio::EventLoop::new().unwrap();
 
         {
             Arc::get_mut(&mut self.upnp).unwrap().start().unwrap();
@@ -97,11 +97,14 @@ impl Controller for FoxBox {
         HttpServer::new(self.clone()).start(&taxo_manager);
         WsServer::start(self.clone());
 
-        event_loop.run(&mut FoxBoxEventLoop {
-                controller: self.clone(),
-                shutdown_flag: shutdown_flag,
-            })
-            .unwrap();
+        let poll = Poll::new().unwrap();
+        let mut events = Events::with_capacity(1024);
+        loop {
+            let _ = poll.poll(&mut events, None);
+            if shutdown_flag.load(Ordering::Acquire) {
+                break;
+            }
+        }
 
         debug!("Stopping controller");
         adapter_manager.stop();
@@ -182,22 +185,5 @@ impl Controller for FoxBox {
 
     fn get_domain(&self) -> String {
         self.domain.clone()
-    }
-}
-
-#[allow(dead_code)]
-struct FoxBoxEventLoop<'a> {
-    controller: FoxBox,
-    shutdown_flag: &'a AtomicBool,
-}
-
-impl<'a> mio::Handler for FoxBoxEventLoop<'a> {
-    type Timeout = ();
-    type Message = ();
-
-    fn tick(&mut self, event_loop: &mut mio::EventLoop<Self>) {
-        if self.shutdown_flag.load(Ordering::Acquire) {
-            event_loop.shutdown();
-        }
     }
 }
