@@ -39,6 +39,8 @@ _set_up_selenium_tests() {
     nvm install 4.2
     nvm use 4.2
     npm install
+    # We should not hardcode that path...
+    export PATH=/home/travis/build/fxbox/foxbox/node_modules/.bin:$PATH
 }
 
 set_up_tests() {
