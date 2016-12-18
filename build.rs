@@ -8,8 +8,8 @@ use std::path::Path;
 extern crate pkg_config;
 extern crate rustc_version;
 
-static RUSTC_DATE: &'static str = "2016-11-24";
-static RUSTC_HASH: &'static str = "d9bdc636da951314064d8c3442bc5842a13e5b79";
+static RUSTC_DATE: &'static str = "2016-12-15";
+static RUSTC_HASH: &'static str = "8f02c429ad3e2ad687a222d1daae2e04bb9bb876";
 
 fn check_rustc_version() {
     let info = rustc_version::version_meta();
