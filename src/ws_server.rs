@@ -54,14 +54,9 @@ impl<T: Controller> Handler for WsHandler<T> {
             _ => return self.close_with_error("Invalid path"),
         };
 
-        let auth = match url.query_pairs() {
-            Some(pairs) => {
-                pairs.iter()
-                    .find(|set| set.0.to_lowercase() == "auth")
-                    .map(|set| set.1.clone())
-            }
-            _ => return self.close_with_error("Missing authorization"),
-        };
+        let auth = url.query_pairs()
+            .find(|set| set.0.to_lowercase() == "auth")
+            .map(|set| set.1.clone());
 
         let token = match auth {
             Some(val) => val,

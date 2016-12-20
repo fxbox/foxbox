@@ -308,11 +308,11 @@ fn main() {
     // Start the tunnel.
     let mut tunnel: Option<Tunnel> = None;
     if let Some(tunnel_url) = args.flag_tunnel {
-        tunnel = Some(Tunnel::new(TunnelConfig::new(tunnel_url,
-                                                    args.flag_tunnel_secret,
+        tunnel = Some(Tunnel::new(TunnelConfig::new(&tunnel_url,
+                                                    &args.flag_tunnel_secret,
                                                     args.flag_port,
                                                     args.flag_wsport,
-                                                    registrar.get_remote_dns_name())));
+                                                    &registrar.get_remote_dns_name())));
         tunnel.as_mut().unwrap().start().unwrap();
     }
 
