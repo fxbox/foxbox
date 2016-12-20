@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use url::{SchemeData, Url};
+use url::Url;
 
 use pagekite::{PageKite, InitFlags, LOG_NORMAL};
 
@@ -22,45 +22,45 @@ pub struct TunnelConfig {
 }
 
 impl TunnelConfig {
-    pub fn new(tunnel_url: String,
-               tunnel_secret: String,
+    pub fn new(tunnel_url: &str,
+               tunnel_secret: &str,
                local_http_port: u16,
                local_ws_port: u16,
-               remote_name: String)
+               remote_name: &str)
                -> Self {
 
-        let tunnel_url = match Url::parse(&tunnel_url) {
+        fn invalid_url() {
+            error!("Could not parse tunnel url.
+                        Try something like knilxof.org:443");
+        }
+
+        let tunnel_url = match Url::parse(tunnel_url) {
             Ok(url) => {
-                match url.scheme_data {
-                    SchemeData::Relative(..) => url,
-                    SchemeData::NonRelative(..) => {
-                        // We don't care about the scheme, we just want domain
-                        // and port, but Url does not parse them properly without
-                        // the scheme, so we append a fake 'http'.
-                        match Url::parse(&format!("http://{}", tunnel_url)) {
-                            Ok(url) => url,
-                            Err(err) => {
-                                error!("Could not parse tunnel url.
-                                        Try something like knilxof.org:443");
-                                panic!(err)
-                            }
+                // If we have no domain, reparse with http:// in front.
+                if url.domain().is_none() {
+                    match Url::parse(&format!("http://{}", tunnel_url)) {
+                        Ok(url) => url,
+                        Err(err) => {
+                            invalid_url();
+                            panic!(err);
                         }
                     }
+                } else {
+                    url
                 }
             }
             Err(err) => {
-                error!("Could not parse tunnel url.
-                        Try something like knilxof.org:443");
-                panic!(err)
+                invalid_url();
+                panic!(err);
             }
         };
 
         TunnelConfig {
             tunnel_url: tunnel_url,
-            tunnel_secret: tunnel_secret,
+            tunnel_secret: String::from(tunnel_secret),
             local_http_port: local_http_port,
             local_ws_port: local_ws_port,
-            remote_name: remote_name,
+            remote_name: String::from(remote_name),
         }
     }
 }
@@ -154,4 +154,12 @@ impl Tunnel {
             None => None,
         }
     }
+}
+
+#[test]
+fn test_tunnel_url() {
+    let config = TunnelConfig::new("knilxof.org:443", "secret", 80, 80, "remote");
+    assert_eq!(config.tunnel_url.domain().unwrap(), "knilxof.org");
+    let config = TunnelConfig::new("http://knilxof.org:443", "secret", 80, 80, "remote");
+    assert_eq!(config.tunnel_url.domain().unwrap(), "knilxof.org");
 }
