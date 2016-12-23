@@ -346,11 +346,9 @@ pub struct State {
     /// mutable/immutable.
     liveness: Arc<Liveness>,
 
-    /// The path to the database used to persist tags.
-    /// We don't keep track on the database itself since it won't see high load:
-    /// - We read all tags once per lifetime of the manager.
-    /// - We write occasionaly when adding or removing tags.
-    db_path: Option<PathBuf>,
+    /// The database used to persist tags.
+    /// The underlying SQlite is opened lazily so we can create one here.
+    db: Option<Arc<Mutex<TagStorage>>>,
 }
 
 impl State {
@@ -371,20 +369,12 @@ impl State {
     }
 
     fn with_services<F>(&self, selectors: Vec<ServiceSelector>, mut cb: F)
-        where F: FnMut(&Arc<SubCell<ServiceData>>, &mut Option<TagStorage>)
+        where F: FnMut(&Arc<SubCell<ServiceData>>)
     {
-
-        let mut store = match self.db_path {
-            // Even if we have a path, TagStorage opens the underlying database lazily,
-            // so this is cheap.
-            Some(ref path) => Some(TagStorage::new(path)),
-            None => None,
-        };
-
         for service in self.service_by_id.values() {
             // All services match when we have no selectors.
             if selectors.is_empty() {
-                cb(service, &mut store);
+                cb(service);
                 continue;
             }
             let matches;
@@ -395,7 +385,7 @@ impl State {
                 matches = selectors.iter().any(|selector| selector.matches(&view));
             }
             if matches {
-                cb(service, &mut store);
+                cb(service);
             }
         }
     }
@@ -557,13 +547,20 @@ impl State {
 
 impl State {
     pub fn new(liveness: &Arc<Liveness>, db_path: Option<PathBuf>) -> Self {
+        info!("Creating State struct");
+        let db = if let Some(ref path) = db_path {
+            Some(Arc::new(Mutex::new(TagStorage::new(path))))
+        } else {
+            None
+        };
+
         State {
             liveness: liveness.clone(),
             adapter_by_id: HashMap::new(),
             service_by_id: HashMap::new(),
             channel_by_id: HashMap::new(),
             watchers: Arc::new(Mutex::new(WatchMap::new(liveness))),
-            db_path: db_path,
+            db: db,
         }
     }
 
@@ -648,9 +645,9 @@ impl State {
 
         // Synchronize the tags with the database.
         {
-            if let Some(ref path) = self.db_path {
+            if let Some(ref mutex) = self.db {
                 // Update the service's tag set with the full set from the database.
-                let mut store = TagStorage::new(path);
+                let mut store = mutex.lock().unwrap();
                 let tags =
                     match store.get_tags_for(&id) {
                         Err(err) => return Err(Error::Internal(InternalError::GenericError(format!("{}", err)))),
@@ -732,8 +729,8 @@ impl State {
         }
 
         // Add the database tags to this channel.
-        if let Some(ref path) = self.db_path {
-            let mut store = TagStorage::new(path);
+        if let Some(ref db) = self.db {
+            let mut store = db.lock().unwrap();
             // Add all the tags for this channel.
             if let Ok(all_tags) = store.get_tags_for(&channel.id) {
                 channel.insert_tags(&all_tags);
@@ -811,7 +808,7 @@ impl State {
         // with relatively few services.
         let mut result = Vec::new();
         self.with_services(selectors,
-                           |service, _| result.push(service.borrow().as_service()));
+                           |service| result.push(service.borrow().as_service()));
         result
     }
 
@@ -821,12 +818,15 @@ impl State {
                             -> usize {
         let mut result = 0;
 
-        self.with_services(selectors, |service, store| {
+        let mut db = self.db.clone();
+        self.with_services(selectors, |service| {
             let service = service.borrow_mut();
             let mut tag_set = service.tags.borrow_mut();
 
-            if let Some(ref mut storage) = *store {
-                storage.add_tags(&service.id, &tags)
+            if let Some(ref mut storage) = db {
+                storage.lock()
+                    .unwrap()
+                    .add_tags(&service.id, &tags)
                     .unwrap_or_else(|err| {
                         error!("Storage add_tags error: {}", err);
                     });
@@ -845,12 +845,15 @@ impl State {
                                tags: Vec<Id<TagId>>)
                                -> usize {
         let mut result = 0;
-        self.with_services(selectors, |service, store| {
+        let mut db = self.db.clone();
+        self.with_services(selectors, |service| {
             let service = service.borrow_mut();
             let mut tag_set = service.tags.borrow_mut();
 
-            if let Some(ref mut storage) = *store {
-                storage.remove_tags(&service.id, &tags)
+            if let Some(ref mut storage) = db {
+                storage.lock()
+                    .unwrap()
+                    .remove_tags(&service.id, &tags)
                     .unwrap_or_else(|err| {
                         error!("Storage remove_tags error: {}", err);
                     });
@@ -878,12 +881,12 @@ impl State {
         let mut size = 0;
         let mut channels = vec![];
         {
-            let db_path = self.db_path.clone();
+            let tag_db = self.db.clone();
             Self::with_channels_mut(selectors, &mut self.channel_by_id, |mut data| {
                 // This channel has changed, we may need to update watches and the tags database.
                 if data.insert_tags(&tags) {
-                    if let Some(ref path) = db_path {
-                        let mut store = TagStorage::new(path);
+                    if let Some(ref db) = tag_db {
+                        let mut store = db.lock().unwrap();
                         store.add_tags(&data.id, &tags)
                             .unwrap_or_else(|err| {
                                 error!("Storage add_tags error: {}", err);
@@ -903,11 +906,11 @@ impl State {
                                tags: Vec<Id<TagId>>)
                                -> usize {
         let mut result = 0;
-        let db_path = self.db_path.clone();
+        let tag_db = self.db.clone();
         Self::with_channels_mut(selectors, &mut self.channel_by_id, |mut data| {
             if data.remove_tags(&tags) {
-                if let Some(ref path) = db_path {
-                    let mut store = TagStorage::new(path);
+                if let Some(ref db) = tag_db {
+                    let mut store = db.lock().unwrap();
                     store.remove_tags(&data.id, &tags)
                         .unwrap_or_else(|err| {
                             error!("Storage remove_tags error: {}", err);
