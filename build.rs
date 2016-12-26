@@ -1,27 +1,11 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::env;
 use std::fs;
 use std::path::Path;
 extern crate pkg_config;
-extern crate rustc_version;
-
-static RUSTC_DATE: &'static str = "2016-12-15";
-static RUSTC_HASH: &'static str = "8f02c429ad3e2ad687a222d1daae2e04bb9bb876";
-
-fn check_rustc_version() {
-    let info = rustc_version::version_meta();
-    let hash = info.commit_hash.unwrap_or("".to_owned());
-    let date = info.commit_date.unwrap_or("".to_owned());
-    if hash == RUSTC_HASH && date == RUSTC_DATE {
-        return;
-    }
-
-    panic!(r#"Found rustc ({} {}), but you need to install rustc nightly from {}, commit {}"#,
-           hash, date, RUSTC_DATE, RUSTC_HASH);
-}
 
 fn update_local_git_hook() {
     let p = env::current_dir().unwrap();
@@ -70,7 +54,6 @@ fn link_external_libs() {
 }
 
 fn main() {
-    check_rustc_version();
     update_local_git_hook();
     link_external_libs();
     copy_shared_static_files();
