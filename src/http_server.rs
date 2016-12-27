@@ -125,11 +125,12 @@ impl<T: Controller> HttpServer<T> {
                                    "api/v1/channels/tags".to_owned())]);
         chain.link_after(cors);
 
-        chain.link_after(SecurityHeaders);
-
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
 
         if self.controller.get_tls_enabled() {
+            // When running with TLS enabled, add the security headers.
+            chain.link_after(SecurityHeaders);
+
             let certificate_manager = self.controller.get_certificate_manager();
             let fingerprint = certificate_manager.get_box_certificate()
                 .unwrap()
