@@ -19,6 +19,7 @@ use taxonomy_router;
 
 const THREAD_COUNT: usize = 8;
 
+// 404 middleware.
 struct Custom404;
 
 impl AfterMiddleware for Custom404 {
@@ -38,6 +39,46 @@ impl AfterMiddleware for Custom404 {
 
         // Just let other errors go through, like 401.
         Err(err)
+    }
+}
+
+// Middleware that adds security related headers.
+// See https://wiki.mozilla.org/Security/Guidelines/Web_Security
+struct SecurityHeaders;
+
+impl AfterMiddleware for SecurityHeaders {
+    fn after(&self, _: &mut Request, mut res: Response) -> IronResult<Response> {
+        use iron::{headers, Set};
+        use iron::modifiers::Header;
+
+        // HSTS
+        let header = headers::StrictTransportSecurity {
+            include_subdomains: false,
+            max_age: 31536000u64,
+        };
+        res.set_mut(Header(header));
+
+        // Referrer-Policy
+        res.set_mut(Header(headers::ReferrerPolicy::NoReferrer));
+
+        // X-Frame-Options
+        header! { (XFrameOptions, "X-Frame-Options") => [String] }
+        res.set_mut(Header(XFrameOptions("DENY".to_owned())));
+
+        // X-Content-Type-Options
+        header! { (XContentTypeOptions, "X-Content-Type-Options") => [String] }
+        res.set_mut(Header(XContentTypeOptions("nosniff".to_owned())));
+
+        // Content-Security-Policy
+        // TODO: refine the value of this header.
+        header! { (Xcsp, "Content-Security-Policy") => [String] }
+        res.set_mut(Header(Xcsp("default-src 'none'; frame-ancestors 'none'".to_owned())));
+
+        // X-XSS-Protection
+        header! { (XXSSProtection, "X-XSS-Protection") => [String] }
+        res.set_mut(Header(XXSSProtection("1; mode=block".to_owned())));
+
+        Ok(res)
     }
 }
 
@@ -84,6 +125,8 @@ impl<T: Controller> HttpServer<T> {
                                    "api/v1/channels/tags".to_owned())]);
         chain.link_after(cors);
 
+        chain.link_after(SecurityHeaders);
+
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
 
         if self.controller.get_tls_enabled() {
@@ -99,7 +142,7 @@ impl<T: Controller> HttpServer<T> {
             start_server(addrs,
                          chain,
                          Protocol::Https {
-                             certificate: record.cert_file,
+                             certificate: record.full_chain.unwrap_or(record.cert_file),
                              key: record.private_key_file,
                          });
         } else {
