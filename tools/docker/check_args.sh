@@ -1,8 +1,8 @@
 #!/bin/bash
 
 die () {
-    TARGETS=`find ./* -maxdepth 0 -type d -exec basename {} \; | sed s/builds//`
-    echo "Usage: |$0 TARGET| where TARGET can be: $TARGETS"
+    # TODO: dynamically get the list of available targets.
+    echo "Usage: |$0 TARGET| where TARGET can be: rpi2"
     exit 1
 }
 

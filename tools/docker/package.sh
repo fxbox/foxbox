@@ -32,3 +32,5 @@ cp support/launch.sh ${DEST_DIR}
 cp -R ../../static ${DEST_DIR}
 
 tar -cjf builds/${TARGET}/foxbox-${TARGET}-`date +%Y-%m-%d`.tar.bz2 -C ${DEST_DIR} .
+
+rm -rf ${DEST_DIR}
