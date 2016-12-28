@@ -220,11 +220,8 @@ application gets, the slower and more painful this will be (not recommended).
 
 ### Linux
 
-@fabricedesre has created a script to help compile a toolchain. So far it's
-only been tested on Ubuntu but there's nothing ubuntu specific so that should
-work just fine on any Linux.
-
- - https://github.com/fabricedesre/rustpi2
+There is support to cross-compile with a Docker image targetting the Raspberry Pi
+(model 2 and up) in the `tools/docker` directory.
 
 For an extensive write-up about cross compiling Rust programs see:
 
