@@ -14,6 +14,7 @@ use router::NoRoute;
 use static_router;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use std::thread;
 use taxonomy_router;
 
@@ -72,7 +73,7 @@ impl AfterMiddleware for SecurityHeaders {
         // Content-Security-Policy
         // TODO: refine the value of this header.
         header! { (Xcsp, "Content-Security-Policy") => [String] }
-        res.set_mut(Header(Xcsp("default-src 'none'; frame-ancestors 'none'".to_owned())));
+        res.set_mut(Header(Xcsp("default-src 'self'; frame-ancestors 'none'".to_owned())));
 
         // X-XSS-Protection
         header! { (XXSSProtection, "X-XSS-Protection") => [String] }
@@ -138,14 +139,24 @@ impl<T: Controller> HttpServer<T> {
             // Get the certificate record for the hostname, and use its certificate and
             // private key files.
             let host_name = format!("remote.{}.{}", fingerprint, self.controller.get_domain());
-            let record = certificate_manager.get_certificate(&host_name)
-                .expect("Unable to start https server without remote certificate");
-            start_server(addrs,
-                         chain,
-                         Protocol::Https {
-                             certificate: record.full_chain.unwrap_or(record.cert_file),
-                             key: record.private_key_file,
-                         });
+
+            // This will fail when starting without a certificate, so for now just loop until we generate one.
+            loop {
+                info!("Looking for remote certificate for {}", host_name);
+                let record = certificate_manager.get_certificate(&host_name);
+                if record.is_some() {
+                    let record = record.unwrap();
+                    start_server(addrs,
+                                 chain,
+                                 Protocol::Https {
+                                     certificate: record.full_chain
+                                         .unwrap_or(record.cert_file),
+                                     key: record.private_key_file,
+                                 });
+                    break;
+                }
+                thread::sleep(Duration::new(10, 0));
+            }
         } else {
             start_server(addrs, chain, Protocol::Http);
         }

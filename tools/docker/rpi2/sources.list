@@ -1,0 +1,8 @@
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ trusty main
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ trusty-updates main
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ trusty universe
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ trusty-updates universe
+deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty main
+deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty-updates main
+deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty universe
+deb [arch=armhf,arm64] http://ports.ubuntu.com/ trusty-updates  universe

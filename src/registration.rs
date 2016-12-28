@@ -98,6 +98,7 @@ impl Registrar {
             }
         };
 
+        debug!("Registering {}", body);
         let client = Client::new();
         let res = client.post(&self.registration_endpoint)
             .header(Connection::close())
