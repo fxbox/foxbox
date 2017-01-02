@@ -124,6 +124,14 @@ impl CertificateManager {
         }
     }
 
+    pub fn get_local_hostname_certificate(&self) -> Option<CertificateRecord> {
+        self.get_certificate(&self.get_local_dns_name())
+    }
+
+    pub fn get_remote_hostname_certificate(&self) -> Option<CertificateRecord> {
+        self.get_certificate(&self.get_remote_dns_name())
+    }
+
     #[allow(dead_code)]
     pub fn remove_certificate(&self, hostname: &str) {
         {
