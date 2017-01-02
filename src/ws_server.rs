@@ -5,16 +5,20 @@ extern crate url;
 
 use self::url::Url;
 use foxbox_core::traits::Controller;
+use openssl::ssl::{Ssl, SslContext, SslMethod};
+use openssl::x509::X509FileType;
+use std::rc::Rc;
+use std::time::Duration;
 use std::thread;
 use ws;
 use ws::{Handler, Sender, Result, Message, Handshake, CloseCode, Error};
-use ws::listen;
 
 pub struct WsServer;
 
 pub struct WsHandler<T> {
     pub out: Sender,
     pub controller: T,
+    ssl: Option<Rc<SslContext>>,
 }
 
 impl WsServer {
@@ -23,14 +27,44 @@ impl WsServer {
         thread::Builder::new()
             .name("WsServer".to_owned())
             .spawn(move || {
+                // Create a SSL Context if needed.
+                let ssl = {
+                    if controller.get_tls_enabled() {
+                        let mut context = SslContext::new(SslMethod::Tlsv1)
+                            .expect("Creating a SSL context should not fail.");
+                            // This will fail when starting without a certificate, so for now just loop until we generate one.
+                        loop {
+                            // Get the certificate record for the remote hostname, and use its certificate and
+                            // private key files.
+                            let record =
+                                controller.get_certificate_manager().get_remote_hostname_certificate();
+                            if record.is_some() {
+                                let record = record.unwrap();
+                                context.set_certificate_file(record.full_chain
+                                                    .unwrap_or(record.cert_file), X509FileType::PEM).unwrap();
+                                context.set_private_key_file(record.private_key_file, X509FileType::PEM).unwrap();
+                                break;
+                            }
+                            thread::sleep(Duration::new(10, 0));
+                        }
+                        info!("Created SSL context for the websocket server, will listen on {}", addrs[0]);
+                        Some(Rc::new(context))
+                    } else {
+                        info!("Starting the websocket server without SSL, will listen on {}", addrs[0]);
+                        None
+                    }
+                };
 
-                listen(addrs[0], |out| {
+                ws::Builder::new().with_settings(ws::Settings {
+                        encrypt_server: controller.get_tls_enabled(),
+                        ..ws::Settings::default()
+                    }).build(|out: ws::Sender| {
                         WsHandler {
                             out: out,
                             controller: controller.clone(),
+                            ssl: ssl.clone(),
                         }
-                    })
-                    .unwrap();
+                }).unwrap().listen(addrs[0]).unwrap();
             })
             .unwrap();
     }
@@ -90,5 +124,13 @@ impl<T: Controller> Handler for WsHandler<T> {
 
     fn on_error(&mut self, err: Error) {
         error!("The ws server encountered an error: {:?}", err);
+    }
+
+    fn build_ssl(&mut self) -> ws::Result<Ssl> {
+        if self.ssl.is_none() {
+            return Err(ws::Error::new(ws::ErrorKind::Internal, "SSL is disabled"));
+        }
+
+        Ssl::new(&self.ssl.clone().unwrap()).map_err(ws::Error::from)
     }
 }

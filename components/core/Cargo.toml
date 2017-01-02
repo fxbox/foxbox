@@ -20,7 +20,7 @@ libc = "0.2.7"
 log = "0.3"
 serde_json = "0.8"
 tls = { path = "../tls/" }
-ws = "0.5"
+ws = { version = "0.5", features = ["ssl"] }
 xml-rs = "0.3.0"
 
 [dev-dependencies]

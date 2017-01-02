@@ -71,9 +71,11 @@ impl AfterMiddleware for SecurityHeaders {
         res.set_mut(Header(XContentTypeOptions("nosniff".to_owned())));
 
         // Content-Security-Policy
-        // TODO: refine the value of this header.
         header! { (Xcsp, "Content-Security-Policy") => [String] }
-        res.set_mut(Header(Xcsp("default-src 'self'; frame-ancestors 'none'".to_owned())));
+        res.set_mut(Header(Xcsp("default-src 'self' wss: ; style-src 'self' 'unsafe-inline' ; \
+                                 connect-src * ; object-src 'none' ; img-src 'self' blob: ; \
+                                 frame-ancestors 'none'"
+            .to_owned())));
 
         // X-XSS-Protection
         header! { (XXSSProtection, "X-XSS-Protection") => [String] }
