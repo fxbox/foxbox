@@ -25,7 +25,6 @@ const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
 
 pub struct Registrar {
     certificate_manager: CertificateManager,
-    top_level_domain: String,
     registration_endpoint: String,
     dns_api_endpoint: String,
 }
@@ -40,35 +39,14 @@ struct RegistrationRequest {
 
 impl Registrar {
     pub fn new(certificate_manager: CertificateManager,
-               top_level_domain: String,
                registration_endpoint: String,
                dns_api_endpoint: String)
                -> Registrar {
         Registrar {
             certificate_manager: certificate_manager,
-            top_level_domain: top_level_domain,
             registration_endpoint: format!("{}/register", registration_endpoint),
             dns_api_endpoint: dns_api_endpoint,
         }
-    }
-
-    fn get_fingerprint(&self) -> String {
-        self.certificate_manager
-            .get_box_certificate()
-            .unwrap()
-            .get_certificate_fingerprint()
-    }
-
-    fn get_common_name(&self) -> String {
-        format!("{}.{}", self.get_fingerprint(), self.top_level_domain)
-    }
-
-    pub fn get_local_dns_name(&self) -> String {
-        format!("local.{}", self.get_common_name())
-    }
-
-    pub fn get_remote_dns_name(&self) -> String {
-        format!("remote.{}", self.get_common_name())
     }
 
     fn register_with_registration_server(&self,
@@ -78,9 +56,9 @@ impl Registrar {
                                          tunnel_enabled: bool)
                                          -> () {
         let message = json!({
-            local_origin: format!("{}://{}:{}", http_scheme, self.get_local_dns_name(), box_port),
+            local_origin: format!("{}://{}:{}", http_scheme, self.certificate_manager.get_local_dns_name(), box_port),
             tunnel_origin: if tunnel_enabled {
-                Some(format!("{}://{}", http_scheme, self.get_remote_dns_name()))
+                Some(format!("{}://{}", http_scheme, self.certificate_manager.get_remote_dns_name()))
             } else {
                 None
             }
@@ -88,7 +66,7 @@ impl Registrar {
 
         let body = match serde_json::to_string(&RegistrationRequest {
             message: message,
-            client: self.get_fingerprint(),
+            client: self.certificate_manager.get_fingerprint(),
             local_ip: ip_addr,
         }) {
             Ok(body) => body,
@@ -129,7 +107,7 @@ impl Registrar {
     fn register_with_dns_server(&self, ip_addr: String, tunnel_frontend: Option<String>) {
         let client_certificate = self.certificate_manager.get_box_certificate().unwrap();
 
-        let local_name = self.get_local_dns_name();
+        let local_name = self.certificate_manager.get_local_dns_name();
         // Create entry for local DNS
         info!("DNS server: Creating DNS entry for {}", local_name);
         let result = register_dns_record(client_certificate.clone(),
@@ -145,7 +123,7 @@ impl Registrar {
         }
 
         if let Some(tunnel_frontend) = tunnel_frontend {
-            let remote_name = self.get_remote_dns_name();
+            let remote_name = self.certificate_manager.get_remote_dns_name();
             info!("DNS server: Creating DNS entry for {}", remote_name);
             let result = register_dns_record(client_certificate.clone(),
                                              &DnsRecord {
@@ -162,8 +140,10 @@ impl Registrar {
     }
 
     fn register_certificates(&self) {
-        if self.certificate_manager.get_certificate(&self.get_local_dns_name()).is_none() {
-            let domains = vec![self.get_local_dns_name(), self.get_remote_dns_name()];
+        if self.certificate_manager
+            .get_certificate(&self.certificate_manager.get_local_dns_name())
+            .is_none() {
+            let domains = vec![self.certificate_manager.get_local_dns_name(), self.certificate_manager.get_remote_dns_name()];
 
             info!("Getting/renewing LetsEncrypt certificate for: {:?}", domains);
             let rx = get_san_cert_for(domains.into_iter(),
@@ -302,8 +282,7 @@ describe! registrar {
         use std::path::PathBuf;
         use tls::{ CertificateManager, SniSslContextProvider };
         let registrar = Registrar::new(
-            CertificateManager::new(PathBuf::from(current_dir!()), Box::new(SniSslContextProvider::new())),
-            "box.knilxof.org".to_owned(),
+            CertificateManager::new(PathBuf::from(current_dir!()), "knilxof.org", Box::new(SniSslContextProvider::new())),
             "https://knilxof.org:4443/".to_owned(),
             "https://knilxof.org:5300".to_owned()
         );

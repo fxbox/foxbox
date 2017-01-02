@@ -252,8 +252,8 @@ fn main() {
         .unwrap();
 
     let mut controller = FoxBox::new(args.flag_verbose,
-                                     local_name.clone(),
-                                     args.flag_dns_domain.clone(),
+                                     &local_name,
+                                     &args.flag_dns_domain,
                                      args.flag_port,
                                      args.flag_wsport,
                                      if args.flag_disable_tls {
@@ -301,7 +301,6 @@ fn main() {
     // issue certificates for each name - the local name will be the common name of
     // the certificate, and every other name will be a subject alternative name.
     let registrar = registration::Registrar::new(controller.get_certificate_manager(),
-                                                 args.flag_dns_domain,
                                                  args.flag_register,
                                                  args.flag_dns_api);
 
@@ -312,7 +311,8 @@ fn main() {
                                                     &args.flag_tunnel_secret,
                                                     args.flag_port,
                                                     args.flag_wsport,
-                                                    &registrar.get_remote_dns_name())));
+                                                    &controller.get_certificate_manager()
+                                                        .get_remote_dns_name())));
         tunnel.as_mut().unwrap().start().unwrap();
     }
 

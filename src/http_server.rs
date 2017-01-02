@@ -132,18 +132,12 @@ impl<T: Controller> HttpServer<T> {
             // When running with TLS enabled, add the security headers.
             chain.link_after(SecurityHeaders);
 
-            let certificate_manager = self.controller.get_certificate_manager();
-            let fingerprint = certificate_manager.get_box_certificate()
-                .unwrap()
-                .get_certificate_fingerprint();
-            // Get the certificate record for the hostname, and use its certificate and
-            // private key files.
-            let host_name = format!("remote.{}.{}", fingerprint, self.controller.get_domain());
-
             // This will fail when starting without a certificate, so for now just loop until we generate one.
             loop {
-                info!("Looking for remote certificate for {}", host_name);
-                let record = certificate_manager.get_certificate(&host_name);
+                // Get the certificate record for the remote hostname, and use its certificate and
+                // private key files.
+                let record =
+                    self.controller.get_certificate_manager().get_remote_hostname_certificate();
                 if record.is_some() {
                     let record = record.unwrap();
                     start_server(addrs,
