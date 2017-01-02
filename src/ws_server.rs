@@ -12,7 +12,6 @@ use std::time::Duration;
 use std::thread;
 use ws;
 use ws::{Handler, Sender, Result, Message, Handshake, CloseCode, Error};
-use ws::listen;
 
 pub struct WsServer;
 
@@ -48,22 +47,24 @@ impl WsServer {
                             }
                             thread::sleep(Duration::new(10, 0));
                         }
-                        info!("Created SSL context for the websocket server.");
+                        info!("Created SSL context for the websocket server, will listen on {}", addrs[0]);
                         Some(Rc::new(context))
                     } else {
-                        info!("Starting the websocket server without SSL.");
+                        info!("Starting the websocket server without SSL, will listen on {}", addrs[0]);
                         None
                     }
                 };
-                
-                listen(addrs[0], |out| {
+
+                ws::Builder::new().with_settings(ws::Settings {
+                        encrypt_server: controller.get_tls_enabled(),
+                        ..ws::Settings::default()
+                    }).build(|out: ws::Sender| {
                         WsHandler {
                             out: out,
                             controller: controller.clone(),
                             ssl: ssl.clone(),
                         }
-                    })
-                    .unwrap();
+                }).unwrap().listen(addrs[0]).unwrap();
             })
             .unwrap();
     }
