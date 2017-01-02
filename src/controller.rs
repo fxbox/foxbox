@@ -44,8 +44,8 @@ pub struct FoxBox {
 
 impl FoxBox {
     pub fn new(verbose: bool,
-               hostname: String,
-               domain: String,
+               hostname: &str,
+               domain: &str,
                http_port: u16,
                ws_port: u16,
                tls_option: TlsOption,
@@ -61,12 +61,13 @@ impl FoxBox {
 
         FoxBox {
             certificate_manager: CertificateManager::new(certificate_directory,
+                                                         domain,
                                                          Box::new(SniSslContextProvider::new())),
             tls_option: tls_option,
             websockets: Arc::new(Mutex::new(HashMap::new())),
             verbose: verbose,
-            hostname: hostname,
-            domain: domain,
+            hostname: hostname.to_owned(),
+            domain: domain.to_owned(),
             http_port: http_port,
             ws_port: ws_port,
             config: config,

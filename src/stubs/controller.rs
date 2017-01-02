@@ -92,6 +92,7 @@ impl Controller for ControllerStub {
 
     fn get_certificate_manager(&self) -> CertificateManager {
         CertificateManager::new(PathBuf::from(current_dir!()),
+                                "knilxof.org",
                                 Box::new(SniSslContextProvider::new()))
     }
 }

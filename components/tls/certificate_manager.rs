@@ -17,6 +17,7 @@ const DEFAULT_BOX_NAME: &'static str = "foxbox.local";
 #[derive(Clone)]
 pub struct CertificateManager {
     directory: PathBuf,
+    domain: String,
     ssl_hosts: Arc<RwLock<HashMap<String, CertificateRecord>>>,
 
     // Observer
@@ -24,9 +25,13 @@ pub struct CertificateManager {
 }
 
 impl CertificateManager {
-    pub fn new(directory: PathBuf, context_provider: Box<SslContextProvider>) -> Self {
+    pub fn new(directory: PathBuf,
+               domain: &str,
+               context_provider: Box<SslContextProvider>)
+               -> Self {
         CertificateManager {
             directory: directory,
+            domain: domain.to_owned(),
             ssl_hosts: Arc::new(RwLock::new(HashMap::new())),
             context_provider: Arc::new(context_provider),
         }
@@ -41,6 +46,7 @@ impl CertificateManager {
 
         CertificateManager {
             directory: test_certs_directory,
+            domain: "knilxof.org".to_owned(),
             ssl_hosts: Arc::new(RwLock::new(HashMap::new())),
             context_provider: Arc::new(Box::new(SniSslContextProvider::new())),
         }
@@ -136,6 +142,24 @@ impl CertificateManager {
 
         self.context_provider.update(ssl_hosts);
     }
+
+    pub fn get_fingerprint(&self) -> String {
+        self.get_box_certificate()
+            .unwrap()
+            .get_certificate_fingerprint()
+    }
+
+    fn get_common_name(&self) -> String {
+        format!("{}.{}", self.get_fingerprint(), self.domain)
+    }
+
+    pub fn get_local_dns_name(&self) -> String {
+        format!("local.{}", self.get_common_name())
+    }
+
+    pub fn get_remote_dns_name(&self) -> String {
+        format!("remote.{}", self.get_common_name())
+    }
 }
 
 #[cfg(test)]
@@ -190,6 +214,7 @@ mod certificate_manager_test {
 
         let cert_manager =
             CertificateManager::new(PathBuf::from(current_dir!()),
+                                    "knilxof.org",
                                     Box::new(TestSslContextProvider::new(tx_update_called)));
 
         cert_manager.add_certificate(cert_record.clone());
@@ -209,6 +234,7 @@ mod certificate_manager_test {
         let (tx_update_called, _) = channel();
         let cert_manager =
             CertificateManager::new(PathBuf::from(current_dir!()),
+                                    "knilxof.org",
                                     Box::new(TestSslContextProvider::new(tx_update_called)));
 
         cert_manager.add_certificate(cert_record);
@@ -224,6 +250,7 @@ mod certificate_manager_test {
         let (tx_update_called, rx_update_called) = channel();
         let cert_manager =
             CertificateManager::new(PathBuf::from(current_dir!()),
+                                    "knilxof.org",
                                     Box::new(TestSslContextProvider::new(tx_update_called)));
 
         cert_manager.add_certificate(cert_record);
@@ -238,6 +265,7 @@ mod certificate_manager_test {
         let (tx_update_called, rx_update_called) = channel();
         let cert_manager =
             CertificateManager::new(PathBuf::from(current_dir!()),
+                                    "knilxof.org",
                                     Box::new(TestSslContextProvider::new(tx_update_called)));
 
         cert_manager.add_certificate(cert_record);

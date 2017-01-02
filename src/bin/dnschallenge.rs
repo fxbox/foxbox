@@ -50,6 +50,7 @@ fn main() {
     println!("Using DNS api endpoint: {:?}", dns_api);
 
     let certificate_manager = CertificateManager::new(PathBuf::from(&certificate_directory),
+                                                      "knilxof.org", /* This is fine to hardcode here since we only get the local certificate. */
                                                       Box::new(SniSslContextProvider::new()));
 
     let box_cert = certificate_manager.get_box_certificate().unwrap();
