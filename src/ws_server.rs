@@ -5,8 +5,10 @@ extern crate url;
 
 use self::url::Url;
 use foxbox_core::traits::Controller;
-use openssl::ssl::{Ssl, SslContext};
+use openssl::ssl::{Ssl, SslContext, SslMethod};
+use openssl::x509::X509FileType;
 use std::rc::Rc;
+use std::time::Duration;
 use std::thread;
 use ws;
 use ws::{Handler, Sender, Result, Message, Handshake, CloseCode, Error};
@@ -26,15 +28,34 @@ impl WsServer {
         thread::Builder::new()
             .name("WsServer".to_owned())
             .spawn(move || {
+                // Create a SSL Context if needed.
                 let ssl = {
                     if controller.get_tls_enabled() {
                         let mut context = SslContext::new(SslMethod::Tlsv1)
                             .expect("Creating a SSL context should not fail.");
-                        None
+                            // This will fail when starting without a certificate, so for now just loop until we generate one.
+                        loop {
+                            // Get the certificate record for the remote hostname, and use its certificate and
+                            // private key files.
+                            let record =
+                                controller.get_certificate_manager().get_remote_hostname_certificate();
+                            if record.is_some() {
+                                let record = record.unwrap();
+                                context.set_certificate_file(record.full_chain
+                                                    .unwrap_or(record.cert_file), X509FileType::PEM).unwrap();
+                                context.set_private_key_file(record.private_key_file, X509FileType::PEM).unwrap();
+                                break;
+                            }
+                            thread::sleep(Duration::new(10, 0));
+                        }
+                        info!("Created SSL context for the websocket server.");
+                        Some(Rc::new(context))
                     } else {
+                        info!("Starting the websocket server without SSL.");
                         None
                     }
                 };
+                
                 listen(addrs[0], |out| {
                         WsHandler {
                             out: out,
