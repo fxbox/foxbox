@@ -5,6 +5,8 @@ extern crate url;
 
 use self::url::Url;
 use foxbox_core::traits::Controller;
+use openssl::ssl::{Ssl, SslContext};
+use std::rc::Rc;
 use std::thread;
 use ws;
 use ws::{Handler, Sender, Result, Message, Handshake, CloseCode, Error};
@@ -15,6 +17,7 @@ pub struct WsServer;
 pub struct WsHandler<T> {
     pub out: Sender,
     pub controller: T,
+    ssl: Option<Rc<SslContext>>,
 }
 
 impl WsServer {
@@ -23,11 +26,20 @@ impl WsServer {
         thread::Builder::new()
             .name("WsServer".to_owned())
             .spawn(move || {
-
+                let ssl = {
+                    if controller.get_tls_enabled() {
+                        let mut context = SslContext::new(SslMethod::Tlsv1)
+                            .expect("Creating a SSL context should not fail.");
+                        None
+                    } else {
+                        None
+                    }
+                };
                 listen(addrs[0], |out| {
                         WsHandler {
                             out: out,
                             controller: controller.clone(),
+                            ssl: ssl.clone(),
                         }
                     })
                     .unwrap();
@@ -90,5 +102,13 @@ impl<T: Controller> Handler for WsHandler<T> {
 
     fn on_error(&mut self, err: Error) {
         error!("The ws server encountered an error: {:?}", err);
+    }
+
+    fn build_ssl(&mut self) -> ws::Result<Ssl> {
+        if self.ssl.is_none() {
+            return Err(ws::Error::new(ws::ErrorKind::Internal, "SSL is disabled"));
+        }
+
+        Ssl::new(&self.ssl.clone().unwrap()).map_err(ws::Error::from)
     }
 }
