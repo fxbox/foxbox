@@ -18,7 +18,6 @@ Prepper.makeSuite('Test Hue Authentication', function () {
     // collect all getters for the lightbulbs
     return chakram.put(Prepper.foxboxManager.getterURL, getterPayload)
       .then(function (listResponse) {
-        console.log("no auth: " + JSON.stringify(listResponse));
         lights = Object.keys(listResponse.body);
         expect(lights.length).equals(0);
         expect(listResponse).to.have.status(200);
@@ -33,7 +32,6 @@ Prepper.makeSuite('Test Hue Authentication', function () {
       // collect all getters for the lightbulbs
       return chakram.put(Prepper.foxboxManager.getterURL, getterPayload)
         .then(function (listResponse) {
-          console.log("with auth: " + JSON.stringify(listResponse));
           lights = Object.keys(listResponse.body);
           expect(lights.length).equals(3);
           expect(listResponse).to.have.status(200);
