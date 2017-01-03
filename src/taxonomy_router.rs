@@ -271,7 +271,7 @@ pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
             AuthEndpoint(vec![Method::Get, Method::Post], "services".to_owned()),
             AuthEndpoint(vec![Method::Post, Method::Delete], "services/tags".to_owned()),
             AuthEndpoint(vec![Method::Get, Method::Post], "channels".to_owned()),
-            AuthEndpoint(vec![Method::Get], "channels/get".to_owned()),
+            AuthEndpoint(vec![Method::Put], "channels/get".to_owned()),
             AuthEndpoint(vec![Method::Put], "channels/set".to_owned()),
             AuthEndpoint(vec![Method::Post, Method::Delete], "channels/tags".to_owned())
         ]
