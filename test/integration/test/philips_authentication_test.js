@@ -9,13 +9,17 @@ Prepper.makeSuite('Test Hue Authentication', function () {
   var getterPayload = [{ 'feature': 'light/is-on' }];
   var lights;
 
-  before('turn on simulators', function (done) {
-    Prepper.turnOnHueNupnp();
-    Prepper.turnOnHue(true);
-    Prepper.turnOnFoxbox();
-    Prepper.foxboxManager.foxboxLogin();
-    setTimeout(done, 5000);
-  });
+  before(Prepper.turnOnAllSimulators);
+  before(Prepper.turnOnFoxbox);
+  before(Prepper.foxboxManager.foxboxLogin);
+
+  // before('turn on simulators', function (done) {
+  //   Prepper.turnOnHueNupnp();
+  //   Prepper.turnOnHue(true);
+  //   Prepper.turnOnFoxbox();
+  //   Prepper.foxboxManager.foxboxLogin();
+  //   setTimeout(done, 5000);
+  // });
 
   it('Send light query without authentication', function () {
 
