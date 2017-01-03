@@ -28,8 +28,8 @@ Prepper.makeSuite('Test Hue Authentication', function () {
       .then(function (listResponse) {
         console.log("no auth: " + JSON.stringify(listResponse));
         lights = Object.keys(listResponse.body);
-        expect(lights.length).equals(0);
-        expect(listResponse).to.have.statusCode(401);
+        expect(lights.length).equals(3);
+        expect(listResponse).to.have.statusCode(200);
       });
   });
 
@@ -46,7 +46,7 @@ Prepper.makeSuite('Test Hue Authentication', function () {
           console.log("with auth: " + JSON.stringify(listResponse));
           lights = Object.keys(listResponse.body);
           expect(lights.length).equals(3);
-          expect(listResponse).to.have.status(200);
+          expect(listResponse).to.have.statusCode(200);
         });
     });
   });
