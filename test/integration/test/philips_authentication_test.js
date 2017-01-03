@@ -29,14 +29,15 @@ Prepper.makeSuite('Test Hue Authentication', function () {
         console.log("no auth: " + JSON.stringify(listResponse));
         lights = Object.keys(listResponse.body);
         expect(lights.length).equals(3);
-        expect(listResponse).to.have.statusCode(200);
+        expect(listResponse).to.have.status(200);
       });
   });
 
   describe('Authenticate with Philips Hue', function () {
-    before('Press the button', function () {
-      return Prepper.philipshue_server.pressButton();
-    });
+    before(Prepper.philipshue_server.pressButton);
+    // before('Press the button', function () {
+    //   return Prepper.philipshue_server.pressButton();
+    // });
 
     it('Send light query after authentication', function () {
 
@@ -46,7 +47,7 @@ Prepper.makeSuite('Test Hue Authentication', function () {
           console.log("with auth: " + JSON.stringify(listResponse));
           lights = Object.keys(listResponse.body);
           expect(lights.length).equals(3);
-          expect(listResponse).to.have.statusCode(200);
+          expect(listResponse).to.have.status(200);
         });
     });
   });
