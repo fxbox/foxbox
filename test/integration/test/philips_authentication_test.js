@@ -4,46 +4,46 @@ const chakram = require('chakram'), expect = chakram.expect;
 
 var Prepper = require('../lib/make_suite.js');
 
-Prepper.makeSuite('Test Hue Authentication',function(){
+Prepper.makeSuite('Test Hue Authentication', function () {
 
-  var getterPayload = [{'feature': 'light/is-on'}];
+  var getterPayload = [{ 'feature': 'light/is-on' }];
   var lights;
 
-  before ('turn on simulators', function (done){
+  before('turn on simulators', function (done) {
     Prepper.turnOnHueNupnp();
     Prepper.turnOnHue(true);
     Prepper.turnOnFoxbox();
     Prepper.foxboxManager.foxboxLogin();
-    setTimeout(done,5000);
+    setTimeout(done, 5000);
   });
 
-  it('Send light query without authentication',function(){
-  
+  it('Send light query without authentication', function () {
+
     // collect all getters for the lightbulbs
-    return chakram.put(Prepper.foxboxManager.getterURL,getterPayload)
-    .then(function(listResponse) {
-      console.log("no auth: " + JSON.stringify(listResponse));
-      lights = Object.keys(listResponse.body);
-      expect(lights.length).equals(0);
-      expect(listResponse).to.have.status(200);
-    });
+    return chakram.put(Prepper.foxboxManager.getterURL, getterPayload)
+      .then(function (listResponse) {
+        console.log("no auth: " + JSON.stringify(listResponse));
+        lights = Object.keys(listResponse.body);
+        expect(lights.length).equals(0);
+        expect(listResponse).to.have.statusCode(401);
+      });
   });
 
   describe('Authenticate with Philips Hue', function () {
-    before('Press the button', function() {
+    before('Press the button', function () {
       return Prepper.philipshue_server.pressButton();
     });
 
-    it('Send light query after authentication',function(){
-      
+    it('Send light query after authentication', function () {
+
       // collect all getters for the lightbulbs
-      return chakram.put(Prepper.foxboxManager.getterURL,getterPayload)
-      .then(function(listResponse) {
-        console.log("with auth: " + JSON.stringify(listResponse));
-        lights = Object.keys(listResponse.body);
-        expect(lights.length).equals(3);
-        expect(listResponse).to.have.status(200);
-      });
+      return chakram.put(Prepper.foxboxManager.getterURL, getterPayload)
+        .then(function (listResponse) {
+          console.log("with auth: " + JSON.stringify(listResponse));
+          lights = Object.keys(listResponse.body);
+          expect(lights.length).equals(3);
+          expect(listResponse).to.have.status(200);
+        });
     });
   });
 });
