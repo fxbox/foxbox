@@ -11,15 +11,6 @@ Prepper.makeSuite('Test Hue Authentication', function () {
 
   before(Prepper.turnOnAllSimulators);
   before(Prepper.turnOnFoxbox);
-  before(Prepper.foxboxManager.foxboxLogin);
-
-  // before('turn on simulators', function (done) {
-  //   Prepper.turnOnHueNupnp();
-  //   Prepper.turnOnHue(true);
-  //   Prepper.turnOnFoxbox();
-  //   Prepper.foxboxManager.foxboxLogin();
-  //   setTimeout(done, 5000);
-  // });
 
   it('Send light query without authentication', function () {
 
@@ -28,16 +19,14 @@ Prepper.makeSuite('Test Hue Authentication', function () {
       .then(function (listResponse) {
         console.log("no auth: " + JSON.stringify(listResponse));
         lights = Object.keys(listResponse.body);
-        expect(lights.length).equals(3);
+        expect(lights.length).equals(0);
         expect(listResponse).to.have.status(200);
       });
   });
 
   describe('Authenticate with Philips Hue', function () {
+    before(Prepper.foxboxManager.foxboxLogin);
     before(Prepper.philipshue_server.pressButton);
-    // before('Press the button', function () {
-    //   return Prepper.philipshue_server.pressButton();
-    // });
 
     it('Send light query after authentication', function () {
 
