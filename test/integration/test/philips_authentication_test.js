@@ -11,6 +11,7 @@ Prepper.makeSuite('Test Hue Authentication', function () {
 
   before(Prepper.turnOnAllSimulators);
   before(Prepper.turnOnFoxbox);
+  before(Prepper.foxboxManager.foxboxLogin);
 
   it('Send light query without authentication', function () {
 
@@ -25,7 +26,6 @@ Prepper.makeSuite('Test Hue Authentication', function () {
   });
 
   describe('Authenticate with Philips Hue', function () {
-    before(Prepper.foxboxManager.foxboxLogin);
     before(Prepper.philipshue_server.pressButton);
 
     it('Send light query after authentication', function () {

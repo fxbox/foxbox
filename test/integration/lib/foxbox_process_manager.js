@@ -55,8 +55,6 @@ var foxbox_process_manager = (function () {
         return chakram.post(loginURL, null, { 'headers': header });
       })
       .then(function (resp) {
-        console.log("loginURL result is " + JSON.stringify(resp));
-        console.log("Logged in, token is " + resp.body.session_token);
         header.Authorization = 'Bearer ' + resp.body.session_token;
         chakram.setRequestDefaults({ 'headers': header });
       });

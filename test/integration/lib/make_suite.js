@@ -38,12 +38,9 @@ var make_suite = (function () {
       config.get('nupnp_server.port'));
   }
 
-  function turnOnHue(authentication) {
-    authentication = authentication || false;
-
+  function turnOnHue() {
     hueSimulatorOn = true;
-    return philipshue_server.setup(
-      config.get('philips_hue.port'), authentication);
+    return philipshue_server.setup(config.get('philips_hue.port'));
   }
 
   function turnOnCamera() {

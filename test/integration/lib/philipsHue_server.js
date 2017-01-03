@@ -15,7 +15,6 @@ var philipsHue_server = (function () {
   var instance;
   var foxboxId;
   var server_port;
-  var auth_status;
 
   function areAllLightsOn() {
     return [1, 2, 3].every(i => this.lightStatus(i));
@@ -84,12 +83,11 @@ var philipsHue_server = (function () {
     });
   }
 
-  function setup(port, authentication) {
+  function setup(port) {
     // Reset variables, since the instance gets 'reused' between tests
     light_status = api_resp.lights;
     foxboxId = undefined;
     server_port = port;
-    auth_status = authentication;
 
     return new Promise(resolve => {
       instance = _server.listen(server_port, function () {
@@ -124,22 +122,14 @@ var philipsHue_server = (function () {
   });
 
   _server.get('/api/:foxboxId/', function (req, res) {
-
-    if (foxboxId === undefined) {
-      if (auth_status === false) {
-        foxboxId = req.params.foxboxId;
-        res.sendStatus(200);
-      }
-      // Althought it's an error message, Hue hub returns 200 OK
-      else if (auth_status === true) {
-        res.status(200).send([{
-          'error': {
-            'type': 1,
-            'address': '/',
-            'description': 'unauthorized user'
-          }
-        }]);
-      }
+    if (req.params.foxboxId !== foxboxId) {
+      res.status(200).send([{
+        'error': {
+          'type': 1,
+          'address': '/',
+          'description': 'unauthorized user'
+        }
+      }]);
     }
     else {
       res.status(200).json(api_resp);
@@ -147,7 +137,6 @@ var philipsHue_server = (function () {
   });
 
   _server.post('/api', bodyParser.json(), function (req, res) {
-
     if (foxboxId === undefined) {
       res.status(200).send([{
         'error': {
@@ -156,8 +145,7 @@ var philipsHue_server = (function () {
           'description': 'link button not pressed'
         }
       }]);
-    }
-    else {
+    } else {
       if (req.body.devicetype === 'foxbox_hub') {
         res.status(200).send([{
           'success': {
