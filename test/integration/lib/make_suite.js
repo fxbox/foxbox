@@ -10,14 +10,14 @@ var foxboxManager = require('../lib/foxbox_process_manager.js');
 var config = new Config('./test/integration/lib/config/foxbox.js');
 
 
-var make_suite = (function() {
+var make_suite = (function () {
   var nupnpSimulatorOn = false;
   var hueSimulatorOn = false;
   var cameraSimulatorOn = false;
   var webPushSimulatorOn = false;
   var foxboxOn = false;
-  
-  function turnOnAllSimulators() { 
+
+  function turnOnAllSimulators() {
 
     // Note: when one of the simulators needs to be enabled later, make sure
     // it is in the before hook with the turnOnxxx method returning the promise
@@ -27,23 +27,20 @@ var make_suite = (function() {
     promises.push(turnOnHue());
     promises.push(turnOnCamera());
     promises.push(turnOnWebPush());
-    
+
     return Promise.all(promises);
- }
+  }
 
   function turnOnHueNupnp() {
-      nupnpSimulatorOn = true;
-      return nupnp_server.start(config.get('nupnp_server.id'),
-      config.get('philips_hue.url') +':'+config.get('philips_hue.port'),
+    nupnpSimulatorOn = true;
+    return nupnp_server.start(config.get('nupnp_server.id'),
+      config.get('philips_hue.url') + ':' + config.get('philips_hue.port'),
       config.get('nupnp_server.port'));
   }
 
-  function turnOnHue(authentication){
-    authentication = authentication || false;
-
+  function turnOnHue() {
     hueSimulatorOn = true;
-    return philipshue_server.setup(
-      config.get('philips_hue.port'),authentication);
+    return philipshue_server.setup(config.get('philips_hue.port'));
   }
 
   function turnOnCamera() {
@@ -62,7 +59,7 @@ var make_suite = (function() {
   }
 
   function nupnpOff() {
-   nupnpSimulatorOn = false;
+    nupnpSimulatorOn = false;
     return nupnp_server.stop();
   }
 
@@ -85,12 +82,12 @@ var make_suite = (function() {
     describe(desc, function () {
       this.timeout(60000);
       subSuite();
-      after(function() {
+      after(function () {
         var promises = [];
         foxboxManager.killFoxBox();
         foxboxManager.cleanData();
 
-        if (hueSimulatorOn){
+        if (hueSimulatorOn) {
           promises.push(nupnpOff());
           promises.push(hueOff());
         }
@@ -105,9 +102,11 @@ var make_suite = (function() {
     });
   }
 
-  return { makeSuite, turnOnAllSimulators,
-    philipshue_server,ipcamera_server, webPush_server,
-    foxboxManager, turnOnFoxbox, turnOnHue, turnOnHueNupnp};
+  return {
+    makeSuite, turnOnAllSimulators,
+    philipshue_server, ipcamera_server, webPush_server,
+    foxboxManager, turnOnFoxbox, turnOnHue, turnOnHueNupnp
+  };
 })();
 
 module.exports = make_suite;
