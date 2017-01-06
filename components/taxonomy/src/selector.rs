@@ -298,7 +298,7 @@ pub struct ChannelSelector {
     /// If `Exactly(id)`, return only the channel with the corresponding id.
     pub id: Exactly<Id<Channel>>,
 
-    /// If `Eactly(id)`, return only channels that are children of
+    /// If `Exactly(id)`, return only channels that are children of
     /// service `id`.
     pub parent: Exactly<Id<ServiceId>>,
 
@@ -334,12 +334,12 @@ impl Parser<ChannelSelector> for ChannelSelector {
         });
         let service_id =
             try!(match path.push("service", |path| Exactly::take_opt(path, source, "service")) {
-            None => Ok(Exactly::Always),
-            Some(result) => {
-                is_empty = false;
-                result
-            }
-        });
+                None => Ok(Exactly::Always),
+                Some(result) => {
+                    is_empty = false;
+                    result
+                }
+            });
         let tags: HashSet<_> =
             match path.push("tags", |path| Id::take_vec_opt(path, source, "tags")) {
                 None => HashSet::new(),
@@ -361,23 +361,29 @@ impl Parser<ChannelSelector> for ChannelSelector {
         };
         let feature =
             try!(match path.push("feature", |path| Exactly::take_opt(path, source, "feature")) {
+                None => Ok(Exactly::Always),
+                Some(result) => {
+                    is_empty = false;
+                    result
+                }
+            });
+        let supports_send = try!(match path.push("supports_send", |path| {
+            Exactly::take_opt(path, source, "supports_send")
+        }) {
             None => Ok(Exactly::Always),
-            Some(result) => {
-                is_empty = false;
-                result
-            }
+            Some(result) => result,
         });
-        let supports_send = try!(match path.push("supports_send", |path| Exactly::take_opt(path, source, "supports_send")) {
+        let supports_fetch = try!(match path.push("supports_fetch", |path| {
+            Exactly::take_opt(path, source, "supports_fetch")
+        }) {
             None => Ok(Exactly::Always),
-            Some(result) => result
+            Some(result) => result,
         });
-        let supports_fetch = try!(match path.push("supports_fetch", |path| Exactly::take_opt(path, source, "supports_fetch")) {
+        let supports_watch = try!(match path.push("supports_watch", |path| {
+            Exactly::take_opt(path, source, "supports_watch")
+        }) {
             None => Ok(Exactly::Always),
-            Some(result) => result
-        });
-        let supports_watch = try!(match path.push("supports_watch", |path| Exactly::take_opt(path, source, "supports_watch")) {
-            None => Ok(Exactly::Always),
-            Some(result) => result
+            Some(result) => result,
         });
         if is_empty {
             Err(ParseError::empty_object(&path))
