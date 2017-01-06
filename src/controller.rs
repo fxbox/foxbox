@@ -10,7 +10,10 @@ use foxbox_core::config_store::ConfigService;
 use foxbox_core::profile_service::{ProfilePath, ProfileService};
 use foxbox_core::traits::Controller;
 use foxbox_core::upnp::UpnpManager;
-use foxbox_taxonomy::manager::AdapterManager as TaxoManager;
+use foxbox_taxonomy::api::{API, Targetted, WatchEvent};
+use foxbox_taxonomy::manager::{AdapterManager as TaxoManager, WatchGuard};
+use foxbox_taxonomy::selector::ChannelSelector;
+use foxbox_taxonomy::util::Exactly;
 use foxbox_users::UsersManager;
 use http_server::HttpServer;
 use mio::{Events, Poll};
@@ -21,8 +24,10 @@ use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
 use std::vec::IntoIter;
 use tls::{CertificateManager, CertificateRecord, SniSslContextProvider, TlsOption};
+use transformable_channels::mpsc;
 use ws_server::WsServer;
 use ws;
 
@@ -77,9 +82,55 @@ impl FoxBox {
             profile_service: Arc::new(profile_service),
         }
     }
+
+    #[allow(unused_variables)] // for `format`
+    fn watch_values(&self, taxo_manager: &Arc<TaxoManager>) -> WatchGuard {
+        let (tx, rx) = mpsc::channel::<WatchEvent>();
+        let watchguard = taxo_manager.watch_values(vec![Targetted {
+                                           select: vec![ChannelSelector::new()], // All channels.
+                                           payload: Exactly::Always, // All events.
+                                       }],
+                                  Box::new(tx));
+
+        // This thread will receive the events from the adapters and relay them to websockets.
+        let myself = self.clone();
+        thread::Builder::new()
+            .name("ValueWatcher".to_owned())
+            .spawn(move || {
+                loop {
+                    if let Ok(event) = rx.recv() {
+                        match event {
+                            WatchEvent::Error { channel, error } => {
+                                error!("{} : {}", channel, error)
+                            }
+                            WatchEvent::ChannelAdded(id) => {
+                                info!("Channel Added: {}", id);
+                                myself.broadcast_to_websockets(json_value!({ type: "channel/added", id: id }));
+                            },
+                            WatchEvent::ChannelRemoved(id) => {
+                                info!("Channel Removed: {}", id);
+                                myself.broadcast_to_websockets(json_value!({ type: "channel/removed", id: id }));
+                            }
+                            WatchEvent::EnterRange { channel, value, format} => {
+                                info!("Entering Range {} : {:?}", channel, value);
+                                myself.broadcast_to_websockets(json_value!({ type: "range/enter", channel: channel, value: value }));
+                            }
+                             WatchEvent::ExitRange { channel, value, format} => {
+                                info!("Exiting Range {} : {:?}", channel, value);
+                                myself.broadcast_to_websockets(json_value!({ type: "range/exit", channel: channel, value: value }));
+                            }
+                        }
+                    }
+                }
+            })
+            .unwrap();
+
+        watchguard
+    }
 }
 
 impl Controller for FoxBox {
+    #[allow(unused_variables)] // for `guard`
     fn run(&mut self, shutdown_flag: &AtomicBool) {
 
         debug!("Starting controller");
@@ -91,6 +142,10 @@ impl Controller for FoxBox {
         // Create the taxonomy based AdapterManager
         let tags_db_path = PathBuf::from(self.profile_service.path_for("taxonomy_tags.sqlite"));
         let taxo_manager = Arc::new(TaxoManager::new(Some(tags_db_path)));
+
+        // We can't use let _ = self.watch_values(...) because that would drop the
+        // guard immediately and remove the watcher.
+        let guard = self.watch_values(&taxo_manager);
 
         let mut adapter_manager = AdapterManager::new(self.clone());
         adapter_manager.start(&taxo_manager);

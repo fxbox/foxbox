@@ -324,6 +324,7 @@ impl WatchMap {
         watcher
     }
     fn remove(&mut self, key: WatchKey) -> Option<Arc<WatcherData>> {
+        self.counter -= 1;
         self.watchers.remove(&key)
     }
 }
@@ -547,7 +548,6 @@ impl State {
 
 impl State {
     pub fn new(liveness: &Arc<Liveness>, db_path: Option<PathBuf>) -> Self {
-        info!("Creating State struct");
         let db = if let Some(ref path) = db_path {
             Some(Arc::new(Mutex::new(TagStorage::new(path))))
         } else {
