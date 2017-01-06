@@ -83,11 +83,9 @@ impl FoxBox {
         }
     }
 
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // for `format`
     fn watch_values(&self, taxo_manager: &Arc<TaxoManager>) -> WatchGuard {
         let (tx, rx) = mpsc::channel::<WatchEvent>();
-        // We can't use let _ = taxo_manager.watch_values() because that would drop the
-        // guard immediately and remove the watcher.
         let watchguard = taxo_manager.watch_values(vec![Targetted {
                                            select: vec![ChannelSelector::new()], // All channels.
                                            payload: Exactly::Always, // All events.
@@ -132,6 +130,7 @@ impl FoxBox {
 }
 
 impl Controller for FoxBox {
+    #[allow(unused_variables)] // for `guard`
     fn run(&mut self, shutdown_flag: &AtomicBool) {
 
         debug!("Starting controller");
@@ -144,6 +143,8 @@ impl Controller for FoxBox {
         let tags_db_path = PathBuf::from(self.profile_service.path_for("taxonomy_tags.sqlite"));
         let taxo_manager = Arc::new(TaxoManager::new(Some(tags_db_path)));
 
+        // We can't use let _ = self.watch_values(...) because that would drop the
+        // guard immediately and remove the watcher.
         let guard = self.watch_values(&taxo_manager);
 
         let mut adapter_manager = AdapterManager::new(self.clone());
