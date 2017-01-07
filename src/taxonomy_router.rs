@@ -268,23 +268,28 @@ impl Handler for TaxonomyRouter {
     }
 }
 
-pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
+pub fn create<T>(controller: T,
+                 adapter_api: &Arc<AdapterManager>)
+                 -> (Chain, Vec<(Vec<Method>, String)>)
     where T: Controller
 {
     let router = TaxonomyRouter::new(adapter_api);
 
+    // The list of endpoints supported by this router.
+    // Keep it in sync with all the (url path, http method) from
+    // the handle() method.
+    let endpoints = vec![
+        (vec![Method::Get, Method::Post], "services".to_owned()),
+        (vec![Method::Post, Method::Delete], "services/tags".to_owned()),
+        (vec![Method::Get, Method::Post], "channels".to_owned()),
+        (vec![Method::Put], "channels/get".to_owned()),
+        (vec![Method::Put], "channels/set".to_owned()),
+        (vec![Method::Post, Method::Delete], "channels/tags".to_owned()),
+        (vec![Method::Get], "channel/:id".to_owned()),
+    ];
+
     let auth_endpoints = if cfg!(feature = "authentication") && !cfg!(test) {
-        // Keep this list in sync with all the (url path, http method) from
-        // the handle() method and with the CORS chain in http_server.rs
-        vec![
-            AuthEndpoint(vec![Method::Get, Method::Post], "services".to_owned()),
-            AuthEndpoint(vec![Method::Post, Method::Delete], "services/tags".to_owned()),
-            AuthEndpoint(vec![Method::Get, Method::Post], "channels".to_owned()),
-            AuthEndpoint(vec![Method::Put], "channels/get".to_owned()),
-            AuthEndpoint(vec![Method::Put], "channels/set".to_owned()),
-            AuthEndpoint(vec![Method::Post, Method::Delete], "channels/tags".to_owned()),
-            AuthEndpoint(vec![Method::Get], "channel/:id".to_owned()),
-        ]
+        endpoints.iter().map(|item| AuthEndpoint(item.0.clone(), item.1.clone())).collect()
     } else {
         vec![]
     };
@@ -292,7 +297,7 @@ pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
     let mut chain = Chain::new(router);
     chain.around(controller.get_users_manager().get_middleware(auth_endpoints));
 
-    chain
+    (chain, endpoints)
 }
 
 #[cfg(test)]
@@ -312,7 +317,7 @@ describe! taxonomy_router {
         clock::Clock::init(&taxo_manager).unwrap();
 
         let mut mount = Mount::new();
-        mount.mount("/api/v1", create(ControllerStub::new(), &taxo_manager));
+        mount.mount("/api/v1", create(ControllerStub::new(), &taxo_manager).0);
     }
 
     it "should return the list of services from a GET request" {
@@ -448,7 +453,7 @@ describe! binary_getter {
         BinaryAdapter::init(&taxo_manager).unwrap();
 
         let mut mount = Mount::new();
-        mount.mount("/api/v1", create(ControllerStub::new(), &taxo_manager));
+        mount.mount("/api/v1", create(ControllerStub::new(), &taxo_manager).0);
 
         let response = request::put("http://localhost:3000/api/v1/channels/get",
                                     Headers::new(),
