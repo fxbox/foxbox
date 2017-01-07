@@ -103,7 +103,8 @@ impl<T: Controller> HttpServer<T> {
     }
 
     pub fn start(&mut self, adapter_api: &Arc<AdapterManager>) {
-        let taxonomy_chain = taxonomy_router::create(self.controller.clone(), adapter_api);
+        let (taxonomy_chain, mut taxonomy_endpoints) =
+            taxonomy_router::create(self.controller.clone(), adapter_api);
 
         let users_manager = self.controller.get_users_manager();
         let mut mount = Mount::new();
@@ -115,18 +116,14 @@ impl<T: Controller> HttpServer<T> {
         let mut chain = Chain::new(mount);
         chain.link_after(Custom404);
 
-        let cors = CORS::new(vec![(vec![Method::Get], "ping".to_owned()),
+        // Build the set of CORS endpoints by prefixing the taxonomy ones with api/v1 and
+        // adding the /ping handler.
+        let mut cors_endpoints: Vec<(Vec<Method>, String)> = taxonomy_endpoints.drain(..)
+            .map(|item| (item.0, format!("api/v1/{}", item.1)))
+            .collect();
+        cors_endpoints.push((vec![Method::Get], "ping".to_owned()));
 
-                                  // Taxonomy router paths. Keep in sync with taxonomy_router.rs
-                                  (vec![Method::Get, Method::Post], "api/v1/services".to_owned()),
-                                  (vec![Method::Post, Method::Delete],
-                                   "api/v1/services/tags".to_owned()),
-                                  (vec![Method::Get, Method::Post], "api/v1/channels".to_owned()),
-                                  (vec![Method::Put], "api/v1/channels/get".to_owned()),
-                                  (vec![Method::Put], "api/v1/channels/set".to_owned()),
-                                  (vec![Method::Post, Method::Delete],
-                                   "api/v1/channels/tags".to_owned()),
-                                  (vec![Method::Get], "api/v1/channel/:id".to_owned())]);
+        let cors = CORS::new(cors_endpoints);
         chain.link_after(cors);
 
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
