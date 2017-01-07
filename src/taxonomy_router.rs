@@ -126,6 +126,30 @@ impl Handler for TaxonomyRouter {
         // the req.url.path will only contain ["services"]
         let path = req.url.path();
 
+        macro_rules! simple {
+            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg, user)))
+        }
+
+        macro_rules! binary {
+            ($api:ident, $arg:ident, $call:ident) => ({
+                        let res = $api.$call($arg, user);
+                        if let Some(payload) = self.get_binary(&res) {
+                            self.build_binary_response(&payload)
+                        } else {
+                            self.build_response(&res)
+                        }
+                    })
+        }
+
+        // Special case for GET channel/:id
+        // This will fetch the values for a ChannelSelector using the id.
+        if req.method == Method::Get && path.len() == 2 && path[0] == "channel" {
+            let id = Id::<Channel>::new(path[1]);
+            let api = &self.api;
+            let selector = vec![ChannelSelector::new().with_id(&id)];
+            return binary!(api, selector, fetch_values);
+        }
+
         /// Generates the code for a generic HTTP call, where we use an empty
         /// taxonomy selector for GET requests, and a decoded json body for POST ones.
         /// $call is the method we'll call on the api, like get_services.
@@ -155,21 +179,6 @@ impl Handler for TaxonomyRouter {
                     }
                 }
             })
-        }
-
-        macro_rules! simple {
-            ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg, user)))
-        }
-
-        macro_rules! binary {
-            ($api:ident, $arg:ident, $call:ident) => ({
-                        let res = $api.$call($arg, user);
-                        if let Some(payload) = self.get_binary(&res) {
-                            self.build_binary_response(&payload)
-                        } else {
-                            self.build_response(&res)
-                        }
-                    })
         }
 
         // Generates the code to process a given HTTP call with a json body.
@@ -273,7 +282,8 @@ pub fn create<T>(controller: T, adapter_api: &Arc<AdapterManager>) -> Chain
             AuthEndpoint(vec![Method::Get, Method::Post], "channels".to_owned()),
             AuthEndpoint(vec![Method::Put], "channels/get".to_owned()),
             AuthEndpoint(vec![Method::Put], "channels/set".to_owned()),
-            AuthEndpoint(vec![Method::Post, Method::Delete], "channels/tags".to_owned())
+            AuthEndpoint(vec![Method::Post, Method::Delete], "channels/tags".to_owned()),
+            AuthEndpoint(vec![Method::Get], "channel/:id".to_owned()),
         ]
     } else {
         vec![]
@@ -443,6 +453,19 @@ describe! binary_getter {
         let response = request::put("http://localhost:3000/api/v1/channels/get",
                                     Headers::new(),
                                     r#"[{"id":"getter:binary@link.mozilla.org", "feature":"x-test/x-binary"}]"#,
+                                    &mount).unwrap();
+
+        let content_length = format!("{}", response.headers.get::<ContentLength>().unwrap());
+        let content_type = format!("{}", response.headers.get::<ContentType>().unwrap());
+        assert_eq!(content_length, "6");
+        assert_eq!(content_type, "image/png");
+
+        let result = response::extract_body_to_bytes(response);
+        assert_eq!(result, vec![1, 2, 3, 10, 11, 12]);
+
+// Now retrieve the same resource using a GET request.
+        let response = request::get("http://localhost:3000/api/v1/channel/getter:binary@link.mozilla.org",
+                                    Headers::new(),
                                     &mount).unwrap();
 
         let content_length = format!("{}", response.headers.get::<ContentLength>().unwrap());

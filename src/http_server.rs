@@ -125,7 +125,8 @@ impl<T: Controller> HttpServer<T> {
                                   (vec![Method::Put], "api/v1/channels/get".to_owned()),
                                   (vec![Method::Put], "api/v1/channels/set".to_owned()),
                                   (vec![Method::Post, Method::Delete],
-                                   "api/v1/channels/tags".to_owned())]);
+                                   "api/v1/channels/tags".to_owned()),
+                                  (vec![Method::Get], "api/v1/channel/:id".to_owned())]);
         chain.link_after(cors);
 
         let addrs: Vec<_> = self.controller.http_as_addrs().unwrap().collect();
