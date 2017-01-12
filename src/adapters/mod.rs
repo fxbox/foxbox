@@ -28,6 +28,10 @@ mod thinkerbell;
 #[cfg(feature = "webpush")]
 pub mod webpush;
 
+/// An adapter providing file storage services.
+#[cfg(feature = "file_storage")]
+pub mod file_storage;
+
 use foxbox_taxonomy::manager::AdapterManager as TaxoManager;
 
 #[cfg(feature = "thinkerbell")]
@@ -104,6 +108,16 @@ impl<T: Controller> AdapterManager<T> {
         // nothing to see :)
     }
 
+    #[cfg(feature = "file_storage")]
+    fn start_file_storage(&self, manager: &Arc<TaxoManager>) {
+        file_storage::FileStorageAdapter::init(self.controller.clone(), manager).unwrap();
+    }
+
+    #[cfg(not(feature = "file_storage"))]
+    fn start_file_storage(&self, _: &Arc<TaxoManager>) {
+        // nothing to see :)
+    }
+
     #[cfg(feature = "ip_camera")]
     fn start_ip_camera(&self, manager: &Arc<TaxoManager>) {
         ip_camera::IPCameraAdapter::init(manager, self.controller.clone()).unwrap();
@@ -125,6 +139,7 @@ impl<T: Controller> AdapterManager<T> {
         self.start_philips_hue(manager);
         self.start_zwave(manager);
         self.start_tts(manager);
+        self.start_file_storage(manager);
     }
 
     /// Stop all the adapters.
