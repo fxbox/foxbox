@@ -1,4 +1,4 @@
-#![feature(custom_derive, plugin, proc_macro)]
+#![feature(custom_derive, plugin)]
 
 extern crate foxbox_taxonomy;
 extern crate foxbox_thinkerbell;
@@ -16,7 +16,7 @@ use foxbox_thinkerbell::ast::Script;
 use foxbox_thinkerbell::fake_env::*;
 
 use foxbox_taxonomy::api::User;
-use foxbox_taxonomy::parse::{ Path, Parser };
+use foxbox_taxonomy::parse::{Path, Parser};
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -37,7 +37,7 @@ Usage: simulator [options]...
 ";
 
 
-fn main () {
+fn main() {
     use foxbox_thinkerbell::run::ExecutionEvent::*;
 
     println!("Preparing simulator.");
@@ -49,8 +49,8 @@ fn main () {
             match event {
                 FakeEnvEvent::Done => {
                     let _ = tx_done.send(()).unwrap();
-                },
-                event => println!("<<< {:?}", event)
+                }
+                event => println!("<<< {:?}", event),
             }
         }
     });
@@ -66,7 +66,7 @@ fn main () {
             if vec.is_empty() || vec[0].is_empty() {
                 StdDuration::new(0, 0)
             } else {
-                let s : f64 = FromStr::from_str(vec[0]).unwrap();
+                let s: f64 = FromStr::from_str(vec[0]).unwrap();
                 StdDuration::new(s as u64, (s.fract() * 1_000_000.0) as u32)
             }
         }
@@ -88,7 +88,7 @@ fn main () {
         runner.start(env.clone(), script, User::None, tx).unwrap();
         match rx.recv().unwrap() {
             Starting { result: Ok(()) } => println!("ready."),
-            err => panic!("Could not launch script {:?}", err)
+            err => panic!("Could not launch script {:?}", err),
         }
         runners.push(runner);
     }
@@ -99,7 +99,7 @@ fn main () {
         let mut file = File::open(path).unwrap();
         let mut source = String::new();
         file.read_to_string(&mut source).unwrap();
-        let json : serde_json::Value = serde_json::from_str(&source).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&source).unwrap();
         let script = Vec::<Instruction>::parse(Path::new(), &json).unwrap();
         println!("Sequence of events loaded, playing...");
 

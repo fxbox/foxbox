@@ -1,4 +1,4 @@
-#![feature(custom_derive, proc_macro)]
+#![feature(custom_derive)]
 //! This create defines mechanisms for executing simple scripts on the
 //! server.
 //!
