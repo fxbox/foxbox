@@ -55,7 +55,7 @@ ENV PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig
 USER user
 WORKDIR /home/user
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2016-12-16
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2017-01-12
 ENV PATH=/home/user/.cargo/bin:/home/user/bin:$PATH
 RUN rustup target add armv7-unknown-linux-gnueabihf
 

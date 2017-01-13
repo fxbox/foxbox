@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Update this when doing a rustup.
-EXPECTED_HASH="8f02c429ad3e2ad687a222d1daae2e04bb9bb876"
-EXPECTED_DATE="2016-12-16"
+EXPECTED_HASH="2782e8f8fcefdce77c5e0dd0846c15c4c5103d84"
+EXPECTED_DATE="2017-01-12"
 
 CURRENT_HASH=`rustc --version -v|grep commit-hash|cut -f 2 -d ' '`
 
