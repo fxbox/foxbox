@@ -1,4 +1,4 @@
-#![feature(custom_derive, plugin, proc_macro)]
+#![feature(custom_derive, plugin)]
 extern crate foxbox_taxonomy;
 extern crate foxbox_thinkerbell;
 extern crate serde;
@@ -31,7 +31,10 @@ fn test_database_add_remove_script() {
 
     println!("* Cleaning up the database.");
     let (tx, _) = channel();
-    let mut db = ScriptManager::new(env, Path::new("./test_script_database.sqlite"), Box::new(tx)).unwrap();
+    let mut db = ScriptManager::new(env,
+                                    Path::new("./test_script_database.sqlite"),
+                                    Box::new(tx))
+        .unwrap();
 
     db.remove_all().unwrap();
 
@@ -40,7 +43,10 @@ fn test_database_add_remove_script() {
 
     println!("* Putting a recipe in the database. It should be reported as running.");
     let name = Id::<ScriptId>::new("Sample Ruleset");
-    db.put(&name, &load_json("./examples/ruleset.json"), &User::Id(String::from("1"))).unwrap();
+    db.put(&name,
+             &load_json("./examples/ruleset.json"),
+             &User::Id(String::from("1")))
+        .unwrap();
     assert_eq!(db.get_running_count(), 1);
 
     println!("* The recipe should have the user with which it was stored.");
@@ -64,10 +70,16 @@ fn test_database_add_remove_script() {
     assert_eq!(db.get_running_count(), 0);
 
     println!("* Add again the recipe. It should be reported as running again.");
-    db.put(&name, &load_json("./examples/ruleset.json"), &User::Id(String::from("1"))).unwrap();
+    db.put(&name,
+             &load_json("./examples/ruleset.json"),
+             &User::Id(String::from("1")))
+        .unwrap();
     assert_eq!(db.get_running_count(), 1);
 
     println!("* Overwrite the recipe. It should still be reported as running.");
-    db.put(&name, &load_json("./examples/ruleset.json"), &User::Id(String::from("1"))).unwrap();
+    db.put(&name,
+             &load_json("./examples/ruleset.json"),
+             &User::Id(String::from("1")))
+        .unwrap();
     assert_eq!(db.get_running_count(), 1);
 }
