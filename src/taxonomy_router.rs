@@ -6,12 +6,13 @@ extern crate serde_json;
 
 use foxbox_core::traits::Controller;
 use foxbox_taxonomy::manager::*;
-use foxbox_taxonomy::api::{API, Error, TargetMap, User};
+use foxbox_taxonomy::api::{API, Error, TargetMap, Targetted, User};
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::io::*;
-use foxbox_taxonomy::values::{format, Binary};
+use foxbox_taxonomy::values::{format, Binary, Value};
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
+use foxbox_taxonomy::util::MimeTypeId;
 
 use foxbox_users::AuthEndpoint;
 use foxbox_users::SessionToken;
@@ -159,10 +160,28 @@ impl Handler for TaxonomyRouter {
             let api = &self.api;
             let selector = vec![ChannelSelector::new().with_id(&id)];
 
-            let c_type = format!("{}",
-                                 req.headers.clone().get::<headers::ContentType>().unwrap());
+            // TODO: be more robust.
+            let content_type = format!("{}",
+                                       req.headers.clone().get::<headers::ContentType>().unwrap());
+            let target = if content_type == "application/json" {
+                let mut buffer = Vec::new();
+                req.body.read_to_end(&mut buffer).unwrap(); // TODO: manage error.
+                let payload = Payload::from_value(&Value::new(Binary {
+                                                      data: buffer,
+                                                      mimetype:
+                                                          Id::<MimeTypeId>::new(&content_type),
+                                                  }),
+                                                  &format::BINARY)
+                    .unwrap();
+                Targetted {
+                    payload: payload,
+                    select: selector,
+                }
+            } else {
 
-            return binary!(api, selector, send_values);
+            };
+            let arg = vec![target];
+            return binary!(api, arg, send_values);
         }
 
         /// Generates the code for a generic HTTP call, where we use an empty
