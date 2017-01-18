@@ -6,12 +6,13 @@ extern crate serde_json;
 
 use foxbox_core::traits::Controller;
 use foxbox_taxonomy::manager::*;
-use foxbox_taxonomy::api::{API, Error, TargetMap, User};
+use foxbox_taxonomy::api::{API, Error, TargetMap, Targetted, User};
 use foxbox_taxonomy::channel::*;
 use foxbox_taxonomy::io::*;
-use foxbox_taxonomy::values::{format, Binary};
+use foxbox_taxonomy::values::{format, Binary, Json, Value};
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
+use foxbox_taxonomy::util::MimeTypeId;
 
 use foxbox_users::AuthEndpoint;
 use foxbox_users::SessionToken;
@@ -126,11 +127,11 @@ impl Handler for TaxonomyRouter {
         // the req.url.path will only contain ["services"]
         let path = req.url.path();
 
-        macro_rules! simple {
+        macro_rules! simple_response {
             ($api:ident, $arg:ident, $call:ident) => (self.build_response(&$api.$call($arg, user)))
         }
 
-        macro_rules! binary {
+        macro_rules! binary_response {
             ($api:ident, $arg:ident, $call:ident) => ({
                         let res = $api.$call($arg, user);
                         if let Some(payload) = self.get_binary(&res) {
@@ -147,7 +148,45 @@ impl Handler for TaxonomyRouter {
             let id = Id::<Channel>::new(path[1]);
             let api = &self.api;
             let selector = vec![ChannelSelector::new().with_id(&id)];
-            return binary!(api, selector, fetch_values);
+            return binary_response!(api, selector, fetch_values);
+        }
+
+        // Special case for PUT channel/:id
+        // This will send the body to a ChannelSelector using the id.
+        if req.method == Method::Put && path.len() == 2 && path[0] == "channel" {
+            let id = Id::<Channel>::new(path[1]);
+            let api = &self.api;
+            let selector = vec![ChannelSelector::new().with_id(&id)];
+
+            let content_type = match req.headers.get::<headers::ContentType>() {
+                Some(val) => format!("{}", val),
+                None => "application/octet-stream".to_owned(),
+            };
+
+            let payload = if content_type.starts_with("application/json") {
+                // JSON payload.
+                let source = itry!(Self::read_body_to_string(&mut req.body));
+                let json = match serde_json::de::from_str(&source as &str) {
+                    Err(err) => return self.build_parse_error(&ParseError::json(err)),
+                    Ok(args) => args,
+                };
+                // TODO: check the expected value type for this setter instead of assuming JSON.
+                itry!(Payload::from_value(&Value::new(Json(json)), &format::JSON))
+            } else {
+                // Read a binary payload.
+                let mut buffer = Vec::new();
+                itry!(req.body.read_to_end(&mut buffer));
+                itry!(Payload::from_value(&Value::new(Binary {
+                                              data: buffer,
+                                              mimetype: Id::<MimeTypeId>::new(&content_type),
+                                          }),
+                                          &format::BINARY))
+            };
+            let arg = vec![Targetted {
+                               payload: payload,
+                               select: selector,
+                           }];
+            return simple_response!(api, arg, send_values);
         }
 
         /// Generates the code for a generic HTTP call, where we use an empty
@@ -240,8 +279,8 @@ impl Handler for TaxonomyRouter {
         // Fetching and getting values.
         // We can't use a GET http method here because the Fetch() DOM api
         // doesn't allow bodies with GET and HEAD requests.
-        payload_api!(fetch_values, Vec<ChannelSelectorWithFeature>, ["channels", "get"], Method::Put, binary);
-        payload_api!(send_values, TargetMap<ChannelSelectorWithFeature, Payload>, ["channels", "set"], Method::Put, simple);
+        payload_api!(fetch_values, Vec<ChannelSelectorWithFeature>, ["channels", "get"], Method::Put, binary_response);
+        payload_api!(send_values, TargetMap<ChannelSelectorWithFeature, Payload>, ["channels", "set"], Method::Put, simple_response);
 
         // Adding tags.
         payload_api2!(add_service_tags,
@@ -285,7 +324,7 @@ pub fn create<T>(controller: T,
         (vec![Method::Put], "channels/get".to_owned()),
         (vec![Method::Put], "channels/set".to_owned()),
         (vec![Method::Post, Method::Delete], "channels/tags".to_owned()),
-        (vec![Method::Get], "channel/:id".to_owned()),
+        (vec![Method::Get, Method::Put], "channel/:id".to_owned()),
     ];
 
     let auth_endpoints = if cfg!(feature = "authentication") && !cfg!(test) {
@@ -355,7 +394,7 @@ describe! taxonomy_router {
 
 #[cfg(test)]
 describe! binary_getter {
-    it "should return an image/png http response" {
+    it "should return support binary payloads" {
         extern crate serde_json;
 
         use foxbox_taxonomy::adapter::*;
@@ -363,9 +402,10 @@ describe! binary_getter {
         use foxbox_taxonomy::api::{ Error, InternalError, Operation, User };
         use foxbox_taxonomy::manager::AdapterManager;
         use foxbox_taxonomy::services::*;
-        use foxbox_taxonomy::values::{ format, Value, Binary };
+        use foxbox_taxonomy::values::{ format, Value, Json, Binary };
         use iron::Headers;
         use iron::headers::{ ContentLength, ContentType };
+        use iron::status::Status;
         use iron_test::{ request, response };
         use mount::Mount;
         use std::collections::HashMap;
@@ -418,8 +458,35 @@ describe! binary_getter {
 
             fn send_values(&self, mut values: HashMap<Id<Channel>, Value>, _: User)
                 -> ResultMap<Id<Channel>, (), Error> {
-                values.drain().map(|(id, _)| {
-                    (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
+                values.drain().map(|(id, value)| {
+                    if id == Id::new("setter:binary@link.mozilla.org") {
+                        match value.downcast::<Binary>() {
+                            Some(payload) => {
+                                assert_eq!(payload.mimetype, Id::new("image/png"));
+                                let data = &payload.data;
+                                assert_eq!(data.len(), 6);
+                                assert_eq!(data, &vec![b'A', b'B', b'C', b'D', b'E', b'F']);
+                            }
+                            None => {
+                                panic!(format!("Could not downcast data to Binary {}",
+                                value.description()));
+                            }
+                        }
+                        (id.clone(), Ok(()))
+                    } else if id == Id::new("setter:json@link.mozilla.org") {
+                        match value.downcast::<Json>() {
+                            Some(json) => {
+                                assert_eq!(serde_json::to_string(&json.to_json()).unwrap(), r#"{"json_body":true}"#);
+                            }
+                            None => {
+                                panic!(format!("Could not downcast data to Binary {}",
+                                value.description()));
+                            }
+                        }
+                        (id.clone(), Ok(()))
+                    } else{
+                        (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
+                    }
                 }).collect()
             }
 
@@ -445,6 +512,23 @@ describe! binary_getter {
                     adapter: adapter_id.clone(),
                     ..Channel::default()
                 }));
+                try!(adapt.add_channel(Channel {
+                    feature: Id::new("x-test/x-binary"),
+                    supports_send: Some(Signature::accepts(Maybe::Required(format::BINARY.clone()))),
+                    id: Id::new("setter:binary@link.mozilla.org"),
+                    service: service_id.clone(),
+                    adapter: adapter_id.clone(),
+                    ..Channel::default()
+                }));
+                try!(adapt.add_channel(Channel {
+                    feature: Id::new("x-test/x-binary"),
+                    supports_send: Some(Signature::accepts(Maybe::Required(format::JSON.clone()))),
+                    id: Id::new("setter:json@link.mozilla.org"),
+                    service: service_id.clone(),
+                    adapter: adapter_id.clone(),
+                    ..Channel::default()
+                }));
+
 
                 Ok(())
             }
@@ -480,5 +564,31 @@ describe! binary_getter {
 
         let result = response::extract_body_to_bytes(response);
         assert_eq!(result, vec![1, 2, 3, 10, 11, 12]);
+
+// Send some binary data to the binary setter.
+        let mut headers = Headers::new();
+        headers.set(ContentType::png());
+
+        let response = request::put("http://localhost:3000/api/v1/channel/setter:binary@link.mozilla.org",
+                                    headers,
+                                    "ABCDEF",
+                                    &mount).unwrap();
+
+        assert_eq!(response.status, Some(Status::Ok));
+        let result = response::extract_body_to_string(response);
+        assert_eq!(result, r#"{"setter:binary@link.mozilla.org":null}"#.to_owned());
+
+// Send some json data to the binary setter.
+        let mut headers = Headers::new();
+        headers.set(ContentType::json());
+
+        let response = request::put("http://localhost:3000/api/v1/channel/setter:json@link.mozilla.org",
+                                    headers,
+                                    r#"{ "json_body": true }"#,
+                                    &mount).unwrap();
+
+        assert_eq!(response.status, Some(Status::Ok));
+        let result = response::extract_body_to_string(response);
+        assert_eq!(result, r#"{"setter:json@link.mozilla.org":null}"#.to_owned());
     }
 }
