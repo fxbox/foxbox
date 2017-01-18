@@ -402,7 +402,7 @@ describe! binary_getter {
         use foxbox_taxonomy::api::{ Error, InternalError, Operation, User };
         use foxbox_taxonomy::manager::AdapterManager;
         use foxbox_taxonomy::services::*;
-        use foxbox_taxonomy::values::{ format, Value, Binary };
+        use foxbox_taxonomy::values::{ format, Value, Json, Binary };
         use iron::Headers;
         use iron::headers::{ ContentLength, ContentType };
         use iron::status::Status;
@@ -473,7 +473,18 @@ describe! binary_getter {
                             }
                         }
                         (id.clone(), Ok(()))
-                    } else {
+                    } else if id == Id::new("setter:json@link.mozilla.org") {
+                        match value.downcast::<Json>() {
+                            Some(json) => {
+                                assert_eq!(serde_json::to_string(&json.to_json()).unwrap(), r#"{"json_body":true}"#);
+                            }
+                            None => {
+                                panic!(format!("Could not downcast data to Binary {}",
+                                value.description()));
+                            }
+                        }
+                        (id.clone(), Ok(()))
+                    } else{
                         (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
                     }
                 }).collect()
@@ -505,6 +516,14 @@ describe! binary_getter {
                     feature: Id::new("x-test/x-binary"),
                     supports_send: Some(Signature::accepts(Maybe::Required(format::BINARY.clone()))),
                     id: Id::new("setter:binary@link.mozilla.org"),
+                    service: service_id.clone(),
+                    adapter: adapter_id.clone(),
+                    ..Channel::default()
+                }));
+                try!(adapt.add_channel(Channel {
+                    feature: Id::new("x-test/x-binary"),
+                    supports_send: Some(Signature::accepts(Maybe::Required(format::JSON.clone()))),
+                    id: Id::new("setter:json@link.mozilla.org"),
                     service: service_id.clone(),
                     adapter: adapter_id.clone(),
                     ..Channel::default()
@@ -546,7 +565,7 @@ describe! binary_getter {
         let result = response::extract_body_to_bytes(response);
         assert_eq!(result, vec![1, 2, 3, 10, 11, 12]);
 
-// Send some data to the binary setter.
+// Send some binary data to the binary setter.
         let mut headers = Headers::new();
         headers.set(ContentType::png());
 
@@ -558,5 +577,18 @@ describe! binary_getter {
         assert_eq!(response.status, Some(Status::Ok));
         let result = response::extract_body_to_string(response);
         assert_eq!(result, r#"{"setter:binary@link.mozilla.org":null}"#.to_owned());
+
+// Send some json data to the binary setter.
+        let mut headers = Headers::new();
+        headers.set(ContentType::json());
+
+        let response = request::put("http://localhost:3000/api/v1/channel/setter:json@link.mozilla.org",
+                                    headers,
+                                    r#"{ "json_body": true }"#,
+                                    &mount).unwrap();
+
+        assert_eq!(response.status, Some(Status::Ok));
+        let result = response::extract_body_to_string(response);
+        assert_eq!(result, r#"{"setter:json@link.mozilla.org":null}"#.to_owned());
     }
 }
