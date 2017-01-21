@@ -4,72 +4,80 @@ version = "0.1.0"
 authors = ["fabrice <fabrice@desre.org>"]
 build = "build.rs"
 # Files that shouldn't retrigger a new rust build if they are changed
-exclude = [ "**/*.conf",
+exclude = [ "**/*.conf", "**/*.json",
             "node_modules/**/*", "test/**/*", "tools/**/*", "*.sh", # Non-rust scripts
             "**/*.log", "**/*.sqlite", # Application generated data
             "**/*.md", "**/*.yml"      # e.g.: READMEs, Travis
           ]
 
-[features]
-default = ["authentication"]
-authentication = []
+[workspace]
+# We get the workspace's crates from the `path` definitions.
 
-[replace]
-"iron:0.3.0" = { path = "iron-fork/" }
+[features]
+default = ["authentication", "zwave", "philips_hue", "thinkerbell", "ip_camera", "webpush"]
+authentication = []
+zwave = ["openzwave-adapter"]
+philips_hue = []
+thinkerbell = ["foxbox_thinkerbell"]
+ip_camera = []
+webpush = []
 
 [build-dependencies]
 pkg-config = "0.3"
+rustc_version = "0.1.7"
 
 [dependencies]
-foxbox_thinkerbell = { path = "components/thinkerbell/" }
-openzwave-adapter = { path = "components/openzwave-adapter/" }
+foxbox_core = { path = "components/core/" }
+foxbox_thinkerbell = { path = "components/thinkerbell/", optional = true }
 foxbox_taxonomy = { path = "components/taxonomy/" }
+openzwave-adapter = { path = "components/openzwave-adapter/", optional = true }
 tls = { path = "components/tls/" }
 
-foxbox_users = { git = "https://github.com/fxbox/users.git", rev = "1033e08" }
-multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "a6e4bcc" }
-iron-cors = { git = "https://github.com/fxbox/iron-cors.git", rev = "96ede73" }
+foxbox_users = { git = "https://github.com/fxbox/users.git" }
+iron-cors = { git = "https://github.com/fxbox/iron-cors.git" }
+multicast_dns = { git = "https://github.com/fxbox/multicast-dns.git", rev = "91fe8d4" }
 
 chrono = "0.2.19"
-clippy = "0.0.63"
+clippy = "0.0"
 docopt = "0.6.78"
 docopt_macros = "0.6.80"
 env_logger = "0.3.2"
-get_if_addrs = "0.3.1"
-hyper = "0.8.1"
+get_if_addrs = { git = "https://github.com/maidsafe-archive/get_if_addrs" }
+hyper = "0.9"
+lazy_static = "^0.2"
 libc = "0.2.7"
 log = "0.3"
-mio = { git = "https://github.com/carllerche/mio.git" }
-mount = "0.1.0"
-nix = { git = "https://github.com/nix-rust/nix.git", rev = "138080" } # Until 0.5.1 is released
+mio = "0.6"
+mount = "0.2"
+nix = "0.7"
 openssl = "0.7.6"
 openssl-sys = "0.7.6"
+pagekite = { git = "https://github.com/fabricedesre/pagekite-rs.git" }
 rand = "0.3"
-router = "0.1.0"
+router = "0.4"
 rust-crypto = "0.2.34"
 rustc-serialize = "0.3"
-rusqlite = "0.6.0"
-serde = "0.7.0"
-serde_json = "0.7.0"
-serde_macros = "0.7.2"
-staticfile = "0.2.0"
+rusqlite = "0.7"
+serde = "0.8"
+serde_json = "0.8"
+serde_derive = "0.8"
+staticfile = "0.3"
 transformable_channels = "^0.1"
 unicase = "1.3.0"
 time = "0.1"
 timer = "0.1.6"
-uuid = "0.1.18"
-url = "0.5.7"
-ws = { git = "https://github.com/JohanLorenzo/ws-rs.git" , branch = "0.4.6" }
-xml-rs = "0.3.0"
+url = "1.2"
+ws = { version = "0.5", features = ["ssl"] }
 
 [dependencies.iron]
-version = "0.3.0"
+version = "0.4"
 default-features = true
 features = ["ssl"]
 
 [dev-dependencies]
 stainless = "0.1.4"
-iron-test = "0.3.0"
+iron-test = "0.4"
 regex = "0.1.55"
 rand = "0.3.14"
 tempdir = "0.3.4"
+uuid = { version = "0.3", features = ["v4"] }

@@ -11,12 +11,12 @@ module.exports = {
 
   credential :  {
     'email': 'a@b.com',
-    'username': 'admin',
+    'name': 'admin',
     'password': '87654321'
   },
 
   pagekite : {
-    'r' : 'http://knilxof.org:4242',
+    'r' : 'https://knilxof.org:4443',
     't' : 'knilxof.org:443',
     's' : 'foxbox',
   },

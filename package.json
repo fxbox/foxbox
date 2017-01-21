@@ -6,7 +6,7 @@
     "node": ">=4.0.0"
   },
   "scripts": {
-    "test-selenium": "./tools/execute-selenium-tests",
+    "test-selenium": "./tools/execute-selenium-tests.sh",
     "test-integration": "npm run clean && ./node_modules/.bin/mocha test/integration/test/*.js && ./node_modules/.bin/mocha test/integration/test/no_travis/*.js",
     "test-integration-travis": "npm run clean && ./node_modules/.bin/mocha test/integration/test/*.js",
     "clean": "npm run clean_db && npm run clean_picture",
@@ -24,26 +24,25 @@
   },
   "homepage": "https://github.com/fxbox/foxbox",
   "devDependencies": {
-    "jshint": "2.9.1",
-    "mocha": "2.4.5",
-    "selenium-webdriver": "2.53.1",
-    "chai": "^3.5.0",
     "body-parser": "^1.15.0",
+    "callsite": "^1.0.0",
+    "chai": "^3.5.0",
+    "chakram": "^1.2.2",
+    "config-js": "^1.1.9",
+    "express": "^4.13.4",
+    "find": "^0.2.4",
+    "http_ece": "^0.5.0",
+    "iso-date": "^1.0.0",
+    "jshint": "2.9.1",
+    "media-typer": "^0.3.0",
+    "mocha": "2.4.5",
+    "node-ssdp": "^2.7.0",
+    "path": "^0.12.7",
+    "raw-body": "^2.1.6",
+    "selenium-webdriver": "https://github.com/JohanLorenzo/selenium/releases/download/2.54.0-dev/selenium-webdriver-2.54.0-dev.tgz",
     "should": "^8.2.2",
     "socket.io": "^1.4.5",
     "supertest": "^1.2.0",
-    "node-ssdp": "^2.7.0",
-    "chakram": "^1.2.2",
-    "path": "^0.12.7",
-    "config-js": "^1.1.9",
-    "express": "^4.13.4",
-    "iso-date": "^1.0.0",
-    "http_ece": "^0.5.0",
-    "media-typer": "^0.3.0",
-    "raw-body": "^2.1.6",
     "urlsafe-base64": "^1.0.0"
-  },
-  "dependencies": {
-    
   }
 }

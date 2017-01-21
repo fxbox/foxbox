@@ -4,6 +4,8 @@
 //! objects. Rather, they will use module `parse` to parse a script
 //! and module `run` to execute it.
 
+use foxbox_taxonomy::channel::*;
+use foxbox_taxonomy::io::*;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
 use foxbox_taxonomy::values::*;
@@ -12,7 +14,9 @@ use std::marker::PhantomData;
 
 /// A thinkerbell scrip"t.
 #[derive(Debug)]
-pub struct Script<Ctx> where Ctx: Context {
+pub struct Script<Ctx>
+    where Ctx: Context
+{
     pub name: String,
 
     /// A set of rules, stating what must be done in which circumstance.
@@ -25,13 +29,13 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
     fn description() -> String {
         "Script".to_owned()
     }
-    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
-        let name =  try!(path.push("name", |path| String::take(path, source, "name")));
+    fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
+        let name = try!(path.push("name", |path| String::take(path, source, "name")));
         let rules = try!(path.push("rules", |path| Rule::take_vec(path, source, "rules")));
         Ok(Script {
             name: name,
             rules: rules,
-            phantom: PhantomData
+            phantom: PhantomData,
         })
     }
 }
@@ -59,14 +63,14 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
 /// let source = r#"{
 ///   "conditions": [{
 ///     "source": [{"id": "my getter"}],
-///     "kind": "OvenTemperature",
-///     "range": {"Geq": {"Temperature": {"C": 300}}},
+///     "feature": "oven/temperature-c",
+///     "when": {"Geq": {"Temperature": {"C": 300}}},
 ///     "duration": 3600
 ///   }],
 ///   "execute": [{
 ///     "destination": [{"id": "my setter"}],
-///     "value": {"OnOff": "Off"},
-///     "kind": "LightOn"
+///     "value": "Off",
+///     "feature": "light/is-on"
 ///   }]
 /// }"#;
 ///
@@ -74,7 +78,9 @@ impl Parser<Script<UncheckedCtx>> for Script<UncheckedCtx> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Rule<Ctx> where Ctx: Context {
+pub struct Rule<Ctx>
+    where Ctx: Context
+{
     /// The condition in which to execute the trigger. The condition
     /// is matched once *all* the `Match` branches are true. Whenever
     /// `conditions` was false and becomes true, we execute `execute`.
@@ -90,13 +96,11 @@ impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
         "Rule".to_owned()
     }
 
-    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+    fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
         let conditions = try!(path.push("conditions",
-            |path| Match::take_vec(path, source, "conditions"))
-        );
+                                        |path| Match::take_vec(path, source, "conditions")));
         let execute = try!(path.push("execute",
-            |path| Statement::take_vec(path, source, "execute"))
-        );
+                                     |path| Statement::take_vec(path, source, "execute")));
         Ok(Rule {
             conditions: conditions,
             execute: execute,
@@ -117,10 +121,10 @@ impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
 ///
 /// A match is represented as an object with the following fields:
 ///
-/// - source (array of GetterSelector) - the selector for getters that will
+/// - source (array of ChannelSelector) - the selector for getters that will
 ///   provide the data;
-/// - kind (ChannelKind) - the kind of getters;
-/// - range (Range) - the condition in whih the match is considered met –
+/// - feature (string) - the kind of channels;
+/// - condition (JSON) - the condition in whih the match is considered met –
 ///   a match becomes met when any of the sources *enters* the range;
 /// - duration (Duration, optional) - if provided, the match is only considered
 ///   met if any of the sources *enters* and *remains* in the range
@@ -137,32 +141,34 @@ impl Parser<Rule<UncheckedCtx>> for Rule<UncheckedCtx> {
 /// # fn main() {
 /// let source = r#"{
 ///   "source": [{"id": "my getter"}],
-///   "kind": "OvenTemperature",
-///   "range": {"Geq": {"Temperature": {"C": 300}}},
+///   "feature": "oven/temperature-c",
+///   "when": {"Geq": {"Temperature": {"C": 300}}},
 ///   "duration": 3600
 /// }"#;
 ///
 /// let match_ = Match::<UncheckedCtx>::from_str(&source).unwrap();
-/// assert_eq!(match_.kind, ChannelKind::OvenTemperature);
+/// assert_eq!(match_.feature, Id::new("oven/temperature-c"));
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Match<Ctx> where Ctx: Context {
+pub struct Match<Ctx>
+    where Ctx: Context
+{
     /// The set of getters to watch. Note that the set of getters may
     /// change (e.g. when devices are added/removed) without rebooting
     /// the script.
-    pub source: Vec<GetterSelector>,
+    pub source: Vec<ChannelSelector>,
 
     /// The kind of channel expected from `source`, e.g. "the current
     /// time of day", "is the door opened?", etc. During compilation,
     /// we make sure that we restrict to the elements of `source` that
-    /// offer `kind`.
-    pub kind: ChannelKind,
+    /// offer `feature`.
+    pub feature: Id<FeatureId>,
 
-    /// The range of values for which the condition is considered met.
-    /// During compilation, we check that the type of `range` is
-    /// compatible with that of `getter`.
-    pub range: Range,
+    /// The condition in which this match becomes valid. For instance,
+    /// it may represent `OnOff::On` to trigger the `Statement` when some
+    /// device is set to `On`.
+    pub when: Payload,
 
     /// If specified, the values must remain in the `range` for at least
     /// `duration` before the match is considered valid. This is useful
@@ -177,27 +183,21 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
         "Match".to_owned()
     }
 
-    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+    fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
         let sources = try!(path.push("source",
-            |path| GetterSelector::take_vec(path, source, "source"))
-        );
-        let kind = try!(path.push("kind",
-            |path| ChannelKind::take(path, source, "kind"))
-        );
-        let range = try!(path.push("range",
-            |path| Range::take(path, source, "range"))
-        );
-        let duration = match path.push("range",
-            |path| Duration::take(path, source, "duration"))
-        {
-            Err(ParseError::MissingField {..}) => None,
-            Err(err) => return Err(err),
-            Ok(ok) => Some(ok)
-        };
+                                     |path| ChannelSelector::take_vec(path, source, "source")));
+        let feature = try!(path.push("feature", |path| Id::take(path, source, "feature")));
+        let when = try!(path.push("when", |path| Payload::take(path, source, "when")));
+        let duration =
+            match path.push("duration", |path| Duration::take(path, source, "duration")) {
+                Err(ParseError::MissingField { .. }) => None,
+                Err(err) => return Err(err),
+                Ok(ok) => Some(ok),
+            };
         Ok(Match {
             source: sources,
-            kind: kind,
-            range: range,
+            feature: feature,
+            when: when,
             duration: duration,
             phantom: PhantomData,
         })
@@ -209,15 +209,16 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
 /// # JSON
 ///
 /// A statement is represented as an object with the following fields:
-/// - destination (array of SetterSelector);
+/// - destination (array of ChannelSelector);
 /// - value (Value);
-/// - kind (ChannelKind);
+/// - feature (Id<FeatureId>);
 ///
 /// ```
 /// extern crate foxbox_thinkerbell;
 /// extern crate foxbox_taxonomy;
 ///
 /// use foxbox_thinkerbell::ast::*;
+/// use foxbox_taxonomy::io::*;
 /// use foxbox_taxonomy::values::*;
 /// use foxbox_taxonomy::services::*;
 /// use foxbox_taxonomy::parse::*;
@@ -225,32 +226,34 @@ impl Parser<Match<UncheckedCtx>> for Match<UncheckedCtx> {
 /// # fn main() {
 /// let source = r#"{
 ///   "destination": [{"id": "my setter"}],
-///   "value": {"OnOff": "Off"},
-///   "kind": "LightOn"
+///   "value": "Off",
+///   "feature": "light/is-on"
 /// }"#;
 ///
 /// let statement = Statement::<UncheckedCtx>::from_str(&source).unwrap();
-/// assert_eq!(statement.value, Value::OnOff(OnOff::Off));
-/// assert_eq!(statement.kind, ChannelKind::LightOn);
+/// assert_eq!(statement.value, Payload::from_data(OnOff::Off, &*format::ON_OFF).unwrap());
+/// assert_eq!(statement.feature, Id::new("light/is-on"));
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Statement<Ctx> where Ctx: Context {
+pub struct Statement<Ctx>
+    where Ctx: Context
+{
     /// The set of setters to which to send a command. Note that the
     /// set of setters may change (e.g. when devices are
     /// added/removed) without rebooting the script.
-    pub destination: Vec<SetterSelector>,
+    pub destination: Vec<ChannelSelector>,
 
     /// Data to send to the resource. During compilation, we check
     /// that the type of `value` is compatible with that of
     /// `destination`.
-    pub value: Value,
+    pub value: Payload,
 
     /// The kind of channel expected from `destination`, e.g. "close
     /// the door", "set the temperature", etc. During compilation, we
     /// make sure that we restrict to the elements of `destination` that
-    /// offer `kind`.
-    pub kind: ChannelKind,
+    /// offer `feature`.
+    pub feature: Id<FeatureId>,
 
     pub phantom: PhantomData<Ctx>,
 }
@@ -259,20 +262,16 @@ impl Parser<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
         "Parser".to_owned()
     }
 
-    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
-        let destination = try!(path.push("destination",
-            |path| SetterSelector::take_vec(path, source, "destination"))
-        );
-        let kind = try!(path.push("kind",
-            |path| ChannelKind::take(path, source, "kind"))
-        );
-        let value = try!(path.push("value",
-            |path| Value::take(path, source, "value"))
-        );
+    fn parse(path: Path, source: &JSON) -> Result<Self, ParseError> {
+        let destination = try!(path.push("destination", |path| {
+            ChannelSelector::take_vec(path, source, "destination")
+        }));
+        let feature = try!(path.push("feature", |path| Id::take(path, source, "feature")));
+        let value = try!(path.push("value", |path| Payload::take(path, source, "value")));
         Ok(Statement {
             destination: destination,
             value: value,
-            kind: kind,
+            feature: feature,
             phantom: PhantomData,
         })
     }
@@ -287,13 +286,10 @@ impl Parser<Statement<UncheckedCtx>> for Statement<UncheckedCtx> {
 /// been compiled/checked yet and must not be executed;
 /// - `compile::CompiledCtx`, designed to mark the fact that a script
 /// has been compiled and can be executed.
-pub trait Context {
-}
+pub trait Context {}
 
 /// A Context used to represent a script that hasn't been compiled
 /// yet.
 #[derive(Debug)]
 pub struct UncheckedCtx;
-impl Context for UncheckedCtx {
-}
-
+impl Context for UncheckedCtx {}

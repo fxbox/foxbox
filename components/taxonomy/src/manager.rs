@@ -6,17 +6,18 @@
 
 pub use adapter::*;
 use api;
-use api::{ API, Error, TargetMap, User };
+use api::{API, Error, TargetMap, User};
 use backend::*;
+use channel::Channel;
+use io::*;
 use selector::*;
 use services::*;
 use util::is_sync;
-use values::{ Range, TypeError, Value };
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{ Arc, Mutex, Weak };
-use std::sync::atomic::{ AtomicBool, Ordering };
+use std::sync::{Arc, Mutex, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use sublock::atomlock::*;
@@ -127,13 +128,13 @@ impl AdapterManagerHandle for AdapterManager {
     /// Returns an error if the adapter is not registered, the parent service is not
     /// registered, or a channel with the same identifier is already registered.
     /// In either cases, this method reverts all its changes.
-    fn add_getter(&self, getter: Channel<Getter>) -> Result<(), Error> {
+    fn add_channel(&self, getter: Channel) -> Result<(), Error> {
         let request = {
             // Acquire and release lock asap.
-            try!(self.back_end.write().unwrap().add_getter(getter))
+            try!(self.back_end.write().unwrap().add_channel(getter))
         };
         if !request.is_empty() {
-            debug!(target: "Taxonomy-manager", "manager.add_getter => need to register watches");
+            debug!(target: "Taxonomy-manager", "manager.add_channel => need to register watches");
         }
         self.register_watches(request);
         Ok(())
@@ -147,37 +148,8 @@ impl AdapterManagerHandle for AdapterManager {
     /// This method returns an error if the setter is not registered or if the service
     /// is not registered. In either case, it attemps to clean as much as possible, even
     /// if the state is inconsistent.
-    fn remove_getter(&self, id: &Id<Getter>) -> Result<(), Error> {
-        self.back_end.write().unwrap().remove_getter(id)
-    }
-
-    /// Add a setter to the system. Typically, this is called by the adapter when a new
-    /// service has been detected/configured. Some services may gain/lose setters at
-    /// runtime depending on their configuration.
-    ///
-    /// # Requirements
-    ///
-    /// The adapter is in charge of making sure that identifiers persist across reboots.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the adapter is not registered, the parent service is not
-    /// registered, or a channel with the same identifier is already registered.
-    /// In either cases, this method reverts all its changes.
-    fn add_setter(&self, setter: Channel<Setter>) -> Result<(), Error> {
-        self.back_end.write().unwrap().add_setter(setter)
-    }
-
-    /// Remove a setter previously registered on the system. Typically, called by
-    /// an adapter when a service is reconfigured to remove one of its setters.
-    ///
-    /// # Error
-    ///
-    /// This method returns an error if the setter is not registered or if the service
-    /// is not registered. In either case, it attemps to clean as much as possible, even
-    /// if the state is inconsistent.
-    fn remove_setter(&self, id: &Id<Setter>) -> Result<(), Error> {
-        self.back_end.write().unwrap().remove_setter(id)
+    fn remove_channel(&self, id: &Id<Channel>) -> Result<(), Error> {
+        self.back_end.write().unwrap().remove_channel(id)
     }
 }
 
@@ -228,11 +200,8 @@ impl API for AdapterManager {
     }
 
     /// Get a list of channels matching some conditions
-    fn get_getter_channels(&self, selectors: Vec<GetterSelector>) -> Vec<Channel<Getter>> {
-        self.back_end.read().unwrap().get_getter_channels(selectors)
-    }
-    fn get_setter_channels(&self, selectors: Vec<SetterSelector>) -> Vec<Channel<Setter>> {
-        self.back_end.read().unwrap().get_setter_channels(selectors)
+    fn get_channels(&self, selectors: Vec<ChannelSelector>) -> Vec<Channel> {
+        self.back_end.read().unwrap().get_channels(selectors)
     }
 
     /// Label a set of channels with a set of tags.
@@ -248,19 +217,16 @@ impl API for AdapterManager {
     ///
     /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
-    fn add_getter_tags(&self, selectors: Vec<GetterSelector>, tags: Vec<Id<TagId>>) -> usize {
+    fn add_channel_tags(&self, selectors: Vec<ChannelSelector>, tags: Vec<Id<TagId>>) -> usize {
         let (request, result) = {
             // Acquire and release the write lock.
-            self.back_end.write().unwrap().add_getter_tags(selectors, tags)
+            self.back_end.write().unwrap().add_channel_tags(selectors, tags)
         };
         if !request.is_empty() {
             debug!(target: "Taxonomy-manager", "manager.add_getter_tags => need to register watches");
         }
         self.register_watches(request);
         result
-    }
-    fn add_setter_tags(&self, selectors: Vec<SetterSelector>, tags: Vec<Id<TagId>>) -> usize {
-        self.back_end.write().unwrap().add_setter_tags(selectors, tags)
     }
 
     /// Remove a set of tags from a set of channels.
@@ -276,17 +242,15 @@ impl API for AdapterManager {
     ///
     /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
-    fn remove_getter_tags(&self, selectors: Vec<GetterSelector>, tags: Vec<Id<TagId>>) -> usize {
-        self.back_end.write().unwrap().remove_getter_tags(selectors, tags)
-    }
-    fn remove_setter_tags(&self, selectors: Vec<SetterSelector>, tags: Vec<Id<TagId>>) -> usize {
-        self.back_end.write().unwrap().remove_setter_tags(selectors, tags)
+    fn remove_channel_tags(&self, selectors: Vec<ChannelSelector>, tags: Vec<Id<TagId>>) -> usize {
+        self.back_end.write().unwrap().remove_channel_tags(selectors, tags)
     }
 
     /// Read the latest value from a set of channels
-    fn fetch_values(&self, selectors: Vec<GetterSelector>, user: User) ->
-        ResultMap<Id<Getter>, Option<Value>, Error>
-    {
+    fn fetch_values(&self,
+                    selectors: Vec<ChannelSelector>,
+                    user: User)
+                    -> OpResult<(Payload, Arc<Format>)> {
         // First, prepare the request.
         let mut request;
         {
@@ -295,37 +259,20 @@ impl API for AdapterManager {
         }
         // Now fetch the values
         let mut results = HashMap::new();
-        for (_, (adapter, mut getters)) in request.drain() {
-            let (getters, mut types) : (Vec<_>, Vec<_>) = getters.drain().unzip();
-            let mut got = adapter
-                .fetch_values(getters, user.clone());
+        for (_, (adapter, mut channels)) in request.drain() {
+            let channels = channels.drain().collect();
+            let got = adapter.fetch_values(channels, user.clone());
 
-            let checked = got.drain()
-                .zip(types.drain(..))
-                .map(|(result, typ)| {
-                    if let (id, Ok(Some(value))) = result {
-                        if value.get_type() == typ {
-                            (id, Ok(Some(value)))
-                        } else {
-                            (id, Err(Error::TypeError(TypeError {
-                                expected: typ,
-                                got: value.get_type()
-                            })))
-                        }
-                    } else {
-                        result
-                    }
-                });
-
-            results.extend(checked);
+            results.extend(got);
         }
         results
     }
 
     /// Send a bunch of values to a set of channels
-    fn send_values(&self, keyvalues: TargetMap<SetterSelector, Value>, user: User) ->
-        ResultMap<Id<Setter>, (), Error>
-    {
+    fn send_values(&self,
+                   keyvalues: TargetMap<ChannelSelector, Payload>,
+                   user: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
         // First, prepare the request.
         let mut prepared;
         {
@@ -335,23 +282,23 @@ impl API for AdapterManager {
 
         // Dispatch to adapter
         let mut results = HashMap::new();
-        for (_, (adapter, (request, failures))) in prepared.drain() {
+        for (_, (adapter, request)) in prepared.drain() {
             let got = adapter.send_values(request, user.clone());
             results.extend(got);
-            results.extend(failures);
         }
 
         results
     }
 
     /// Watch for any change
-    fn watch_values(&self, watch: TargetMap<GetterSelector, Exactly<Range>>,
-        on_event: Box<ExtSender<api::WatchEvent>>) -> Self::WatchGuard
-    {
-        let (request, watch_key, is_dropped) =
-        {
+    fn watch_values(&self,
+                    watch: TargetMap<ChannelSelector, Exactly<Payload>>,
+                    on_event: Box<ExtSender<api::WatchEvent>>)
+                    -> Self::WatchGuard {
+        let (request, watch_key, is_dropped) = {
             // Acquire and release write lock.
-            self.back_end.write()
+            self.back_end
+                .write()
                 .unwrap()
                 .prepare_channel_watch(watch, on_event)
         };
@@ -360,7 +307,9 @@ impl API for AdapterManager {
             debug!(target: "Taxonomy-manager", "manager.watch_values => need to register watches");
         }
         self.register_watches(request);
-        WatchGuard::new(self.tx_watch.lock().unwrap().internal_clone(), watch_key, is_dropped)
+        WatchGuard::new(self.tx_watch.lock().unwrap().internal_clone(),
+                        watch_key,
+                        is_dropped)
     }
 
     /// A value that causes a disconnection once it is dropped.
@@ -377,7 +326,7 @@ enum WatchOp {
     Start(WatchRequest, RawSender<()>),
 
     /// Release a watch, after the corresponding WatchGuard has been dropped.
-    Release(WatchKey)
+    Release(WatchKey),
 }
 
 impl AdapterManager {
@@ -399,7 +348,7 @@ impl AdapterManager {
             for msg in rx {
                 match state.upgrade() {
                     None => return, // The manager has been dropped.
-                    Some(backend) =>
+                    Some(backend) => {
                         match msg {
                             WatchOp::Start(request, tx) => {
                                 let add = State::start_watch(request);
@@ -410,6 +359,7 @@ impl AdapterManager {
                                 backend.write().unwrap().stop_watch(request)
                             }
                         }
+                    }
                 }
             }
         });
@@ -431,12 +381,11 @@ pub struct WatchGuard {
     is_dropped: Arc<AtomicBool>,
 }
 impl WatchGuard {
-    fn new(tx_owner: Box<ExtSender<WatchOp>>, key: WatchKey, is_dropped: Arc<AtomicBool>) -> Self
-    {
+    fn new(tx_owner: Box<ExtSender<WatchOp>>, key: WatchKey, is_dropped: Arc<AtomicBool>) -> Self {
         WatchGuard {
             tx_owner: tx_owner,
             key: key,
-            is_dropped: is_dropped
+            is_dropped: is_dropped,
         }
     }
 }

@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #![feature(plugin)]
 
@@ -10,7 +10,7 @@
 
 extern crate tls;
 
-use std::env::{ args, var };
+use std::env::{args, var};
 use std::path::PathBuf;
 
 use tls::*;
@@ -49,15 +49,18 @@ fn main() {
     println!("Using certificate directory: {:?}", certificate_directory);
     println!("Using DNS api endpoint: {:?}", dns_api);
 
-    let certificate_manager = CertificateManager::new(PathBuf::from(&certificate_directory), Box::new(SniSslContextProvider::new()));
+    let certificate_manager = CertificateManager::new(PathBuf::from(&certificate_directory),
+                                                      "knilxof.org", /* This is fine to hardcode here since we only get the local certificate. */
+                                                      Box::new(SniSslContextProvider::new()));
 
     let box_cert = certificate_manager.get_box_certificate().unwrap();
     println!("Registering DNS record");
-    register_dns_record(box_cert, &DnsRecord {
-            record_type: "TXT",
-            name: &format!("_acme-challenge.{}", hostname.unwrap()),
-            value: &challenge_value.unwrap()
-        },
-        &dns_api
-    ).unwrap();
+    register_dns_record(box_cert,
+                        &DnsRecord {
+                            record_type: "TXT",
+                            name: &format!("_acme-challenge.{}", hostname.unwrap()),
+                            value: &challenge_value.unwrap(),
+                        },
+                        &dns_api)
+        .unwrap();
 }

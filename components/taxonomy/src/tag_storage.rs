@@ -1,14 +1,14 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-///! This is the database that holds tags associated to various objects.
-///! It provides an api to manage Id <-> tags relationships.
-///! All users share the same tags for objects.
+/// ! This is the database that holds tags associated to various objects.
+/// ! It provides an api to manage Id <-> tags relationships.
+/// ! All users share the same tags for objects.
 
-use rusqlite::{ Connection, Result };
+use rusqlite::{Connection, Result};
 use std::path::PathBuf;
-use util::{ Id, TagId };
+use util::{Id, TagId};
 
 fn escape<T>(string: &Id<T>) -> String {
     // http://www.sqlite.org/faq.html#q14
@@ -18,9 +18,10 @@ fn escape<T>(string: &Id<T>) -> String {
 /// Creates a unique key for a (id, tag) tuple.
 /// `SQlite` integers are i64 so we turn the hashed u64 into a String...
 fn create_key<T>(id: &Id<T>, tag: &Id<TagId>) -> String {
-    use std::hash::{ Hash, Hasher, SipHasher };
+    use std::hash::{Hash, Hasher};
+    use std::collections::hash_map::DefaultHasher;
 
-    let mut hasher = SipHasher::new();
+    let mut hasher = DefaultHasher::new();
     id.hash(&mut hasher);
     tag.hash(&mut hasher);
     format!("{}", hasher.finish())
@@ -37,7 +38,7 @@ impl TagStorage {
     pub fn new(path: &PathBuf) -> Self {
         TagStorage {
             db: None,
-            path: path.clone()
+            path: path.clone(),
         }
     }
 
@@ -54,10 +55,14 @@ impl TagStorage {
         });
 
         db.execute("CREATE TABLE IF NOT EXISTS tags (
-                    key    TEXT NOT NULL PRIMARY KEY,
+                    key    TEXT NOT NULL \
+                      PRIMARY KEY,
                     id     TEXT NOT NULL,
-                    tag    TEXT NOT NULL
-            )", &[]).unwrap_or_else(|err| {
+                    \
+                      tag    TEXT NOT NULL
+            )",
+                     &[])
+            .unwrap_or_else(|err| {
                 panic!("Unable to create taxonomy tags database: {}", err);
             });
 
@@ -68,13 +73,16 @@ impl TagStorage {
     #[allow(dead_code)]
     fn dump(&mut self, msg: &str) {
         let mut stmt = self.db.as_ref().unwrap().prepare("SELECT * FROM tags").unwrap();
-        let rows = stmt.query(&[]).unwrap();
+        let mut rows = stmt.query(&[]).unwrap();
         println!("+-----------------------------------------------------------------------------");
         println!("| {}", msg);
         println!("+-----------------------------------------------------------------------------");
-        for result_row in rows {
+        while let Some(result_row) = rows.next() {
             let row = result_row.unwrap();
-            println!("| {} {} {}", row.get::<String>(0), row.get::<String>(1), row.get::<String>(2));
+            println!("| {} {} {}",
+                     row.get::<i32, String>(0),
+                     row.get::<i32, String>(1),
+                     row.get::<i32, String>(2));
         }
         println!("+-----------------------------------------------------------------------------");
     }
@@ -82,7 +90,9 @@ impl TagStorage {
     pub fn add_tag<T>(&mut self, id: &Id<T>, tag: &Id<TagId>) -> Result<()> {
         self.ensure_db();
         try!(self.db.as_ref().unwrap().execute("INSERT OR IGNORE INTO tags VALUES ($1, $2, $3)",
-                        &[&create_key(id, tag), &escape(&id), &escape(&tag)]));
+                                               &[&create_key(id, tag),
+                                                 &escape(&id),
+                                                 &escape(&tag)]));
         Ok(())
     }
 
@@ -90,13 +100,16 @@ impl TagStorage {
         for tag in tags {
             try!(self.add_tag(id, tag));
         }
-        //self.dump("add_tags");
+        // self.dump("add_tags");
         Ok(())
     }
 
     pub fn remove_tag<T>(&mut self, id: &Id<T>, tag: &Id<TagId>) -> Result<()> {
         self.ensure_db();
-        try!(self.db.as_ref().unwrap().execute("DELETE FROM tags WHERE key=$1", &[&create_key(id, tag)]));
+        try!(self.db
+            .as_ref()
+            .unwrap()
+            .execute("DELETE FROM tags WHERE key=$1", &[&create_key(id, tag)]));
         Ok(())
     }
 
@@ -117,10 +130,9 @@ impl TagStorage {
         self.ensure_db();
         let mut subs = Vec::new();
         let mut stmt = try!(self.db.as_ref().unwrap().prepare("SELECT tag FROM tags WHERE id=$1"));
-        let rows = try!(stmt.query(&[&escape(&id)]));
-        let (count, _) = rows.size_hint();
-        subs.reserve_exact(count);
-        for result_row in rows {
+        let mut rows = try!(stmt.query(&[&escape(&id)]));
+
+        while let Some(result_row) = rows.next() {
             let row = try!(result_row);
             let s: String = row.get(0);
             subs.push(Id::<TagId>::new(&s));
@@ -134,7 +146,9 @@ pub fn get_db_environment() -> PathBuf {
     use libc::getpid;
     use std::thread;
     let tid = format!("{:?}", thread::current()).replace("(", "+").replace(")", "+");
-    let s = format!("./tagstore_db_test-{}-{}.sqlite", unsafe { getpid() }, tid.replace("/", "42"));
+    let s = format!("./tagstore_db_test-{}-{}.sqlite",
+                    unsafe { getpid() },
+                    tid.replace("/", "42"));
     PathBuf::from(s)
 }
 
@@ -145,7 +159,7 @@ pub fn remove_test_db() {
     let dbfile = get_db_environment();
     match fs::remove_file(dbfile.clone()) {
         Err(e) => panic!("Error {} cleaning up {}", e, dbfile.display()),
-        _ => assert!(true)
+        _ => assert!(true),
     }
 }
 
@@ -173,7 +187,7 @@ fn storage_test() {
             remove_test_db();
         }
     }
-    let auto_db = AutoDeleteDb { };
+    let auto_db = AutoDeleteDb {};
 
     let mut store = TagStorage::new(&get_db_environment());
 

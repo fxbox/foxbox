@@ -1,23 +1,23 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 // Needed to derive `Serialize` on ServiceProperties
 #![feature(custom_derive, plugin)]
-#![plugin(serde_macros)]
 // For Docopt macro
 #![plugin(docopt_macros)]
 
 // Make linter fail for every warning
 #![plugin(clippy)]
+
 #![deny(clippy)]
+// Clippy tries hard to be clever but sometimes fails.
+#![warn(useless_let_if_seq)]
 // Needed for many #[derive(...)] macros
 #![allow(used_underscore_binding)]
 
 #![cfg_attr(test, feature(const_fn))] // Dependency of stainless
 #![cfg_attr(test, plugin(stainless))] // Test runner
-
-#![feature(reflect_marker)]
 
 #![feature(associated_consts)]
 
@@ -26,7 +26,10 @@ extern crate core;
 extern crate docopt;
 extern crate env_logger;
 #[macro_use]
+extern crate foxbox_core;
+#[macro_use]
 extern crate foxbox_taxonomy;
+#[cfg(feature = "thinkerbell")]
 extern crate foxbox_thinkerbell;
 extern crate foxbox_users;
 #[macro_use]
@@ -36,6 +39,8 @@ extern crate iron;
 extern crate iron_cors;
 #[cfg(test)]
 extern crate iron_test;
+#[macro_use]
+extern crate lazy_static;
 extern crate libc;
 #[macro_use]
 extern crate log;
@@ -44,11 +49,14 @@ extern crate mount;
 extern crate nix;
 extern crate openssl;
 extern crate openssl_sys;
+extern crate pagekite;
 extern crate rand;
 extern crate router;
 extern crate rustc_serialize;
 extern crate rusqlite;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
 extern crate staticfile;
 extern crate tls;
@@ -57,33 +65,26 @@ extern crate timer;
 extern crate transformable_channels;
 extern crate unicase;
 extern crate url;
-extern crate uuid;
 extern crate ws;
 extern crate multicast_dns;
-extern crate xml;
 
 // adapters
+#[cfg(feature = "zwave")]
 extern crate openzwave_adapter as openzwave;
 
 #[cfg(test)]
 extern crate regex;
 #[cfg(test)]
 extern crate tempdir;
+#[cfg(test)]
+extern crate uuid;
 
-// Need to be declared first so to let the macros be visible from other modules.
-#[macro_use]
-mod utils;
 mod adapters;
-mod config_store;
 mod controller;
 mod http_server;
-mod managed_process;
-mod profile_service;
 mod registration;
-mod upnp;
 mod static_router;
 mod taxonomy_router;
-mod traits;
 mod tunnel_controller;
 mod ws_server;
 
@@ -97,16 +98,18 @@ mod stubs {
 
 use controller::FoxBox;
 use env_logger::LogBuilder;
-use tunnel_controller:: { TunnelConfig, Tunnel };
-use libc::{ sighandler_t, SIGINT };
-use log::{ LogRecord, LogLevelFilter };
+use tunnel_controller::{TunnelConfig, Tunnel};
+use libc::{sighandler_t, SIGINT};
+use log::{LogRecord, LogLevelFilter};
 
+use multicast_dns::errors::Error as HostManagerError;
 use multicast_dns::host::HostManager;
-use profile_service::ProfilePath;
+use foxbox_core::profile_service::ProfilePath;
 use std::env;
-use std::sync::atomic::{ AtomicBool, Ordering, ATOMIC_BOOL_INIT };
+use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
 use tls::TlsOption;
-use traits::Controller;
+use foxbox_core::traits::Controller;
+use foxbox_core::utils;
 
 docopt!(Args derive Debug, "
 Usage: foxbox [-v] [-h] [-l <hostname>] [-p <port>] [-w <wsport>] [-d <profile_path>] [-r <url>] [-i <iface>] [-t <tunnel>] [-s <secret>] [--disable-tls] [--dns-domain <domain>] [--dns-api <url>] [-c <namespace;key;value>]...
@@ -117,7 +120,7 @@ Options:
     -p, --port <port>        Set port to listen on for http connections. [default: 3000]
     -w, --wsport <wsport>    Set port to listen on for websocket. [default: 4000]
     -d, --profile <path>     Set profile path to store user data.
-    -r, --register <url>     Change the url of the registration endpoint. [default: http://knilxof.org:4242]
+    -r, --register <url>     Change the url of the registration endpoint. [default: https://knilxof.org:4443]
     -i, --iface <iface>      Specify the local IP interface.
     -t, --tunnel <tunnel>    Set the tunnel endpoint's hostname. If omitted, the tunnel is disabled.
     -s, --tunnel-secret <secret>       Set the tunnel shared secret. [default: secret]
@@ -153,21 +156,24 @@ Options:
 /// # Arguments
 ///
 /// * `hostname` - host name name we'd like to set (should be a valid non-FQDN host name).
-fn update_hostname(hostname: String) -> String {
+fn update_hostname(hostname: &str) -> Result<String, HostManagerError> {
     let host_manager = HostManager::new();
 
-    if !host_manager.is_valid_name(&hostname) {
-        panic!("Host name `{}` is not a valid host name!", &hostname);
-    }
+    host_manager.is_valid_name(hostname)
+        .and_then(|is_valid| {
+            if !is_valid {
+                panic!("Host name `{}` is not a valid host name!", hostname);
+            }
 
-    host_manager.set_name(&hostname)
+            host_manager.set_name(hostname)
+        })
 }
 
 // Handle SIGINT (Ctrl-C) for manual shutdown.
 // Signal handlers must not do anything substantial. To trigger shutdown, we atomically
 // flip this flag; the event loop checks the flag and exits accordingly.
 static SHUTDOWN_FLAG: AtomicBool = ATOMIC_BOOL_INIT;
-unsafe fn handle_sigint(_:i32) {
+unsafe fn handle_sigint(_: i32) {
     SHUTDOWN_FLAG.store(true, Ordering::Release);
 }
 
@@ -197,54 +203,68 @@ fn main() {
             let t = time::now();
             let level_color = match record.level() {
                 log::LogLevel::Error => "\x1b[1;31m",  // bold red
-                log::LogLevel::Warn  => "\x1b[1;33m",  // bold yellow
-                log::LogLevel::Info  => "\x1b[1;32m",  // bold green
+                log::LogLevel::Warn => "\x1b[1;33m",  // bold yellow
+                log::LogLevel::Info => "\x1b[1;32m",  // bold green
                 log::LogLevel::Debug => "\x1b[1;34m",  // bold blue
-                log::LogLevel::Trace => "\x1b[1;35m"   // bold magenta
+                log::LogLevel::Trace => "\x1b[1;35m",   // bold magenta
             };
-            format!("[\x1b[90m{}.{:03}\x1b[0m] {}{}{:5}\x1b[0m {}",
-                time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
-                t.tm_nsec / 1_000_000,
-                tid_str(),
-                level_color,
-                record.level(),
-                record.args()
-            )
+            format!("[\x1b[90m{}.{:03}\x1b[0m] {}{}{:5} [{}@{}]\x1b[0m {}",
+                    time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
+                    t.tm_nsec / 1_000_000,
+                    tid_str(),
+                    level_color,
+                    record.level(),
+                    record.target(),
+                    record.location().line(),
+                    record.args())
         };
         builder.format(format).filter(None, LogLevelFilter::Info);
     } else {
         // Plain output formatter
         let format = |record: &LogRecord| {
             let t = time::now();
-            format!("{}.{:03} {}{:5} {}",
-                time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
-                t.tm_nsec / 1_000_000,
-                tid_str(),
-                record.level(),
-                record.args()
-            )
+            format!("{}.{:03} {}{:5} [{}@{}] {}",
+                    time::strftime("%Y-%m-%d %H:%M:%S", &t).unwrap(),
+                    t.tm_nsec / 1_000_000,
+                    tid_str(),
+                    record.level(),
+                    record.target(),
+                    record.location().line(),
+                    record.args())
         };
         builder.format(format).filter(None, LogLevelFilter::Info);
     }
 
     if env::var("RUST_LOG").is_ok() {
-       builder.parse(&env::var("RUST_LOG").unwrap());
+        builder.parse(&env::var("RUST_LOG").unwrap());
     }
     builder.init().unwrap();
 
     let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
-    let local_name = update_hostname(args.flag_local_name.to_owned());
-    let local_name = format!("{}.local", local_name);
+    let local_name = args.flag_local_name;
+    let local_name = update_hostname(&local_name)
+        .or_else(|err| {
+            error!("Could not update local host name: {}", err);
+            Ok::<String, HostManagerError>(local_name)
+        })
+        .and_then(|name| Ok(format!("{}.local", name)))
+        .unwrap();
 
-    let mut controller = FoxBox::new(
-        args.flag_verbose, local_name.clone(), args.flag_port,
-        args.flag_wsport,
-        if args.flag_disable_tls { TlsOption::Disabled } else { TlsOption::Enabled },
-        match args.flag_profile {
-            Some(p) => ProfilePath::Custom(p),
-            None => ProfilePath::Default
-        });
+    let mut controller = FoxBox::new(args.flag_verbose,
+                                     &local_name,
+                                     &args.flag_dns_domain,
+                                     args.flag_port,
+                                     args.flag_wsport,
+                                     if args.flag_disable_tls {
+                                         TlsOption::Disabled
+                                     } else {
+                                         TlsOption::Enabled
+                                     },
+                                     match args.flag_profile {
+                                         Some(p) => ProfilePath::Custom(p),
+                                         None => ProfilePath::Default,
+                                     });
 
     // Override config values
     {
@@ -281,23 +301,22 @@ fn main() {
     // issue certificates for each name - the local name will be the common name of
     // the certificate, and every other name will be a subject alternative name.
     let registrar = registration::Registrar::new(controller.get_certificate_manager(),
-                                                 args.flag_dns_domain,
                                                  args.flag_register,
                                                  args.flag_dns_api);
 
     // Start the tunnel.
     let mut tunnel: Option<Tunnel> = None;
     if let Some(tunnel_url) = args.flag_tunnel {
-        tunnel = Some(Tunnel::new(TunnelConfig::new(tunnel_url,
-                                                    args.flag_tunnel_secret,
+        tunnel = Some(Tunnel::new(TunnelConfig::new(&tunnel_url,
+                                                    &args.flag_tunnel_secret,
                                                     args.flag_port,
                                                     args.flag_wsport,
-                                                    registrar.get_remote_dns_name())));
+                                                    &controller.get_certificate_manager()
+                                                        .get_remote_dns_name())));
         tunnel.as_mut().unwrap().start().unwrap();
     }
 
-    registrar.start(args.flag_iface, &tunnel,
-                    args.flag_port,  &controller);
+    registrar.start(args.flag_iface, &tunnel, args.flag_port, &controller);
 
     controller.run(&SHUTDOWN_FLAG);
 
@@ -318,7 +337,7 @@ describe! main {
             assert_eq!(args.flag_local_name, "foxbox");
             assert_eq!(args.flag_port, 3000);
             assert_eq!(args.flag_wsport, 4000);
-            assert_eq!(args.flag_register, "http://knilxof.org:4242");
+            assert_eq!(args.flag_register, "https://knilxof.org:4443");
             assert_eq!(args.flag_dns_domain, "box.knilxof.org");
             assert_eq!(args.flag_dns_api, "https://knilxof.org:5300");
             assert_eq!(args.flag_iface, None);
@@ -373,6 +392,12 @@ describe! main {
             assert_eq!(args.flag_iface.unwrap(), "eth99");
             assert_eq!(args.flag_tunnel.unwrap(), "tunnel.host");
             assert_eq!(args.flag_config.unwrap(), vec!["ns;key;value"]);
+        }
+    }
+
+    describe! host_name {
+        it "should return updated host name" {
+            assert_eq!(super::super::update_hostname("foxbox").unwrap(), "foxbox");
         }
     }
 }

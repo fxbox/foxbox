@@ -10,14 +10,16 @@ use foxbox_thinkerbell::run::*;
 use foxbox_thinkerbell::ast::*;
 
 use foxbox_taxonomy::api::{ Error as APIError, User };
+use foxbox_taxonomy::channel::*;
+use foxbox_taxonomy::io::*;
 use foxbox_taxonomy::selector::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ Duration, OnOff, Range, TimeStamp, Type, TypeError as APITypeError , Value };
+use foxbox_taxonomy::values::{ format, Duration, OnOff, OpenClosed, TimeStamp, TypeError as APITypeError , Value };
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::thread;
-use std::collections::{ HashMap, HashSet };
+use std::collections::HashMap;
 
 use transformable_channels::mpsc::*;
 
@@ -76,6 +78,9 @@ fn test_run() {
     let env = FakeEnv::new(tx_env);
     let mut exec = Execution::<FakeEnv>::new();
 
+    let data_off = Payload::from_data(OnOff::Off, &format::ON_OFF).unwrap();
+    let data_on = Payload::from_data(OnOff::On, &format::ON_OFF).unwrap();
+
     println!("* Spawning thread.");
     thread::spawn(move || {
         for msg in rx {
@@ -98,10 +103,10 @@ fn test_run() {
                 conditions: vec![
                     Match {
                         source: vec![
-                            GetterSelector::new()
+                            ChannelSelector::new()
                         ],
-                        kind: ChannelKind::LightOn,
-                        range: Range::Eq(Value::OnOff(OnOff::On)),
+                        feature: Id::new("light/is-on"),
+                        when: data_on.clone(),
                         duration: None,
                         phantom: PhantomData
                     }
@@ -109,10 +114,10 @@ fn test_run() {
                 execute: vec![
                     Statement {
                         destination: vec![
-                            SetterSelector::new()
+                            ChannelSelector::new()
                         ],
-                        value: Value::OnOff(OnOff::Off),
-                        kind: ChannelKind::LightOn,
+                        value: data_off,
+                        feature: Id::new("light/is-on"),
                         phantom: PhantomData,
                     }
                 ],
@@ -124,11 +129,11 @@ fn test_run() {
 
     let adapter_id_1 = Id::<AdapterId>::new("Adapter 1");
     let service_id_1 = Id::<ServiceId>::new("Service 1");
-    let getter_id_1 = Id::<Getter>::new("Getter 1");
-    let getter_id_2 = Id::<Getter>::new("Getter 2");
-    let setter_id_1 = Id::<Setter>::new("Setter 1");
-    let setter_id_2 = Id::<Setter>::new("Setter 2");
-    let setter_id_3 = Id::<Setter>::new("Setter 3");
+    let getter_id_1 = Id::<Channel>::new("Getter 1");
+    let getter_id_2 = Id::<Channel>::new("Getter 2");
+    let setter_id_1 = Id::<Channel>::new("Setter 1");
+    let setter_id_2 = Id::<Channel>::new("Setter 2");
+    let setter_id_3 = Id::<Channel>::new("Setter 3");
 
     println!("* We can start executing a trivial rule.");
     exec.start(env.clone(), script_1, User::None, tx_run).unwrap();
@@ -138,60 +143,46 @@ fn test_run() {
     rx_done.recv().unwrap();
 
     env.execute(Instruction::AddServices(vec![
-        Service {
-            id: service_id_1.clone(),
-            adapter: adapter_id_1.clone(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-        }
+        Service::empty(&service_id_1, &adapter_id_1)
     ]));
     rx_done.recv().unwrap();
 
-    env.execute(Instruction::AddGetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: getter_id_1.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            tags: HashSet::new(),
-            last_seen: None,
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_send: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
-    env.execute(Instruction::AddSetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: setter_id_1.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_fetch: None,
+            supports_watch: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
     println!("* Injecting the expected value triggers the send.");
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
 
     rx_done.recv().unwrap();
     let (id, value) = rx_send.recv().unwrap();
     assert_eq!(id, setter_id_1);
-    assert_eq!(value, Value::OnOff(OnOff::Off));
+    assert_eq!(value, Value::new(OnOff::Off));
 
     println!("* Injecting an out-of-range value does not trigger the send.");
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off)))
     ]));
 
     rx_done.recv().unwrap();
@@ -199,10 +190,7 @@ fn test_run() {
 
     println!("* Injecting an error does not trigger the send.");
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Err(APIError::TypeError(APITypeError {
-            expected: Type::OnOff,
-            got: Type::OpenClosed
-        })))
+        (getter_id_1.clone(), Err(APIError::WrongType(APITypeError::new(&format::ON_OFF, &Value::new(OpenClosed::Open)))))
     ]));
 
     rx_done.recv().unwrap();
@@ -210,26 +198,22 @@ fn test_run() {
 
     println!("* Injecting the expected value again triggers the send again.");
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
 
     rx_done.recv().unwrap();
     let (id, value) = rx_send.recv().unwrap();
     assert_eq!(id, setter_id_1);
-    assert_eq!(value, Value::OnOff(OnOff::Off));
+    assert_eq!(value, Value::new(OnOff::Off));
 
     println!("* Adding a second getter doesn't break the world.");
-    env.execute(Instruction::AddGetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: getter_id_2.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            tags: HashSet::new(),
-            last_seen: None,
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_send: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
@@ -237,38 +221,38 @@ fn test_run() {
 
     println!("* Changing the state of the second getter while the condition remains true with the second getter doesn't do anything.");
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     println!("* Changing the state of the first getter while the condition remains true with the second getter doesn't do anything.");
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
@@ -276,62 +260,59 @@ fn test_run() {
     println!("* If neither condition is met, the second getter can trigger the send.");
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
     let (id, value) = rx_send.recv().unwrap();
     assert_eq!(id, setter_id_1);
-    assert_eq!(value, Value::OnOff(OnOff::Off));
+    assert_eq!(value, Value::new(OnOff::Off));
 
     println!("* If neither condition is met, the first getter can trigger the send.");
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
     let (id, value) = rx_send.recv().unwrap();
     assert_eq!(id, setter_id_1);
-    assert_eq!(value, Value::OnOff(OnOff::Off));
+    assert_eq!(value, Value::new(OnOff::Off));
 
     println!("* If we add a second setter, it also receives these sends.");
-    env.execute(Instruction::AddSetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: setter_id_2.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_fetch: None,
+            supports_watch: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
 
@@ -339,35 +320,32 @@ fn test_run() {
         rx_send.recv().unwrap()
     }).collect();
     assert_eq!(events.len(), 2);
-    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::OnOff(OnOff::Off));
-    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::new(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::new(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
     println!("* If we add a setter of a mismatched type, it does not receive these sends.");
-    env.execute(Instruction::AddSetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: setter_id_3.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::Ready,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_fetch: None,
+            supports_watch: None,
+            .. AVAILABLE.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
 
@@ -375,25 +353,25 @@ fn test_run() {
         rx_send.recv().unwrap()
     }).collect();
     assert_eq!(events.len(), 2);
-    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::OnOff(OnOff::Off));
-    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::new(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::new(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
     println!("* Removing a getter resets its condition_is_met to false.");
-    env.execute(Instruction::RemoveGetters(vec![
+    env.execute(Instruction::RemoveChannels(vec![
         getter_id_1.clone()
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
 
@@ -401,80 +379,74 @@ fn test_run() {
         rx_send.recv().unwrap()
     }).collect();
     assert_eq!(events.len(), 2);
-    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::OnOff(OnOff::Off));
-    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::OnOff(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_1).unwrap(), Value::new(OnOff::Off));
+    assert_eq!(*events.get(&setter_id_2).unwrap(), Value::new(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
     println!("* Removing a setter does not prevent the other setter from receiving.");
-    env.execute(Instruction::RemoveSetters(vec![
+    env.execute(Instruction::RemoveChannels(vec![
         setter_id_1.clone()
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
 
     let (id, value) = rx_send.recv().unwrap();
     assert_eq!(id, setter_id_2);
-    assert_eq!(value, Value::OnOff(OnOff::Off));
+    assert_eq!(value, Value::new(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
     println!("* Even if a setter has errors, other setters will receive the send.");
-    env.execute(Instruction::AddSetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: setter_id_1.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_watch: None,
+            supports_fetch: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectSetterErrors(vec![
-        (setter_id_1.clone(), Some(APIError::TypeError(APITypeError {
-            expected: Type::OnOff,
-            got: Type::OpenClosed
-        })))
+        (setter_id_1.clone(), Some(APIError::WrongType(APITypeError::new(&format::ON_OFF, &Value::new(OpenClosed::Open)))))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_2.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
 
     let (id, value) = rx_send.recv().unwrap();
     assert_eq!(id, setter_id_2);
-    assert_eq!(value, Value::OnOff(OnOff::Off));
+    assert_eq!(value, Value::new(OnOff::Off));
     rx_send.try_recv().unwrap_err();
 
     println!("");
 }
 
 
-fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Setter>, Value)>, rx_timer: &Receiver<T>)
+fn sleep<T>(rx_done: &Receiver<()>, rx_send: &Receiver<(Id<Channel>, Value)>, rx_timer: &Receiver<T>)
     where T: Debug {
     thread::sleep(std::time::Duration::from_millis(100));
     rx_send.try_recv().unwrap_err();
@@ -498,6 +470,9 @@ fn test_run_with_delay() {
 
     let env = FakeEnv::new(tx_env);
     let mut exec = Execution::<FakeEnv>::new();
+
+    let data_off = Payload::from_data(OnOff::Off, &format::ON_OFF).unwrap();
+    let data_on = Payload::from_data(OnOff::On, &format::ON_OFF).unwrap();
 
     thread::spawn(move || {
         for msg in rx {
@@ -523,10 +498,10 @@ fn test_run_with_delay() {
                 conditions: vec![
                     Match {
                         source: vec![
-                            GetterSelector::new()
+                            ChannelSelector::new()
                         ],
-                        kind: ChannelKind::LightOn,
-                        range: Range::Eq(Value::OnOff(OnOff::On)),
+                        feature: Id::new("light/is-on"),
+                        when: data_on.clone(),
                         duration: Some(Duration::from(chrono::Duration::seconds(10))),
                         phantom: PhantomData
                     }
@@ -534,10 +509,10 @@ fn test_run_with_delay() {
                 execute: vec![
                     Statement {
                         destination: vec![
-                            SetterSelector::new()
+                            ChannelSelector::new()
                         ],
-                        value: Value::OnOff(OnOff::Off),
-                        kind: ChannelKind::LightOn,
+                        value: data_off,
+                        feature: Id::new("light/is-on"),
                         phantom: PhantomData,
                     }
                 ],
@@ -549,9 +524,9 @@ fn test_run_with_delay() {
 
     let adapter_id_1 = Id::<AdapterId>::new("Adapter 1");
     let service_id_1 = Id::<ServiceId>::new("Service 1");
-    let getter_id_1 = Id::<Getter>::new("Getter 1");
-    let getter_id_2 = Id::<Getter>::new("Getter 2");
-    let setter_id_1 = Id::<Setter>::new("Setter 1");
+    let getter_id_1 = Id::<Channel>::new("Getter 1");
+    let getter_id_2 = Id::<Channel>::new("Getter 2");
+    let setter_id_1 = Id::<Channel>::new("Setter 1");
 
     sleep(&rx_done, &rx_send, &rx_timer);
 	println!("* We can start executing a trivial rule.");
@@ -563,43 +538,28 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
 
     env.execute(Instruction::AddServices(vec![
-        Service {
-            id: service_id_1.clone(),
-            adapter: adapter_id_1.clone(),
-            getters: HashMap::new(),
-            setters: HashMap::new(),
-            tags: HashSet::new(),
-            properties: HashMap::new(),
-        }
+        Service::empty(&service_id_1, &adapter_id_1)
     ]));
     rx_done.recv().unwrap();
-
-    env.execute(Instruction::AddGetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: getter_id_1.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            tags: HashSet::new(),
-            last_seen: None,
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_send: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
-    env.execute(Instruction::AddSetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: setter_id_1.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            last_seen: None,
-            tags: HashSet::new(),
-            mechanism: Setter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_fetch: None,
+            supports_watch: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
@@ -607,7 +567,7 @@ fn test_run_with_delay() {
     sleep(&rx_done, &rx_send, &rx_timer);
 	println!("* Injecting the expected value is not sufficient to trigger the send.");
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
 
     rx_done.recv().unwrap();
@@ -619,8 +579,9 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
 
     let (id, value) = rx_send.recv().unwrap();
+
     assert_eq!(id, setter_id_1);
-    assert_eq!(value, Value::OnOff(OnOff::Off));
+    assert_eq!(value, Value::new(OnOff::Off));
 
 
     sleep(&rx_done, &rx_send, &rx_timer);
@@ -629,7 +590,7 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off)))
     ]));
 
     rx_done.recv().unwrap();
@@ -645,20 +606,20 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
     assert_eq!(rx_timer.recv().unwrap(), true);
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     assert_eq!(rx_timer.recv().unwrap(), false);
@@ -674,7 +635,7 @@ fn test_run_with_delay() {
     rx_done.recv().unwrap();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
@@ -682,7 +643,7 @@ fn test_run_with_delay() {
     env.execute(Instruction::TriggerTimersUntil(TimeStamp::from(UTC::now() + ChronoDuration::seconds(2))));
     rx_done.recv().unwrap();
 
-    env.execute(Instruction::RemoveGetters(vec![
+    env.execute(Instruction::RemoveChannels(vec![
         getter_id_1.clone()
     ]));
     rx_done.recv().unwrap();
@@ -693,10 +654,7 @@ fn test_run_with_delay() {
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Err(APIError::TypeError(APITypeError {
-            expected: Type::OnOff,
-            got: Type::OpenClosed
-        })))
+        (getter_id_1.clone(), Err(APIError::WrongType(APITypeError::new(&format::ON_OFF, &Value::new(OpenClosed::Open)))))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
@@ -710,30 +668,26 @@ fn test_run_with_delay() {
     env.execute(Instruction::ResetTimers);
     rx_done.recv().unwrap();
 
-    env.execute(Instruction::AddGetters(vec![
+    env.execute(Instruction::AddChannels(vec![
         Channel {
             id: getter_id_1.clone(),
-            adapter: adapter_id_1.clone(),
             service: service_id_1.clone(),
-            tags: HashSet::new(),
-            last_seen: None,
-            mechanism: Getter {
-                updated: None,
-                kind: ChannelKind::LightOn,
-            }
+            adapter: adapter_id_1.clone(),
+            supports_send: None,
+            .. LIGHT_IS_ON.clone()
         }
     ]));
     rx_done.recv().unwrap();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::Off))),
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off))),
+        (getter_id_2.clone(), Ok(Value::new(OnOff::Off))),
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::On)))
+        (getter_id_1.clone(), Ok(Value::new(OnOff::On)))
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
@@ -746,7 +700,7 @@ fn test_run_with_delay() {
 	println!("* With two devices, cancelling for one device doesn't cancel for all.");
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_2.clone(), Ok(Value::OnOff(OnOff::On))),
+        (getter_id_2.clone(), Ok(Value::new(OnOff::On))),
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();
@@ -756,7 +710,7 @@ fn test_run_with_delay() {
     rx_send.try_recv().unwrap_err();
 
     env.execute(Instruction::InjectGetterValues(vec![
-        (getter_id_1.clone(), Ok(Value::OnOff(OnOff::Off))),
+        (getter_id_1.clone(), Ok(Value::new(OnOff::Off))),
     ]));
     rx_done.recv().unwrap();
     rx_send.try_recv().unwrap_err();

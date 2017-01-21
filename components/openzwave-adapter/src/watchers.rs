@@ -1,22 +1,22 @@
+use taxonomy::channel::Channel;
 use taxonomy::util::Id as TaxoId;
-use taxonomy::services::Getter;
 use taxonomy::values::*;
-use taxonomy::adapter::{ AdapterWatchGuard, WatchEvent };
+use taxonomy::adapter::{AdapterWatchGuard, WatchEvent};
 
 use transformable_channels::mpsc::ExtSender;
 
 use std::collections::HashMap;
-use std::sync::{ Arc, Mutex, Weak };
+use std::sync::{Arc, Mutex, Weak};
 
-pub type SyncSender = Mutex<Box<ExtSender<WatchEvent>>>;
+pub type SyncSender = Mutex<Box<ExtSender<WatchEvent<Value>>>>;
 type WatchersMap = HashMap<usize, Arc<SyncSender>>;
-type RangedWeakSender = (Option<Range>, Weak<SyncSender>);
-pub type RangedSyncSender = (Option<Range>, Arc<SyncSender>);
+type RangedWeakSender = (Option<Value>, Weak<SyncSender>);
+pub type RangedSyncSender = (Option<Value>, Arc<SyncSender>);
 
 pub struct Watchers {
     current_index: usize,
     map: Arc<Mutex<WatchersMap>>,
-    getter_map: HashMap<TaxoId<Getter>, Vec<RangedWeakSender>>,
+    getter_map: HashMap<TaxoId<Channel>, Vec<RangedWeakSender>>,
 }
 
 impl Watchers {
@@ -28,7 +28,11 @@ impl Watchers {
         }
     }
 
-    pub fn push(&mut self, taxo_id: TaxoId<Getter>, range: Option<Range>, watcher: Arc<SyncSender>) -> WatcherGuard {
+    pub fn push(&mut self,
+                taxo_id: TaxoId<Channel>,
+                range: Option<Value>,
+                watcher: Arc<SyncSender>)
+                -> WatcherGuard {
         let index = self.current_index;
         self.current_index += 1;
         {
@@ -41,21 +45,18 @@ impl Watchers {
 
         WatcherGuard {
             key: index,
-            map: self.map.clone()
+            map: self.map.clone(),
         }
     }
 
-    fn get(&self, index: usize) -> Option<Arc<SyncSender>> {
-        let map = self.map.lock().unwrap();
-        map.get(&index).cloned()
-    }
-
-    pub fn get_from_taxo_id(&self, taxo_id: &TaxoId<Getter>) -> Option<Vec<RangedSyncSender>> {
+    pub fn get_from_taxo_id(&self, taxo_id: &TaxoId<Channel>) -> Option<Vec<RangedSyncSender>> {
         self.getter_map.get(taxo_id).and_then(|vec| {
-            let vec: Vec<_> = vec.iter().filter_map(|&(ref range, ref weak_sender)| {
-                let range = range.clone();
-                weak_sender.upgrade().map(|sender| (range, sender))
-            }).collect();
+            let vec: Vec<_> = vec.iter()
+                .filter_map(|&(ref range, ref weak_sender)| {
+                    let range = range.clone();
+                    weak_sender.upgrade().map(|sender| (range, sender))
+                })
+                .collect();
             if vec.len() == 0 { None } else { Some(vec) }
         })
     }

@@ -1,9 +1,9 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io;
-use std::io::{ Error, ErrorKind };
+use std::io::{Error, ErrorKind};
 use std::fs;
 use std::path::PathBuf;
 
@@ -29,7 +29,7 @@ pub struct CertificateRecord {
     pub cert_file: PathBuf,
     pub full_chain: Option<PathBuf>,
 
-    cert_fingerprint: String
+    cert_fingerprint: String,
 }
 
 fn get_x509_sha1_fingerprint_from_pem(pem_file: PathBuf) -> io::Result<String> {
@@ -37,32 +37,27 @@ fn get_x509_sha1_fingerprint_from_pem(pem_file: PathBuf) -> io::Result<String> {
     match X509::from_pem(&mut file) {
         Ok(pem_file_x509) => {
             pem_file_x509.fingerprint(FINGERPRINT_DIGEST)
-                         .map(vec_to_str)
-                         .ok_or_else(|| {
-                             Error::new(
-                                 ErrorKind::InvalidData,
-                                 format!(
-                                     "The PEM file '{:?}' is not valid (a fingerprint could not be determined)",
-                                     pem_file
-                                 )
-                            )
-                         })
-        },
+                .map(vec_to_str)
+                .ok_or_else(|| {
+                    Error::new(ErrorKind::InvalidData,
+                               format!("The PEM file '{:?}' is not valid (a fingerprint could \
+                                        not be determined)",
+                                       pem_file))
+                })
+        }
         Err(error) => {
-            Err(Error::new(
-                    ErrorKind::InvalidData,
-                    format!("Could not load PEM file '{:?}': {}", pem_file, error))
-            )
+            Err(Error::new(ErrorKind::InvalidData,
+                           format!("Could not load PEM file '{:?}': {}", pem_file, error)))
         }
     }
 }
 
 impl CertificateRecord {
-
     pub fn new(hostname: String,
                certificate_file: PathBuf,
                private_key_file: PathBuf,
-               full_chain: Option<PathBuf>) -> io::Result<Self> {
+               full_chain: Option<PathBuf>)
+               -> io::Result<Self> {
         // Load PEMs
 
         let cert_fingerprint = try!(get_x509_sha1_fingerprint_from_pem(certificate_file.clone()));
@@ -82,9 +77,10 @@ impl CertificateRecord {
     /// (doesn't use the file system to load the PEM cert and get its
     /// fingerprint. Useful for testing.
     pub fn new_from_components(hostname: String,
-                        certificate_file: PathBuf,
-                        private_key_file: PathBuf,
-                        cert_fingerprint: String) -> io::Result<Self> {
+                               certificate_file: PathBuf,
+                               private_key_file: PathBuf,
+                               cert_fingerprint: String)
+                               -> io::Result<Self> {
 
         Ok(CertificateRecord {
             hostname: hostname,
@@ -101,7 +97,7 @@ impl CertificateRecord {
 }
 
 #[cfg(test)]
-mod certificate_record {
+mod certificate_record_test {
     use std::path::PathBuf;
     use super::*;
     use super::get_x509_sha1_fingerprint_from_pem;
@@ -111,10 +107,8 @@ mod certificate_record {
         let mut cert_file = PathBuf::from(current_dir!());
         cert_file.push("test_fixtures");
         cert_file.push("cert.pem");
-        assert_eq!(
-            get_x509_sha1_fingerprint_from_pem(cert_file).unwrap(),
-            "1fa576050d8b3710e57a2d62e84f6781504caf7e"
-        );
+        assert_eq!(get_x509_sha1_fingerprint_from_pem(cert_file).unwrap(),
+                   "1fa576050d8b3710e57a2d62e84f6781504caf7e");
     }
 
     #[test]
@@ -127,16 +121,14 @@ mod certificate_record {
     #[test]
     fn should_get_cert_fingerprint() {
         let certificate_record = CertificateRecord {
-             cert_file: PathBuf::from("/test/cert.pem"),
-             private_key_file: PathBuf::from("/test/privkey.pem"),
-             hostname: "test.example.com".to_owned(),
-             cert_fingerprint: "1234567890abcdef".to_owned(),
-             full_chain: None
+            cert_file: PathBuf::from("/test/cert.pem"),
+            private_key_file: PathBuf::from("/test/privkey.pem"),
+            hostname: "test.example.com".to_owned(),
+            cert_fingerprint: "1234567890abcdef".to_owned(),
+            full_chain: None,
         };
 
-        assert_eq!(
-            certificate_record.get_certificate_fingerprint(),
-            "1234567890abcdef"
-        );
+        assert_eq!(certificate_record.get_certificate_fingerprint(),
+                   "1234567890abcdef");
     }
 }

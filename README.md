@@ -19,11 +19,13 @@ rust:
   - nightly-YYYY-MM-DD
 ```
 
-It's recommended that you use [`multirust`](https://github.com/brson/multirust) to install and switch between versions of Rust. You should then be able to then use:
+It's recommended that you use `rustup` to install and switch between versions
+of Rust and available toolchains. You should then be able to then use:
 ```
 cd /your/path/to/foxbox     # Required, otherwise you might replace rustc for another project
-multirust override nightly-YYYY-MM-DD   # Replace with the correct date you found
+rustup override set nightly-YYYY-MM-DD   # Replace with the correct date you found
 ```
+
 After that, you should be all set in regard to compiling the project.
 
 #### :warning: Warning
@@ -40,6 +42,7 @@ rustc 1.9.0-nightly (241a9d0dd 2016-04-05)
 | ------------ | --------------------- | --------------- | ------------------ | --------------- |
 | `libupnp`    | `libupnp-dev`         | `libupnp-devel` | `extra/libupnp`    | `libupnp`       |
 | `libssl`     | `libssl-dev`          | `openssl-devel` | via `base-devel`   | `openssl`       |
+| `libev`      | `libev-dev`           | `libev-devel`   | `?`                | `libev`         |
 | `libavahi`   | `libavahi-client-dev` | `avahi-devel`   | `extra/avahi`      | `n.a.`          |
 | `libsqlite3` | `libsqlite3-dev`      | `sqlite-devel`  | `core/sqlite`      | `sqlite`        |
 | `libespeak`  | `libespeak-dev`       | `espeak-devel`  | `community/espeak` | `espeak`        |
@@ -85,11 +88,13 @@ $ cd foxbox
 
 ### Extra steps for Mac OS X
 
-Foxbox requires some up-to-date libraries (like OpenSSL). In order to make sure you have the correct packages and bindings, we recommend you to install brew and to run:
+Foxbox requires some up-to-date libraries (like OpenSSL). In order to make sure
+you have the correct packages and bindings, we recommend you install `brew` and
+run:
 
 ``` bash
-brew install openssl libupnp sqlite
-source tools/mac-os-x-setup.source.sh
+brew install openssl libupnp sqlite libev
+export LIBRARY_PATH=/usr/local/lib
 ```
 
 ## Build time options
@@ -112,8 +117,6 @@ directory.
 | -------------- | ---------------------------------------------- |-------------------------------------------------------------------------------------------------------------- |
 | `dnschallenge` | No (required for LetsEncrypt DNS-01 challenge) | Built as a binary with `cargo build` in the same target directory as foxbox, see `target/<profile>` directory |
 | `bash`         | No (required for LetsEncrypt client)           | System package manager                                                                                        |
-| `python`       | Yes (required to run `pagekite.py`)            | System package manager                                                                                        |
-| `pagekite.py`  | Yes (required to enable tunneling)             | https://pagekite.net/wiki/OpenSource/                                                                         |
 
 ## Running the daemon
 
@@ -129,7 +132,7 @@ There are several command line options to start the daemon:
 -p, --port <port>  : Set port to listen on for http connections. [default: 3000]
 -w, --wsport <wsport> : Set port to listen on for websocket. [default: 4000]
 -d, --profile <path> : Set profile path to store user data.
--r, --register <url> : URL of registration endpoint [default: http://localhost:4242]
+-r, --register <url> : URL of registration endpoint [default: https://localhost:4443]
 -t, --tunnel <tunnel> : Set the tunnel endpoint hostname. If omitted, the tunnel is disabled.
 -s, --tunnel-secret <secret> : Set the tunnel shared secret. [default: secret]
 -c, --config <namespace;key;value> :  Set configuration override
@@ -142,7 +145,7 @@ There are several command line options to start the daemon:
 Currently you would likely want to start the daemon like this:
 
 ```bash
-./run.sh -- -r http://knilxof.org:4242 --disable-tls
+./run.sh -- -r https://knilxof.org:4443 --disable-tls
 ```
 
 That means that your foxbox will be using our dev [registration server](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Registration_Server) and you will be disabling [TLS](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/TLS) support. We hope to have out-of-the-box TLS support ready pretty soon, but for now disabling it is the easiest way to run foxbox.
@@ -155,7 +158,7 @@ If you want to use TLS you'll likely want to add `target/<profile>` (eg:
 If you want to access your foxbox from outside of the network where it is running, you'll need to enable [tunneling](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link/Tunneling) support. To do that you need to specify the address of the tunneling server that you want to use and the shared secret for this server (if any) to access to your foxbox from outside of your foxbox' local network.
 
 ```bash
-./run.sh -- -r http://knilxof.org:4242 -t knilxof.org:443 -s secret --disable-tls
+./run.sh -- -r https://knilxof.org:4443 -t knilxof.org:443 -s secret --disable-tls
 ```
 
 In the example above, `knilxof.org:443` is the location of our tunneling dev server, which has a not-that-secret-anymore value that you'll need to ask for on [IRC](https://wiki.mozilla.org/Connected_Devices/Projects/Project_Link#IRC). You are supposed to substitute `<yourname>` by the subdomain of your choice, but take into account that you'll need to keep the domain name of the tunneling server, in this case `.knilxof.org`. Starting the daemon with the command line options above you should be able to access your foxbox through `http://yourname.knilxof.org`.
@@ -217,11 +220,8 @@ application gets, the slower and more painful this will be (not recommended).
 
 ### Linux
 
-@fabricedesre has created a script to help compile a toolchain. So far it's
-only been tested on Ubuntu but there's nothing ubuntu specific so that should
-work just fine on any Linux.
-
- - https://github.com/fabricedesre/rustpi2
+There is support to cross-compile with a Docker image targetting the Raspberry Pi
+(model 2 and up) in the `tools/docker` directory.
 
 For an extensive write-up about cross compiling Rust programs see:
 

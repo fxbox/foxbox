@@ -2,48 +2,47 @@
 
 const chakram = require('chakram'), expect = chakram.expect;
 
-var Prepper = require('../lib/testPrepper.js');
+var Prepper = require('../lib/make_suite.js');
 
 Prepper.makeSuite('Test Push Service locally',function(){
   var pushURI = Prepper.webPush_server.getEndpointURI();
   var pushkey = Prepper.webPush_server.getPublicKey();
-  
+
   var baseSubscriptionPayload = {
      'select': {
-       'id':'setter:subscribe.webpush@link.mozilla.org'
-     }, 
+       'id':'channel:subscription.webpush@link.mozilla.org',
+       'feature': 'webpush/subscribe',
+     },
      'value': {
-       'Json': {
-         'subscriptions':[{
-           'push_uri': Prepper.webPush_server.getEndpointURI(),
-           'public_key': Prepper.webPush_server.getPublicKey()
-         }]
-      }
+       'subscriptions':[{
+         'push_uri': Prepper.webPush_server.getEndpointURI(),
+         'public_key': Prepper.webPush_server.getPublicKey()
+       }]
     }
   };
 
-  var newWebPushSubscriptionPayload = 
+  var newWebPushSubscriptionPayload =
   Object.assign({}, baseSubscriptionPayload, {
     value: {
-       Json: {
-          subscriptions: [{
-            'push_uri': Prepper.webPush_server.getEndpointURI(),
-            'public_key': Prepper.webPush_server.getPublicKey(),
-            'auth': Prepper.webPush_server.getUserAuth()
-          }]
-       }
+        subscriptions: [{
+          'push_uri': Prepper.webPush_server.getEndpointURI(),
+          'public_key': Prepper.webPush_server.getPublicKey(),
+          'auth': Prepper.webPush_server.getUserAuth()
+        }]
     }
   });
 
   var testParams = [{
     suiteName: 'Old WebPush',
     payload: baseSubscriptionPayload
-  }, 
+  },
   {
     suiteName: 'New WebPush',
     payload: newWebPushSubscriptionPayload
   }];
 
+  before(Prepper.turnOnAllSimulators);
+  before(Prepper.turnOnFoxbox);
   before(Prepper.foxboxManager.foxboxLogin);
 
   testParams.forEach(testParam => {
@@ -57,19 +56,19 @@ Prepper.makeSuite('Test Push Service locally',function(){
           expect(listResponse).to.have.status(200);
           for (var entry of listResponse.body) {
             if (entry.adapter === 'webpush@link.mozilla.org') {
-              pushService = true;                
+              pushService = true;
             }
           }
           expect(pushService).equals(true);
         });
       });
 
-      it('Add push subscription',function(){     
-        var setter = 'setter:subscribe.webpush@link.mozilla.org';
-        var getter =  'getter:subscription.webpush@link.mozilla.org';
+      it('Add push subscription',function(){
+        var setter = 'channel:subscription.webpush@link.mozilla.org';
+        var getter =  'channel:subscription.webpush@link.mozilla.org';
         // differs by the type of webpush std
-        var setterPayload = testParam.payload;  
-        var getterPayload = {'id': getter};    
+        var setterPayload = testParam.payload;
+        var getterPayload = {'id': getter, 'feature': 'webpush/subscribe'};
 
         return chakram.put(Prepper.foxboxManager.setterURL,setterPayload)
         .then(function(cmdResp){
@@ -80,23 +79,24 @@ Prepper.makeSuite('Test Push Service locally',function(){
         })
         .then(function(cmdResp){
           expect(cmdResp).to.have.status(200);
-          expect(cmdResp.body[getter].Json.subscriptions[0].public_key)
+          expect(cmdResp.body[getter].subscriptions[0].public_key)
           .equals(Prepper.webPush_server.getPublicKey());
-          expect(cmdResp.body[getter].Json.subscriptions[0].push_uri)
+          expect(cmdResp.body[getter].subscriptions[0].push_uri)
           .equals(Prepper.webPush_server.getEndpointURI());
         });
       });
 
-      it('Set resources to receive notification',function(){     
-        var getter =  'getter:resource.webpush@link.mozilla.org';   
-        var setter = 'setter:resource.webpush@link.mozilla.org';
+      it('Set resources to receive notification',function(){
+        var getter = 'channel:resource.webpush@link.mozilla.org';
+        var setter = 'channel:resource.webpush@link.mozilla.org';
         var setterPayload = {
           'select': {
-            'id': setter}, 
+            'id': setter,
+            'feature': 'webpush/resource'
+          },
             'value': {
-              'Json': {
-                'resources':['livingroom', 'washroom']}}};
-        var getterPayload = {'id': getter};
+                'resources':['livingroom', 'washroom']}};
+        var getterPayload = {'id': getter, 'feature': 'webpush/resource'};
 
         return chakram.put(Prepper.foxboxManager.setterURL,setterPayload)
         .then(function(cmdResp){
@@ -107,23 +107,23 @@ Prepper.makeSuite('Test Push Service locally',function(){
         .then(function(cmdResp){
           expect(cmdResp).to.have.status(200);
           expect(cmdResp.body[getter]
-            .Json.resources[0]).equals('livingroom');
+            .resources[0]).equals('livingroom');
           expect(cmdResp.body[getter]
-            .Json.resources[1]).equals('washroom');
-        });  
+            .resources[1]).equals('washroom');
+        });
       });
 
       it('Accepts notification trigger requests',function(){
-        var setter = 'setter:notify.webpush@link.mozilla.org';
+        var setter = 'channel:notify.webpush@link.mozilla.org';
         var resource = 'washroom';
         var notificationText = 'lights on!';
         var payload = {
           'select': {
-            'id': setter
-          }, 
+            'id': setter,
+            'feature': 'webpush/notify-msg'
+          },
           'value': {
-            'WebPushNotify': {
-              'resource':resource,'message':notificationText}}} ;
+              'resource':resource,'message':notificationText}} ;
         return chakram.put(Prepper.foxboxManager.setterURL, payload)
         .then(function(cmdResponse) {
           expect(cmdResponse).to.have.status(200);
@@ -136,14 +136,14 @@ Prepper.makeSuite('Test Push Service locally',function(){
         var notificationText = 'can you encrypt this one too?';
 
         before(function(done) {
-          var setter = 'setter:notify.webpush@link.mozilla.org';
+          var setter = 'channel:notify.webpush@link.mozilla.org';
           var payload = {
             'select': {
-              'id': setter
-            }, 
+              'id': setter,
+              'feature': 'webpush/notify-msg'
+            },
             'value': {
-              'WebPushNotify': {
-                'resource':resource,'message':notificationText}}} ;
+                'resource':resource,'message':notificationText}} ;
           return chakram.put(Prepper.foxboxManager.setterURL, payload)
           .then(function(cmdResponse) {
           // collect the response from the webpush simulator 
@@ -160,19 +160,19 @@ Prepper.makeSuite('Test Push Service locally',function(){
         });
 
         it('Remove subscription', function(){
-          var setter = 'setter:unsubscribe.webpush@link.mozilla.org';
-          var getter =  'getter:subscription.webpush@link.mozilla.org';
+          var setter = 'channel:unsubscribe.webpush@link.mozilla.org';
+          var getter =  'channel:subscription.webpush@link.mozilla.org';
           var setterPayload = {
             'select': {
-              'id':setter
-            }, 
+              'id':setter,
+              'feature': 'webpush/unsubscribe'
+            },
             'value': {
-              'Json': {
                 'subscriptions':[{
                   'push_uri':pushURI,
                   'public_key':pushkey
-                }]}}};
-          var getterPayload = {'id': getter};
+                }]}};
+          var getterPayload = {'id': getter, 'feature': 'webpush/subscribe'};
 
           return chakram.put(Prepper.foxboxManager.setterURL,setterPayload)
           .then(function(cmdResp){
@@ -182,7 +182,7 @@ Prepper.makeSuite('Test Push Service locally',function(){
           })
           .then(function(cmdResp){
             expect(cmdResp).to.have.status(200);
-            expect(cmdResp.body[getter].Json.subscriptions.length).equals(0);
+            expect(cmdResp.body[getter].subscriptions.length).equals(0);
           });
         });
       });

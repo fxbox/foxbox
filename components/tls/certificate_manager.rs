@@ -1,12 +1,12 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::HashMap;
 use std::io;
-use std::io::{ Error as IoError };
+use std::io::Error as IoError;
 use std::path::PathBuf;
-use std::sync::{ Arc, RwLock };
+use std::sync::{Arc, RwLock};
 
 use certificate_record::CertificateRecord;
 use ssl_context::SslContextProvider;
@@ -17,16 +17,21 @@ const DEFAULT_BOX_NAME: &'static str = "foxbox.local";
 #[derive(Clone)]
 pub struct CertificateManager {
     directory: PathBuf,
+    domain: String,
     ssl_hosts: Arc<RwLock<HashMap<String, CertificateRecord>>>,
 
     // Observer
-    context_provider: Arc<Box<SslContextProvider>>
+    context_provider: Arc<Box<SslContextProvider>>,
 }
 
 impl CertificateManager {
-    pub fn new(directory: PathBuf, context_provider: Box<SslContextProvider>) -> Self {
+    pub fn new(directory: PathBuf,
+               domain: &str,
+               context_provider: Box<SslContextProvider>)
+               -> Self {
         CertificateManager {
             directory: directory,
+            domain: domain.to_owned(),
             ssl_hosts: Arc::new(RwLock::new(HashMap::new())),
             context_provider: Arc::new(context_provider),
         }
@@ -41,8 +46,9 @@ impl CertificateManager {
 
         CertificateManager {
             directory: test_certs_directory,
+            domain: "knilxof.org".to_owned(),
             ssl_hosts: Arc::new(RwLock::new(HashMap::new())),
-            context_provider: Arc::new(Box::new(SniSslContextProvider::new()))
+            context_provider: Arc::new(Box::new(SniSslContextProvider::new())),
         }
     }
 
@@ -57,8 +63,9 @@ impl CertificateManager {
     /// Generate a self signed certificate for the given name.
     /// This will write the self signed certificates to the filesystem that this
     /// CertificateManager is configured for.
-    fn get_or_generate_self_signed_certificate(&self, hostname: &str)
-        -> io::Result<CertificateRecord> {
+    fn get_or_generate_self_signed_certificate(&self,
+                                               hostname: &str)
+                                               -> io::Result<CertificateRecord> {
 
         if let Some(certificate_record) = self.get_certificate(hostname) {
             debug!("Using existing self-signed cert for {}", hostname);
@@ -86,7 +93,7 @@ impl CertificateManager {
     }
 
     pub fn reload(&self) -> Result<(), IoError> {
-        let certificates =  try!(create_records_from_directory(&self.directory.clone()));
+        let certificates = try!(create_records_from_directory(&self.directory.clone()));
         {
             let mut current_hosts = checklock!(self.ssl_hosts.write());
             current_hosts.clear();
@@ -117,6 +124,14 @@ impl CertificateManager {
         }
     }
 
+    pub fn get_local_hostname_certificate(&self) -> Option<CertificateRecord> {
+        self.get_certificate(&self.get_local_dns_name())
+    }
+
+    pub fn get_remote_hostname_certificate(&self) -> Option<CertificateRecord> {
+        self.get_certificate(&self.get_remote_dns_name())
+    }
+
     #[allow(dead_code)]
     pub fn remove_certificate(&self, hostname: &str) {
         {
@@ -135,16 +150,34 @@ impl CertificateManager {
 
         self.context_provider.update(ssl_hosts);
     }
+
+    pub fn get_fingerprint(&self) -> String {
+        self.get_box_certificate()
+            .unwrap()
+            .get_certificate_fingerprint()
+    }
+
+    fn get_common_name(&self) -> String {
+        format!("{}.{}", self.get_fingerprint(), self.domain)
+    }
+
+    pub fn get_local_dns_name(&self) -> String {
+        format!("local.{}", self.get_common_name())
+    }
+
+    pub fn get_remote_dns_name(&self) -> String {
+        format!("remote.{}", self.get_common_name())
+    }
 }
 
 #[cfg(test)]
-mod certificate_manager {
-    use openssl::ssl::{ SslContext, SslMethod };
+mod certificate_manager_test {
+    use openssl::ssl::{SslContext, SslMethod};
     use std::collections::HashMap;
-    use std::io::{ Error, ErrorKind };
+    use std::io::{Error, ErrorKind};
     use std::path::PathBuf;
-    use std::sync::{ Arc, Mutex };
-    use std::sync::mpsc::{ channel, Sender };
+    use std::sync::{Arc, Mutex};
+    use std::sync::mpsc::{channel, Sender};
     use certificate_record::CertificateRecord;
     use ssl_context::SslContextProvider;
 
@@ -152,21 +185,20 @@ mod certificate_manager {
 
     #[derive(Clone)]
     pub struct TestSslContextProvider {
-        update_called: Arc<Mutex<Sender<bool>>>
+        update_called: Arc<Mutex<Sender<bool>>>,
     }
 
     impl TestSslContextProvider {
         fn new(update_chan: Sender<bool>) -> Self {
-            TestSslContextProvider {
-                update_called: Arc::new(Mutex::new(update_chan))
-            }
+            TestSslContextProvider { update_called: Arc::new(Mutex::new(update_chan)) }
         }
     }
 
     impl SslContextProvider for TestSslContextProvider {
         fn context(&self) -> Result<SslContext, Error> {
             SslContext::new(SslMethod::Sslv23).map_err(|_| {
-                Error::new(ErrorKind::InvalidInput, "An SSL certificate could not be configured")
+                Error::new(ErrorKind::InvalidInput,
+                           "An SSL certificate could not be configured")
             })
         }
 
@@ -176,12 +208,11 @@ mod certificate_manager {
     }
 
     fn test_cert_record() -> CertificateRecord {
-        CertificateRecord::new_from_components(
-            "test.example.com".to_owned(),
-            PathBuf::from("/test/privkey.pem"),
-            PathBuf::from("/test/cert.pem"),
-            "010203040506070809000a0b0c0d0e0f".to_owned()
-        ).unwrap()
+        CertificateRecord::new_from_components("test.example.com".to_owned(),
+                                               PathBuf::from("/test/privkey.pem"),
+                                               PathBuf::from("/test/cert.pem"),
+                                               "010203040506070809000a0b0c0d0e0f".to_owned())
+            .unwrap()
     }
 
     #[test]
@@ -189,15 +220,15 @@ mod certificate_manager {
         let cert_record = test_cert_record();
         let (tx_update_called, _) = channel();
 
-        let cert_manager = CertificateManager::new(
-            PathBuf::from(current_dir!()),
-            Box::new(TestSslContextProvider::new(tx_update_called))
-        );
+        let cert_manager =
+            CertificateManager::new(PathBuf::from(current_dir!()),
+                                    "knilxof.org",
+                                    Box::new(TestSslContextProvider::new(tx_update_called)));
 
         cert_manager.add_certificate(cert_record.clone());
 
         let certificate = cert_manager.get_certificate("test.example.com")
-                                      .unwrap();
+            .unwrap();
 
         assert!(certificate == cert_record);
 
@@ -209,10 +240,10 @@ mod certificate_manager {
     fn should_allow_certificates_to_be_removed() {
         let cert_record = test_cert_record();
         let (tx_update_called, _) = channel();
-        let cert_manager = CertificateManager::new(
-            PathBuf::from(current_dir!()),
-            Box::new(TestSslContextProvider::new(tx_update_called))
-        );
+        let cert_manager =
+            CertificateManager::new(PathBuf::from(current_dir!()),
+                                    "knilxof.org",
+                                    Box::new(TestSslContextProvider::new(tx_update_called)));
 
         cert_manager.add_certificate(cert_record);
 
@@ -225,40 +256,34 @@ mod certificate_manager {
     fn should_update_configured_providers_when_cert_added() {
         let cert_record = test_cert_record();
         let (tx_update_called, rx_update_called) = channel();
-        let cert_manager = CertificateManager::new(
-            PathBuf::from(current_dir!()),
-            Box::new(TestSslContextProvider::new(tx_update_called))
-        );
+        let cert_manager =
+            CertificateManager::new(PathBuf::from(current_dir!()),
+                                    "knilxof.org",
+                                    Box::new(TestSslContextProvider::new(tx_update_called)));
 
         cert_manager.add_certificate(cert_record);
 
-        assert!(
-            rx_update_called.recv().unwrap(),
-            "Did not receive notification from handler after add"
-        );
+        assert!(rx_update_called.recv().unwrap(),
+                "Did not receive notification from handler after add");
     }
 
     #[test]
     fn should_update_configured_providers_when_cert_removed() {
         let cert_record = test_cert_record();
         let (tx_update_called, rx_update_called) = channel();
-        let cert_manager = CertificateManager::new(
-            PathBuf::from(current_dir!()),
-            Box::new(TestSslContextProvider::new(tx_update_called))
-        );
+        let cert_manager =
+            CertificateManager::new(PathBuf::from(current_dir!()),
+                                    "knilxof.org",
+                                    Box::new(TestSslContextProvider::new(tx_update_called)));
 
         cert_manager.add_certificate(cert_record);
 
-        assert!(
-            rx_update_called.recv().unwrap(),
-            "Did not receive notification from handler after add"
-        );
+        assert!(rx_update_called.recv().unwrap(),
+                "Did not receive notification from handler after add");
 
         cert_manager.remove_certificate(&test_cert_record().hostname);
 
-        assert!(
-            rx_update_called.recv().unwrap(),
-            "Did not receive notification from handler after remove"
-        );
+        assert!(rx_update_called.recv().unwrap(),
+                "Did not receive notification from handler after remove");
     }
 }

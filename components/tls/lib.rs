@@ -1,9 +1,9 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #![feature(plugin)]
-#![plugin(serde_macros)]
+#![plugin(serde_derive)]
 
 #![plugin(clippy)]
 #![deny(clippy)]
@@ -43,7 +43,6 @@ macro_rules! current_dir {
 mod certificate_manager;
 mod certificate_record;
 mod dns_client;
-mod https_server_factory;
 mod letsencrypt;
 mod ssl_context;
 mod utils;
@@ -51,7 +50,6 @@ mod utils;
 pub use certificate_manager::*;
 pub use certificate_record::*;
 pub use dns_client::*;
-pub use https_server_factory::*;
 pub use letsencrypt::*;
 pub use ssl_context::*;
 

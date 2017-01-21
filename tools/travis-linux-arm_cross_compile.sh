@@ -25,7 +25,8 @@ EOF
 
     sudo apt-get install -y --no-install-recommends libasound2:armhf \
         libssl-dev:armhf libespeak-dev:armhf libupnp6-dev:armhf \
-        libudev-dev:armhf libavahi-client-dev:armhf libsqlite3-dev:armhf
+        libudev-dev:armhf libavahi-client-dev:armhf libsqlite3-dev:armhf \
+        libev-dev:armhf
 }
 
 _set_up_cargo_config() {
@@ -40,7 +41,9 @@ EOF
 _set_up_environment() {
     _set_up_cargo_config
 
-    # open-zwave wants -cc and -c++ but no package seems to provid them.
+    export TARGET_TRIPLE=$BUILD_TARGET
+
+    # open-zwave wants -cc and -c++ but no package seems to provide them.
     sudo cp "/usr/bin/$BUILD_TARGET-gcc" "/usr/bin/$BUILD_TARGET-cc"
     sudo cp "/usr/bin/$BUILD_TARGET-g++" "/usr/bin/$BUILD_TARGET-c++"
 

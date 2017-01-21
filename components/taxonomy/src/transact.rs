@@ -31,13 +31,19 @@ use std::hash::Hash;
 /// // At this stage, if we have not called `transaction.commit()`, the
 /// // insertion is cancelled.
 /// ```
-pub struct InsertInMap<'a, K, V> where K: 'a + Clone + Hash + Eq, V: 'a {
+pub struct InsertInMap<'a, K, V>
+    where K: 'a + Clone + Hash + Eq,
+          V: 'a
+{
     map: &'a mut HashMap<K, V>,
     committed: bool,
     keys: Vec<K>,
 }
 
-impl<'a, K, V> InsertInMap<'a, K, V> where K:'a + Clone + Hash + Eq, V: 'a {
+impl<'a, K, V> InsertInMap<'a, K, V>
+    where K: 'a + Clone + Hash + Eq,
+          V: 'a
+{
     /// Insert (key, value) pairs in a map, reversibly, and without overwriting.
     ///
     /// If one of the keys `k` is already present in the map, this is a noop, and the
@@ -59,7 +65,7 @@ impl<'a, K, V> InsertInMap<'a, K, V> where K:'a + Clone + Hash + Eq, V: 'a {
                 Entry::Occupied(_) => {
                     conflict = Some(k);
                     break;
-                },
+                }
                 Entry::Vacant(entry) => {
                     entry.insert(v);
                     keys.push(k)
@@ -67,12 +73,13 @@ impl<'a, K, V> InsertInMap<'a, K, V> where K:'a + Clone + Hash + Eq, V: 'a {
             }
         }
         match conflict {
-            None =>
+            None => {
                 Ok(InsertInMap {
                     map: map,
                     keys: keys,
                     committed: false,
-                }),
+                })
+            }
             Some(k) => {
                 // We need to rollback everything we have inserted so far.
                 for k in keys {
@@ -90,7 +97,10 @@ impl<'a, K, V> InsertInMap<'a, K, V> where K:'a + Clone + Hash + Eq, V: 'a {
     }
 }
 
-impl<'a, K, V> Drop for InsertInMap<'a, K, V> where K:'a + Clone + Hash + Eq, V: 'a {
+impl<'a, K, V> Drop for InsertInMap<'a, K, V>
+    where K: 'a + Clone + Hash + Eq,
+          V: 'a
+{
     /// If this object is dropped before being committed, cancel the transaction.
     fn drop(&mut self) {
         if self.committed {

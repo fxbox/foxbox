@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! Adapter for `WebPush`.
 //!
@@ -15,23 +15,26 @@
 mod crypto;
 mod db;
 
-use foxbox_taxonomy::api::{ Error, InternalError, User };
+use foxbox_taxonomy::api::{Error, InternalError, User};
+use foxbox_taxonomy::channel::*;
+use foxbox_taxonomy::io;
 use foxbox_taxonomy::manager::*;
+use foxbox_taxonomy::parse::*;
 use foxbox_taxonomy::services::*;
-use foxbox_taxonomy::values::{ Type, TypeError, Value, Json, WebPushNotify };
+use foxbox_taxonomy::values::{Data, Value, Json};
+use foxbox_taxonomy::values::format;
 
-use hyper::header::{ ContentEncoding, Encoding };
+use hyper::header::{ContentEncoding, Encoding, Authorization};
 use hyper::Client;
 use hyper::client::Body;
-use rusqlite::{ self };
+use rusqlite;
 use self::crypto::CryptoContext;
 use serde_json;
-use std::cmp::min;
-use std::collections::{ HashMap, HashSet };
+use std::cmp::max;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use traits::Controller;
-use transformable_channels::mpsc::*;
+use foxbox_core::traits::Controller;
 
 header! { (Encryption, "Encryption") => [String] }
 header! { (EncryptionKey, "Encryption-Key") => [String] }
@@ -40,9 +43,7 @@ header! { (Ttl, "TTL") => [u32] }
 
 static ADAPTER_NAME: &'static str = "WebPush adapter (built-in)";
 static ADAPTER_VENDOR: &'static str = "team@link.mozilla.org";
-static ADAPTER_VERSION: [u32;4] = [0, 0, 0, 0];
-// This user identifier will be used when authentication is disabled.
-static NO_AUTH_USER_ID: i32 = -1;
+static ADAPTER_VERSION: [u32; 4] = [0, 0, 0, 0];
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Subscription {
@@ -53,32 +54,29 @@ pub struct Subscription {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct SubscriptionGetter {
-    subscriptions: Vec<Subscription>
+    subscriptions: Vec<Subscription>,
 }
 
 impl SubscriptionGetter {
     fn new(subs: Vec<Subscription>) -> Self {
-        SubscriptionGetter {
-            subscriptions: subs
-        }
+        SubscriptionGetter { subscriptions: subs }
     }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ResourceGetter {
-    resources: Vec<String>
+    resources: Vec<String>,
 }
 
 impl ResourceGetter {
     fn new(res: Vec<String>) -> Self {
-        ResourceGetter {
-            resources: res
-        }
+        ResourceGetter { resources: res }
     }
 }
 
 impl Subscription {
-    fn notify(&self, crypto: &CryptoContext, message: &str) {
+    #[allow(useless_let_if_seq)] // Clippy's warning make no sense at all in this method.
+    fn notify(&self, crypto: &CryptoContext, gcm_api_key: &str, message: &str) {
         // Make the record size at least the size of the encrypted message. We must
         // add 16 bytes for the encryption tag, 1 byte for padding and 1 byte to
         // ensure we don't end on a record boundary.
@@ -96,21 +94,48 @@ impl Subscription {
         // of payload body, which equates to 4080 octets of cleartext, so the "rs"
         // parameter can be omitted for messages that fit within this limit."
         //
-        let record_size = min(4096, message.len() + 18);
-        let enc = match crypto.encrypt(&self.public_key, message.to_owned(), &self.auth, record_size) {
+        let record_size = max(4096, message.len() + 18);
+        let enc = match crypto.encrypt(&self.public_key,
+                                       message.to_owned(),
+                                       &self.auth,
+                                       record_size) {
             Some(x) => x,
             None => {
-                warn!("notity subscription {} failed for {}", self.push_uri, message);
+                warn!("notity subscription {} failed for {}",
+                      self.push_uri,
+                      message);
                 return;
             }
         };
 
+        // If using Google's push service, we need to replace the given endpoint URI
+        // with one known to work with WebPush, as support has not yet rolled out to
+        // all of its servers.
+        //
+        // https://github.com/GoogleChrome/web-push-encryption/blob/dd8c58c62b1846c481ceb066c52da0d695c8415b/src/push.js#L69
+        let push_uri = self.push_uri.replace("https://android.googleapis.com/gcm/send",
+                                             "https://gcm-http.googleapis.com/gcm");
+
         let has_auth = self.auth.is_some();
         let public_key = crypto.get_public_key(has_auth);
         let client = Client::new();
-        let mut req = client.post(&self.push_uri)
+        let mut req = client.post(&push_uri)
             .header(Encryption(format!("keyid=p256dh;salt={};rs={}", enc.salt, record_size)))
             .body(Body::BufBody(&enc.output, enc.output.len()));
+
+        // If using Google's push service, we need to provide an Authorization header
+        // which provides an API key permitting us to send push notifications. This
+        // should be provided in foxbox.conf as webpush/gcm_api_key in base64.
+        //
+        // https://github.com/GoogleChrome/web-push-encryption/blob/dd8c58c62b1846c481ceb066c52da0d695c8415b/src/push.js#L84
+        if push_uri != self.push_uri {
+            if gcm_api_key.is_empty() {
+                warn!("cannot notify subscription {}, GCM API key missing from foxbox.conf",
+                      push_uri);
+                return;
+            }
+            req = req.header(Authorization(format!("key={}", gcm_api_key)));
+        }
 
         req = if has_auth {
             req.header(ContentEncoding(vec![Encoding::EncodingExt(String::from("aesgcm"))]))
@@ -141,22 +166,25 @@ impl Subscription {
         // TODO: Add a retry mechanism if 429 Too Many Requests returned by push service
         let rsp = match req.send() {
             Ok(x) => x,
-            Err(e) => { warn!("notify subscription {} failed: {:?}", self.push_uri, e); return; }
+            Err(e) => {
+                warn!("notify subscription {} failed: {:?}", push_uri, e);
+                return;
+            }
         };
 
-        info!("notified subscription {} (status {:?})", self.push_uri, rsp.status);
+        info!("notified subscription {} (status {:?})",
+              push_uri,
+              rsp.status);
     }
 }
 
 pub struct WebPush<C> {
     controller: C,
     crypto: CryptoContext,
-    getter_resource_id: Id<Getter>,
-    getter_subscription_id: Id<Getter>,
-    setter_resource_id: Id<Setter>,
-    setter_subscribe_id: Id<Setter>,
-    setter_unsubscribe_id: Id<Setter>,
-    setter_notify_id: Id<Setter>,
+    channel_resource_id: Id<Channel>,
+    channel_subscribe_id: Id<Channel>,
+    channel_unsubscribe_id: Id<Channel>,
+    channel_notify_id: Id<Channel>,
 }
 
 impl<C: Controller> WebPush<C> {
@@ -168,28 +196,20 @@ impl<C: Controller> WebPush<C> {
         Id::new("service:webpush@link.mozilla.org")
     }
 
-    pub fn getter_resource_id() -> Id<Getter> {
-        Id::new("getter:resource.webpush@link.mozilla.org")
+    pub fn channel_resource_id() -> Id<Channel> {
+        Id::new("channel:resource.webpush@link.mozilla.org")
     }
 
-    pub fn getter_subscription_id() -> Id<Getter> {
-        Id::new("getter:subscription.webpush@link.mozilla.org")
+    pub fn channel_subscribe_id() -> Id<Channel> {
+        Id::new("channel:subscription.webpush@link.mozilla.org")
     }
 
-    pub fn setter_resource_id() -> Id<Setter> {
-        Id::new("setter:resource.webpush@link.mozilla.org")
+    pub fn channel_unsubscribe_id() -> Id<Channel> {
+        Id::new("channel:unsubscribe.webpush@link.mozilla.org")
     }
 
-    pub fn setter_subscribe_id() -> Id<Setter> {
-        Id::new("setter:subscribe.webpush@link.mozilla.org")
-    }
-
-    pub fn setter_unsubscribe_id() -> Id<Setter> {
-        Id::new("setter:unsubscribe.webpush@link.mozilla.org")
-    }
-
-    pub fn setter_notify_id() -> Id<Setter> {
-        Id::new("setter:notify.webpush@link.mozilla.org")
+    pub fn channel_notify_id() -> Id<Channel> {
+        Id::new("channel:notify.webpush@link.mozilla.org")
     }
 }
 
@@ -206,73 +226,64 @@ impl<C: Controller> Adapter for WebPush<C> {
         ADAPTER_VENDOR
     }
 
-    fn version(&self) -> &[u32;4] {
+    fn version(&self) -> &[u32; 4] {
         &ADAPTER_VERSION
     }
 
-    fn fetch_values(&self, mut set: Vec<Id<Getter>>, user: User) -> ResultMap<Id<Getter>, Option<Value>, Error> {
+    fn fetch_values(&self,
+                    mut set: Vec<Id<Channel>>,
+                    user: User)
+                    -> ResultMap<Id<Channel>, Option<Value>, Error> {
         set.drain(..).map(|id| {
-            let user_id = if cfg!(feature = "authentication") {
-                match user {
-                    User::None => {
-                        return (id,
-                                Err(Error::InternalError(InternalError::GenericError("Cannot fetch from this channel without a user.".to_owned()))));
-                    },
-                    User::Id(id) => id
-                }
-            } else {
-                NO_AUTH_USER_ID
-            };
-
+            if cfg!(feature = "authentication") && (user == User::None) {
+                return (id,
+                        Err(Error::Internal(InternalError::GenericError("Cannot fetch from this channel without a user.".to_owned()))));
+            }
             macro_rules! getter_api {
                 ($getter:ident, $getter_id:ident, $getter_type:ident) => (
                     if id == self.$getter_id {
-                        match self.$getter(user_id) {
+                        match self.$getter(&user) {
                             Ok(data) => {
                                 let rsp = $getter_type::new(data);
-                                return (id, Ok(Some(Value::Json(Arc::new(Json(serde_json::to_value(&rsp)))))));
+                                return (id, Ok(Some(Value::new(Json(serde_json::to_value(&rsp))))));
                             },
-                            Err(err) => return (id, Err(Error::InternalError(InternalError::GenericError(format!("Database error: {}", err)))))
+                            Err(err) => return (id, Err(Error::Internal(InternalError::GenericError(format!("Database error: {}", err)))))
                         };
                     }
                 )
             }
 
-            getter_api!(get_subscriptions, getter_subscription_id, SubscriptionGetter);
-            getter_api!(get_resources, getter_resource_id, ResourceGetter);
-            (id.clone(), Err(Error::InternalError(InternalError::NoSuchGetter(id))))
+            getter_api!(get_subscriptions, channel_subscribe_id, SubscriptionGetter);
+            getter_api!(get_resources, channel_resource_id, ResourceGetter);
+            (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
         }).collect()
     }
 
-    fn send_values(&self, mut values: HashMap<Id<Setter>, Value>, user: User) -> ResultMap<Id<Setter>, (), Error> {
+    fn send_values(&self,
+                   mut values: HashMap<Id<Channel>, Value>,
+                   user: User)
+                   -> ResultMap<Id<Channel>, (), Error> {
         values.drain().map(|(id, value)| {
-            let user_id = if cfg!(feature = "authentication") {
-                match user {
-                    User::None => {
-                        return (id,
-                            Err(Error::InternalError(InternalError::GenericError("Cannot send to this channel without a user.".to_owned()))));
-                    },
-                    User::Id(id) => id
-                }
-            } else {
-                NO_AUTH_USER_ID
-            };
+            if cfg!(feature = "authentication") && (user == User::None) {
+                return (id,
+                        Err(Error::Internal(InternalError::GenericError("Cannot send to this channel without a user.".to_owned()))));
+            }
 
-            if id == self.setter_notify_id {
-                match value {
-                    Value::WebPushNotify(notification) => {
-                        match self.set_notify(user_id, &notification) {
+            if id == self.channel_notify_id {
+                match value.cast::<WebPushNotify>() {
+                    Ok(notification) => {
+                        match self.set_notify(&user, notification) {
                             Ok(_) => return (id, Ok(())),
-                            Err(err) => return (id, Err(Error::InternalError(InternalError::GenericError(format!("Database error: {}", err)))))
+                            Err(err) => return (id, Err(Error::Internal(InternalError::GenericError(format!("Database error: {}", err)))))
                         }
                     },
-                   _ => return (id, Err(Error::TypeError(TypeError { expected: Type::WebPushNotify, got: value.get_type() })))
+                   Err(err) => return (id, Err(err))
                 }
             }
 
-            let arc_json_value = match value {
-                Value::Json(v) => v,
-                _ => return (id, Err(Error::TypeError(TypeError { expected: Type::Json, got: value.get_type() })))
+            let arc_json_value = match value.cast::<Json>() {
+                Ok(v) => v,
+                Err(err) => return (id, Err(err))
             };
             let Json(ref json_value) = *arc_json_value;
 
@@ -282,26 +293,19 @@ impl<C: Controller> Adapter for WebPush<C> {
                         let data: Result<$setter_type, _> = serde_json::from_value(json_value.clone());
                         match data {
                             Ok(x) => {
-                                self.$setter(user_id, &x).unwrap();
+                                self.$setter(&user, &x).unwrap();
                                 return (id, Ok(()));
                             }
-                            Err(err) => return (id, Err(Error::InternalError(InternalError::GenericError(format!("While handling {}, cannot serialize value: {}, {:?}", $setter_name, err, json_value)))))
+                            Err(err) => return (id, Err(Error::Internal(InternalError::GenericError(format!("While handling {}, cannot serialize value: {}, {:?}", $setter_name, err, json_value)))))
                         }
                     }
                 )
             }
 
-            setter_api!(set_resources, "set_resources", setter_resource_id, ResourceGetter);
-            setter_api!(set_subscribe, "set_subscribe", setter_subscribe_id, SubscriptionGetter);
-            setter_api!(set_unsubscribe, "set_unsubscribe", setter_unsubscribe_id, SubscriptionGetter);
-            (id.clone(), Err(Error::InternalError(InternalError::NoSuchSetter(id))))
-        }).collect()
-    }
-
-    fn register_watch(&self, mut watch: Vec<WatchTarget>) -> WatchResult
-    {
-        watch.drain(..).map(|(id, _, _)| {
-            (id.clone(), Err(Error::GetterDoesNotSupportWatching(id)))
+            setter_api!(set_resources, "set_resources", channel_resource_id, ResourceGetter);
+            setter_api!(set_subscribe, "set_subscribe", channel_subscribe_id, SubscriptionGetter);
+            setter_api!(set_unsubscribe, "set_unsubscribe", channel_unsubscribe_id, SubscriptionGetter);
+            (id.clone(), Err(Error::Internal(InternalError::NoSuchChannel(id))))
         }).collect()
     }
 }
@@ -311,89 +315,61 @@ impl<C: Controller> WebPush<C> {
         let wp = Arc::new(Self::new(controller));
         let id = WebPush::<C>::id();
         let service_id = WebPush::<C>::service_webpush_id();
-        let getter_resource_id = wp.getter_resource_id.clone();
-        let getter_subscription_id = wp.getter_subscription_id.clone();
-        let setter_resource_id = wp.setter_resource_id.clone();
-        let setter_subscribe_id = wp.setter_subscribe_id.clone();
-        let setter_unsubscribe_id = wp.setter_unsubscribe_id.clone();
-        let setter_notify_id = wp.setter_notify_id.clone();
+        let channel_notify_id = WebPush::<C>::channel_notify_id();
+        let channel_resource_id = WebPush::<C>::channel_resource_id();
+        let channel_subscribe_id = WebPush::<C>::channel_subscribe_id();
+        let channel_unsubscribe_id = WebPush::<C>::channel_unsubscribe_id();
 
         try!(adapt.add_adapter(wp));
-        try!(adapt.add_service(Service::empty(service_id.clone(), id.clone())));
+        try!(adapt.add_service(Service::empty(&service_id, &id)));
 
-        macro_rules! add_getter {
-            ($id:ident, $kind_id:expr) => (
-                try!(adapt.add_getter(Channel {
-                    tags: HashSet::new(),
-                    adapter: id.clone(),
-                    id: $id,
-                    last_seen: None,
-                    service: service_id.clone(),
-                    mechanism: Getter {
-                        kind: ChannelKind::Extension {
-                            vendor: Id::new(ADAPTER_VENDOR),
-                            adapter: Id::new(ADAPTER_NAME),
-                            kind: Id::new($kind_id),
-                            typ: Type::Json,
-                        },
-                        updated: None
-                    }
-                }));
-            )
-        }
-
-        macro_rules! add_setter {
-            ($id:ident, $kind_id:expr) => (
-                try!(adapt.add_setter(Channel {
-                    tags: HashSet::new(),
-                    adapter: id.clone(),
-                    id: $id,
-                    last_seen: None,
-                    service: service_id.clone(),
-                    mechanism: Setter {
-                        kind: ChannelKind::Extension {
-                            vendor: Id::new(ADAPTER_VENDOR),
-                            adapter: Id::new(ADAPTER_NAME),
-                            kind: Id::new($kind_id),
-                            typ: Type::Json,
-                        },
-                        updated: None
-                    }
-                }));
-            )
-        }
-
-        try!(adapt.add_setter(Channel {
-            tags: HashSet::new(),
-            adapter: id.clone(),
-            id: setter_notify_id,
-            last_seen: None,
+        let template = Channel {
             service: service_id.clone(),
-            mechanism: Setter {
-                kind: ChannelKind::WebPushNotify,
-                updated: None
-            }
+            adapter: id.clone(),
+            ..Channel::default()
+        };
+
+        let notify_format = Arc::new(io::Format::new::<WebPushNotify>());
+        try!(adapt.add_channel(Channel {
+            feature: Id::new("webpush/notify-msg"),
+            supports_send: Some(Signature::accepts(Maybe::Required(notify_format))),
+            id: channel_notify_id,
+            ..template.clone()
         }));
 
-        add_getter!(getter_resource_id, "WebPushResource");
-        add_getter!(getter_subscription_id, "WebPushSubscription");
-        add_setter!(setter_resource_id, "WebPushResource");
-        add_setter!(setter_subscribe_id, "WebPushSubscription");
-        add_setter!(setter_unsubscribe_id, "WebPushSubscription");
+        try!(adapt.add_channel(Channel {
+            feature: Id::new("webpush/resource"),
+            supports_fetch: Some(Signature::returns(Maybe::Required(format::JSON.clone()))), // FIXME: Turn this into a more specific type?
+            supports_send: Some(Signature::accepts(Maybe::Required(format::JSON.clone()))), // FIXME: Turn this into a more specific type?
+            id: channel_resource_id,
+            ..template.clone()
+        }));
+
+        try!(adapt.add_channel(Channel {
+            feature: Id::new("webpush/subscribe"),
+            supports_fetch: Some(Signature::returns(Maybe::Required(format::JSON.clone()))), // FIXME: Turn this into a more specific type?
+            supports_send: Some(Signature::accepts(Maybe::Required(format::JSON.clone()))), // FIXME: Turn this into a more specific type?
+            id: channel_subscribe_id,
+            ..template.clone()
+        }));
+
+        try!(adapt.add_channel(Channel {
+            feature: Id::new("webpush/unsubscribe"),
+            supports_send: Some(Signature::accepts(Maybe::Required(format::JSON.clone()))), // FIXME: Turn this into a more specific type?
+            id: channel_unsubscribe_id,
+            ..template.clone()
+        }));
         Ok(())
     }
 
-    fn new(controller: C) -> Self
-    {
+    fn new(controller: C) -> Self {
         WebPush {
             controller: controller,
             crypto: CryptoContext::new().unwrap(),
-            getter_resource_id: Self::getter_resource_id(),
-            getter_subscription_id: Self::getter_subscription_id(),
-            setter_resource_id: Self::setter_resource_id(),
-            setter_subscribe_id: Self::setter_subscribe_id(),
-            setter_unsubscribe_id: Self::setter_unsubscribe_id(),
-            setter_notify_id: Self::setter_notify_id(),
+            channel_resource_id: Self::channel_resource_id(),
+            channel_subscribe_id: Self::channel_subscribe_id(),
+            channel_unsubscribe_id: Self::channel_unsubscribe_id(),
+            channel_notify_id: Self::channel_notify_id(),
         }
     }
 
@@ -401,40 +377,40 @@ impl<C: Controller> WebPush<C> {
         db::WebPushDb::new(&self.controller.get_profile().path_for("webpush.sqlite"))
     }
 
-    fn set_subscribe(&self, user_id: i32, setter: &SubscriptionGetter) -> rusqlite::Result<()> {
+    fn set_subscribe(&self, user: &User, setter: &SubscriptionGetter) -> rusqlite::Result<()> {
         let db = self.get_db();
         for sub in &setter.subscriptions {
-            try!(db.subscribe(user_id, sub));
+            try!(db.subscribe(&user, sub));
         }
         Ok(())
     }
 
-    fn set_unsubscribe(&self, user_id: i32, setter: &SubscriptionGetter) -> rusqlite::Result<()> {
+    fn set_unsubscribe(&self, user: &User, setter: &SubscriptionGetter) -> rusqlite::Result<()> {
         let db = self.get_db();
         for sub in &setter.subscriptions {
-            try!(db.unsubscribe(user_id, &sub.push_uri));
+            try!(db.unsubscribe(&user, &sub.push_uri));
         }
         Ok(())
     }
 
-    fn set_resources(&self, user_id: i32, setter: &ResourceGetter) -> rusqlite::Result<()> {
-        try!(self.get_db().set_resources(user_id, &setter.resources));
+    fn set_resources(&self, user: &User, setter: &ResourceGetter) -> rusqlite::Result<()> {
+        try!(self.get_db().set_resources(&user, &setter.resources));
         Ok(())
     }
 
-    fn get_resources(&self, user_id: i32) -> rusqlite::Result<Vec<String>> {
-        self.get_db().get_resources(user_id)
+    fn get_resources(&self, user: &User) -> rusqlite::Result<Vec<String>> {
+        self.get_db().get_resources(user)
     }
 
-    fn get_subscriptions(&self, user_id: i32) -> rusqlite::Result<Vec<Subscription>> {
-        self.get_db().get_subscriptions(user_id)
+    fn get_subscriptions(&self, user: &User) -> rusqlite::Result<Vec<Subscription>> {
+        self.get_db().get_subscriptions(user)
     }
 
     fn get_resource_subscriptions(&self, resource: &str) -> rusqlite::Result<Vec<Subscription>> {
         self.get_db().get_resource_subscriptions(resource)
     }
 
-    fn set_notify(&self, _: i32, setter: &WebPushNotify) -> rusqlite::Result<()> {
+    fn set_notify(&self, _: &User, setter: &WebPushNotify) -> rusqlite::Result<()> {
         info!("notify on resource {}: {}", setter.resource, setter.message);
 
         let subscriptions = try!(self.get_resource_subscriptions(&setter.resource));
@@ -443,12 +419,44 @@ impl<C: Controller> WebPush<C> {
         } else {
             let json = json!({resource: setter.resource, message: setter.message});
             let crypto = self.crypto.clone();
+            let gcm_api_key =
+                self.controller.get_config().get_or_set_default("webpush", "gcm_api_key", "");
+
             thread::spawn(move || {
                 for sub in subscriptions {
-                    sub.notify(&crypto, &json);
+                    sub.notify(&crypto, &gcm_api_key, &json);
                 }
             });
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct WebPushNotify {
+    pub resource: String,
+    pub message: String,
+}
+
+impl Data for WebPushNotify {
+    fn description() -> String {
+        "WebPushNotify".to_owned()
+    }
+    fn parse(path: Path, source: &JSON, binary: &io::BinarySource) -> Result<Self, Error> {
+        let resource = try!(path.push("resource", |path| String::parse_field(path, source, binary, "resource")));
+        let message =
+            try!(path.push("message", |path| String::parse_field(path, source, binary, "message")));
+        Ok(WebPushNotify {
+            resource: resource,
+            message: message,
+        })
+    }
+    fn serialize(source: &Self, _binary: &io::BinaryTarget) -> Result<JSON, Error> {
+        let json = vec![
+            ("resource", &source.resource),
+            ("message", &source.message),
+        ]
+            .to_json();
+        Ok(json)
     }
 }

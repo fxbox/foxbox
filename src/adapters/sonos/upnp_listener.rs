@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! UPnP listener for Sonos speakers.
 //!
@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use foxbox_taxonomy::manager::*;
 
-use config_store::ConfigService;
+use foxbox_core::config_store::ConfigService;
 use super::SonosAdapter;
 use super::SonosServiceMap;
-use upnp::{ UpnpListener, UpnpService };
+use foxbox_core::upnp::{UpnpListener, UpnpService};
 
 pub struct SonosUpnpListener {
     manager: Arc<AdapterManager>,
@@ -23,7 +23,10 @@ pub struct SonosUpnpListener {
 }
 
 impl SonosUpnpListener {
-    pub fn new(manager: &Arc<AdapterManager>, services: SonosServiceMap, config: &Arc<ConfigService>) -> Box<Self> {
+    pub fn new(manager: &Arc<AdapterManager>,
+               services: SonosServiceMap,
+               config: &Arc<ConfigService>)
+               -> Box<Self> {
         Box::new(SonosUpnpListener {
             manager: manager.clone(),
             services: services,
@@ -65,8 +68,15 @@ impl UpnpListener for SonosUpnpListener {
         let name = try_get!(service.description, "/root/device/friendlyName").clone();
         let manufacturer = try_get!(service.description, "/root/device/manufacturer");
 
-        SonosAdapter::init_service(&self.manager, self.services.clone(), &self.config,
-                                   &udn, &url, &name, &manufacturer, &model_name).unwrap();
+        SonosAdapter::init_service(&self.manager,
+                                   self.services.clone(),
+                                   &self.config,
+                                   &udn,
+                                   &url,
+                                   &name,
+                                   manufacturer,
+                                   model_name)
+            .unwrap();
         true
     }
 }

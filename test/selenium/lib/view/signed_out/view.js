@@ -1,17 +1,11 @@
 'use strict';
 
-var webdriver = require('selenium-webdriver');
-var SignedOutPageAccessor = require('./accessors.js');
+const View = require('../view.js');
 
-function SignedOutPageView(driver) {
-    this.driver = driver;
-    this.accessors = new SignedOutPageAccessor(this.driver);
-};
+function SignedOutPageView() {
+  View.apply(this, arguments);
 
-SignedOutPageView.prototype = {
-    hasSignedOut: function() {
-        return this.accessors.root;
-    }
-};
+  this.accessor.root;
+}
 
 module.exports = SignedOutPageView;

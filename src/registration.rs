@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 /// This manages registration of the foxbox with the discovery endpoint.
 /// For now it simply register itselfs every N minutes with the endpoint,
@@ -12,20 +12,19 @@ extern crate hyper;
 use self::hyper::Client;
 use self::hyper::header::Connection;
 use self::hyper::status::StatusCode;
-use self::get_if_addrs::{ IfAddr, Interface };
+use self::get_if_addrs::{IfAddr, Interface};
+use foxbox_core::traits::Controller;
 use serde_json;
 use std::io::Read;
 use std::time::Duration;
 use std::thread;
-use tls::{ CertificateManager, DnsRecord, get_san_cert_for, register_dns_record };
-use traits::Controller;
-use tunnel_controller:: { Tunnel };
+use tls::{CertificateManager, DnsRecord, get_san_cert_for, register_dns_record};
+use tunnel_controller::Tunnel;
 
 const REGISTRATION_INTERVAL_IN_MINUTES: u32 = 1;
 
 pub struct Registrar {
     certificate_manager: CertificateManager,
-    top_level_domain: String,
     registration_endpoint: String,
     dns_api_endpoint: String,
 }
@@ -40,40 +39,26 @@ struct RegistrationRequest {
 
 impl Registrar {
     pub fn new(certificate_manager: CertificateManager,
-               top_level_domain: String,
                registration_endpoint: String,
-               dns_api_endpoint: String) -> Registrar {
+               dns_api_endpoint: String)
+               -> Registrar {
         Registrar {
             certificate_manager: certificate_manager,
-            top_level_domain: top_level_domain,
             registration_endpoint: format!("{}/register", registration_endpoint),
             dns_api_endpoint: dns_api_endpoint,
         }
     }
 
-    fn get_fingerprint(&self) -> String {
-        self.certificate_manager.get_box_certificate()
-                                .unwrap()
-                                .get_certificate_fingerprint()
-    }
-
-    fn get_common_name(&self) -> String {
-        format!("{}.{}", self.get_fingerprint(), self.top_level_domain)
-    }
-
-    pub fn get_local_dns_name(&self) -> String {
-        format!("local.{}", self.get_common_name())
-    }
-
-    pub fn get_remote_dns_name(&self) -> String {
-        format!("remote.{}", self.get_common_name())
-    }
-
-    fn register_with_registration_server(&self, ip_addr: String, http_scheme: &str, box_port: u16, tunnel_enabled: bool) -> () {
+    fn register_with_registration_server(&self,
+                                         ip_addr: String,
+                                         http_scheme: &str,
+                                         box_port: u16,
+                                         tunnel_enabled: bool)
+                                         -> () {
         let message = json!({
-            local_origin: format!("{}://{}:{}", http_scheme, self.get_local_dns_name(), box_port),
+            local_origin: format!("{}://{}:{}", http_scheme, self.certificate_manager.get_local_dns_name(), box_port),
             tunnel_origin: if tunnel_enabled {
-                Some(format!("{}://{}", http_scheme, self.get_remote_dns_name()))
+                Some(format!("{}://{}", http_scheme, self.certificate_manager.get_remote_dns_name()))
             } else {
                 None
             }
@@ -81,7 +66,7 @@ impl Registrar {
 
         let body = match serde_json::to_string(&RegistrationRequest {
             message: message,
-            client: self.get_fingerprint(),
+            client: self.certificate_manager.get_fingerprint(),
             local_ip: ip_addr,
         }) {
             Ok(body) => body,
@@ -91,6 +76,7 @@ impl Registrar {
             }
         };
 
+        debug!("Registering {}", body);
         let client = Client::new();
         let res = client.post(&self.registration_endpoint)
             .header(Connection::close())
@@ -102,7 +88,7 @@ impl Registrar {
         if let Ok(mut response) = res {
             if response.status == StatusCode::Ok {
                 let mut body = String::new();
-                if let Ok(_) = response.read_to_string(&mut body) {
+                if response.read_to_string(&mut body).is_ok() {
                     info!("registration server responded with: {}", body);
                 } else {
                     warn!("registration server: Unable to read answer from {}", self.registration_endpoint);
@@ -121,52 +107,48 @@ impl Registrar {
     fn register_with_dns_server(&self, ip_addr: String, tunnel_frontend: Option<String>) {
         let client_certificate = self.certificate_manager.get_box_certificate().unwrap();
 
-        let local_name = self.get_local_dns_name();
+        let local_name = self.certificate_manager.get_local_dns_name();
         // Create entry for local DNS
         info!("DNS server: Creating DNS entry for {}", local_name);
-        let result = register_dns_record(
-            client_certificate.clone(),
-            &DnsRecord {
-                record_type: "A",
-                name: &local_name,
-                value: &ip_addr,
-            },
-            &self.dns_api_endpoint.clone(),
-        );
+        let result = register_dns_record(client_certificate.clone(),
+                                         &DnsRecord {
+                                             record_type: "A",
+                                             name: &local_name,
+                                             value: &ip_addr,
+                                         },
+                                         &self.dns_api_endpoint.clone());
 
-        if let Err(_) = result {
+        if result.is_err() {
             warn!("DNS server: Could not create DNS entry for {}", local_name);
         }
 
         if let Some(tunnel_frontend) = tunnel_frontend {
-            let remote_name = self.get_remote_dns_name();
+            let remote_name = self.certificate_manager.get_remote_dns_name();
             info!("DNS server: Creating DNS entry for {}", remote_name);
-            let result = register_dns_record(
-                client_certificate.clone(),
-                &DnsRecord {
-                    record_type: "CNAME",
-                    name: &remote_name,
-                    value: &tunnel_frontend,
-                },
-                &self.dns_api_endpoint.clone(),
-            );
+            let result = register_dns_record(client_certificate.clone(),
+                                             &DnsRecord {
+                                                 record_type: "CNAME",
+                                                 name: &remote_name,
+                                                 value: &tunnel_frontend,
+                                             },
+                                             &self.dns_api_endpoint.clone());
 
-            if let Err(_) = result {
+            if result.is_err() {
                 warn!("DNS server: Could not create DNS entry for {}", remote_name);
             }
         }
     }
 
     fn register_certificates(&self) {
-        if self.certificate_manager.get_certificate(&self.get_local_dns_name()).is_none() {
-            let domains = vec![self.get_local_dns_name(), self.get_remote_dns_name()];
+        if self.certificate_manager
+            .get_certificate(&self.certificate_manager.get_local_dns_name())
+            .is_none() {
+            let domains = vec![self.certificate_manager.get_local_dns_name(), self.certificate_manager.get_remote_dns_name()];
 
             info!("Getting/renewing LetsEncrypt certificate for: {:?}", domains);
-            let rx = get_san_cert_for(
-                domains.into_iter(),
-                self.certificate_manager.clone(),
-                self.dns_api_endpoint.clone()
-            );
+            let rx = get_san_cert_for(domains.into_iter(),
+                                      self.certificate_manager.clone(),
+                                      self.dns_api_endpoint.clone());
 
             rx.recv().unwrap().unwrap();
             self.certificate_manager.reload().unwrap();
@@ -197,14 +179,11 @@ impl Registrar {
         };
         let enabled_tls = controller.get_tls_enabled();
 
-        let http_scheme = if enabled_tls {
-            "https"
-        } else {
-            "http"
-        };
+        let http_scheme = if enabled_tls { "https" } else { "http" };
 
         // Spawn a thread to register every REGISTRATION_INTERVAL_IN_MINUTES.
-        thread::Builder::new().name("Registrar".to_owned())
+        thread::Builder::new()
+            .name("Registrar".to_owned())
             .spawn(move || {
                 let tunnel_configured = tunnel_frontend.clone().is_some();
 
@@ -216,18 +195,18 @@ impl Registrar {
                     // TODO: If the ip address changes, we need to update the dns server and
                     // registration server with the new IP address.
                     // https://github.com/fxbox/foxbox/issues/348
-                    self.register_with_registration_server(
-                        ip_addr.clone().unwrap(),
-                        http_scheme,
-                        box_port,
-                        tunnel_configured
-                    );
-                    self.register_with_dns_server(ip_addr.clone().unwrap(), tunnel_frontend.clone());
+                    self.register_with_registration_server(ip_addr.clone().unwrap(),
+                                                           http_scheme,
+                                                           box_port,
+                                                           tunnel_configured);
+                    self.register_with_dns_server(ip_addr.clone().unwrap(),
+                                                  tunnel_frontend.clone());
 
                     // Go to sleep.
                     thread::sleep(Duration::from_secs(REGISTRATION_INTERVAL_IN_MINUTES as u64 * 60))
                 }
-            }).unwrap();
+            })
+            .unwrap();
     }
 
     /// return the host IP address of the first valid interface.
@@ -250,8 +229,10 @@ impl Registrar {
     /// This is a private function that to which we pass the ifaces
     /// This is so that we can shim get_if_addrs() in tests with a
     /// pre-set list of interfaces.
-    fn get_ip_addr_from_ifaces(&self, ifaces: &[Interface],
-                               want_iface: &Option<String>) -> Option<String> {
+    fn get_ip_addr_from_ifaces(&self,
+                               ifaces: &[Interface],
+                               want_iface: &Option<String>)
+                               -> Option<String> {
 
         let mut ip_addr: Option<String> = None;
         let mut ipv6_addr: Option<String> = None;
@@ -264,7 +245,8 @@ impl Registrar {
                          iface.name.starts_with("wlan") ||
                          iface.name.starts_with("en") ||
                          iface.name.starts_with("em") ||
-                         iface.name.starts_with("wlp3s")) {
+                         iface.name.starts_with("wlp3s") ||
+                         iface.name.starts_with("wlp4s")) {
                         continue;
                     },
                     Some(iface_name) =>
@@ -291,7 +273,6 @@ impl Registrar {
         }
         ip_addr
     }
-
 }
 
 #[cfg(test)]
@@ -301,9 +282,8 @@ describe! registrar {
         use std::path::PathBuf;
         use tls::{ CertificateManager, SniSslContextProvider };
         let registrar = Registrar::new(
-            CertificateManager::new(PathBuf::from(current_dir!()), Box::new(SniSslContextProvider::new())),
-            "box.knilxof.org".to_owned(),
-            "http://knilxof.org:4242/".to_owned(),
+            CertificateManager::new(PathBuf::from(current_dir!()), "knilxof.org", Box::new(SniSslContextProvider::new())),
+            "https://knilxof.org:4443/".to_owned(),
             "https://knilxof.org:5300".to_owned()
         );
     }

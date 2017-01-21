@@ -1,4 +1,3 @@
-//!
 //! The API for communicating with devices.
 //!
 //! This API is provided as Traits to be implemented:
@@ -13,58 +12,96 @@
 //!
 //!
 
+use channel::Channel;
+use io::*;
 use services::*;
 use selector::*;
-pub use util::{ ResultMap, TargetMap, Targetted };
-use values::{ Value, Range, TypeError };
+pub use util::{ResultMap, TargetMap, Targetted};
+use values::TypeError;
 
 use transformable_channels::mpsc::*;
 
-use std::{ error, fmt };
+use std::{error, fmt};
 use std::error::Error as std_error;
+use std::sync::Arc;
 
-use serde::ser::Serialize;
-use serde_json::value::Serializer;
+use serde_json;
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub enum Operation {
+    Fetch,
+    Send,
+    Watch,
+}
+impl fmt::Display for Operation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Operation::*;
+        match *self {
+            Fetch => f.write_str("Fetch"),
+            Send => f.write_str("Send"),
+            Watch => f.write_str("Watch"),
+        }
+    }
+}
+impl ToJSON for Operation {
+    fn to_json(&self) -> JSON {
+        use self::Operation::*;
+        match *self {
+                Fetch => "Fetch",
+                Send => "Send",
+                Watch => "Watch",
+            }
+            .to_json()
+    }
+}
 
 /// An error that arose during interaction with either a device, an adapter or the
 /// adapter manager
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
-    /// Attempting to fetch a value from a Channel<Getter> that doesn't support this operation.
-    GetterDoesNotSupportPolling(Id<Getter>),
+    /// Attempting to execute a value from a Channel that doesn't support this operation.
+    OperationNotSupported(Operation, Id<Channel>),
 
-    /// Attempting to watch a value from a Channel<Getter> that doesn't support this operation.
-    GetterDoesNotSupportWatching(Id<Getter>),
-
-    /// Attempting to watch all values from a Channel<Getter> that requires a filter.
-    /// For instance, some Channel<Getter> may be updated 60 times per second. Attempting to
+    /// Attempting to watch all values from a Channel that requires a filter.
+    /// For instance, some Channel may be updated 60 times per second. Attempting to
     /// watch all values could easily exceed the capacity of the network or exhaust the battery.
     /// In such a case, the adapter should return this error.
-    GetterRequiresThresholdForWatching(Id<Getter>),
+    GetterRequiresThresholdForWatching(Id<Channel>),
 
     /// Attempting to send a value with a wrong type.
-    TypeError(TypeError),
-
-    /// Attempting to use an inconsistent range. For instance, one with `min > max`.
-    RangeError(Range),
+    WrongType(TypeError),
 
     /// Attempting to send an invalid value. For instance, a time of day larger than 24h.
-    InvalidValue(Value),
+    InvalidValue,
 
     /// An error internal to the foxbox or an adapter. Normally, these errors should never
     /// arise from the high-level API.
-    InternalError(InternalError),
+    Internal(InternalError),
+
+    // An error happened while attempting to parse a value.
+    Parsing(ParseError),
+
+    // An error happened while attempting to serialize a value.
+    Serializing(SerializeError),
 }
 
 impl ToJSON for Error {
     fn to_json(&self) -> JSON {
-        let mut serializer = Serializer::new();
-        match self.serialize(&mut serializer) {
-            // FIXME: I don't think that this can explode, but there doesn't seem to
-            // be any way to check :/
-            Ok(()) => serializer.unwrap(),
-            Err(_) =>
-                vec![("Internal error while serializing", "")].to_json()
+        use self::Error::*;
+        match *self {
+            OperationNotSupported(ref op, ref id) => {
+                vec![("OperationNotSupported",
+                      vec![("operation", op.to_json()), ("channel", id.to_json())])]
+                    .to_json()
+            }
+            GetterRequiresThresholdForWatching(ref id) => {
+                vec![("GetterRequiresThresholdForWatching", id.to_json())].to_json()
+            }
+            InvalidValue => "InvalidValue".to_json(),
+            Internal(_) => "Internal Error".to_json(), // FIXME: Implement ToJSON for InternalError as well
+            Parsing(ref err) => vec![("ParseError", serde_json::to_value(err))].to_json(),
+            Serializing(ref err) => vec![("SerializeError", serde_json::to_value(err))].to_json(),
+            WrongType(ref err) => vec![("TypeError", serde_json::to_value(err))].to_json(),
         }
     }
 }
@@ -72,13 +109,17 @@ impl ToJSON for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::GetterDoesNotSupportPolling(ref getter) |
-            Error::GetterDoesNotSupportWatching(ref getter) |
-            Error::GetterRequiresThresholdForWatching(ref getter) => write!(f, "{}: {}", self.description(), getter),
-            Error::TypeError(ref err) => write!(f, "{}: {}", self.description(), err),
-            Error::RangeError(ref range) => write!(f, "{}: {:?}", self.description(), range),
-            Error::InvalidValue(ref value) => write!(f, "{}: {:?}",self.description(), value),
-            Error::InternalError(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for InternalError as well
+            Error::OperationNotSupported(ref operation, ref channel) => {
+                write!(f, "{}: {} {}", self.description(), operation, channel)
+            }
+            Error::GetterRequiresThresholdForWatching(ref getter) => {
+                write!(f, "{}: {}", self.description(), getter)
+            }
+            Error::WrongType(ref err) => write!(f, "{}: {}", self.description(), err),
+            Error::InvalidValue => write!(f, "{}", self.description()),
+            Error::Internal(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for InternalError as well
+            Error::Parsing(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for ParseError as well
+            Error::Serializing(ref err) => write!(f, "{}: {:?}", self.description(), err), // TODO implement Display for ParseError as well
         }
     }
 }
@@ -86,43 +127,45 @@ impl fmt::Display for Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::GetterDoesNotSupportPolling(_) => "Attempting to fetch a value from a Channel<Getter> that doesn't support this operation",
-            Error::GetterDoesNotSupportWatching(_) => "Attempting to watch a value from a Channel<Getter> that doesn't support this operation",
-            Error::GetterRequiresThresholdForWatching(_) => "Attempting to watch all value from a Channel<Getter> that requires a filter",
-            Error::TypeError(_) => "Attempting to send a value with a wrong type",
-            Error::RangeError(_) => "Attempting to use an inconsistent range",
-            Error::InvalidValue(_) => "Attempting to send an invalid value",
-            Error::InternalError(_) => "Internal Error" // TODO implement Error for InternalError as well
+            Error::OperationNotSupported(_, _) => {
+                "Attempting to perform a call to a Channel that does not support such calls"
+            }
+            Error::GetterRequiresThresholdForWatching(_) => {
+                "Attempting to watch all value from a Channel that requires a filter"
+            }
+            Error::WrongType(_) => "Attempting to send a value with a wrong type",
+            Error::InvalidValue => "Attempting to send an invalid value",
+            Error::Internal(_) => "Internal Error", // TODO implement Error for InternalError as well
+            Error::Parsing(ref err) => err.description(),
+            Error::Serializing(ref err) => err.description(),
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            Error::TypeError(ref err) => Some(err),
-            _ => None
+            Error::WrongType(ref err) => Some(err),
+            _ => None,
         }
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub enum InternalError {
-    /// Attempting to fetch or watch a getter that isn't registered.
-    NoSuchGetter(Id<Getter>),
-    /// Attempting to send values to a setter that isn't registered.
-    NoSuchSetter(Id<Setter>),
+    /// Attempting to use a channel that isn't registered.
+    NoSuchChannel(Id<Channel>),
     /// Attempting to access a service that isn't registered.
     NoSuchService(Id<ServiceId>),
     /// Attempting to access an adapter that isn't registered.
     NoSuchAdapter(Id<AdapterId>),
 
-    /// Attempting to register a getter with an id that is already used.
-    DuplicateGetter(Id<Getter>),
-    /// Attempting to register a setter with an id that is already used.
-    DuplicateSetter(Id<Setter>),
+    /// Attempting to register a channel with an id that is already used.
+    DuplicateChannel(Id<Channel>),
     /// Attempting to register a service with an id that is already used.
     DuplicateService(Id<ServiceId>),
     /// Attempting to register an adapter with an id that is already used.
     DuplicateAdapter(Id<AdapterId>),
+
+    WrongChannel(Id<Channel>),
 
     /// Attempting to register a channel with an adapter that doesn't match that of its service.
     ConflictingAdapter(Id<AdapterId>, Id<AdapterId>),
@@ -137,46 +180,44 @@ pub enum InternalError {
 }
 
 /// An event during watching.
-#[derive(Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum WatchEvent {
     /// If a range was specified when we registered for watching, `EnterRange` is fired whenever
     /// we enter this range. If `Always` was specified, `EnterRange` is fired whenever a new value
     /// is available. Otherwise, never fired.
     EnterRange {
         /// The channel that sent the value.
-        from: Id<Getter>,
+        channel: Id<Channel>,
 
         /// The actual value.
-        value: Value
+        value: Payload,
+
+        format: Arc<Format>,
     },
 
     /// If a range was specified when we registered for watching, `ExitRange` is fired whenever
     /// we exit this range. Otherwise, never fired.
     ExitRange {
         /// The channel that sent the value.
-        from: Id<Getter>,
+        channel: Id<Channel>,
 
         /// The actual value.
-        value: Value
+        value: Payload,
+
+        format: Arc<Format>,
     },
 
     /// The set of devices being watched has changed, typically either
     /// because a tag was edited or because a device was
     /// removed. Payload is the id of the device that was removed.
-    GetterRemoved(Id<Getter>),
+    ChannelRemoved(Id<Channel>),
 
     /// The set of devices being watched has changed, typically either
     /// because a tag was edited or because a device was
     /// added. Payload is the id of the device that was added.
-    GetterAdded(Id<Getter>),
+    ChannelAdded(Id<Channel>),
 
-    /// One of the channels encountered an error during initialization.
-    /// This channel will not be watched, but other channels will remain
-    /// watched.
-    InitializationError {
-        channel: Id<Getter>,
-        error: Error
-    },
+    Error { channel: Id<Channel>, error: Error },
 }
 
 /// User identifier that will be passed from the REST API handlers to the
@@ -184,68 +225,80 @@ pub enum WatchEvent {
 #[derive(Debug, Clone, PartialEq)]
 pub enum User {
     None,
-    Id(i32)
+    Id(String),
 }
 
 #[test]
 fn test_user_partialeq() {
     assert_eq!(User::None, User::None);
-    assert_eq!(User::Id(1), User::Id(1));
+    assert_eq!(User::Id(String::from("1")), User::Id(String::from("1")));
 }
 
-impl<K> Parser<Targetted<K, Value>> for Targetted<K, Value> where K: Parser<K> + Clone {
+impl<P, T> Parser<Targetted<T, Payload>> for Targetted<P, Payload>
+    where P: Parser<T>,
+          T: Clone
+{
     fn description() -> String {
-        format!("Targetted<{}, Value>", K::description())
+        format!("Targetted<{}, Value>", P::description())
     }
-    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
+    fn parse(path: Path, source: &JSON) -> Result<Targetted<T, Payload>, ParseError> {
         if source.is_object() {
             // Default format: an object {select, value}.
-            let select = try!(path.push("select", |path| Vec::<K>::take(path, source, "select")));
-            let payload = try!(path.push("value", |path| Value::take(path, source, "value")));
+            let select = try!(path.push("select", |path| Vec::<P>::take(path, source, "select")));
+            let payload = try!(path.push("value", |path| Payload::take(path, source, "value")));
             Ok(Targetted {
                 select: select,
-                payload: payload
+                payload: payload,
             })
-        } else if let JSON::Array(ref mut array) = *source {
+        } else if let JSON::Array(ref array) = *source {
             // Fallback format: an array of two values.
             if array.len() != 2 {
-                return Err(ParseError::type_error(&Self::description() as &str, &path, "an array of length 2"))
+                return Err(ParseError::type_error(&Self::description() as &str,
+                                                  &path,
+                                                  "an array of length 2"));
             }
-            let mut right = array.pop().unwrap(); // We just checked that length == 2
-            let mut left = array.pop().unwrap(); // We just checked that length == 2
-            let select = try!(path.push_index(0, |path| Vec::<K>::parse(path, &mut left)));
-            let payload = try!(path.push_index(1, |path| Value::parse(path, &mut right)));
+            let select = try!(path.push_index(0, |path| Vec::<P>::parse(path, &array[0])));
+            let payload = try!(path.push_index(1, |path| Payload::parse(path, &array[1])));
             Ok(Targetted {
                 select: select,
-                payload: payload
+                payload: payload,
             })
         } else {
-            Err(ParseError::type_error(&Self::description() as &str, &path, "an object {select, value}"))
+            Err(ParseError::type_error(&Self::description() as &str,
+                                       &path,
+                                       "an object {select, value}"))
         }
     }
 }
 
-impl<K> Parser<Targetted<K, Exactly<Range>>> for Targetted<K, Exactly<Range>> where K: Parser<K> + Clone {
+impl<P, T> Parser<Targetted<T, Exactly<Payload>>> for Targetted<P, Exactly<Payload>>
+    where P: Parser<T>,
+          T: Clone
+{
     fn description() -> String {
-        format!("Targetted<{}, Value>", K::description())
+        format!("Targetted<{}, range>", P::description())
     }
-    fn parse(path: Path, source: &mut JSON) -> Result<Self, ParseError> {
-        let select = try!(path.push("select", |path| Vec::<K>::take(path, source, "select")));
+    fn parse(path: Path, source: &JSON) -> Result<Targetted<T, Exactly<Payload>>, ParseError> {
+        let select = try!(path.push("select", |path| Vec::<P>::take(path, source, "select")));
         if let Some(&JSON::String(ref str)) = source.find("range") {
-            if &str as &str == "Never" {
+            if str == "Never" {
                 return Ok(Targetted {
                     select: select,
-                    payload: Exactly::Never
-                })
+                    payload: Exactly::Never,
+                });
             }
         }
-        let payload = match path.push("range", |path| Exactly::<Range>::take_opt(path, source, "range")) {
-            Some(result) => try!(result),
-            None => Exactly::Always
+        let result = match path.push("range",
+                                     |path| Exactly::<Payload>::take_opt(path, source, "range")) {
+            Some(Ok(Exactly::Exactly(payload))) => Exactly::Exactly(payload),
+            Some(Ok(Exactly::Always)) |
+            None => Exactly::Always,
+            Some(Ok(Exactly::Never)) => Exactly::Never,
+            Some(Err(err)) => return Err(err),
         };
         Ok(Targetted {
             select: select,
-            payload: payload
+            payload: result,
         })
     }
 }
@@ -258,63 +311,7 @@ pub trait API: Send {
     /// the metadata on all services matching _either_ `req1` or `req2`
     /// or ...
     ///
-    /// # REST API
-    ///
-    /// `GET /api/v1/services`
-    ///
-    /// ### JSON
-    ///
-    /// This call accepts as JSON argument a vector of `ServiceSelector`. See the documentation
-    /// of `ServiceSelector` for more details.
-    ///
-    /// Example: Select all doors in the entrance (tags `door`, `entrance`)
-    /// that support setter channel `OpenClosed`
-    ///
-    /// ```
-    /// # use foxbox_taxonomy::selector::*;
-    ///
-    /// let source = r#"[{
-    ///   "tags": ["entrance", "door"],
-    ///   "getters": [
-    ///     {
-    ///       "kind": "OpenClosed"
-    ///     }
-    ///   ]
-    /// }]"#;
-    ///
-    /// # Vec::<ServiceSelector>::from_str(&source).unwrap();
-    /// ```
-    ///
-    ///
-    /// ## Errors
-    ///
-    /// In case of syntax error, Error 400, accompanied with a
-    /// somewhat human-readable JSON string detailing the error.
-    ///
-    /// ## Success
-    ///
-    /// A JSON representing an array of `Service`. See the implementation
-    /// of `Service` for details.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// # let source =
-    /// r#"[{
-    ///   "tags": ["entrance", "door", "somevendor"],
-    ///   "id: "some-service-id",
-    ///   "getters": [],
-    ///   "setters": [
-    ///     "tags": ["tag 1", "tag 2"],
-    ///     "id": "some-channel-id",
-    ///     "service": "some-service-id",
-    ///     "updated": "2014-11-28T12:00:09+00:00",
-    ///     "mechanism": "setter",
-    ///     "kind": "OnOff"
-    ///   ]
-    /// }]"#;
-    /// ```
-    fn get_services(& self, Vec<ServiceSelector>) -> Vec<Service>;
+    fn get_services(&self, Vec<ServiceSelector>) -> Vec<Service>;
 
     /// Label a set of services with a set of tags.
     ///
@@ -329,47 +326,7 @@ pub trait API: Send {
     ///
     /// Note that this call is _not live_. In other words, if services
     /// are added after the call, they will not be affected.
-    ///
-    /// # REST API
-    ///
-    /// `POST /api/v1/services/tag`
-    ///
-    /// ## JSON
-    ///
-    /// A JSON object with the following fields:
-    /// - services: array - an array of `ServiceSelector`;
-    /// - tags: array - an array of string
-    ///
-    /// ```
-    /// # extern crate serde;
-    /// # extern crate serde_json;
-    /// # extern crate foxbox_taxonomy;
-    /// # use foxbox_taxonomy::services::*;
-    /// # use foxbox_taxonomy::selector::*;
-    ///
-    /// # fn main() {
-    ///  # let source =
-    /// r#"{
-    ///   "services": [{"id": "id 1"}, {"id": "id 2"}],
-    ///   "tags": ["tag 1", "tag 2"]
-    /// }"#;
-    ///
-    /// # let mut json: JSON = serde_json::from_str(&source).unwrap();
-    /// # Vec::<ServiceSelector>::take(Path::new(), &mut json, "services").unwrap();
-    /// # Vec::<Id<String>>::take(Path::new(), &mut json, "tags").unwrap();
-    ///
-    /// # }
-    /// ```
-    ///
-    /// ## Errors
-    ///
-    /// In case of syntax error, Error 400, accompanied with a
-    /// somewhat human-readable JSON string detailing the error.
-    ///
-    /// ## Success
-    ///
-    /// A JSON string representing a number.
-    fn add_service_tags(& self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn add_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Remove a set of tags from a set of services.
     ///
@@ -384,105 +341,11 @@ pub trait API: Send {
     ///
     /// Note that this call is _not live_. In other words, if services
     /// are added after the call, they will not be affected.
-    ///
-    /// # REST API
-    ///
-    /// `DELETE /api/v1/services/tag`
-    ///
-    /// ## JSON
-    ///
-    /// A JSON object with the following fields:
-    /// - services: array - an array of ServiceSelector;
-    /// - tags: array - an array of string
-    ///
-    /// ```
-    /// # extern crate serde;
-    /// # extern crate serde_json;
-    /// # extern crate foxbox_taxonomy;
-    /// # use foxbox_taxonomy::services::*;
-    /// # use foxbox_taxonomy::selector::*;
-    ///
-    /// # fn main() {
-    ///
-    ///  # let source =
-    /// r#"{
-    ///   "services": [{"id": "id 1"}, {"id": "id 2"}],
-    ///   "tags": ["tag 1", "tag 2"]
-    /// }"#;
-    ///
-    /// # let mut json: JSON = serde_json::from_str(&source).unwrap();
-    /// # Vec::<ServiceSelector>::take(Path::new(), &mut json, "services").unwrap();
-    /// # Vec::<Id<String>>::take(Path::new(), &mut json, "tags").unwrap();
-    /// # }
-    /// ```
-    ///
-    /// ## Errors
-    ///
-    /// In case of syntax error, Error 400, accompanied with a
-    /// somewhat human-readable JSON string detailing the error.
-    ///
-    /// ## Success
-    ///
-    /// A JSON string representing a number.
-    fn remove_service_tags(& self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn remove_service_tags(&self, selectors: Vec<ServiceSelector>, tags: Vec<Id<TagId>>) -> usize;
 
-    /// Get a list of getters matching some conditions
-    ///
-    /// # REST API
-    ///
-    /// `GET /api/v1/channels/getters`
-    ///
-    /// ### JSON
-    ///
-    /// This call accepts as JSON argument a vector of `GetterSelector`. See the documentation
-    /// of `GetterSelector` for more details.
-    ///
-    /// Example: Select all doors in the entrance (tags `door`, `entrance`)
-    /// that support setter channel `OpenClosed`
-    ///
-    /// ```
-    /// # use foxbox_taxonomy::selector::*;
-    ///
-    /// let source = r#"[{
-    ///   "tags": ["entrance", "door"],
-    ///   "kind": "OpenClosed"
-    /// }]"#;
-    ///
-    /// # Vec::<GetterSelector>::from_str(&source).unwrap();
-    /// ```
-    ///
-    ///
-    /// ## Errors
-    ///
-    /// In case of syntax error, Error 400, accompanied with a
-    /// somewhat human-readable JSON string detailing the error.
-    ///
-    /// ## Success
-    ///
-    /// A JSON representing an array of `Service`. See the implementation
-    /// of `Service` for details.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// # let source =
-    /// r#"[{
-    ///   "tags": ["entrance", "door", "somevendor"],
-    ///   "id: "some-getter-id",
-    ///   "service": "some-service-id",
-    ///   "updated": "2014-11-28T12:00:09+00:00",
-    ///   "mechanism": "getter",
-    ///   "kind": "OnOff"
-    /// }]"#;
-    /// ```
-    fn get_getter_channels(& self, selectors: Vec<GetterSelector>) -> Vec<Channel<Getter>>;
 
-    /// Get a list of getters matching some conditions
-    ///
-    /// # REST API
-    ///
-    /// `GET /api/v1/channels`
-    fn get_setter_channels(& self, selectors: Vec<SetterSelector>) -> Vec<Channel<Setter>>;
+    /// Get a list of channels matching some conditions
+    fn get_channels(&self, selectors: Vec<ChannelSelector>) -> Vec<Channel>;
 
     /// Label a set of channels with a set of tags.
     ///
@@ -497,39 +360,7 @@ pub trait API: Send {
     ///
     /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
-    ///
-    /// # REST API
-    ///
-    /// `POST /api/v1/channels/tag`
-    ///
-    /// ## Requests
-    ///
-    /// Any JSON that can be deserialized to
-    ///
-    /// ```ignore
-    /// {
-    ///   set: Vec<GetterSelector>,
-    ///   tags: Vec<Id<TagId>>,
-    /// }
-    /// ```
-    /// or
-    /// ```ignore
-    /// {
-    ///   set: Vec<SetterSelector>,
-    ///   tags: Vec<Id<TagId>>,
-    /// }
-    /// ```
-    ///
-    /// ## Errors
-    ///
-    /// In case of syntax error, Error 400, accompanied with a
-    /// somewhat human-readable JSON string detailing the error.
-    ///
-    /// ## Success
-    ///
-    /// A JSON representing a number.
-    fn add_getter_tags(& self, selectors: Vec<GetterSelector>, tags: Vec<Id<TagId>>) -> usize;
-    fn add_setter_tags(& self, selectors: Vec<SetterSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn add_channel_tags(&self, selectors: Vec<ChannelSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Remove a set of tags from a set of channels.
     ///
@@ -544,136 +375,19 @@ pub trait API: Send {
     ///
     /// Note that this call is _not live_. In other words, if channels
     /// are added after the call, they will not be affected.
-    ///
-    /// # REST API
-    ///
-    /// `DELETE /api/v1/channels/tag`
-    ///
-    /// ## Requests
-    ///
-    /// Any JSON that can be deserialized to
-    ///
-    /// ```ignore
-    /// {
-    ///   set: Vec<GetterSelector>,
-    ///   tags: Vec<Id<TagId>>,
-    /// }
-    /// ```
-    /// or
-    /// ```ignore
-    /// {
-    ///   set: Vec<SetterSelector>,
-    ///   tags: Vec<Id<TagId>>,
-    /// }
-    /// ```
-    ///
-    /// ## Errors
-    ///
-    /// In case of syntax error, Error 400, accompanied with a
-    /// somewhat human-readable JSON string detailing the error.
-    ///
-    /// ## Success
-    ///
-    /// A JSON representing a number.
-    fn remove_getter_tags(& self, selectors: Vec<GetterSelector>, tags: Vec<Id<TagId>>) -> usize;
-    fn remove_setter_tags(& self, selectors: Vec<SetterSelector>, tags: Vec<Id<TagId>>) -> usize;
+    fn remove_channel_tags(&self, selectors: Vec<ChannelSelector>, tags: Vec<Id<TagId>>) -> usize;
 
     /// Read the latest value from a set of channels
-    ///
-    /// # REST API
-    ///
-    /// `GET /api/v1/channels/get`
-    ///
-    /// This call supports one or more `GetterSelector`.
-    ///
-    /// ```
-    /// # extern crate serde;
-    /// # extern crate serde_json;
-    /// # extern crate foxbox_taxonomy;
-    /// # use foxbox_taxonomy::selector::*;
-    /// # use foxbox_taxonomy::api::*;
-    /// # use foxbox_taxonomy::values::*;
-    ///
-    /// # fn main() {
-    ///
-    /// // The following argument will fetch a value from to a single getter:
-    /// # let source =
-    /// r#"{"id": "my-getter"}"#;
-    ///
-    /// # GetterSelector::from_str(&source).unwrap();
-    ///
-    /// # }
-    /// ```
-    ///
-    /// ## Errors
-    ///
-    /// In case of syntax error, Error 400, accompanied with a
-    /// somewhat human-readable JSON string detailing the error.
-    ///
-    /// ## Success
-    ///
-    /// The results, per getter.
-    fn fetch_values(&self, Vec<GetterSelector>, user: User) -> ResultMap<Id<Getter>, Option<Value>, Error>;
+    fn fetch_values(&self, Vec<ChannelSelector>, user: User) -> OpResult<(Payload, Arc<Format>)>;
 
     /// Send a bunch of values to a set of channels.
     ///
     /// Sending values to several setters of the same service in a single call will generally
     /// be much faster than calling this method several times.
-    ///
-    /// # REST API
-    ///
-    /// `PUT /api/v1/channels/set`
-    ///
-    /// ## JSON
-    ///
-    /// This call supports one or more objects with the following fields:
-    /// - select (Service Selector | array of ServiceSelector) - the setters to which the value must be sent
-    /// - value (Value) - the value to send
-    ///
-    /// ```
-    /// # extern crate serde;
-    /// # extern crate serde_json;
-    /// # extern crate foxbox_taxonomy;
-    /// # use foxbox_taxonomy::selector::*;
-    /// # use foxbox_taxonomy::api::*;
-    /// # use foxbox_taxonomy::values::*;
-    ///
-    /// # fn main() {
-    ///
-    /// // The following argument will send `On` to a single setter:
-    /// # let source =
-    /// r#"{
-    ///   "select": {"id": "my-setter"},
-    ///   "value": {"OnOff": "On"}
-    /// }"#;
-    ///
-    /// # TargetMap::<SetterSelector, Value>::from_str(&source).unwrap();
-    ///
-    /// // The following argument will send `On` to two setters and `Unit` to everything
-    /// // that supports `Ready`.
-    /// # let source =
-    /// r#"[{
-    ///   "select": [{"id": "my-setter 1"}, {"id": "my-setter 2"}],
-    ///   "value": {"OnOff": "On"}
-    /// }, {
-    ///   "select": {"kind": "Ready"},
-    ///   "value": {"Unit": null}
-    /// }]"#;
-    ///
-    /// # TargetMap::<SetterSelector, Value>::from_str(&source).unwrap();
-    ///
-    /// # }
-    /// ```
-    ///
-    /// ## Errors
-    ///
-    /// In case of syntax error, Error 400, accompanied with a
-    /// somewhat human-readable JSON string detailing the error.
-    ///
-    /// ## Success
-    ///
-    /// The results, per setter.
-    fn send_values(&self, TargetMap<SetterSelector, Value>, user: User) -> ResultMap<Id<Setter>, (), Error>;
+    fn send_values(&self,
+                   TargetMap<ChannelSelector, Payload>,
+                   user: User)
+                   -> ResultMap<Id<Channel>, (), Error>;
 
     /// Watch for changes from channels.
     ///
@@ -695,13 +409,13 @@ pub trait API: Send {
     /// Many devices may reject such requests.
     ///
     /// The watcher is disconnected once the `WatchGuard` returned by this method is dropped.
-    ///
-    /// # `WebSocket` API
-    ///
-    /// `/api/v1/channels/watch`
-    fn watch_values(& self, watch: TargetMap<GetterSelector, Exactly<Range>>,
-            on_event: Box<ExtSender<WatchEvent>>) -> Self::WatchGuard;
+    fn watch_values(&self,
+                    watch: TargetMap<ChannelSelector, Exactly<Payload>>,
+                    on_event: Box<ExtSender<WatchEvent>>)
+                    -> Self::WatchGuard;
 
     /// A value that causes a disconnection once it is dropped.
     type WatchGuard;
 }
+
+pub type OpResult<T> = ResultMap<Id<Channel>, Option<T>, Error>;

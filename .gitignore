@@ -39,3 +39,6 @@ foxbox.conf
 # Generated certs
 certs
 *.pkcs12
+
+# Builds in tools/docker
+builds

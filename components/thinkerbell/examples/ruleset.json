@@ -6,27 +6,23 @@
         {
           "source": [
             {
-              "kind": "CurrentTimeOfDay"
+              "feature": "clock/time-of-day-s"
             }
           ],
-          "kind": "CurrentTimeOfDay",
-          "range": {
-            "Geq": {
-              "Duration": 5
-            }
+          "feature": "clock/time-of-day-s",
+          "when": {
+            "Duration": 5
           }
         },
         {
           "source": [
             {
-              "kind": "CurrentTimeOfDay"
+              "feature": "clock/time-of-day-s"
             }
           ],
-          "kind": "CurrentTimeOfDay",
-          "range": {
-            "Leq": {
+          "feature": "clock/time-of-day-s",
+          "when": {
               "Duration": 2
-            }
           }
         }
       ],
@@ -34,13 +30,13 @@
         {
           "destination": [
             {
-              "kind": "Ready"
+              "feature": "Ready"
             }
           ],
           "value": {
             "Unit": []
           },
-          "kind": "Ready"
+          "feature": "Ready"
         }
       ]
     }

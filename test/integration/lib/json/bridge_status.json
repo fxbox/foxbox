@@ -14,7 +14,7 @@
         "ct": 370,
         "alert": "none",
         "colormode": "ct",
-        "reachable": false
+        "reachable": true
       },
       "type": "Extended color light",
       "name": "Hue color lamp 1",
@@ -37,7 +37,7 @@
         "ct": 233,
         "alert": "none",
         "colormode": "xy",
-        "reachable": false
+        "reachable": true
       },
       "type": "Extended color light",
       "name": "Hue color lamp 2",
@@ -60,7 +60,7 @@
         "ct": 370,
         "alert": "none",
         "colormode": "ct",
-        "reachable": false
+        "reachable": true
       },
       "type": "Extended color light",
       "name": "Hue color lamp 3",

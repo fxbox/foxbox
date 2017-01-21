@@ -5,13 +5,25 @@ set -ev
 CURRENT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$CURRENT_PATH/travis-linux-common.sh"
 
+_build_without_features() {
+  echo '> Building foxbox without default features.'
+  cargo build --no-default-features
+}
 
-build() {
+_build_default() {
+    echo '> Building foxbox with default features.'
     cargo build
 }
 
+build() {
+  _build_without_features
+  _build_default
+}
+
 lint() {
-    jshint static/main/js/*.js static/setup/js/*.js test/selenium/*.js test/integration/lib/*.js test/integration/test/*.js
+    jshint test/**/*.js \
+        static/main/js/*.js static/setup/js/*.js
+        # There is a minified js in static/**/shared which breaks jshint
 }
 
 _set_up_unit_tests() {
@@ -27,6 +39,8 @@ _set_up_selenium_tests() {
     nvm install 4.2
     nvm use 4.2
     npm install
+    # We should not hardcode that path...
+    export PATH=/home/travis/build/fxbox/foxbox/node_modules/.bin:$PATH
 }
 
 set_up_tests() {
@@ -35,7 +49,7 @@ set_up_tests() {
 }
 
 run_tests() {
-    #npm run test-selenium
+    npm run test-selenium
     npm run test-integration-travis
     # TODO: Currently unit tests are executed twice. We need a way to filter out
     # tests with `cargo test` depending on where they are defined in the tree

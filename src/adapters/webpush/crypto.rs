@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! Cryptographic operations for `WebPush`.
 //!
@@ -18,20 +18,20 @@ use self::crypto::aead::AeadDecryptor;
 use self::crypto::aead::AeadEncryptor;
 use self::crypto::aes_gcm::AesGcm;
 use self::crypto::aes::KeySize;
-use self::crypto::hkdf::{ hkdf_expand, hkdf_extract };
+use self::crypto::hkdf::{hkdf_expand, hkdf_extract};
 use self::crypto::hmac::Hmac;
 use self::crypto::sha2::Sha256;
 use self::crypto::mac::Mac;
 
 use std::cmp::min;
-use std::ffi::{ CString, CStr };
+use std::ffi::{CString, CStr};
 use std::ptr;
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 use rand::Rng;
 use rand::os::OsRng;
 
-use rustc_serialize::base64::{ FromBase64, ToBase64, URL_SAFE };
-use rustc_serialize::hex::{ ToHex, FromHex };
+use rustc_serialize::base64::{FromBase64, ToBase64, URL_SAFE};
+use rustc_serialize::hex::{ToHex, FromHex};
 
 const NID_X9_62_PRIMVE256V1: libc::c_int = 415;
 
@@ -44,17 +44,17 @@ const AESGCM_TAG_LEN: usize = 16;
 #[derive(Debug)]
 pub struct EncryptData {
     pub salt: String,
-    pub output: Vec<u8>
+    pub output: Vec<u8>,
 }
 
 struct AuthData {
     pub auth: Vec<u8>,
-    pub key_context: Vec<u8>
+    pub key_context: Vec<u8>,
 }
 
 #[repr(C)]
 enum EcPointConversion {
-    Uncompressed = 4
+    Uncompressed = 4,
 }
 
 type EcKey = libc::c_void;
@@ -73,8 +73,16 @@ extern "C" {
     fn EC_KEY_set_public_key(key: *mut EcKey, pub_key: *const EcPoint) -> libc::c_int;
     fn EC_KEY_get0_public_key(key: *const EcKey) -> *mut EcPoint;
 
-    fn EC_POINT_hex2point(group: *const EcGroup, hex: *const libc::c_char, p: *mut EcPoint, ctx: *mut BnCtx) -> *mut EcPoint;
-    fn EC_POINT_point2hex(group: *const EcGroup, point: *const EcPoint, form: EcPointConversion, ctx: *mut BnCtx) -> *mut libc::c_char;
+    fn EC_POINT_hex2point(group: *const EcGroup,
+                          hex: *const libc::c_char,
+                          p: *mut EcPoint,
+                          ctx: *mut BnCtx)
+                          -> *mut EcPoint;
+    fn EC_POINT_point2hex(group: *const EcGroup,
+                          point: *const EcPoint,
+                          form: EcPointConversion,
+                          ctx: *mut BnCtx)
+                          -> *mut libc::c_char;
     fn EC_POINT_free(point: *mut EcPoint);
 
     fn EVP_PKEY_new() -> *mut EvpPkey;
@@ -85,7 +93,13 @@ extern "C" {
     fn EVP_PKEY_CTX_new_id(id: libc::c_int, engine: *mut libc::c_void) -> *mut EvpPkeyCtx;
     fn EVP_PKEY_CTX_new(pkey: *mut EvpPkey, engine: *mut libc::c_void) -> *mut EvpPkeyCtx;
     fn EVP_PKEY_CTX_free(ctx: *mut EvpPkeyCtx);
-    fn EVP_PKEY_CTX_ctrl(ctx: *mut EvpPkeyCtx, keytype: libc::c_int, optype: libc::c_int, cmd: libc::c_int, p1: libc::c_int, p2: *mut libc::c_void) -> libc::c_int;
+    fn EVP_PKEY_CTX_ctrl(ctx: *mut EvpPkeyCtx,
+                         keytype: libc::c_int,
+                         optype: libc::c_int,
+                         cmd: libc::c_int,
+                         p1: libc::c_int,
+                         p2: *mut libc::c_void)
+                         -> libc::c_int;
 
     fn EVP_PKEY_paramgen_init(ctx: *mut EvpPkeyCtx) -> libc::c_int;
     fn EVP_PKEY_paramgen(ctx: *mut EvpPkeyCtx, ppkey: *mut *mut EvpPkey) -> libc::c_int;
@@ -95,14 +109,17 @@ extern "C" {
 
     fn EVP_PKEY_derive_init(ctx: *mut EvpPkeyCtx) -> libc::c_int;
     fn EVP_PKEY_derive_set_peer(ctx: *mut EvpPkeyCtx, peer: *mut EvpPkey) -> libc::c_int;
-    fn EVP_PKEY_derive(ctx: *mut EvpPkeyCtx, key: *mut libc::c_char, size: *mut libc::size_t) -> libc::c_int;
+    fn EVP_PKEY_derive(ctx: *mut EvpPkeyCtx,
+                       key: *mut libc::c_char,
+                       size: *mut libc::size_t)
+                       -> libc::c_int;
 
     fn CRYPTO_free(ptr: *mut libc::c_void);
 }
 
 /// Creates an `OpenSSL` representation of the given ECDH X9.62 public key,
 /// represented as a string of hex digits.
-fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
+fn ecdh_import_public_key(public_key: String) -> *mut EvpPkey {
     let eckey;
     let mut ecpoint = ptr::null_mut();
     let mut peer_key = ptr::null_mut();
@@ -122,7 +139,10 @@ fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
                 break;
             }
 
-            ecpoint = EC_POINT_hex2point(ecgroup, native_key.as_ptr(), ptr::null_mut(), ptr::null_mut());
+            ecpoint = EC_POINT_hex2point(ecgroup,
+                                         native_key.as_ptr(),
+                                         ptr::null_mut(),
+                                         ptr::null_mut());
             if ecpoint.is_null() {
                 warn!("cannot convert raw EC public key to EC point");
                 break;
@@ -149,8 +169,12 @@ fn ecdh_import_public_key(public_key : String) -> *mut EvpPkey {
             break;
         }
 
-        if !eckey.is_null() { EC_KEY_free(eckey); }
-        if !ecpoint.is_null() { EC_POINT_free(ecpoint); }
+        if !eckey.is_null() {
+            EC_KEY_free(eckey);
+        }
+        if !ecpoint.is_null() {
+            EC_POINT_free(ecpoint);
+        }
     }
 
     peer_key
@@ -175,7 +199,12 @@ fn ecdh_generate_params() -> *mut EvpPkey {
                 break;
             }
 
-            if EVP_PKEY_CTX_ctrl(ctx, EVP_PKEY_EC, EVP_PKEY_OP_PARAMGEN, EVP_PKEY_CTRL_EC_PARAMGEN_CURVE_NID, NID_X9_62_PRIMVE256V1, ptr::null_mut()) != 1 {
+            if EVP_PKEY_CTX_ctrl(ctx,
+                                 EVP_PKEY_EC,
+                                 EVP_PKEY_OP_PARAMGEN,
+                                 EVP_PKEY_CTRL_EC_PARAMGEN_CURVE_NID,
+                                 NID_X9_62_PRIMVE256V1,
+                                 ptr::null_mut()) != 1 {
                 warn!("cannot set param context as X9.62 P256V1");
                 break;
             }
@@ -188,7 +217,9 @@ fn ecdh_generate_params() -> *mut EvpPkey {
             break;
         }
 
-        if !ctx.is_null() { EVP_PKEY_CTX_free(ctx); }
+        if !ctx.is_null() {
+            EVP_PKEY_CTX_free(ctx);
+        }
     }
 
     params
@@ -226,8 +257,12 @@ fn ecdh_generate_key_pair() -> *mut EvpPkey {
             break;
         }
 
-        if !ctx.is_null() { EVP_PKEY_CTX_free(ctx); }
-        if !params.is_null() { EVP_PKEY_free(params); }
+        if !ctx.is_null() {
+            EVP_PKEY_CTX_free(ctx);
+        }
+        if !params.is_null() {
+            EVP_PKEY_free(params);
+        }
     }
 
     key
@@ -261,14 +296,16 @@ fn ecdh_derive_shared_key(local_key: *mut EvpPkey, peer_key: *mut EvpPkey) -> Op
                 break;
             }
 
-            let mut shared_len : libc::size_t = 0;
+            let mut shared_len: libc::size_t = 0;
             if EVP_PKEY_derive(ctx, ptr::null_mut(), &mut shared_len) != 1 {
                 warn!("cannot get shared key length from shared context");
                 break;
             }
 
             let shared_key = vec![0u8; shared_len];
-            if EVP_PKEY_derive(ctx, shared_key.as_ptr() as *mut libc::c_char, &mut shared_len) != 1 {
+            if EVP_PKEY_derive(ctx,
+                               shared_key.as_ptr() as *mut libc::c_char,
+                               &mut shared_len) != 1 {
                 warn!("cannot get shared key from shared context");
                 break;
             }
@@ -277,7 +314,9 @@ fn ecdh_derive_shared_key(local_key: *mut EvpPkey, peer_key: *mut EvpPkey) -> Op
             break;
         }
 
-        if !ctx.is_null() { EVP_PKEY_CTX_free(ctx); }
+        if !ctx.is_null() {
+            EVP_PKEY_CTX_free(ctx);
+        }
     }
 
     status
@@ -313,8 +352,11 @@ fn ecdh_export_public_key(key: *mut EvpPkey) -> Option<String> {
                 warn!("cannot get group from local ec key");
             }
 
-            buf = EC_POINT_point2hex(ecgroup, ecpoint, EcPointConversion::Uncompressed, ptr::null_mut());
-            if buf == ptr::null_mut() {
+            buf = EC_POINT_point2hex(ecgroup,
+                                     ecpoint,
+                                     EcPointConversion::Uncompressed,
+                                     ptr::null_mut());
+            if buf.is_null() {
                 warn!("cannot get uncompressed public key from local ec point");
                 break;
             }
@@ -323,8 +365,12 @@ fn ecdh_export_public_key(key: *mut EvpPkey) -> Option<String> {
             break;
         }
 
-        if !buf.is_null() { CRYPTO_free(buf as *mut libc::c_void); }
-        if !eckey.is_null() { EC_KEY_free(eckey); }
+        if !buf.is_null() {
+            CRYPTO_free(buf as *mut libc::c_void);
+        }
+        if !eckey.is_null() {
+            EC_KEY_free(eckey);
+        }
     }
 
     status
@@ -337,7 +383,9 @@ struct KeyPairStore {
 impl Drop for KeyPairStore {
     fn drop(&mut self) {
         if !self.key.is_null() {
-            unsafe { EVP_PKEY_free(self.key); }
+            unsafe {
+                EVP_PKEY_free(self.key);
+            }
         }
     }
 }
@@ -346,7 +394,7 @@ impl Drop for KeyPairStore {
 pub struct CryptoContext {
     /// base64 encoding representing the local public key.
     public_key: String,
-    key_pair: Arc<Mutex<KeyPairStore>>
+    key_pair: Arc<Mutex<KeyPairStore>>,
 }
 
 unsafe impl Send for CryptoContext {}
@@ -374,9 +422,7 @@ impl CryptoContext {
             // This needs to be protected by a mutex because OpenSSL updates
             // the reference count, even if we shouldn't need to modify anything
             // else with the local key.
-            key_pair: Arc::new(Mutex::new(KeyPairStore {
-                key: local_key
-            }))
+            key_pair: Arc::new(Mutex::new(KeyPairStore { key: local_key })),
         })
     }
 
@@ -391,12 +437,14 @@ impl CryptoContext {
     /// Derives a shared key from the given peer's public key and our local key pair.
     ///
     /// * `raw_peer_key` is the peer's public ECDH key represented as hex digits.
-    fn ecdh_derive_keys(&self, raw_peer_key : String) -> Option<Vec<u8>> {
+    fn ecdh_derive_keys(&self, raw_peer_key: String) -> Option<Vec<u8>> {
         let peer_key = ecdh_import_public_key(raw_peer_key);
         let key_pair = self.key_pair.lock().unwrap().key;
         let shared_key = ecdh_derive_shared_key(key_pair, peer_key);
         if !peer_key.is_null() {
-            unsafe { EVP_PKEY_free(peer_key); }
+            unsafe {
+                EVP_PKEY_free(peer_key);
+            }
         }
         shared_key
     }
@@ -408,16 +456,24 @@ impl CryptoContext {
         key_context.extend_from_slice(key);
     }
 
-    fn aesgcm128_auth_data(&self, auth: &Option<String>, peer_key: &[u8], encrypt: bool) -> Option<AuthData> {
+    fn aesgcm128_auth_data(&self,
+                           auth: &Option<String>,
+                           peer_key: &[u8],
+                           encrypt: bool)
+                           -> Option<AuthData> {
         let auth_bytes = match *auth {
-            Some(ref x) => match x.from_base64() {
-                Ok(y) => y,
-                Err(e) => {
-                    warn!("could not base64 decode auth: {:?}", e);
-                    return None;
+            Some(ref x) => {
+                match x.from_base64() {
+                    Ok(y) => y,
+                    Err(e) => {
+                        warn!("could not base64 decode auth: {:?}", e);
+                        return None;
+                    }
                 }
-            },
-            None => { return None; }
+            }
+            None => {
+                return None;
+            }
         };
 
         let local_key = match self.public_key.from_base64() {
@@ -442,7 +498,7 @@ impl CryptoContext {
         //
         // "The label for this curve is the string "P-256" encoded in ASCII (that
         //  is, the octet sequence 0x50, 0x2d, 0x32, 0x35, 0x36)."
-        let mut key_context : Vec<u8> = Vec::with_capacity(peer_key.len() + local_key.len() + 11);
+        let mut key_context: Vec<u8> = Vec::with_capacity(peer_key.len() + local_key.len() + 11);
         key_context.extend_from_slice(b"P-256\x00");
         if encrypt {
             Self::aesgcm128_append_key(&mut key_context, peer_key);
@@ -459,10 +515,14 @@ impl CryptoContext {
         })
     }
 
-    fn aesgcm128_common(&self, salt: &[u8], shared_key: &[u8], auth: Option<AuthData>) -> ([u8; 32], [u8; 32], [u8; 12]) {
+    fn aesgcm128_common(&self,
+                        salt: &[u8],
+                        shared_key: &[u8],
+                        auth: Option<AuthData>)
+                        -> ([u8; 32], [u8; 32], [u8; 12]) {
         let sha = Sha256::new();
-        let mut encrypt_info : Vec<u8> = Vec::new();
-        let mut nonce_info : Vec<u8> = Vec::new();
+        let mut encrypt_info: Vec<u8> = Vec::new();
+        let mut nonce_info: Vec<u8> = Vec::new();
 
         // Create the HKDF salt from our shared key and transaction salt
         let mut salt_hmac = Hmac::new(Sha256::new(), salt);
@@ -563,7 +623,7 @@ impl CryptoContext {
         (encrypt_key, nonce, seq)
     }
 
-    fn aesgcm128_record_nonce(&self, nonce: &[u8], seq: &mut[u8; 12]) -> [u8; 12] {
+    fn aesgcm128_record_nonce(&self, nonce: &[u8], seq: &mut [u8; 12]) -> [u8; 12] {
         // Generate the nonce for this record
         // https://tools.ietf.org/html/draft-thomson-http-encryption-01#section-3.3
         //
@@ -594,7 +654,13 @@ impl CryptoContext {
     /// Decrypts the given payload using AES-GCM 128-bit with the shared key and salt.
     /// The shared key and salt are not used directly but rather are used to derive
     /// the encryption key and nonce as defined in the draft RFC.
-    fn aesgcm128_decrypt(&self, mut input: Vec<u8>, shared_key: &[u8], salt: &[u8], auth: Option<AuthData>, record_size: usize) -> Option<String> {
+    fn aesgcm128_decrypt(&self,
+                         mut input: Vec<u8>,
+                         shared_key: &[u8],
+                         salt: &[u8],
+                         auth: Option<AuthData>,
+                         record_size: usize)
+                         -> Option<String> {
         let has_auth = auth.is_some();
         let (decrypt_key, nonce, mut seq) = self.aesgcm128_common(salt, shared_key, auth);
         let mut chunks = Vec::new();
@@ -626,7 +692,10 @@ impl CryptoContext {
                 return None;
             }
 
-            let mut cipher = AesGcm::new(KeySize::KeySize128, &decrypt_key[0..16], &record_nonce, &[0; 0]);
+            let mut cipher = AesGcm::new(KeySize::KeySize128,
+                                         &decrypt_key[0..16],
+                                         &record_nonce,
+                                         &[0; 0]);
             if !cipher.decrypt(&chunk[..], &mut output[..], &tag[..]) {
                 return None;
             }
@@ -651,16 +720,23 @@ impl CryptoContext {
 
         match String::from_utf8(out) {
             Ok(s) => Some(s),
-            Err(_) => None
+            Err(_) => None,
         }
     }
 
     /// Encrypts the given payload using AES-GCM 128-bit with the shared key and salt.
     /// The shared key and salt are not used directly but rather are used to derive
     /// the encryption key and nonce as defined in the draft RFC.
-    fn aesgcm128_encrypt(&self, input: String, shared_key: &[u8], salt: &[u8; 16], auth: Option<AuthData>, record_size: usize) -> Vec<u8> {
+    fn aesgcm128_encrypt(&self,
+                         input: String,
+                         shared_key: &[u8],
+                         salt: &[u8; 16],
+                         auth: Option<AuthData>,
+                         record_size: usize)
+                         -> Vec<u8> {
         assert!(!input.is_empty(), "input cannot be empty");
-        assert!(record_size > 2, "record size must be greater than the padding");
+        assert!(record_size > 2,
+                "record size must be greater than the padding");
 
         let has_auth = auth.is_some();
         let (encrypt_key, nonce, mut seq) = self.aesgcm128_common(salt, shared_key, auth);
@@ -684,7 +760,9 @@ impl CryptoContext {
             // "Padding consists of a two octet unsigned integer in network byte order, followed
             //  that number of zero-valued octets."
             raw_input.insert(0, 0);
-            if has_auth { raw_input.insert(0, 0); }
+            if has_auth {
+                raw_input.insert(0, 0);
+            }
 
             let bound = min(record_size, raw_input.len());
             let chunk: Vec<_> = raw_input.drain(0..bound).collect();
@@ -699,7 +777,10 @@ impl CryptoContext {
             padding = bound == record_size && raw_input.is_empty();
 
             // With the generation AES-GCM key/nonce pair, encrypt the payload
-            let mut cipher = AesGcm::new(KeySize::KeySize128, &encrypt_key[0..16], &record_nonce, &[0; 0]);
+            let mut cipher = AesGcm::new(KeySize::KeySize128,
+                                         &encrypt_key[0..16],
+                                         &record_nonce,
+                                         &[0; 0]);
             let mut tag = [0u8; AESGCM_TAG_LEN];
             let mut out = vec![0u8; chunk.len() + tag.len()];
             out.truncate(chunk.len());
@@ -724,7 +805,12 @@ impl CryptoContext {
 
     /// Encrypt a payload using the given public key according to the `WebPush`
     /// RFC specifications.
-    pub fn encrypt(&self, peer_key: &str, input: String, auth: &Option<String>, record_size: usize) -> Option<EncryptData> {
+    pub fn encrypt(&self,
+                   peer_key: &str,
+                   input: String,
+                   auth: &Option<String>,
+                   record_size: usize)
+                   -> Option<EncryptData> {
         // Derive public and secret keys from peer public key
         let peer_key_bytes = match peer_key.from_base64() {
             Ok(x) => x,
@@ -764,12 +850,18 @@ impl CryptoContext {
 
         Some(EncryptData {
             salt: salt_b64,
-            output: self.aesgcm128_encrypt(input, &shared_key, &salt, auth_data, record_size)
+            output: self.aesgcm128_encrypt(input, &shared_key, &salt, auth_data, record_size),
         })
     }
 
     #[cfg(test)]
-    pub fn decrypt(&self, peer_key: &str, input: Vec<u8>, salt: &str, auth: &Option<String>, record_size: usize) -> Option<String> {
+    pub fn decrypt(&self,
+                   peer_key: &str,
+                   input: Vec<u8>,
+                   salt: &str,
+                   auth: &Option<String>,
+                   record_size: usize)
+                   -> Option<String> {
         // Derive public and secret keys from peer public key
         let peer_key_bytes = match peer_key.from_base64() {
             Ok(x) => x,

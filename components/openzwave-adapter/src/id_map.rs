@@ -1,17 +1,18 @@
 use taxonomy::util::Id as TaxoId;
 
-use std::sync::{ Arc, RwLock };
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct IdMap<Kind, Type> {
-    map: Arc<RwLock<Vec<(TaxoId<Kind>, Type)>>>
+    map: Arc<RwLock<Vec<(TaxoId<Kind>, Type)>>>,
 }
 
-impl<Kind, Type> IdMap<Kind, Type> where Type: Eq + Clone, Kind: Clone {
+impl<Kind, Type> IdMap<Kind, Type>
+    where Type: Eq + Clone,
+          Kind: Clone
+{
     pub fn new() -> Self {
-        IdMap {
-            map: Arc::new(RwLock::new(Vec::new()))
-        }
+        IdMap { map: Arc::new(RwLock::new(Vec::new())) }
     }
 
     pub fn push(&mut self, id: TaxoId<Kind>, ozw_object: Type) {
@@ -29,5 +30,10 @@ impl<Kind, Type> IdMap<Kind, Type> where Type: Eq + Clone, Kind: Clone {
         let guard = self.map.read().unwrap(); // we have bigger problems if we're poisoned
         let find_result = guard.iter().find(|&&(ref id, _)| id == needle);
         find_result.map(|&(_, ref ozw_object)| ozw_object.clone())
+    }
+
+    pub fn remove_by_ozw(&mut self, needle: &Type) -> Option<TaxoId<Kind>> {
+        let mut guard = self.map.write().unwrap(); // we have bigger problems if we're poisoned
+        guard.iter().position(|&(_, ref item)| item == needle).map(|index| guard.remove(index).0)
     }
 }

@@ -1,9 +1,9 @@
 //! This crate defines the high-level API for accessing Connected Devices.
 #![feature(custom_derive, plugin, stmt_expr_attributes)]
-#![plugin(serde_macros)]
 #![plugin(clippy)]
 // To prevent clippy being noisy with derive(...)
 #![allow(used_underscore_binding)]
+#![allow(let_unit_value)] // For some reason, clippy decides to display this warning, without any hint as to *where* it applies.
 
 #[macro_use]
 extern crate lazy_static;
@@ -12,15 +12,25 @@ extern crate chrono;
 extern crate libc;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate mopa;
+extern crate odds;
 extern crate rusqlite;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
 extern crate string_cache;
 extern crate sublock;
 extern crate transformable_channels;
 
-/// Metadata on devices
+/// Metadata on devices.
 pub mod services;
+
+/// Metadata on channels.
+///
+/// This module also offers definitions for standardized channels.
+pub mod channel;
 
 /// Public-facing API
 pub mod api;
@@ -60,3 +70,6 @@ pub mod tag_storage;
 /// Implementation of a fake adapter, controlled entirely programmatically. Designed to be used
 /// as a component of tests.
 pub mod fake_adapter;
+
+/// Serialization and deserialization.
+pub mod io;

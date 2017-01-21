@@ -1,19 +1,16 @@
 sudo: required
 
-env:
-  global:
-    # $BOX_HOST_NAME and $BOX_PORT are also used by Selenium tests.
-    - BOX_LOCAL_NAME=foxbox BOX_PORT=3000
-
 os:
-  - osx
+# Disabling OS X because of link failures with sqlite.
+#  - osx
   - linux
 
 dist: trusty
 
 language: rust
 rust:
-  - nightly-2016-04-10
+  # Make sure to also update the nightly version for the arm_cross_compile branch of the matrix.
+  - nightly-2017-01-12
   - nightly
 
 matrix:
@@ -22,7 +19,7 @@ matrix:
     - rust: nightly
   include:
     - os: linux
-      rust: nightly-2016-04-10
+      rust: nightly-2017-01-12
       env: BUILD_ENV=-arm_cross_compile
     - os: linux
       rust: nightly
@@ -35,6 +32,8 @@ addons:
       - libupnp-dev
       - libespeak-dev
       - libudev-dev
+      # pagekite
+      - libev-dev
       # kcov
       - libcurl4-openssl-dev
       - libelf-dev

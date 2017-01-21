@@ -1,17 +1,12 @@
-var View = require('../view');
-var ServicesAccessors = require('./accessors');
+'use strict';
+
+const View = require('../view');
 
 
 function ServicesView() {
-  [].push.call(arguments, ServicesAccessors);
   View.apply(this, arguments);
 
-  this.accessors.logOutButton;  // Wait until it appears
+  this.accessor.logOutButton;  // Wait until it appears
 }
 
-ServicesView.prototype = Object.assign({
-
- // To add functions here
-
-}, View.prototype);
 module.exports = ServicesView;

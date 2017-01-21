@@ -17,15 +17,16 @@
 //! - Transform each `Statement` to make sure that the kind of the
 //!   `destination` matches the `kind`, even if devices change.
 
-use ast::{ Script, Rule, Statement, Match, Context, UncheckedCtx };
+use ast::{Script, Rule, Statement, Match, Context, UncheckedCtx};
 use util::*;
 
 use foxbox_taxonomy::api::API;
+use foxbox_taxonomy::util::Exactly;
 use foxbox_taxonomy::values::Duration;
 
 use transformable_channels::mpsc::*;
 
-use std::fmt::{ Debug, Formatter, Error as FmtError };
+use std::fmt::{Debug, Formatter, Error as FmtError};
 use std::marker::PhantomData;
 
 /// The environment in which the code is meant to be executed.  This
@@ -42,7 +43,7 @@ pub trait ExecutableDevEnv: Send {
     type TimerGuard;
     fn start_timer(&self, duration: Duration, timer: Box<ExtSender<()>>) -> Self::TimerGuard;
 }
-impl<W, A, T> Debug for ExecutableDevEnv<WatchGuard=W, API=A, TimerGuard=T> {
+impl<W, A, T> Debug for ExecutableDevEnv<WatchGuard = W, API = A, TimerGuard = T> {
     fn fmt(&self, _: &mut Formatter) -> Result<(), FmtError> {
         Ok(())
     }
@@ -51,15 +52,13 @@ impl<W, A, T> Debug for ExecutableDevEnv<WatchGuard=W, API=A, TimerGuard=T> {
 ///
 /// # Precompilation
 ///
-
 #[derive(Debug)]
-pub struct CompiledCtx<Env>  {
+pub struct CompiledCtx<Env> {
     phantom: PhantomData<Env>,
 }
 
 
-impl<Env> Context for CompiledCtx<Env>  {
-}
+impl<Env> Context for CompiledCtx<Env> {}
 
 #[derive(Clone, Debug, Serialize)]
 pub enum SourceError {
@@ -99,103 +98,94 @@ pub enum Error {
     TypeError(TypeError),
 }
 
-pub struct Compiler<Env> where Env: ExecutableDevEnv {
+pub struct Compiler<Env>
+    where Env: ExecutableDevEnv
+{
     phantom: PhantomData<Env>,
 }
 
-impl<Env> Compiler<Env> where Env: ExecutableDevEnv {
+impl<Env> Compiler<Env>
+    where Env: ExecutableDevEnv
+{
     pub fn new() -> Result<Self, Error> {
-        Ok(Compiler {
-            phantom: PhantomData
-        })
+        Ok(Compiler { phantom: PhantomData })
     }
 
     /// Attempt to compile a script.
-    pub fn compile(&self, script: Script<UncheckedCtx>)
-                   -> Result<Script<CompiledCtx<Env>>, Error> {
+    pub fn compile(&self, script: Script<UncheckedCtx>) -> Result<Script<CompiledCtx<Env>>, Error> {
         self.compile_script(script)
     }
 
-    fn compile_script(&self, script: Script<UncheckedCtx>) -> Result<Script<CompiledCtx<Env>>, Error>
-    {
+    fn compile_script(&self,
+                      script: Script<UncheckedCtx>)
+                      -> Result<Script<CompiledCtx<Env>>, Error> {
         if script.rules.len() == 0 {
             return Err(Error::SourceError(SourceError::NoRule));
         }
-        let rules = try!(map(script.rules, |rule| {
-            self.compile_rule(rule)
-        }));
+        let rules = try!(map(script.rules, |rule| self.compile_rule(rule)));
         Ok(Script {
             name: script.name,
             rules: rules,
-            phantom: PhantomData
+            phantom: PhantomData,
         })
     }
 
-    fn compile_rule(&self, trigger: Rule<UncheckedCtx>) -> Result<Rule<CompiledCtx<Env>>, Error>
-    {
+    fn compile_rule(&self, trigger: Rule<UncheckedCtx>) -> Result<Rule<CompiledCtx<Env>>, Error> {
         if trigger.execute.len() == 0 {
             return Err(Error::SourceError(SourceError::NoStatement));
         }
         if trigger.conditions.len() == 0 {
             return Err(Error::SourceError(SourceError::NoMatch));
         }
-        let conditions = try!(map(trigger.conditions, |match_| {
-            self.compile_match(match_)
-        }));
-        let execute = try!(map(trigger.execute, |statement| {
-            self.compile_statement(statement)
-        }));
+        let conditions = try!(map(trigger.conditions, |match_| self.compile_match(match_)));
+        let execute = try!(map(trigger.execute,
+                               |statement| self.compile_statement(statement)));
         Ok(Rule {
             conditions: conditions,
             execute: execute,
-            phantom: PhantomData
+            phantom: PhantomData,
         })
     }
 
-    fn compile_match(&self, match_: Match<UncheckedCtx>) -> Result<Match<CompiledCtx<Env>>, Error>
-    {
+    fn compile_match(&self, match_: Match<UncheckedCtx>) -> Result<Match<CompiledCtx<Env>>, Error> {
         if match_.source.len() == 0 {
             return Err(Error::SourceError(SourceError::NoMatchSource));
         }
-        let typ = match match_.range.get_type() {
-            Err(_) => return Err(Error::TypeError(TypeError::InvalidRange)),
-            Ok(typ) => typ
-        };
-        if match_.kind.get_type() != typ {
-            return Err(Error::TypeError(TypeError::KindAndRangeDoNotAgree));
-        }
         let source = match_.source
             .iter()
-            .map(|input| input.clone()
-                 .with_kind(match_.kind.clone()))
+            .map(|input| {
+                input.clone()
+                    .with_feature(&match_.feature)
+                    .with_supports_watch(Exactly::Exactly(true))
+            })
             .collect();
         Ok(Match {
             source: source,
-            kind: match_.kind,
-            range: match_.range,
+            feature: match_.feature,
+            when: match_.when,
             duration: match_.duration,
-            phantom: PhantomData
+            phantom: PhantomData,
         })
     }
 
-    fn compile_statement(&self, statement: Statement<UncheckedCtx>) -> Result<Statement<CompiledCtx<Env>>, Error>
-    {
+    fn compile_statement(&self,
+                         statement: Statement<UncheckedCtx>)
+                         -> Result<Statement<CompiledCtx<Env>>, Error> {
         if statement.destination.len() == 0 {
             return Err(Error::SourceError(SourceError::NoStatementDestination));
         }
-        if statement.kind.get_type() != statement.value.get_type() {
-            return Err(Error::TypeError(TypeError::KindAndValueDoNotAgree));
-        }
         let destination = statement.destination
             .iter()
-            .map(|output| output.clone()
-                 .with_kind(statement.kind.clone()))
+            .map(|output| {
+                output.clone()
+                    .with_feature(&statement.feature)
+            })
             .collect();
         Ok(Statement {
             destination: destination,
             value: statement.value,
-            kind: statement.kind,
-            phantom: PhantomData
+            feature: statement.feature,
+            phantom: PhantomData,
         })
     }
 }

@@ -1,6 +1,6 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! Module to handle Philips Hue bridges
 //!
@@ -11,12 +11,12 @@
 //! The module spawns a management thread for every hub.
 
 use serde_json;
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use super::hub_api::HubApi;
-use super::{ HueAction, PhilipsHueAdapter, structs };
-use traits::Controller;
+use super::{HueAction, PhilipsHueAdapter, structs};
+use foxbox_core::traits::Controller;
 
 pub struct Hub<C> {
     pub adapter: PhilipsHueAdapter<C>,
@@ -32,10 +32,9 @@ impl<C: Controller> Hub<C> {
         // Philips Hue bridge. Once paired, it is sent with every
         // API request for authentication purposes, so it is crucial
         // that it is not predictable.
-        let token = adapter.controller.get_config().get_or_set_default(
-            "philips_hue",
-            &format!("token_{}", id),
-            "unauthorized");
+        let token = adapter.controller
+            .get_config()
+            .get_or_set_default("philips_hue", &format!("token_{}", id), "unauthorized");
         Hub {
             adapter: adapter,
             id: id.to_owned(),
@@ -55,7 +54,7 @@ impl<C: Controller> Hub<C> {
             loop {
                 if !api.lock().unwrap().is_available() {
                     // Re-check availability every minute.
-                    thread::sleep(Duration::from_millis(60*1000));
+                    thread::sleep(Duration::from_millis(60 * 1000));
                     continue;
                 }
 
@@ -66,24 +65,23 @@ impl<C: Controller> Hub<C> {
 
                     // Try pairing for 120 seconds.
                     for _ in 0..120 {
-                        adapter.controller.adapter_notification(
-                            json_value!({ adapter: "philips_hue",
+                        adapter.controller
+                            .adapter_notification(json_value!({ adapter: "philips_hue",
                                 message: "NeedsPairing", hub: id }));
                         let pairing_result = api.lock().unwrap().try_pairing();
                         match pairing_result {
                             Ok(Some(new_token)) => {
                                 info!("Pairing success with Philips Hue Bridge {}", id);
                                 // Save the new token
-                                adapter.controller.get_config().set(
-                                    "philips_hue",
-                                    &format!("token_{}", id),
-                                    &new_token);
+                                adapter.controller
+                                    .get_config()
+                                    .set("philips_hue", &format!("token_{}", id), &new_token);
                                 api.lock().unwrap().update_token(&new_token);
                                 break;
-                            },
+                            }
                             Ok(None) => {
                                 warn!("Push pairing button on Philips Hue Bridge {}", id);
-                            },
+                            }
                             Err(_) => {
                                 error!("Error while pairing with Philips Hue Bridge {}", id);
                             }
@@ -102,7 +100,7 @@ impl<C: Controller> Hub<C> {
                                 hub: id }));
                         // Giving up for this Hub.
                         // Re-try pairing every hour.
-                        thread::sleep(Duration::from_millis(60*60*1000));
+                        thread::sleep(Duration::from_millis(60 * 60 * 1000));
                         continue;
                     }
                 }
@@ -122,9 +120,10 @@ impl<C: Controller> Hub<C> {
                     adapter.send(HueAction::AddLight(id.to_owned(), light_id.to_owned()));
                 }
 
-                loop { // Forever
+                loop {
+                    // Forever
                     // TODO: add hub monitoring (polling) here
-                    thread::sleep(Duration::from_millis(60*1000));
+                    thread::sleep(Duration::from_millis(60 * 1000));
                 }
             }
         });

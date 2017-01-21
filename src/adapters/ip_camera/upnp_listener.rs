@@ -1,20 +1,21 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! UPnP listener for IP camera.
+//! `UPnP` listener for IP camera.
 //!
 
 extern crate url;
 
 use std::sync::Arc;
 
+use foxbox_core::config_store::ConfigService;
+use foxbox_core::upnp::{UpnpListener, UpnpService};
 use foxbox_taxonomy::manager::*;
 
-use config_store::ConfigService;
 use super::IPCameraAdapter;
+use super::IPCameraDescription;
 use super::IpCameraServiceMap;
-use upnp::{UpnpListener, UpnpService};
 
 pub struct IpCameraUpnpListener {
     manager: Arc<AdapterManager>,
@@ -23,7 +24,10 @@ pub struct IpCameraUpnpListener {
 }
 
 impl IpCameraUpnpListener {
-    pub fn new(manager: &Arc<AdapterManager>, services: IpCameraServiceMap, config: &Arc<ConfigService>) -> Box<Self> {
+    pub fn new(manager: &Arc<AdapterManager>,
+               services: IpCameraServiceMap,
+               config: &Arc<ConfigService>)
+               -> Box<Self> {
         Box::new(IpCameraUpnpListener {
             manager: manager.clone(),
             services: services,
@@ -47,20 +51,19 @@ impl UpnpListener for IpCameraUpnpListener {
 
         let model_name = try_get!(service.description, "/root/device/modelName");
         let known_models = ["DCS-5010L", "DCS-5020L", "DCS-5025L", "Link-IpCamera"];
-        let model_name_str: &str = &model_name;
+        let model_name_str: &str = model_name;
         if !known_models.contains(&model_name_str) {
             return false;
         }
 
         let url = try_get!(service.description, "/root/device/presentationURL");
 
-        let mut udn = try_get!(service.description, "/root/device/UDN").clone();
         // The UDN is typically of the for uuid:SOME-UID-HERE, but some devices
         // response with just a UUID. We strip off the uuid: prefix, if it exists
         // and use the resulting UUID as the service id.
-        if udn.starts_with("uuid:") {
-            udn = String::from(&udn[5..]);
-        }
+        let udn = try_get!(service.description, "/root/device/UDN")
+            .trim_left_matches("uuid:")
+            .to_owned();
 
         // TODO: We really need to update the IP/camera name in the event that
         //       it changed. I'll add this once we start persisting the camera
@@ -69,8 +72,15 @@ impl UpnpListener for IpCameraUpnpListener {
         let name = try_get!(service.description, "/root/device/friendlyName").clone();
         let manufacturer = try_get!(service.description, "/root/device/manufacturer");
 
-        IPCameraAdapter::init_service(&self.manager, self.services.clone(), &self.config,
-                                      &udn, &url, &name, &manufacturer, &model_name).unwrap();
+        let camera = IPCameraDescription {
+            udn: udn,
+            url: url.to_owned(),
+            manufacturer: manufacturer.to_owned(),
+            model_name: model_name.to_owned(),
+            name: name,
+        };
+        IPCameraAdapter::init_service(&self.manager, self.services.clone(), &self.config, camera)
+            .unwrap();
         true
     }
 }
