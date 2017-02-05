@@ -202,11 +202,11 @@ dependencies = [
  "foxbox_core 0.1.0",
  "foxbox_taxonomy 0.2.0",
  "foxbox_thinkerbell 0.1.2",
- "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git)",
+ "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=66add38dcf96e4c56e80fb3f0f35084647567837)",
  "get_if_addrs 0.4.0 (git+https://github.com/maidsafe-archive/get_if_addrs)",
  "hyper 0.9.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git)",
+ "iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=a58fa6d7921b03c894e1834778bf673dcf93613c)",
  "iron-test 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -248,7 +248,7 @@ name = "foxbox_core"
 version = "0.1.0"
 dependencies = [
  "clippy 0.0.108 (registry+https://github.com/rust-lang/crates.io-index)",
- "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git)",
+ "foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=66add38dcf96e4c56e80fb3f0f35084647567837)",
  "hyper 0.9.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -301,7 +301,7 @@ dependencies = [
 [[package]]
 name = "foxbox_users"
 version = "0.1.0"
-source = "git+https://github.com/fxbox/users.git#66add38dcf96e4c56e80fb3f0f35084647567837"
+source = "git+https://github.com/fxbox/users.git?rev=66add38dcf96e4c56e80fb3f0f35084647567837#66add38dcf96e4c56e80fb3f0f35084647567837"
 dependencies = [
  "hyper 0.9.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -439,6 +439,15 @@ dependencies = [
 name = "iron-cors"
 version = "0.1.0"
 source = "git+https://github.com/fxbox/iron-cors.git#a58fa6d7921b03c894e1834778bf673dcf93613c"
+dependencies = [
+ "iron 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicase 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "iron-cors"
+version = "0.1.0"
+source = "git+https://github.com/fxbox/iron-cors.git?rev=a58fa6d7921b03c894e1834778bf673dcf93613c#a58fa6d7921b03c894e1834778bf673dcf93613c"
 dependencies = [
  "iron 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicase 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1408,7 +1417,7 @@ dependencies = [
 "checksum env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "15abd780e45b3ea4f76b4e9a26ff4843258dd8a3eed2775a0e7368c2e7936c2f"
 "checksum error 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "a6e606f14042bb87cc02ef6a14db6c90ab92ed6f62d87e69377bc759fd7987cc"
 "checksum filetime 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "5363ab8e4139b8568a6237db5248646e5a8a2f89bd5ccb02092182b11fd3e922"
-"checksum foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git)" = "<none>"
+"checksum foxbox_users 0.1.0 (git+https://github.com/fxbox/users.git?rev=66add38dcf96e4c56e80fb3f0f35084647567837)" = "<none>"
 "checksum fsevent 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)" = "740a52ca589381d87dd0d9960555de3320aa6d408326659e3bae88be9f71a125"
 "checksum fsevent-sys 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "72e33a926306442d961595c3a325864326ca4287795e106dae8993afe484ede6"
 "checksum gcc 0.3.41 (registry+https://github.com/rust-lang/crates.io-index)" = "3689e1982a563af74960ae3a4758aa632bb8fd984cfc3cc3b60ee6109477ab6e"
@@ -1422,6 +1431,7 @@ dependencies = [
 "checksum inotify 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "e8458c07bdbdaf309c80e2c3304d14c3db64e7465d4f07cf589ccb83fd0ff31a"
 "checksum iron 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9fb1b2d809f84bf347e472d5758762b5c804e0c622970235f156d82673e4d334"
 "checksum iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git)" = "<none>"
+"checksum iron-cors 0.1.0 (git+https://github.com/fxbox/iron-cors.git?rev=a58fa6d7921b03c894e1834778bf673dcf93613c)" = "<none>"
 "checksum iron-test 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "33639388568efb87186cb30031b9e2445eb2dd95aa12d137f88eae61934439ab"
 "checksum itertools 0.4.19 (registry+https://github.com/rust-lang/crates.io-index)" = "c4a9b56eb56058f43dc66e58f40a214b2ccbc9f3df51861b63d51dec7b65bc3f"
 "checksum itoa 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ae3088ea4baeceb0284ee9eea42f591226e6beaecf65373e41b38d95a1b8e7a1"
