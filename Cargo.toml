@@ -1,5 +1,5 @@
 [package]
-name = "foxbox"
+name = "foxboxlib"
 version = "0.1.0"
 authors = ["fabrice <fabrice@desre.org>"]
 build = "build.rs"

@@ -18,7 +18,7 @@
 #[macro_use]
 extern crate docopt;
 extern crate env_logger;
-extern crate foxbox;
+extern crate foxboxlib;
 extern crate foxbox_core;
 extern crate libc;
 #[macro_use]
@@ -29,9 +29,9 @@ extern crate rustc_serialize;
 extern crate time;
 extern crate tls;
 
-use foxbox::controller::FoxBox;
+use foxboxlib::controller::FoxBox;
 use env_logger::LogBuilder;
-use foxbox::tunnel_controller::{TunnelConfig, Tunnel};
+use foxboxlib::tunnel_controller::{TunnelConfig, Tunnel};
 use libc::{sighandler_t, SIGINT};
 use log::{LogRecord, LogLevelFilter};
 
@@ -233,9 +233,9 @@ fn main() {
     // Once the names have been created in the DNS server, a LetsEncrypt client will
     // issue certificates for each name - the local name will be the common name of
     // the certificate, and every other name will be a subject alternative name.
-    let registrar = foxbox::registration::Registrar::new(controller.get_certificate_manager(),
-                                                         args.flag_register,
-                                                         args.flag_dns_api);
+    let registrar = foxboxlib::registration::Registrar::new(controller.get_certificate_manager(),
+                                                            args.flag_register,
+                                                            args.flag_dns_api);
 
     // Start the tunnel.
     let mut tunnel: Option<Tunnel> = None;
