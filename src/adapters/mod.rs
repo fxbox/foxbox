@@ -20,6 +20,9 @@ mod ip_camera;
 #[cfg(feature = "philips_hue")]
 mod philips_hue;
 
+/// An adapter for Sonos speakers.
+mod sonos;
+
 /// An adapter providing access to Thinkerbell.
 #[cfg(feature = "thinkerbell")]
 mod thinkerbell;
@@ -125,6 +128,9 @@ impl<T: Controller> AdapterManager<T> {
         self.start_philips_hue(manager);
         self.start_zwave(manager);
         self.start_tts(manager);
+
+        // TODO: add a feature to enable the Sonos adapter.
+        sonos::SonosAdapter::init(manager, self.controller.clone()).unwrap();
     }
 
     /// Stop all the adapters.
