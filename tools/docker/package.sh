@@ -10,7 +10,7 @@ GCC_TRIPLE=`cat ${TARGET}/gcc_triple`
 
 function copy_and_strip() {
   cp ../../target/${RUST_TARGET}/release/$1 ${DEST_DIR}
-  docker run --name foxbox_${TARGET}_strip -v `pwd`:/home/user/dev/source foxbox-${TARGET} ${GCC_TRIPLE}-strip ${DEST_DIR}/$1
+  docker run --name foxbox_${TARGET}_strip -v `pwd`:/home/user/dev/source foxbox-${TARGET} ${GCC_TRIPLE}strip ${DEST_DIR}/$1
   docker rm foxbox_${TARGET}_strip
 }
 
