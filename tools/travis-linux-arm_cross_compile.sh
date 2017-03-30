@@ -31,6 +31,7 @@ EOF
 
 _set_up_cargo_config() {
     mkdir -p "$HOME/.cargo"
+    rm -f "$HOME/.cargo/config"
     touch "$HOME/.cargo/config"
     tee -a "$HOME/.cargo/config" << EOF
 [target.$RUST_TARGET]
